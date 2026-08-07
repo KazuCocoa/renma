@@ -394,6 +394,15 @@ function scanResult(
 ): ScanResult {
   return {
     root: "/repo",
+    scanBoundary: {
+      schemaVersion: "renma.scan-boundary.v1",
+      configPath: null,
+      globs: [],
+      exclude: [],
+      maxFileSizeBytes: 1,
+      maxDepth: 1,
+      activeSuppressions: [],
+    },
     scannedFileCount: 13,
     format: "text",
     agentSkills: {
@@ -410,6 +419,7 @@ function scanResult(
     },
     executableSurfaceInventory,
     findings: [],
+    suppressedFindings: [],
     diagnostics: [],
     diagnosticsV2: [],
     reviewBundles: [],

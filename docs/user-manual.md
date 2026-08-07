@@ -987,6 +987,10 @@ For example:
     // Weakening an effective security boundary requires explicit review.
     "ci_policy": "fail"
   },
+  "scan_boundary": {
+    // A reviewed revision cannot narrow what CI is able to inspect or retain.
+    "ci_policy": "fail"
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1001,7 +1005,9 @@ The configuration supports the same names used by the implementation, including:
 
 - `globs`: glob patterns to scan.
 - `exclude`: paths or path prefixes to skip.
-- `suppressions`: rule suppressions that remove matching findings from normal reports and failure thresholds.
+- `suppressions`: rule suppressions that remove matching findings from the
+  active report and failure threshold while retaining them in structured
+  `suppressedFindings` evidence.
 - `max_file_size_bytes`: largest file renma will read for content analysis. A
   larger discovered file remains repository existence evidence, so a valid
   reference is not also reported as missing.
@@ -1013,6 +1019,9 @@ The configuration supports the same names used by the implementation, including:
 - `security`: command, network, upload, profile, and revision-review policy.
   `ci_policy` supports `off`, `warn`, and `fail`, defaults to `fail`, and
   governs effective boolean security-policy relaxations in `ci-report`.
+- `scan_boundary`: revision-review policy for changes to `globs`, `exclude`,
+  `max_file_size_bytes`, `max_depth`, and `suppressions`. `ci_policy` supports
+  `off`, `warn`, and `fail` and defaults to `fail`.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1042,7 +1051,15 @@ generic filename stems such as `run`, `check`, or `logo` are not evidence.
 Extensionless executables and quoted or linked asset paths with spaces are
 valid; `..` traversal outside the Skill root remains invalid.
 
-Use `exclude` for files Renma should not scan. Use `suppressions` for audited exceptions where Renma should scan the file, detect matching findings internally, then omit those findings from normal reports and failure decisions. A suppression applies only when both `id` and `paths` match. Each suppression includes `id`, `paths`, required `reason`, and optional `expires`; the reason lives in config for auditability.
+Use `exclude` for files Renma should not scan. Use `suppressions` for audited
+exceptions where Renma should scan the file, detect matching findings, omit
+them from the active finding set and failure decision, and retain them in the
+structured suppression ledger. A finding is never duplicated into both
+`findings` and `suppressedFindings`. Each retained row identifies the finding,
+severity/risk class, evidence location, matching rule and path pattern, reason,
+and expiration. A suppression applies only when both `id` and `paths` match.
+Each suppression includes `id`, `paths`, required `reason`, and optional
+`expires`; the reason lives in config for auditability.
 
 Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exception is intentionally permanent. Permanent suppressions should still use narrow path patterns and a clear reason. Suppression path patterns are repository-relative and support exact paths, directory-prefix matches for non-glob patterns, `*` within one path segment, and `**` across directories.
 
@@ -1912,10 +1929,14 @@ candidate, target, lifecycle, usability, and reason changes under the same
 identity remain a changed route instead of removal plus addition. Cycle
 identity uses the sorted maximal component member IDs.
 
-The section reports facts only. It does not classify improvements or
-regressions, infer publication or routes, describe runtime use, copy Skill
-Index diagnostics, or affect the command exit code. Markdown caps detailed
-lists and directs readers to JSON for omitted entries.
+The `renma.scan-boundary-diff.v1` section separately records canonical endpoint
+boundaries and every exact weakening or tightening fact. Its endpoint evidence
+uses `renma.scan-boundary.v1` and contains config path (or `null` for defaults),
+sorted normalized globs and exclusions, maximum file size and depth, and active
+suppression declarations. Suppressed finding ledgers remain available under the
+finding diff. The other semantic sections report facts only and do not affect
+the direct `diff` command exit code. Markdown caps detailed lists and directs
+readers to JSON for omitted entries.
 
 ### `ci-report`
 
@@ -1949,10 +1970,19 @@ one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
 `skillDiscoveryPolicy`. It also includes one
 `renma.security-policy-ci-policy.v1` evaluation at top-level `securityPolicy`;
 the nested `diff.security.policyTransitions` array is the canonical per-asset
-scalar/list transition evidence consumed by that evaluation. The existing nested `diff`
-remains Discovery-policy-free. Diff endpoints also expose the readiness ownership numerator,
-eligible-asset denominator, and coverage percentage while retaining the
-existing `summary.ownershipCoverageDelta` field.
+scalar/list transition evidence consumed by that evaluation. New reports also
+include `renma.scan-boundary-ci-policy.v1` at top-level `scanBoundaryPolicy`.
+Its `effectiveBoundary` is `renma.ci-evidence-boundary.v1`: target repository
+paths are evaluated against both archived endpoint coverage predicates and the
+inspected-path union is retained. `sourceBoundaries` (ordered base then target)
+and `inspectedPaths` are authoritative; flattened glob, exclusion, and limit
+fields are a deterministic envelope for review rather than a new merged-glob
+language. Repository semantic configuration, including
+effective security policy and Skill Discovery semantics, remains revision-local.
+Only evidence coverage is fail-closed against target-only narrowing. The
+existing nested `diff` remains Discovery-policy-free. Diff endpoints also expose
+the readiness ownership numerator, eligible-asset denominator, and coverage
+percentage while retaining the existing `summary.ownershipCoverageDelta` field.
 
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero
@@ -2085,6 +2115,39 @@ policy relaxation is not considered verified remediation. CI-report suppresses
 the generic `Scan findings decreased.` praise and explicitly says the decrease
 is not verified remediation when both occur. Removing or correcting the
 contradictory instruction without relaxing policy remains valid remediation.
+
+Scan-boundary weakening is governed independently:
+
+```json
+{
+  "scan_boundary": {
+    "ci_policy": "fail"
+  }
+}
+```
+
+The default is `fail`, and CI selects the stricter archived mode under
+`off < warn < fail`. Removing an include glob, adding an exclusion, reducing a
+size/depth limit, adding or expanding a suppression, or extending its lifetime
+is weakening. Opposite changes are tightening. A pattern replacement may
+retain both facts rather than pretending its net effect is known. Stable match
+IDs use the `scan_boundary_ci.*` namespace and identify exact patterns, limits,
+or suppression scopes rather than aggregate counts. The IDs are
+`scan_boundary_ci.glob_removed`, `scan_boundary_ci.exclusion_added`,
+`scan_boundary_ci.max_depth_reduced`,
+`scan_boundary_ci.max_file_size_reduced`,
+`scan_boundary_ci.suppression_added`, and
+`scan_boundary_ci.suppression_lifetime_extended`.
+
+CI enforcement scans the target through the union of the base and target path
+coverage predicates. This both preserves base-trusted coverage and admits new
+target coverage without heuristic glob-language subset reasoning. A
+suppression affects that enforcement view only when its normalized rule, paths,
+and expiration are active and enforcement-equivalent on both revisions;
+reason-only edits do not invalidate it. Target-only additions, path expansion,
+or lifetime extension remain evidence but cannot hide a finding. When a finding
+count falls alongside boundary weakening, CI does not call the reduction
+verified remediation.
 
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so

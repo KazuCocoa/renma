@@ -5,7 +5,8 @@ import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { graphFromRepositorySnapshot, type GraphReport } from "./graph.js";
 import {
-  readinessFromRepositorySnapshot,
+  buildReadinessReport,
+  readinessDiagnosticsFromRepositorySnapshot,
   type ReadinessReport,
 } from "./readiness.js";
 import {
@@ -29,14 +30,16 @@ import {
   zeroExecutableSurfaceInventory,
   type ExecutableSurfaceInventory,
 } from "../executable-surface-inventory.js";
-import type { ConfigOverrides } from "../config.js";
+import { DEFAULT_CONFIG, type ConfigOverrides } from "../config.js";
 import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
 import type { SecurityCiPolicyMode } from "../types/configuration.js";
+import type { ScanBoundaryCiPolicyMode } from "../types/configuration.js";
 import type { SecurityConfig } from "../types/configuration.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
   collectRepositorySnapshot,
   type RepositoryCollectionInstrumentation,
+  type RepositorySnapshot,
 } from "../repository-evidence.js";
 import {
   buildSkillDiscoveryDiff,
@@ -51,6 +54,23 @@ import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatJsonDocument } from "../report.js";
 import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 import { securityPolicyRelaxations } from "../security-policy-ci-policy.js";
+import {
+  canonicalScanBoundary,
+  scanBoundarySource,
+  type ScanBoundaryEvidence,
+  type ScanBoundarySource,
+  type EffectiveCiScanBoundaryEvidence,
+  trustedCiSuppressions,
+} from "../scan-boundary.js";
+import {
+  buildScanBoundaryDiff,
+  type ScanBoundaryDiff,
+} from "../scan-boundary-diff.js";
+import { scanFromRepositorySnapshot } from "../scanner.js";
+import type {
+  SuppressedFindingEvidence,
+  SuppressionConfig,
+} from "../types/diagnostics.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -86,6 +106,7 @@ export interface DiffReport {
   discovery: SkillDiscoveryDiff;
   executableSurface: ExecutableSurfaceDiff;
   security: SecurityDiffSummary;
+  scanBoundary: ScanBoundaryDiff;
   findings: {
     added: FindingDelta[];
     removed: FindingDelta[];
@@ -95,6 +116,12 @@ export interface DiffReport {
       to: number;
       delta: number;
     }>;
+    suppressed: {
+      from: SuppressedFindingEvidence[];
+      to: SuppressedFindingEvidence[];
+      added: SuppressedFindingEvidence[];
+      removed: SuppressedFindingEvidence[];
+    };
   };
 }
 
@@ -192,7 +219,9 @@ export interface DiffSnapshot {
   executableSurfaceInventory?: ExecutableSurfaceInventory;
   securityPolicies?: SecurityPolicyAssetEvidence[];
   securityConfig?: SecurityConfig;
+  scanBoundary?: ScanBoundaryEvidence;
   configPath?: string;
+  suppressedFindings?: SuppressedFindingEvidence[];
 }
 
 export interface DiffCollectionInstrumentation {
@@ -210,6 +239,11 @@ export interface DiffExecutionContext {
     from: SecurityCiPolicyMode;
     to: SecurityCiPolicyMode;
   };
+  scanBoundaryCiPolicy: {
+    from: ScanBoundaryCiPolicyMode;
+    to: ScanBoundaryCiPolicyMode;
+  };
+  effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence;
 }
 
 interface DiffOptions {
@@ -217,6 +251,7 @@ interface DiffOptions {
   toRef: string;
   overrides?: ConfigOverrides;
   instrumentation?: DiffCollectionInstrumentation;
+  includeCiEvidence?: boolean;
 }
 
 export async function runDiffCommand(
@@ -311,12 +346,49 @@ async function executeDiffWithProjection(
     const fromCollected = fromResult.value;
     const toCollected = toResult.value;
     if (includeSkillDiscovery) {
-      result = {
-        report: buildDiffReport(
+      const localReport = buildDiffReport(
+        repoRoot,
+        fromCollected.snapshot,
+        toCollected.snapshot,
+      );
+      let report = localReport;
+      let effectiveCiBoundary: EffectiveCiScanBoundaryEvidence | undefined;
+      if (options.includeCiEvidence === true) {
+        const trustedSuppressions = trustedCiSuppressions(
+          fromCollected.boundarySource.suppressions,
+          toCollected.boundarySource.suppressions,
+        );
+        const effectiveRepositorySnapshot = await collectRepositorySnapshot(
+          toCollected.target,
+          snapshotOverrides(
+            repoRoot,
+            toCollected.archiveRoot,
+            options.overrides ?? {},
+          ),
+          undefined,
+          {
+            sources: [fromCollected.boundarySource, toCollected.boundarySource],
+          },
+        );
+        const effectiveProjected = projectDiffSnapshot(
+          toCollected.snapshot.ref,
+          effectiveRepositorySnapshot,
+          includeSkillDiscovery,
+          trustedSuppressions,
+        );
+        effectiveCiBoundary = effectiveProjected.effectiveBoundary;
+        report = buildDiffReport(
           repoRoot,
           fromCollected.snapshot,
-          toCollected.snapshot,
-        ),
+          effectiveProjected.snapshot,
+        );
+        // Boundary declarations and target-local suppression matches describe
+        // repository edits; active findings and summary remain enforcement-view.
+        report.scanBoundary = localReport.scanBoundary;
+        report.findings.suppressed = localReport.findings.suppressed;
+      }
+      result = {
+        report,
         skillDiscoveryCiPolicy: {
           from: fromCollected.skillDiscoveryCiPolicy,
           to: toCollected.skillDiscoveryCiPolicy,
@@ -325,6 +397,13 @@ async function executeDiffWithProjection(
           from: fromCollected.securityPolicyCiPolicy,
           to: toCollected.securityPolicyCiPolicy,
         },
+        scanBoundaryCiPolicy: {
+          from: fromCollected.scanBoundaryCiPolicy,
+          to: toCollected.scanBoundaryCiPolicy,
+        },
+        ...(effectiveCiBoundary
+          ? { effectiveCiScanBoundary: effectiveCiBoundary }
+          : {}),
       };
     } else {
       result = buildDiffReportWithoutSkillDiscovery(
@@ -399,6 +478,20 @@ function buildDiffReportProjection(
   const toEdges = edgeMap(toSnapshot.graph.edges);
   const fromEndpoint = endpoint(fromSnapshot);
   const toEndpoint = endpoint(toSnapshot);
+  const fromScanBoundary =
+    fromSnapshot.scanBoundary ??
+    canonicalScanBoundary(
+      scanBoundarySource(DEFAULT_CONFIG, fromSnapshot.configPath),
+    );
+  const toScanBoundary =
+    toSnapshot.scanBoundary ??
+    canonicalScanBoundary(
+      scanBoundarySource(DEFAULT_CONFIG, toSnapshot.configPath),
+    );
+  const fromSuppressed = fromSnapshot.suppressedFindings ?? [];
+  const toSuppressed = toSnapshot.suppressedFindings ?? [];
+  const fromSuppressedMap = suppressedFindingMap(fromSuppressed);
+  const toSuppressedMap = suppressedFindingMap(toSuppressed);
   const addedFindings = [...toFindings]
     .filter(([key]) => !fromFindings.has(key))
     .map(([, finding]) => finding);
@@ -487,6 +580,7 @@ function buildDiffReportProjection(
       fromAssetIdsByPath: assetIdsByPath(fromSnapshot.graph),
       toAssetIdsByPath: assetIdsByPath(toSnapshot.graph),
     }),
+    scanBoundary: buildScanBoundaryDiff(fromScanBoundary, toScanBoundary),
     findings: {
       added: addedFindings,
       removed: removedFindings,
@@ -494,6 +588,16 @@ function buildDiffReportProjection(
         fromReadiness.findings ?? [],
         toReadiness.findings ?? [],
       ),
+      suppressed: {
+        from: fromSuppressed,
+        to: toSuppressed,
+        added: [...toSuppressedMap]
+          .filter(([key]) => !fromSuppressedMap.has(key))
+          .map(([, evidence]) => evidence),
+        removed: [...fromSuppressedMap]
+          .filter(([key]) => !toSuppressedMap.has(key))
+          .map(([, evidence]) => evidence),
+      },
     },
   };
 
@@ -552,6 +656,13 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
     ...discoveryLines,
     "",
+    "## Scan Boundary",
+    "",
+    `- Base active suppressions: ${report.scanBoundary.from.activeSuppressions.length}`,
+    `- Target active suppressions: ${report.scanBoundary.to.activeSuppressions.length}`,
+    `- Boundary changes: ${report.scanBoundary.changes.length}`,
+    ...report.scanBoundary.changes.map(formatScanBoundaryChange),
+    "",
     "## Catalog",
     "",
     `- Added assets: ${report.catalog.addedAssets.length}`,
@@ -591,6 +702,8 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     "",
     `- Added findings: ${report.findings.added.length}`,
     `- Removed findings: ${report.findings.removed.length}`,
+    `- Suppressed at base: ${report.findings.suppressed.from.length}`,
+    `- Suppressed at target: ${report.findings.suppressed.to.length}`,
   ];
 
   lines.push("", ...formatExecutableSurfaceChanges(report.executableSurface));
@@ -614,6 +727,26 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatScanBoundaryChange(
+  change: ScanBoundaryDiff["changes"][number],
+): string {
+  const direction =
+    change.direction === "weakening" ? "WEAKENING" : "tightening";
+  if (change.kind === "glob" || change.kind === "exclusion") {
+    return `- ${direction}: ${change.kind} ${change.change} ${formatMarkdownInlineCode(change.pattern)}`;
+  }
+  if (change.kind === "limit") {
+    return `- ${direction}: ${change.property} ${change.from} -> ${change.to}`;
+  }
+  const expires =
+    change.suppression.fromExpires === null
+      ? `expires ${change.suppression.toExpires}`
+      : change.suppression.toExpires === null
+        ? `expires ${change.suppression.fromExpires}`
+        : `expires ${change.suppression.fromExpires} -> ${change.suppression.toExpires}`;
+  return `- ${direction}: suppression ${change.change} ${formatMarkdownInlineCode(change.suppression.id)} at ${formatMarkdownInlineCode(change.suppression.path)}; ${expires}`;
 }
 
 function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
@@ -1213,8 +1346,12 @@ async function snapshot(
   includeSkillDiscovery = true,
 ): Promise<{
   snapshot: DiffSnapshot;
+  target: string;
+  archiveRoot: string;
+  boundarySource: ScanBoundarySource;
   skillDiscoveryCiPolicy: SkillDiscoveryCiPolicyMode;
   securityPolicyCiPolicy: SecurityCiPolicyMode;
+  scanBoundaryCiPolicy: ScanBoundaryCiPolicyMode;
 }> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
@@ -1233,14 +1370,57 @@ async function snapshot(
     snapshotOverrides(repoRoot, root, overrides),
     instrumentation,
   );
+  const projected = projectDiffSnapshot(
+    ref,
+    repositorySnapshot,
+    includeSkillDiscovery,
+  );
+  const boundarySource = scanBoundarySource(
+    repositorySnapshot.config,
+    repositorySnapshot.configPath,
+  );
+  return {
+    snapshot: projected.snapshot,
+    target,
+    archiveRoot: root,
+    boundarySource,
+    skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
+    securityPolicyCiPolicy:
+      repositorySnapshot.config.security.ciPolicy ?? "fail",
+    scanBoundaryCiPolicy: repositorySnapshot.config.scanBoundary.ciPolicy,
+  };
+}
+
+function projectDiffSnapshot(
+  ref: string,
+  repositorySnapshot: RepositorySnapshot,
+  includeSkillDiscovery: boolean,
+  enforcementSuppressions?: SuppressionConfig[],
+): {
+  snapshot: DiffSnapshot;
+  effectiveBoundary?: EffectiveCiScanBoundaryEvidence;
+} {
   const graphReport = graphFromRepositorySnapshot(repositorySnapshot);
-  const readinessReport = readinessFromRepositorySnapshot(repositorySnapshot, {
-    includeSkillDiscovery: false,
+  const scanResult = scanFromRepositorySnapshot(repositorySnapshot, {
+    includeSkillDiscoveryDiagnostics: false,
+    ...(enforcementSuppressions ? { enforcementSuppressions } : {}),
   });
+  const readinessReport = buildReadinessReport(
+    graphReport,
+    scanResult.findings,
+    readinessDiagnosticsFromRepositorySnapshot(
+      repositorySnapshot,
+      scanResult.diagnostics,
+      { includeSkillDiscovery: false },
+    ),
+    scanResult.contextLens,
+    scanResult.securityPolicyInventory,
+    scanResult.agentSkills,
+  );
   return {
     snapshot: {
       ref,
-      root: target,
+      root: repositorySnapshot.root,
       readiness: readinessReport,
       graph: graphReport,
       ...(includeSkillDiscovery
@@ -1249,13 +1429,21 @@ async function snapshot(
       executableSurfaceInventory: repositorySnapshot.executableSurfaceInventory,
       securityPolicies: repositorySnapshot.securityPolicies,
       securityConfig: repositorySnapshot.config.security,
+      scanBoundary: canonicalScanBoundary(
+        scanBoundarySource(
+          repositorySnapshot.config,
+          repositorySnapshot.configPath,
+        ),
+      ),
+      suppressedFindings: scanResult.suppressedFindings,
       ...(repositorySnapshot.configPath
         ? { configPath: repositorySnapshot.configPath }
         : {}),
     },
-    skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
-    securityPolicyCiPolicy:
-      repositorySnapshot.config.security.ciPolicy ?? "fail",
+    ...(scanResult.scanBoundary.schemaVersion ===
+    "renma.ci-evidence-boundary.v1"
+      ? { effectiveBoundary: scanResult.scanBoundary }
+      : {}),
   };
 }
 
@@ -1274,6 +1462,28 @@ function endpoint(snapshot: DiffSnapshot): DiffEndpoint {
     contextLens: snapshot.readiness.summary.contextLens,
     securityPolicyInventory: snapshot.readiness.summary.securityPolicyInventory,
   };
+}
+
+function suppressedFindingMap(
+  values: readonly SuppressedFindingEvidence[],
+): Map<string, SuppressedFindingEvidence> {
+  return new Map(
+    values.map((evidence) => [
+      [
+        evidence.finding.id,
+        evidence.finding.severity,
+        evidence.finding.riskClass ?? "",
+        evidence.finding.evidence.path,
+        evidence.finding.evidence.startLine,
+        evidence.finding.evidence.endLine,
+        evidence.suppression.id,
+        evidence.suppression.matchedPath,
+        evidence.suppression.expires,
+        evidence.suppression.reason,
+      ].join("\0"),
+      evidence,
+    ]),
+  );
 }
 
 function assetIdsByPath(graph: GraphReport): Map<string, string> {

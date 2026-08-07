@@ -46,6 +46,13 @@ import {
   type SecurityPolicyCiMatch,
 } from "../security-policy-ci-policy.js";
 import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
+import {
+  evaluateScanBoundaryCiPolicy,
+  type ScanBoundaryCiConfiguration,
+  type ScanBoundaryCiEvaluation,
+  type ScanBoundaryCiMatch,
+} from "../scan-boundary-ci-policy.js";
+import type { EffectiveCiScanBoundaryEvidence } from "../scan-boundary.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -90,6 +97,7 @@ export interface CiReport {
   skillDiscovery: SkillDiscoveryDiff;
   skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation;
   securityPolicy: SecurityPolicyCiEvaluation;
+  scanBoundaryPolicy: ScanBoundaryCiEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -100,12 +108,19 @@ export interface CiReport {
 
 export type CiReportFormatInput =
   | CiReport
-  | (Omit<CiReport, "diff" | "skillDiscoveryPolicy" | "securityPolicy"> & {
+  | (Omit<
+      CiReport,
+      "diff" | "skillDiscoveryPolicy" | "securityPolicy" | "scanBoundaryPolicy"
+    > & {
       diff: CiFormatCompatibleDiffReport;
     })
   | (Omit<
       CiReport,
-      "diff" | "skillDiscovery" | "skillDiscoveryPolicy" | "securityPolicy"
+      | "diff"
+      | "skillDiscovery"
+      | "skillDiscoveryPolicy"
+      | "securityPolicy"
+      | "scanBoundaryPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     });
@@ -145,11 +160,16 @@ export async function ciReport(
   targetPath: string,
   options: CiReportOptions,
 ): Promise<CiReport> {
-  const execution = await executeDiff(targetPath, options);
+  const execution = await executeDiff(targetPath, {
+    ...options,
+    includeCiEvidence: true,
+  });
   return buildCiReportFromDiff(
     execution.report,
     execution.skillDiscoveryCiPolicy,
     execution.securityPolicyCiPolicy,
+    execution.scanBoundaryCiPolicy,
+    execution.effectiveCiScanBoundary,
   );
 }
 
@@ -163,6 +183,11 @@ export function buildCiReportFromDiff(
     from: "fail",
     to: "fail",
   },
+  configuredScanBoundaryPolicy: ScanBoundaryCiConfiguration = {
+    from: "fail",
+    to: "fail",
+  },
+  effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence,
 ): CiReport {
   const { discovery, ...ciCompatibleDiff } = report;
   const existingStatus = determineCiReportStatus(ciCompatibleDiff);
@@ -174,10 +199,16 @@ export function buildCiReportFromDiff(
     ciCompatibleDiff.security,
     configuredSecurityPolicy,
   );
+  const scanBoundaryPolicy = evaluateScanBoundaryCiPolicy(
+    ciCompatibleDiff.scanBoundary ?? { changes: [] },
+    configuredScanBoundaryPolicy,
+    effectiveCiScanBoundary,
+  );
   const status = composeCiReportStatus(
     existingStatus,
     skillDiscoveryPolicy.outcome,
     securityPolicy.outcome,
+    scanBoundaryPolicy.outcome,
   );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
@@ -193,6 +224,7 @@ export function buildCiReportFromDiff(
     skillDiscovery: discovery,
     skillDiscoveryPolicy,
     securityPolicy,
+    scanBoundaryPolicy,
     securityPosture,
     notes: reviewNotes(
       ciCompatibleDiff,
@@ -200,6 +232,7 @@ export function buildCiReportFromDiff(
       securityPosture.added,
       skillDiscoveryPolicy,
       securityPolicy,
+      scanBoundaryPolicy,
     ),
     diff: ciCompatibleDiff,
   };
@@ -240,13 +273,19 @@ export function composeCiReportStatus(
   existingStatus: CiReportStatus,
   discoveryPolicyOutcome: SkillDiscoveryCiPolicyEvaluation["outcome"],
   securityPolicyOutcome: SecurityPolicyCiEvaluation["outcome"] = "pass",
+  scanBoundaryPolicyOutcome: ScanBoundaryCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
-  if (existingStatus === "fail" || securityPolicyOutcome === "fail")
+  if (
+    existingStatus === "fail" ||
+    securityPolicyOutcome === "fail" ||
+    scanBoundaryPolicyOutcome === "fail"
+  )
     return "fail";
   if (
     existingStatus === "warn" ||
     discoveryPolicyOutcome === "warn" ||
-    securityPolicyOutcome === "warn"
+    securityPolicyOutcome === "warn" ||
+    scanBoundaryPolicyOutcome === "warn"
   )
     return "warn";
   return "pass";
@@ -284,6 +323,7 @@ function reviewNotes(
   addedSecurityPosture: SecurityPostureSummary,
   skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation,
   securityPolicy: SecurityPolicyCiEvaluation,
+  scanBoundaryPolicy: ScanBoundaryCiEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -308,8 +348,24 @@ function reviewNotes(
   if (report.summary.ownershipCoverageDelta > 0) {
     notes.push("Ownership coverage improved.");
   }
-  if (report.summary.findingsDelta < 0 && securityPolicy.matchCount === 0) {
+  if (
+    report.summary.findingsDelta < 0 &&
+    securityPolicy.matchCount === 0 &&
+    scanBoundaryPolicy.matchCount === 0
+  ) {
     notes.push("Scan findings decreased.");
+  }
+  if (scanBoundaryPolicy.matchCount > 0) {
+    const suffix =
+      scanBoundaryPolicy.matchCount === 1 ? "weakening" : "weakenings";
+    notes.push(
+      `Scan boundary policy matched ${scanBoundaryPolicy.matchCount} ${suffix}; target-local narrowing is not trusted for CI enforcement.`,
+    );
+    if (report.summary.findingsDelta < 0) {
+      notes.push(
+        "Scan findings decreased alongside a scan-boundary weakening; this is not treated as verified remediation.",
+      );
+    }
   }
   if (securityPolicy.matchCount > 0) {
     const suffix =
@@ -402,6 +458,21 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     securityPolicy && securityPolicy.matchCount > 0
       ? ["", ...formatSecurityPolicyRelaxationSection(securityPolicy)]
       : [];
+  const scanBoundaryPolicy =
+    "scanBoundaryPolicy" in report ? report.scanBoundaryPolicy : undefined;
+  if (scanBoundaryPolicy && scanBoundaryPolicy.matchCount > 0) {
+    const effect =
+      scanBoundaryPolicy.configured.effective === "off"
+        ? "GATE OFF"
+        : scanBoundaryPolicy.outcome.toUpperCase();
+    summaryLines.push(
+      `- Scan boundary weakening: ${effect} — ${scanBoundaryPolicy.matchCount} exact changes; target-local narrowing is not trusted`,
+    );
+  }
+  const scanBoundaryPolicyLines =
+    scanBoundaryPolicy && scanBoundaryPolicy.matchCount > 0
+      ? ["", ...formatScanBoundaryWeakeningSection(scanBoundaryPolicy)]
+      : [];
 
   const detailLines = [
     "## Readiness",
@@ -453,6 +524,26 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "",
     ...formatFindingSection("Added", report.diff.findings.added),
     ...formatFindingSection("Resolved", report.diff.findings.removed),
+    ...("suppressed" in report.diff.findings
+      ? [
+          `- Suppressed at base: ${report.diff.findings.suppressed.from.length}`,
+          `- Suppressed at target: ${report.diff.findings.suppressed.to.length}`,
+          ...(report.diff.findings.suppressed.to.length > 0
+            ? [
+                "",
+                "### Target Suppressed Finding Evidence",
+                "",
+                ...report.diff.findings.suppressed.to
+                  .slice(0, MAX_LIST_ITEMS)
+                  .map(
+                    (item) =>
+                      `- ${item.finding.severity.toUpperCase()} ${formatMarkdownInlineCode(item.finding.id)} at ${formatMarkdownInlineCode(item.finding.evidence.path)}; matched ${formatMarkdownInlineCode(item.suppression.matchedPath)}; expires ${item.suppression.expires}; reason: ${item.suppression.reason}`,
+                  ),
+                ...formatOverflow(report.diff.findings.suppressed.to.length),
+              ]
+            : []),
+        ]
+      : []),
     "",
     "## Finding Count Changes",
     "",
@@ -466,6 +557,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...summaryLines,
     ...formatChangeOverview(report, executableSurface),
     ...securityPolicyLines,
+    ...scanBoundaryPolicyLines,
     "",
     "## Review Notes",
     "",
@@ -599,6 +691,10 @@ function formatChangeOverview(
       "security policy relaxations",
       "securityPolicy" in report ? report.securityPolicy.matchCount : 0,
     ],
+    [
+      "scan boundary weakenings",
+      "scanBoundaryPolicy" in report ? report.scanBoundaryPolicy.matchCount : 0,
+    ],
   ]);
 
   return [
@@ -692,6 +788,59 @@ function formatSecurityPolicyRelaxationSection(
       .map((match) => `- ${formatSecurityPolicyCiMatch(match)}`),
     ...formatOverflow(policy.matches.length),
   ];
+}
+
+function formatScanBoundaryWeakeningSection(
+  policy: ScanBoundaryCiEvaluation,
+): string[] {
+  const { from, to, effective } = policy.configured;
+  const configured =
+    from === to
+      ? [`- CI review policy: ${from}`]
+      : [
+          `- CI review policy: ${from} -> ${to}`,
+          `- Effective CI review policy: ${effective}`,
+        ];
+  const boundary = policy.effectiveBoundary;
+  return [
+    "## Scan Boundary Weakening",
+    "",
+    ...configured,
+    ...(effective === "off"
+      ? ["- CI status effect: none — gate disabled; explicit review required"]
+      : [`- Policy outcome: ${policy.outcome.toUpperCase()}`]),
+    ...(boundary
+      ? [
+          `- Enforcement coverage: endpoint-boundary union over ${boundary.inspectedPaths.length} inspected target paths`,
+          `- Enforcement suppressions trusted on both revisions: ${boundary.activeSuppressions.length}`,
+        ]
+      : []),
+    "",
+    ...policy.matches
+      .slice(0, MAX_LIST_ITEMS)
+      .map((match) => `- ${formatScanBoundaryCiMatch(match)}`),
+    ...formatOverflow(policy.matches.length),
+  ];
+}
+
+function formatScanBoundaryCiMatch(match: ScanBoundaryCiMatch): string {
+  const change = match.change;
+  if (change.kind === "glob") {
+    return `include glob removed: ${formatMarkdownInlineCode(change.pattern)} (${match.id})`;
+  }
+  if (change.kind === "exclusion") {
+    return `exclusion added: ${formatMarkdownInlineCode(change.pattern)} (${match.id})`;
+  }
+  if (change.kind === "limit") {
+    const label =
+      change.property === "maxDepth" ? "max depth" : "max file size bytes";
+    return `${label}: ${change.from} -> ${change.to} (${match.id})`;
+  }
+  const expires =
+    change.suppression.fromExpires === null
+      ? `expires ${change.suppression.toExpires}`
+      : `expires ${change.suppression.fromExpires} -> ${change.suppression.toExpires}`;
+  return `suppression ${formatMarkdownInlineCode(change.suppression.id)} at ${formatMarkdownInlineCode(change.suppression.path)}; ${expires} (${match.id})`;
 }
 
 function formatSecurityPolicyCiMatch(match: SecurityPolicyCiMatch): string {

@@ -582,9 +582,13 @@ neutral detail list without adding them to path-problem evidence.
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as
 `skillDiscoveryPolicy`, evaluates both snapshot `security.ci_policy` modes as
-`securityPolicy`, and retains a compatibility-shaped nested diff. It
-does not recollect, reload configuration, reconstruct Discovery, or run a
-second comparison.
+`securityPolicy`, evaluates both `scan_boundary.ci_policy` modes as
+`scanBoundaryPolicy`, and retains a compatibility-shaped nested diff. Endpoint
+snapshots remain revision-local for semantic configuration. For CI only, target
+paths are collected once more through the independent union of both endpoint
+coverage predicates; the target's semantic configuration is still used for
+parsing, projections, and rules. This is an enforcement projection, not a
+second semantic comparison.
 
 `determineCiReportStatus()` still receives only the compatible diff. The pure
 `skill-discovery-ci-policy` module selects the stricter `off < warn` mode,
@@ -602,6 +606,17 @@ exact states, property, and provenance; aggregate inventory deltas never drive
 the gate. Security policy can request `WARN` or `FAIL`, and default `FAIL`
 produces the command's normal exit code `1` without changing single-revision
 scan or Readiness semantics.
+
+`scan-boundary` owns canonical endpoint/effective coverage evidence and the
+intersection of enforcement-equivalent active suppressions. The effective CI
+collector runs each endpoint predicate against target paths and unions the
+artifacts, so no glob-subset heuristic is authoritative. `scan-boundary-diff`
+retains independent weakening and tightening facts. The pure
+`scan-boundary-ci-policy` module selects the stricter `off < warn < fail` mode,
+matches exact weakening rows under `scan_boundary_ci.*`, and composes its
+outcome with existing CI status. Suppression application returns disjoint
+active and suppressed-finding arrays; Diagnostics v2 and Trust Graph continue
+to consume only active findings.
 
 CI Markdown uses the shared presentation cap, while JSON retains the complete
 diff and policy evaluation once each. Formatters accept reports that lack the

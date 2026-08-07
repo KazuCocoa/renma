@@ -45,11 +45,17 @@ import type { AssetClassificationEvidence } from "./types/classification.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { Diagnostic } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
+import {
+  scanBoundarySource,
+  type ScanBoundarySource,
+} from "./scan-boundary.js";
 
 export interface RepositorySnapshotCore {
   readonly root: string;
   readonly config: ScanConfig;
   readonly configPath?: string;
+  readonly evidenceBoundarySources: ScanBoundarySource[];
+  readonly repositoryPathConfig: ScanConfig;
   readonly artifacts: Artifact[];
   readonly documents: ParsedDocument[];
   readonly discoveredPaths: ReadonlySet<string>;
@@ -79,6 +85,11 @@ export interface RepositoryCollectionInstrumentation {
   onProjection?: (projection: RepositoryProjectionName) => void;
 }
 
+/** CI-only boundary predicates evaluated independently against target paths. */
+export interface RepositoryEvidenceBoundaryOptions {
+  sources: ScanBoundarySource[];
+}
+
 export interface RepositoryEvidence {
   root: string;
   configPath?: string;
@@ -91,6 +102,7 @@ export interface RepositoryEvidence {
 export interface RepositorySnapshot extends RepositoryEvidence {
   core: RepositorySnapshotCore;
   config: ScanConfig;
+  evidenceBoundarySources: ScanBoundarySource[];
   artifacts: Artifact[];
   documents: ParsedDocument[];
   repositoryPaths: ReadonlySet<string>;
@@ -174,15 +186,19 @@ export async function collectRepositorySnapshotCore(
   targetPath: string,
   overrides: ConfigOverrides = {},
   instrumentation?: RepositoryCollectionInstrumentation,
+  evidenceBoundary?: RepositoryEvidenceBoundaryOptions,
 ): Promise<RepositorySnapshotCore> {
   const root = path.resolve(targetPath);
   const { config, configPath } = await loadConfig(root, overrides);
+  const evidenceBoundarySources = evidenceBoundary?.sources.length
+    ? evidenceBoundary.sources
+    : [scanBoundarySource(config, configPath)];
   instrumentation?.onDiscovery?.(root);
   const {
     artifacts,
     diagnostics: discoveryDiagnostics,
     discoveredPaths,
-  } = await discoverArtifacts(root, config);
+  } = await discoverWithBoundarySources(root, config, evidenceBoundarySources);
   const documents = artifacts.map((artifact) => {
     instrumentation?.onDocumentParse?.(artifact.path);
     return parseDocument(artifact);
@@ -195,6 +211,11 @@ export async function collectRepositorySnapshotCore(
     root,
     config,
     ...(configPath ? { configPath } : {}),
+    evidenceBoundarySources,
+    repositoryPathConfig: evidenceBoundaryConfig(
+      config,
+      evidenceBoundarySources,
+    ),
     artifacts,
     documents,
     discoveredPaths,
@@ -207,11 +228,13 @@ export async function collectRepositorySnapshot(
   targetPath: string,
   overrides: ConfigOverrides = {},
   instrumentation?: RepositoryCollectionInstrumentation,
+  evidenceBoundary?: RepositoryEvidenceBoundaryOptions,
 ): Promise<RepositorySnapshot> {
   const core = await collectRepositorySnapshotCore(
     targetPath,
     overrides,
     instrumentation,
+    evidenceBoundary,
   );
   const projections = createRepositoryProjections(core, instrumentation);
   const catalog = projections.catalog();
@@ -235,7 +258,7 @@ export async function collectRepositorySnapshot(
       ),
     ],
     core.artifacts,
-    core.config,
+    core.repositoryPathConfig,
   );
   return createRepositorySnapshot(
     core,
@@ -243,6 +266,86 @@ export async function collectRepositorySnapshot(
     immutableEvidenceGraph(repositoryPaths),
     immutableEvidenceGraph(repositoryPathStates),
     instrumentation,
+  );
+}
+
+async function discoverWithBoundarySources(
+  root: string,
+  semanticConfig: ScanConfig,
+  sources: readonly ScanBoundarySource[],
+): Promise<Awaited<ReturnType<typeof discoverArtifacts>>> {
+  if (sources.length === 1) {
+    return discoverArtifacts(root, boundaryConfig(semanticConfig, sources[0]!));
+  }
+  const discoveries = await Promise.all(
+    sources.map((source) =>
+      discoverArtifacts(root, boundaryConfig(semanticConfig, source)),
+    ),
+  );
+  const artifacts = new Map<string, Artifact>();
+  const diagnostics = new Map<string, Diagnostic>();
+  const discoveredPaths = new Set<string>();
+  for (const discovery of discoveries) {
+    for (const artifact of discovery.artifacts) {
+      artifacts.set(artifact.path, artifact);
+    }
+    for (const diagnostic of discovery.diagnostics) {
+      diagnostics.set(JSON.stringify(diagnostic), diagnostic);
+    }
+    for (const discoveredPath of discovery.discoveredPaths) {
+      discoveredPaths.add(discoveredPath);
+    }
+  }
+  return {
+    artifacts: [...artifacts.values()].sort((left, right) =>
+      left.path.localeCompare(right.path),
+    ),
+    diagnostics: [...diagnostics.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, diagnostic]) => diagnostic),
+    discoveredPaths,
+  };
+}
+
+function evidenceBoundaryConfig(
+  semanticConfig: ScanConfig,
+  sources: readonly ScanBoundarySource[],
+): ScanConfig {
+  const excludes =
+    sources.length === 0 ? [] : normalizedPatterns(sources[0]!.exclude);
+  return {
+    ...semanticConfig,
+    globs: normalizedPatterns(sources.flatMap((source) => source.globs)),
+    exclude: excludes.filter((candidate) =>
+      sources
+        .slice(1)
+        .every((source) =>
+          normalizedPatterns(source.exclude).includes(candidate),
+        ),
+    ),
+    maxFileSizeBytes: Math.max(
+      ...sources.map((source) => source.maxFileSizeBytes),
+    ),
+    maxDepth: Math.max(...sources.map((source) => source.maxDepth)),
+  };
+}
+
+function boundaryConfig(
+  semanticConfig: ScanConfig,
+  source: ScanBoundarySource,
+): ScanConfig {
+  return {
+    ...semanticConfig,
+    globs: [...source.globs],
+    exclude: [...source.exclude],
+    maxFileSizeBytes: source.maxFileSizeBytes,
+    maxDepth: source.maxDepth,
+  };
+}
+
+function normalizedPatterns(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.replaceAll("\\", "/")))].sort(
+    (left, right) => left.localeCompare(right),
   );
 }
 
@@ -366,6 +469,7 @@ function createRepositorySnapshot(
     root: core.root,
     ...(core.configPath ? { configPath: core.configPath } : {}),
     config: core.config,
+    evidenceBoundarySources: core.evidenceBoundarySources,
     artifacts: core.artifacts,
     documents: core.documents,
     repositoryPaths,

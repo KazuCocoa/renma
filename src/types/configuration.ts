@@ -31,6 +31,13 @@ export interface SecurityConfig {
 
 export type SecurityCiPolicyMode = "off" | "warn" | "fail";
 
+export type ScanBoundaryCiPolicyMode = "off" | "warn" | "fail";
+
+export interface ScanBoundaryConfig {
+  /** CI review mode for evidence-boundary weakening. Defaults to fail. */
+  ciPolicy: ScanBoundaryCiPolicyMode;
+}
+
 export type SkillDiscoveryCiPolicyMode = "off" | "warn";
 
 export interface SkillDiscoveryConfig {
@@ -48,6 +55,7 @@ export interface ScanConfig {
   maxDepth: number;
   concurrency: number;
   suppressions: SuppressionConfig[];
+  scanBoundary: ScanBoundaryConfig;
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;

@@ -12,9 +12,14 @@ import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
+import {
+  canonicalScanBoundary,
+  effectiveCiScanBoundary,
+} from "./scan-boundary.js";
 import { buildTrustGraph } from "./trust-graph.js";
 import type { AssetClassificationEvidence } from "./types/classification.js";
 import type { Diagnostic, Finding } from "./types/diagnostics.js";
+import type { SuppressionConfig } from "./types/diagnostics.js";
 import type { ScanResult } from "./types/scan-result.js";
 
 export {
@@ -27,6 +32,8 @@ interface ScanBuilderOptions {
   evaluationDate?: Date | string;
   /** Optional projections may reuse scan evidence without preparing Discovery. */
   includeSkillDiscoveryDiagnostics?: boolean;
+  /** CI-only trusted suppression set; repository-local suppressions remain evidence. */
+  enforcementSuppressions?: SuppressionConfig[];
 }
 
 /** Run the complete deterministic scan pipeline for a target path. */
@@ -86,9 +93,14 @@ export function scanFromRepositorySnapshot(
       if (byPath !== 0) return byPath;
       return a.evidence.startLine - b.evidence.startLine;
     });
+  const evaluationDate =
+    options.evaluationDate === undefined
+      ? new Date()
+      : new Date(options.evaluationDate);
   const suppressed = applySuppressions(
     rawFindings,
-    snapshot.config.suppressions,
+    options.enforcementSuppressions ?? snapshot.config.suppressions,
+    evaluationDate,
   );
   const discoveryDiagnostics = snapshot.discoveryDiagnostics.map((diagnostic) =>
     attachDiagnosticClassification(diagnostic, classifications),
@@ -124,6 +136,18 @@ export function scanFromRepositorySnapshot(
   return {
     root: snapshot.root,
     ...(snapshot.configPath ? { configPath: snapshot.configPath } : {}),
+    scanBoundary:
+      snapshot.evidenceBoundarySources.length === 1
+        ? canonicalScanBoundary(
+            snapshot.evidenceBoundarySources[0]!,
+            evaluationDate,
+          )
+        : effectiveCiScanBoundary(
+            snapshot.evidenceBoundarySources,
+            options.enforcementSuppressions ?? [],
+            snapshot.artifacts.map((artifact) => artifact.path),
+            evaluationDate,
+          ),
     scannedFileCount: snapshot.scannedFileCount,
     format: snapshot.config.format,
     agentSkills: snapshot.agentSkills,
@@ -132,6 +156,7 @@ export function scanFromRepositorySnapshot(
     securityPolicyInventory,
     trustGraph,
     findings: suppressed.findings,
+    suppressedFindings: suppressed.suppressedFindings,
     diagnostics: scanDiagnostics,
     diagnosticsV2,
     reviewBundles: createReviewBundles(diagnosticsV2),
