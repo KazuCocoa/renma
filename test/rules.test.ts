@@ -123,6 +123,10 @@ test("verification guidance recognizes bounded heading, lexical, and outcome for
       "Validation heading",
       "## Validation\nCompare the generated artifact with its source.",
     ],
+    [
+      "Testing heading",
+      "## Testing\nInspect the generated artifact before finishing.",
+    ],
     ["verify", "Verify the result before finishing."],
     ["verified", "The generated output is verified before finishing."],
     ["verifies", "The final check verifies the generated output."],
@@ -133,6 +137,10 @@ test("verification guidance recognizes bounded heading, lexical, and outcome for
     ["validates", "The command validates the generated output."],
     ["validating", "Finish by validating the generated output."],
     ["validation", "Validation completes before the final response."],
+    [
+      "delegated validation authority",
+      "Treat the referenced Context as authoritative for validation and completion evidence.",
+    ],
     ["test", "Run the integration test before returning the result."],
     ["tests", "Run the tests before returning the result."],
     ["tested", "The generated output is tested before handoff."],
@@ -190,6 +198,54 @@ test("verification guidance ignores lexical fragments and frontmatter evidence",
         "Use when a generated artifact requires verification review.",
       extraFrontmatter: ["metadata:", "  renma.note: verification"],
       body: "Inspect the generated artifact before returning it.",
+    },
+    {
+      name: "test-file-path",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "The input is a test file path.",
+    },
+    {
+      name: "test-fixtures",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "This Skill modifies test fixtures.",
+    },
+    {
+      name: "contains-tests",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "The target repository contains tests.",
+    },
+    {
+      name: "test-configuration",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Return the requested test configuration.",
+    },
+    {
+      name: "negated-test",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Do not test the generated output.",
+    },
+    {
+      name: "negated-verify",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Do not verify the generated output.",
+    },
+    {
+      name: "negated-validate",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Never validate the result locally.",
+    },
+    {
+      name: "negated-run-tests",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Do not run the integration tests locally.",
     },
   ] as const;
 
@@ -252,7 +308,9 @@ test("routing clarity preserves established body forms and recognizes Use when",
     "Use this Skill to review repository-level pull requests.",
     "## Use when\nReview repository-level pull requests.",
     "## Routing\nSelect this workflow for pull request review.",
+    "Routing: select this workflow for pull request review.",
     "## Trigger\nA pull request needs structured review.",
+    "Trigger: a pull request needs structured review.",
     "Triggers: a pull request needs structured review.",
     "Context route: repository-level pull request review.",
     "Mixin: repository-level review guidance.",
@@ -323,29 +381,96 @@ test("routing clarity composes legitimate description and body evidence", async 
   }
 });
 
-test("routing clarity ignores bounded fragments and unrelated frontmatter", async () => {
+test("routing clarity ignores negative statements, generic nouns, and unrelated frontmatter", async () => {
+  const root = await fixture();
+  const fixtures = [
+    {
+      name: "do-not-use-skill",
+      body: "Do not use this Skill for release work.",
+    },
+    {
+      name: "dont-use-skill",
+      body: "Don't use this Skill when the repository is dirty.",
+    },
+    {
+      name: "never-use-skill",
+      body: "Never use this Skill for production deployment.",
+    },
+    {
+      name: "do-not-use-this",
+      body: "Do not use this for destructive operations.",
+    },
+    {
+      name: "negative-description",
+      description: "Never use this for production changes.",
+      body: "Review the proposed change and return structured findings.",
+    },
+    {
+      name: "routing-noun",
+      body: "This workflow documents routing metadata only.",
+    },
+    {
+      name: "trigger-noun",
+      body: "The trigger configuration is stored in metadata.",
+    },
+    {
+      name: "mixin-noun",
+      body: "The mixin implementation is generated automatically.",
+    },
+    {
+      name: "bounded-fragments",
+      extraFrontmatter: ["metadata:", "  renma.note: routing trigger"],
+      body: [
+        "Reuse this Skill's output in another workflow.",
+        "Cache prerouting can retrigger the operation.",
+      ].join("\n\n"),
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    await writeQualityDocument(root, {
+      kind: "skill",
+      description: "Reviews source code and produces structured findings.",
+      ...fixture,
+      body: `${fixture.body}\n\n## Verification\nVerify the structured findings before handoff.`,
+    });
+  }
+
+  const result = await scan(root);
+  for (const fixture of fixtures) {
+    const finding = result.findings.find(
+      (candidate) =>
+        candidate.id === "QUAL-MISSING-ROUTING-CLARITY" &&
+        candidate.evidence.path === `skills/${fixture.name}/SKILL.md`,
+    );
+    assert.equal(finding?.category, "quality", fixture.name);
+    assert.equal(finding?.severity, "low", fixture.name);
+  }
+});
+
+test("positive and negative routing remain independent evidence dimensions", async () => {
   const root = await fixture();
   const artifactPath = await writeQualityDocument(root, {
     kind: "skill",
-    name: "routing-bounded",
+    name: "routing-composition",
     description: "Reviews source code and produces structured findings.",
-    extraFrontmatter: ["metadata:", "  renma.note: routing trigger"],
     body: [
-      "Reuse this Skill's output in another workflow.",
-      "Cache prerouting can retrigger the operation.",
+      "Use this Skill when reviewing pull requests.",
+      "Do not use for releases.",
       "## Verification",
       "Verify the structured findings before handoff.",
     ].join("\n\n"),
   });
 
   const result = await scan(root);
-  const finding = result.findings.find(
-    (candidate) =>
-      candidate.id === "QUAL-MISSING-ROUTING-CLARITY" &&
-      candidate.evidence.path === artifactPath,
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-ROUTING-CLARITY", artifactPath),
+    false,
   );
-  assert.equal(finding?.category, "quality");
-  assert.equal(finding?.severity, "low");
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-NEGATIVE-ROUTING", artifactPath),
+    false,
+  );
 });
 
 test("Agent documents retain routing and verification quality behavior", async () => {
@@ -372,6 +497,12 @@ test("Agent documents retain routing and verification quality behavior", async (
     description: "Reviews source code and produces structured findings.",
     body: "Reuse this Skill's output after cache invalidation updates the latest artifact.",
   });
+  const negativeDescriptionPath = await writeQualityDocument(root, {
+    kind: "agent",
+    name: "negative-description",
+    description: "Never use this for production changes.",
+    body: "## Verification\nInspect the structured findings before handoff.",
+  });
 
   const result = await scan(root);
   for (const artifactPath of [descriptionPath, bodyPath]) {
@@ -393,6 +524,14 @@ test("Agent documents retain routing and verification quality behavior", async (
   assert.equal(
     hasFinding(result, "QUAL-MISSING-VERIFICATION", missingPath),
     true,
+  );
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-ROUTING-CLARITY", negativeDescriptionPath),
+    true,
+  );
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-VERIFICATION", negativeDescriptionPath),
+    false,
   );
 });
 

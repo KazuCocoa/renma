@@ -76,11 +76,25 @@ const VERIFICATION_HEADING_PATTERNS: readonly RegExp[] = [
   /^post[-\s]checks$/iu,
 ];
 const VERIFICATION_BODY_PATTERNS: readonly RegExp[] = [
-  /\b(?:verify|verified|verifies|verifying|verification)\b/iu,
-  /\b(?:validate|validated|validates|validating|validation)\b/iu,
-  /\b(?:test|tests|tested|testing)\b/iu,
+  /\b(?:verify|verified|verifies|verifying)\b/iu,
+  /\b(?:validate|validated|validates|validating)\b/iu,
+  /\b(?:run|perform|complete)\s+(?:the\s+)?(?:verification|validation)\b/iu,
+  /\b(?:verification|validation)\s+(?:is|runs?|occurs?|happens?|completes?|starts?|begins?|must|should|before|after)\b/iu,
+  /\b(?:authoritative|source\s+of\s+truth)\b[^.!?;]{0,120}\b(?:verification|validation)\b/iu,
+  /\b(?:run|execute)\s+(?:(?:the|an?)\s+)?(?:(?:unit|integration|end-to-end|e2e|acceptance|regression|smoke)\s+)?tests?\b/iu,
+  /\b(?:run|execute)\s+(?:npm|pnpm|yarn|bun)\s+tests?\b/iu,
+  /^(?:npm|pnpm|yarn|bun)\s+tests?\b/iu,
+  /\b(?:is|are|was|were|be|been)\s+tested\b/iu,
+  /\btests?\s+(?:runs?|pass(?:es|ed)?|fail(?:s|ed)?|complete[sd]?)\b/iu,
+  /\btesting\s+(?:runs?|occurs?|happens?|completes?|starts?|begins?|must|should|is)\b/iu,
+  /^test\s+(?:the|this|generated)\b/iu,
+  /\b(?:command|script|suite|check)\s+tests?\b/iu,
   /\bconfirm\s+(?:the\s+)?(?:results?|outputs?)\b/iu,
   /\bexpected\s+(?:outputs?|results?|behaviou?r)\b/iu,
+];
+const NEGATED_VERIFICATION_PATTERNS: readonly RegExp[] = [
+  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not|cannot|can['’]t)\s+(?:be\s+)?(?:verify|verified|verifies|verifying|validate|validated|validates|validating|test|tested|testing|confirm)\b/iu,
+  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not)\s+(?:run|execute|perform)\s+(?:(?:the|an?)\s+)?(?:(?:unit|integration|end-to-end|e2e|acceptance|regression|smoke)\s+)?(?:tests?|verification|validation)\b/iu,
 ];
 const ROUTING_HEADING_PATTERNS: readonly RegExp[] = [
   /^when\s+to\s+use$/iu,
@@ -95,26 +109,19 @@ const ROUTING_HEADING_PATTERNS: readonly RegExp[] = [
   /^mixin$/iu,
 ];
 const ROUTING_BODY_PATTERNS: readonly RegExp[] = [
-  /\buse\s+this\s+skill\b/iu,
-  /\bwhen\s+to\s+use\b/iu,
-  /\buse\s+when\b/iu,
-  /\buse\s+(?:this\s+skill\s+|this\s+)?for\b/iu,
-  /\bchoose\s+this\s+skill\s+(?:when|for)\b/iu,
-  /\bwhen\s+this\s+skill\s+applies\b/iu,
-  /\btriggers?\b/iu,
-  /\brouting\b/iu,
-  /\bcontext\s+route\b/iu,
-  /\bmixin\b/iu,
+  /^(?:please\s+)?use\s+this\s+skill\s+(?:to|for|when)\b/iu,
+  /^(?:please\s+)?when\s+to\s+use\b/iu,
+  /^(?:please\s+)?use\s+when\b/iu,
+  /^(?:please\s+)?use\s+(?:this\s+)?for\b/iu,
+  /^(?:please\s+)?choose\s+this\s+skill\s+(?:when|for)\b/iu,
+  /^when\s+this\s+skill\s+applies\b/iu,
+  /^(?:routing|triggers?|mixin|context\s+route)\s*:\s*\S/iu,
 ];
 const ROUTING_DESCRIPTION_PATTERNS: readonly RegExp[] = [
-  /\bwhen\s+to\s+use\b/iu,
-  /\buse\s+when\b/iu,
-  /\buse\s+this\s+skill\s+(?:when|for)\b/iu,
-  /\buse\s+this\s+for\b/iu,
-  /\buse\s+for\b/iu,
-  /\bchoose\s+this\s+skill\s+(?:when|for)\b/iu,
-  /\bwhen\s+this\s+skill\s+applies\b/iu,
+  ...ROUTING_BODY_PATTERNS,
 ];
+const NEGATED_ROUTING_PATTERN =
+  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not|cannot|can['’]t)\s+(?:choose|use)\b/iu;
 const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
   [/\bplatform facts?\b/i, "Platform Facts"],
   [/\breusable troubleshooting\b/i, "Reusable Troubleshooting"],
@@ -1176,17 +1183,20 @@ function hasVerificationGuidance(document: ParsedDocument): boolean {
     return true;
   }
 
-  const body = markdownBody(document.artifact.content);
-  return VERIFICATION_BODY_PATTERNS.some((pattern) => pattern.test(body));
+  return markdownBodyGuidanceStatements(document).some(
+    (statement) =>
+      !NEGATED_VERIFICATION_PATTERNS.some((pattern) =>
+        pattern.test(statement),
+      ) &&
+      VERIFICATION_BODY_PATTERNS.some((pattern) => pattern.test(statement)),
+  );
 }
 
 function hasRoutingClarity(
   document: ParsedDocument,
   description: string,
 ): boolean {
-  if (
-    ROUTING_DESCRIPTION_PATTERNS.some((pattern) => pattern.test(description))
-  ) {
+  if (hasPositiveRoutingStatement(description, ROUTING_DESCRIPTION_PATTERNS)) {
     return true;
   }
   if (
@@ -1199,8 +1209,39 @@ function hasRoutingClarity(
     return true;
   }
 
-  const body = markdownBody(document.artifact.content);
-  return ROUTING_BODY_PATTERNS.some((pattern) => pattern.test(body));
+  return markdownBodyGuidanceStatements(document).some((statement) =>
+    hasPositiveRoutingStatement(statement, ROUTING_BODY_PATTERNS),
+  );
+}
+
+function hasPositiveRoutingStatement(
+  value: string,
+  patterns: readonly RegExp[],
+): boolean {
+  return guidanceStatements(value).some(
+    (statement) =>
+      !NEGATED_ROUTING_PATTERN.test(statement) &&
+      patterns.some((pattern) => pattern.test(statement)),
+  );
+}
+
+function markdownBodyGuidanceStatements(document: ParsedDocument): string[] {
+  return markdownBodyLineIndexes(document).flatMap((index) =>
+    guidanceStatements(document.lines[index] ?? ""),
+  );
+}
+
+function guidanceStatements(value: string): string[] {
+  return value
+    .split(/(?:\r?\n|[.!?;](?:\s+|$))/u)
+    .map((statement) =>
+      statement
+        .trim()
+        .replace(/^["'“”‘’]+|["'“”‘’]+$/gu, "")
+        .trim()
+        .replace(/^(?:(?:>\s*)|(?:[-*+]\s+)|(?:\d+[.)]\s+))+/u, ""),
+    )
+    .filter(Boolean);
 }
 
 function reusableContextCandidateFinding(

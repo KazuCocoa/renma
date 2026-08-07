@@ -973,14 +973,17 @@ Use explicit selection language such as `Use when ...` when the activation
 boundary fits there; Renma also accepts clear routing guidance in the Skill
 body, including `When to use`, `Routing`, and trigger-oriented sections. A
 description that only says what output the Skill produces does not establish
-when or why it should be selected.
+when or why it should be selected. Negative routing remains a separate evidence
+dimension: `Do not use ...` does not replace positive selection guidance.
 
 Keep recognizable result-checking guidance in the Markdown body. A concise
 `Verification`, `Validation`, or `Testing` section is sufficient, and inline
 instructions using forms such as `verify`, `validate`, or `expected result` are
 also supported. A verification-related word in frontmatter alone does not
-establish workflow verification. These advisories are deterministic authoring
-checks; they do not evaluate whether a stated test is correct or exhaustive.
+establish workflow verification. Nor does a test-related noun such as `test
+fixture` or an instruction not to test, verify, or validate. These advisories
+are deterministic authoring checks; they do not evaluate whether a stated test
+is correct or exhaustive.
 
 For a temporary lifecycle stop, preserve the asset and set
 `renma.status: suspended` together with a reviewed, non-blank
