@@ -123,7 +123,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=22.17"
+    "node": ">=22.17.0"
   },
   "scripts": {
     "clean": "node -e \"const fs=require('node:fs'); for (const dir of ['dist','dist-test']) fs.rmSync(dir,{recursive:true,force:true});\"",
