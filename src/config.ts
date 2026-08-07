@@ -17,6 +17,7 @@ import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
 const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
+const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = [
@@ -67,6 +68,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     approvedUploadDomains: [],
     disallowedCommands: [],
     profiles: {},
+    ciPolicy: "fail",
   },
   skillDiscovery: {
     adopted: false,
@@ -361,6 +363,7 @@ function securityPolicy(value: unknown): ScanConfig["security"] {
     "approvedUploadDomains",
     "disallowedCommands",
     "profiles",
+    "ci_policy",
   ]);
   for (const key of Object.keys(security)) {
     if (!allowed.has(key)) {
@@ -395,6 +398,14 @@ function securityPolicy(value: unknown): ScanConfig["security"] {
       security.profiles === undefined
         ? DEFAULT_CONFIG.security.profiles
         : securityProfiles(security.profiles),
+    ciPolicy:
+      security.ci_policy === undefined
+        ? "fail"
+        : enumValue(
+            "security.ci_policy",
+            security.ci_policy,
+            SECURITY_CI_POLICY_MODES,
+          ),
   };
 }
 

@@ -35,7 +35,19 @@ test("Security Policy Guide documents the current Skill and non-Skill syntax bou
   );
   assert.match(
     guide,
-    /reporting-only:[\s\S]*does not add detectors[\s\S]*change `scan --fail-on`[\s\S]*change CI pass\/warn\/fail status or exit behavior/,
+    /`diff\.security\.policyTransitions`[\s\S]*opposite[\s\S]*cannot cancel/,
+  );
+  assert.match(
+    guide,
+    /false -> unspecified[\s\S]*true -> unspecified[\s\S]*no effective declaration/,
+  );
+  assert.match(
+    guide,
+    /security\.ci_policy[\s\S]*defaults to `"fail"`[\s\S]*off < warn < fail/,
+  );
+  assert.match(
+    guide,
+    /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.approved_network_destination_added[\s\S]*security_policy_ci\.allowed_data_added[\s\S]*security_policy_ci\.forbidden_input_removed[\s\S]*security_policy_ci\.disallowed_command_removed[\s\S]*not considered verified remediation/,
   );
 });
 
@@ -46,6 +58,7 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
   );
 
   assert.match(manual, /diff\.security\.policyChanges/);
+  assert.match(manual, /diff\.security\.policyTransitions/);
   assert.match(manual, /diff\.security\.sharedPolicyChanges/);
   assert.match(
     manual,
@@ -73,7 +86,19 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
   );
   assert.match(
     manual,
-    /does not change CI status or exit[\s\S]*`scan --fail-on`[\s\S]*Readiness score[\s\S]*Readiness level/,
+    /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.approved_network_destination_added[\s\S]*security_policy_ci\.allowed_data_added[\s\S]*security_policy_ci\.forbidden_input_removed[\s\S]*security_policy_ci\.disallowed_command_removed/,
+  );
+  assert.match(
+    manual,
+    /Adding an approved network destination[\s\S]*allowed-data value[\s\S]*Removing a forbidden input or disallowed command[\s\S]*relaxation/,
+  );
+  assert.match(
+    manual,
+    /default is `fail`[\s\S]*off < warn < fail[\s\S]*fail -> off[\s\S]*cannot bypass/,
+  );
+  assert.match(
+    manual,
+    /reduction in scan findings caused by[\s\S]*not considered verified remediation[\s\S]*Removing or correcting the[\s\S]*valid remediation/,
   );
 });
 

@@ -183,6 +183,17 @@
       }
     ]
   },
+  "securityPolicy": {
+    "schemaVersion": "renma.security-policy-ci-policy.v1",
+    "configured": {
+      "from": "fail",
+      "to": "fail",
+      "effective": "fail"
+    },
+    "outcome": "pass",
+    "matchCount": 0,
+    "matches": []
+  },
   "securityPosture": {
     "added": {
       "totalSecurityFindings": 0,
@@ -358,6 +369,7 @@
         }
       },
       "policyChanges": [],
+      "policyTransitions": [],
       "sharedPolicyChanges": []
     }
   }

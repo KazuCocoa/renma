@@ -204,14 +204,14 @@ Agent Skills clients may not expose vendor metadata to the model at all.
 These are specification-owned fields, not `renma.*` extensions:
 
 <!-- agent-skills-portable-fields:start -->
-| Top-level field | Value format | Agent Skills requirement | Renma behavior |
+| Top-level field | Value format                                                                                                                                                       | Agent Skills requirement                                                   | Renma behavior                                                                               |
 | --- | --- | --- | --- |
 | `name` | Non-empty string; Renma validates 1–64 Unicode code points, lowercase NFKC form, letters/digits/hyphens, no edge or repeated hyphen, and immediate-directory match | Required | Skill identity validation and Discovery presentation |
-| `description` | Non-empty string, at most 1,024 Unicode code points | Required; Renma recommends capability and usage boundaries | Portable Skill discovery text, quality and authoring diagnostics, and Discovery presentation |
+| `description`   | Non-empty string, at most 1,024 Unicode code points                                                                                                                | Required; Renma recommends capability and usage boundaries                 | Portable Skill discovery text, quality and authoring diagnostics, and Discovery presentation |
 | `license` | String | Optional | Agent Skills validation; not projected into Renma catalog metadata |
-| `compatibility` | Non-empty string, at most 500 Unicode code points | Optional | Agent Skills validation; not a Renma lifecycle or dependency declaration |
-| `metadata` | Mapping from string keys to string values | Optional in Agent Skills; required only when Renma extensions are declared | Container for flat `renma.*` and other vendor metadata |
-| `allowed-tools` | String | Optional | Agent Skills validation; Renma does not treat it as a security-policy field |
+| `compatibility` | Non-empty string, at most 500 Unicode code points                                                                                                                  | Optional                                                                   | Agent Skills validation; not a Renma lifecycle or dependency declaration                     |
+| `metadata`      | Mapping from string keys to string values                                                                                                                          | Optional in Agent Skills; required only when Renma extensions are declared | Container for flat `renma.*` and other vendor metadata                                       |
+| `allowed-tools` | String                                                                                                                                                             | Optional                                                                   | Agent Skills validation; Renma does not treat it as a security-policy field                  |
 <!-- agent-skills-portable-fields:end -->
 
 `name` and `description` make a Skill portable; they do not make a hybrid or
@@ -226,53 +226,53 @@ that serialization surface. The markers delimit the rows checked against the
 implementation-owned registries.
 
 <!-- renma-operational-metadata:start -->
-| Skill key | Non-Skill key | Value format | Applies to | Requirement / authoring status | Primary Renma effects |
+| Skill key                             | Non-Skill key                   | Value format                                                                                          | Applies to                                                                                   | Requirement / authoring status                                                                                 | Primary Renma effects                                                                                                                                                                                                                             |
 | --- | --- | --- | --- | --- | --- |
-| `renma.id` | `id` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Recommended for stable references; Context Lens requires `id` | Catalog identity, duplicate checks, inspect, graphs, BOM, Trust Graph, diff, and CI reporting |
-| `renma.title` | — | Trimmed non-empty text | Skill only | Optional | Normalized Skill catalog and inspect presentation; top-level non-Skill `title` is not an operational equivalent |
-| — | `type` | Trimmed text; `context_lens` is the supported Lens discriminator | Non-Skill assets; only Context/Context Lens for Lens validation | Conditional when a file under a Context root must be classified as a Context Lens | Classification evidence, catalog kind, inspect, and Context Lens diagnostics |
-| `renma.version` | `version` | Trimmed text; a Context Lens accepts only `1` when present | Skill and cataloged non-Skill assets | Optional | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting |
+| `renma.id`                            | `id`                            | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Recommended for stable references; Context Lens requires `id`                                                  | Catalog identity, duplicate checks, inspect, graphs, BOM, Trust Graph, diff, and CI reporting                                                                                                                                                     |
+| `renma.title`                         | —                               | Trimmed non-empty text                                                                                | Skill only                                                                                   | Optional                                                                                                       | Normalized Skill catalog and inspect presentation; top-level non-Skill `title` is not an operational equivalent                                                                                                                                   |
+| —                                     | `type`                          | Trimmed text; `context_lens` is the supported Lens discriminator                                      | Non-Skill assets; only Context/Context Lens for Lens validation                              | Conditional when a file under a Context root must be classified as a Context Lens                              | Classification evidence, catalog kind, inspect, and Context Lens diagnostics                                                                                                                                                                      |
+| `renma.version`                       | `version`                       | Trimmed text; a Context Lens accepts only `1` when present                                            | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting                                                                                                                                                                            |
 | `renma.owner` | `owner` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; recommended for shared Context; optional elsewhere | Declared/effective ownership, ownership reports, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| `renma.status` | `status` | `experimental`, `stable`, `suspended`, `deprecated`, or `archived` | Skill and cataloged non-Skill assets | Optional lifecycle declaration; `suspended` is temporarily inactive and requires reason/date evidence | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| `renma.status-reason` | `status_reason` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Required when status is `suspended`; optional for other statuses | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting |
-| `renma.status-changed-at` | `status_changed_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Required and blocking when status is `suspended`; optional for other statuses, but invalid declared dates warn | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting |
-| `renma.purpose` | `purpose` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; optional elsewhere | Catalog/inspect metadata and Context Lens governance diagnostics |
-| `renma.last-reviewed-at` | `last_reviewed_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Optional; recommended when freshness is governed | Freshness diagnostics, catalog, Readiness, BOM, semantic diff, and CI reporting |
-| `renma.review-cycle` | `review_cycle` | `P<positive integer>D` | Skill and cataloged non-Skill assets | Conditional on cycle-based freshness review; meaningful with `last-reviewed-at` | Review-due calculation, freshness diagnostics, catalog, Readiness, BOM, diff, and CI reporting |
-| `renma.expires-at` | `expires_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Optional | Expiration findings, lifecycle/dependency review, catalog, Readiness, BOM, diff, and CI reporting |
-| `renma.tags` | `tags` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Catalog, ownership grouping, graph/BOM/Trust Graph asset projections, semantic diff, and CI reporting |
-| `renma.when-to-use` | `when_to_use` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Skill: recognized but deprecated for new authoring; active shared Context: recommended | Catalog usage-boundary evidence and Context diagnostics; canonical Skill discovery belongs in portable `description` |
-| `renma.when-not-to-use` | `when_not_to_use` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Skill: recognized but deprecated for new authoring; active shared Context: recommended | Catalog negative-boundary evidence and Context diagnostics; canonical Skill selection exclusions belong in portable `description` |
-| `renma.requires-context` | `requires_context` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional; required only when the declared relationship exists | Required catalog dependency, graph/composition/impact, Readiness, BOM, Trust Graph, semantic diff, and CI reporting |
-| `renma.optional-context` | `optional_context` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Optional catalog dependency and the same static relationship projections |
-| `renma.requires-lens` | `requires_lens` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional; required only when the declared Lens relationship exists | Required Lens dependency, Lens usage diagnostics, graph/composition/impact, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| `renma.optional-lens` | `optional_lens` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Optional Lens dependency and the same static relationship projections |
-| `renma.conflicts` | `conflicts` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Conflict diagnostics, catalog dependency graph, BOM, Trust Graph, semantic diff, and CI reporting |
-| `renma.superseded-by` | `superseded_by` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Recommended when an asset is deprecated because a replacement exists; otherwise optional | Lifecycle/supersession diagnostics, reference edges, catalog, BOM, Trust Graph, diff, and CI reporting |
-| `renma.continues-with` | — | JSON-array string of non-empty Skill IDs or repository-relative `SKILL.md` paths | Canonical Skill only | Optional | Parsed separately for prepared Skill Discovery, Skill Index, discovery graph, route/cycle diagnostics, Readiness evidence, semantic diff, and CI; never a catalog dependency |
-| — | `applies_to` | YAML list or comma-separated scalar of Context IDs/paths | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: required and target-validated; recommended authoring scope: Context Lens | Any catalog entry carrying a normalized value: metadata-declared `applies_to` dependency; Context Lens: requiredness, target resolution to Context Assets, Lens governance, inspect, graph, Readiness, BOM, Trust Graph, diff, and CI projections |
-| — | `focus` | YAML list or comma-separated scalar | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge |
-| — | `expected_outputs` | YAML list or comma-separated scalar | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge |
-| — | `token_budget_override` | Positive safe integer greater than the kind's default limit | Markdown assets initially classified as Context, Reference, Profile, or Example | Conditional; requires `token_budget_rationale` and is invalid when content is within the default limit | Scan token-budget decision and quality finding details only |
-| — | `token_budget_rationale` | Trimmed non-empty text | Same eligible support-asset kinds as `token_budget_override` | Required when an override is declared; otherwise non-operational | Scan token-budget decision evidence only |
-| — | `token_budget_reviewed_at` | Real ISO date `YYYY-MM-DD` | Same eligible support-asset kinds as `token_budget_override` | Optional only when an override is declared | Scan token-budget review provenance only; it does not create recurring freshness review |
-| `renma.published-entrypoint` | — | Exact string `"true"` only | Canonical Skill only | Optional one-state publication marker | Parsed outside catalog metadata for prepared Skill Discovery, Skill Index, discovery graph, publication diagnostics, Readiness evidence, semantic diff, and CI reporting; no catalog dependency |
-| `renma.network-allowed` | `network_allowed` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective security-policy resolution, instruction findings, Security Policy Inventory, BOM, Trust Graph, semantic diff, and CI reporting |
-| `renma.external-upload-allowed` | `external_upload_allowed` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective upload policy, destination/disclosure findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.secrets-allowed` | `secrets_allowed` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective secret-handling policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.requires-human-approval` | `requires_human_approval` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective approval policy, nearby-approval findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.allowed-data` | `allowed_data` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective allowed-data policy, input findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.forbidden-inputs` | `forbidden_inputs` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective forbidden-input policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.approved-network-destinations` | `approved_network_destinations` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional when network access is declared or instructed | Effective destination policy, network findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.approved-upload-destinations` | `approved_upload_destinations` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional when external upload is declared or instructed | Effective upload-destination policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting |
-| `renma.allowed-floating-dependencies` | `allowed_floating_dependencies` | Skill: JSON-array string; non-Skill: YAML list or JSON-array scalar of valid `npm:`/`pypi:` selectors | Canonical Skill or parser-eligible non-Skill Markdown | Optional, exceptional asset-local allowance | Suppresses matching npm/PyPI floating-dependency findings only; recorded as local evidence but excluded from inheritance, effective-policy fingerprints/counts, and owning-Skill inheritance |
-| `renma.security-profile` | `security_profile` | Trimmed non-empty profile name | Canonical Skill or parser-eligible non-Skill Markdown | Optional reusable-policy selection | Profile-chain resolution and diagnostics, effective policy/inventory, BOM, Trust Graph, semantic diff, and CI reporting |
-| — | `scope` | Exact `context` when present; omission defaults to `context` | Context Lens only | Optional | Context Lens scope validation and summary only |
-| — | `target` | Presence is recognized; value is not selected as a target | Context Lens only | Deprecated; use `applies_to` | Deprecation diagnostic only |
-| — | `targets` | Presence is recognized; value is not selected as targets | Context Lens only | Deprecated; use `applies_to` | Deprecation diagnostic only |
-| — | `output` | Presence is recognized; value is not selected as output metadata | Context Lens only | Deprecated; use `expected_outputs` | Deprecation diagnostic only |
-| — | `outputs` | Presence is recognized; value is not selected as output metadata | Context Lens only | Deprecated; use `expected_outputs` | Deprecation diagnostic only |
-| — | `canonical_context` | Comma-separated scalar of Context paths | Skill-local Reference only | Recognized compatibility-only; do not add for new assets | Maintenance diagnosis for a deprecated local reference promoted to shared Context; not catalog metadata or a general dependency |
+| `renma.status`                        | `status`                        | `experimental`, `stable`, `suspended`, `deprecated`, or `archived`                                    | Skill and cataloged non-Skill assets                                                         | Optional lifecycle declaration; `suspended` is temporarily inactive and requires reason/date evidence          | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                  |
+| `renma.status-reason`                 | `status_reason`                 | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Required when status is `suspended`; optional for other statuses                                               | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                      |
+| `renma.status-changed-at`             | `status_changed_at`             | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Required and blocking when status is `suspended`; optional for other statuses, but invalid declared dates warn | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                         |
+| `renma.purpose`                       | `purpose`                       | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Context Lens requires it; optional elsewhere                                                                   | Catalog/inspect metadata and Context Lens governance diagnostics                                                                                                                                                                                  |
+| `renma.last-reviewed-at`              | `last_reviewed_at`              | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Optional; recommended when freshness is governed                                                               | Freshness diagnostics, catalog, Readiness, BOM, semantic diff, and CI reporting                                                                                                                                                                   |
+| `renma.review-cycle`                  | `review_cycle`                  | `P<positive integer>D`                                                                                | Skill and cataloged non-Skill assets                                                         | Conditional on cycle-based freshness review; meaningful with `last-reviewed-at`                                | Review-due calculation, freshness diagnostics, catalog, Readiness, BOM, diff, and CI reporting                                                                                                                                                    |
+| `renma.expires-at`                    | `expires_at`                    | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Expiration findings, lifecycle/dependency review, catalog, Readiness, BOM, diff, and CI reporting                                                                                                                                                 |
+| `renma.tags`                          | `tags`                          | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Catalog, ownership grouping, graph/BOM/Trust Graph asset projections, semantic diff, and CI reporting                                                                                                                                             |
+| `renma.when-to-use`                   | `when_to_use`                   | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Skill: recognized but deprecated for new authoring; active shared Context: recommended                         | Catalog usage-boundary evidence and Context diagnostics; canonical Skill discovery belongs in portable `description`                                                                                                                              |
+| `renma.when-not-to-use`               | `when_not_to_use`               | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Skill: recognized but deprecated for new authoring; active shared Context: recommended                         | Catalog negative-boundary evidence and Context diagnostics; canonical Skill selection exclusions belong in portable `description`                                                                                                                 |
+| `renma.requires-context`              | `requires_context`              | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional; required only when the declared relationship exists                                                  | Required catalog dependency, graph/composition/impact, Readiness, BOM, Trust Graph, semantic diff, and CI reporting                                                                                                                               |
+| `renma.optional-context`              | `optional_context`              | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Optional catalog dependency and the same static relationship projections                                                                                                                                                                          |
+| `renma.requires-lens`                 | `requires_lens`                 | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional; required only when the declared Lens relationship exists                                             | Required Lens dependency, Lens usage diagnostics, graph/composition/impact, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                                   |
+| `renma.optional-lens`                 | `optional_lens`                 | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Optional Lens dependency and the same static relationship projections                                                                                                                                                                             |
+| `renma.conflicts`                     | `conflicts`                     | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Conflict diagnostics, catalog dependency graph, BOM, Trust Graph, semantic diff, and CI reporting                                                                                                                                                 |
+| `renma.superseded-by`                 | `superseded_by`                 | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Recommended when an asset is deprecated because a replacement exists; otherwise optional                       | Lifecycle/supersession diagnostics, reference edges, catalog, BOM, Trust Graph, diff, and CI reporting                                                                                                                                            |
+| `renma.continues-with`                | —                               | JSON-array string of non-empty Skill IDs or repository-relative `SKILL.md` paths                      | Canonical Skill only                                                                         | Optional                                                                                                       | Parsed separately for prepared Skill Discovery, Skill Index, discovery graph, route/cycle diagnostics, Readiness evidence, semantic diff, and CI; never a catalog dependency                                                                      |
+| —                                     | `applies_to`                    | YAML list or comma-separated scalar of Context IDs/paths                                              | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: required and target-validated; recommended authoring scope: Context Lens                         | Any catalog entry carrying a normalized value: metadata-declared `applies_to` dependency; Context Lens: requiredness, target resolution to Context Assets, Lens governance, inspect, graph, Readiness, BOM, Trust Graph, diff, and CI projections |
+| —                                     | `focus`                         | YAML list or comma-separated scalar                                                                   | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens                                              | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge                                                                                                                      |
+| —                                     | `expected_outputs`              | YAML list or comma-separated scalar                                                                   | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens                                              | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge                                                                                                                      |
+| —                                     | `token_budget_override`         | Positive safe integer greater than the kind's default limit                                           | Markdown assets initially classified as Context, Reference, Profile, or Example              | Conditional; requires `token_budget_rationale` and is invalid when content is within the default limit         | Scan token-budget decision and quality finding details only                                                                                                                                                                                       |
+| —                                     | `token_budget_rationale`        | Trimmed non-empty text                                                                                | Same eligible support-asset kinds as `token_budget_override`                                 | Required when an override is declared; otherwise non-operational                                               | Scan token-budget decision evidence only                                                                                                                                                                                                          |
+| —                                     | `token_budget_reviewed_at`      | Real ISO date `YYYY-MM-DD`                                                                            | Same eligible support-asset kinds as `token_budget_override`                                 | Optional only when an override is declared                                                                     | Scan token-budget review provenance only; it does not create recurring freshness review                                                                                                                                                           |
+| `renma.published-entrypoint`          | —                               | Exact string `"true"` only                                                                            | Canonical Skill only                                                                         | Optional one-state publication marker                                                                          | Parsed outside catalog metadata for prepared Skill Discovery, Skill Index, discovery graph, publication diagnostics, Readiness evidence, semantic diff, and CI reporting; no catalog dependency                                                   |
+| `renma.network-allowed`               | `network_allowed`               | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token                               | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional security governance                                                                                | Effective security-policy resolution, instruction findings, Security Policy Inventory, BOM, Trust Graph, semantic diff, and CI reporting                                                                                                          |
+| `renma.external-upload-allowed`       | `external_upload_allowed`       | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token                               | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional security governance                                                                                | Effective upload policy, destination/disclosure findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                     |
+| `renma.secrets-allowed`               | `secrets_allowed`               | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token                               | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional security governance                                                                                | Effective secret-handling policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                                   |
+| `renma.requires-human-approval`       | `requires_human_approval`       | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token                               | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional security governance                                                                                | Effective approval policy, nearby-approval findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                          |
+| `renma.allowed-data`                  | `allowed_data`                  | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional security governance                                                                                | Effective allowed-data policy, input findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                                |
+| `renma.forbidden-inputs`              | `forbidden_inputs`              | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional security governance                                                                                | Effective forbidden-input policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                                   |
+| `renma.approved-network-destinations` | `approved_network_destinations` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional when network access is declared or instructed                                                      | Effective destination policy, network findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                               |
+| `renma.approved-upload-destinations`  | `approved_upload_destinations`  | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Canonical Skill or parser-eligible non-Skill Markdown                                        | Conditional when external upload is declared or instructed                                                     | Effective upload-destination policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting                                                                                                                                                |
+| `renma.allowed-floating-dependencies` | `allowed_floating_dependencies` | Skill: JSON-array string; non-Skill: YAML list or JSON-array scalar of valid `npm:`/`pypi:` selectors | Canonical Skill or parser-eligible non-Skill Markdown                                        | Optional, exceptional asset-local allowance                                                                    | Suppresses matching npm/PyPI floating-dependency findings only; recorded as local evidence but excluded from inheritance, effective-policy fingerprints/counts, and owning-Skill inheritance                                                      |
+| `renma.security-profile`              | `security_profile`              | Trimmed non-empty profile name                                                                        | Canonical Skill or parser-eligible non-Skill Markdown                                        | Optional reusable-policy selection                                                                             | Profile-chain resolution and diagnostics, effective policy/inventory, BOM, Trust Graph, semantic diff, and CI reporting                                                                                                                           |
+| —                                     | `scope`                         | Exact `context` when present; omission defaults to `context`                                          | Context Lens only                                                                            | Optional                                                                                                       | Context Lens scope validation and summary only                                                                                                                                                                                                    |
+| —                                     | `target`                        | Presence is recognized; value is not selected as a target                                             | Context Lens only                                                                            | Deprecated; use `applies_to`                                                                                   | Deprecation diagnostic only                                                                                                                                                                                                                       |
+| —                                     | `targets`                       | Presence is recognized; value is not selected as targets                                              | Context Lens only                                                                            | Deprecated; use `applies_to`                                                                                   | Deprecation diagnostic only                                                                                                                                                                                                                       |
+| —                                     | `output`                        | Presence is recognized; value is not selected as output metadata                                      | Context Lens only                                                                            | Deprecated; use `expected_outputs`                                                                             | Deprecation diagnostic only                                                                                                                                                                                                                       |
+| —                                     | `outputs`                       | Presence is recognized; value is not selected as output metadata                                      | Context Lens only                                                                            | Deprecated; use `expected_outputs`                                                                             | Deprecation diagnostic only                                                                                                                                                                                                                       |
+| —                                     | `canonical_context`             | Comma-separated scalar of Context paths                                                               | Skill-local Reference only                                                                   | Recognized compatibility-only; do not add for new assets                                                       | Maintenance diagnosis for a deprecated local reference promoted to shared Context; not catalog metadata or a general dependency                                                                                                                   |
 <!-- renma-operational-metadata:end -->
 
 The table intentionally has no top-level non-Skill equivalent for
@@ -983,6 +983,10 @@ For example:
 
 ```jsonc
 {
+  "security": {
+    // Weakening an effective security boundary requires explicit review.
+    "ci_policy": "fail"
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1006,7 +1010,9 @@ The configuration supports the same names used by the implementation, including:
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
 - `format`: default `scan` output format.
 - `layout`: compatibility-only `tool_namespace` and `workflow_aliases` input retained for existing configurations. These fields are validated and normalized but do not currently change findings or force Skill-local support migration.
-- `security`: command, network, upload, and profile policy.
+- `security`: command, network, upload, profile, and revision-review policy.
+  `ci_policy` supports `off`, `warn`, and `fail`, defaults to `fail`, and
+  governs effective boolean security-policy relaxations in `ci-report`.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1120,16 +1126,16 @@ Use `renma --version` (or `renma -v`) to print the installed package version.
 
 These commands are related, but they answer different repository-review questions.
 
-| Command | Main question | Best for | Output shape |
+| Command              | Main question                                                                                    | Best for                                                                                                 | Output shape                                                 |
 | --- | --- | --- | --- |
-| `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
-| `catalog` | What assets exist? | Reviewing IDs, owners, lifecycle metadata, hashes, tags, and declared dependencies | Asset inventory |
-| `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
-| `execution-contract` | What executable relationships are statically possible from one Skill? | Binding a future external runtime trace to deterministic static repository evidence | Experimental `renma.experimental-execution-contract.v1` JSON |
-| `skill-index` | Where can static Skill Discovery begin and continue? | Finding published entrypoints, declared continuations, reachability, coverage, and exact review evidence | Compact Markdown or `renma.skill-index.v1` JSON |
-| `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
-| `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
-| `bom` | What declared repository context manifest should reviewers inspect? | Combining catalog, graph, readiness, diagnostics, lifecycle, hashes, and security posture evidence | Repository Context BOM |
+| `scan`               | What concrete problems were found?                                                               | Fixing diagnostics and CI checks                                                                         | Finding list                                                 |
+| `catalog`            | What assets exist?                                                                               | Reviewing IDs, owners, lifecycle metadata, hashes, tags, and declared dependencies                       | Asset inventory                                              |
+| `graph`              | How are assets connected?                                                                        | Inspecting dependencies and references                                                                   | Asset relationship graph                                     |
+| `execution-contract` | What executable relationships are statically possible from one Skill?                            | Binding a future external runtime trace to deterministic static repository evidence                      | Experimental `renma.experimental-execution-contract.v1` JSON |
+| `skill-index`        | Where can static Skill Discovery begin and continue?                                             | Finding published entrypoints, declared continuations, reachability, coverage, and exact review evidence | Compact Markdown or `renma.skill-index.v1` JSON              |
+| `trust-graph`        | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset               | Evidence graph                                               |
+| `readiness`          | Is the repository broadly ready for agent-facing use?                                            | Maintainer summary and CI reporting                                                                      | Repository-level scorecard                                   |
+| `bom`                | What declared repository context manifest should reviewers inspect?                              | Combining catalog, graph, readiness, diagnostics, lifecycle, hashes, and security posture evidence       | Repository Context BOM                                       |
 
 `catalog` is about what assets exist. `graph` is about how assets relate. `readiness` is about repository-level health score and checks. `trust-graph` is about traceability of trust-relevant evidence. `bom` is the reviewable declared repository manifest that combines asset inventory, dependencies, hashes, lifecycle, diagnostics, readiness, and security posture evidence.
 
@@ -1356,9 +1362,9 @@ not supported. For example, `Then run`, `Do not run`, `Try`, `Run this:`, and
 bare `` `node tools/check.mjs` `` remain outside the grammar.
 
 Only the span immediately following the exact cue can qualify. In
-`` Run `node tools/check.mjs`; pass `--local` when requested. ``, the command is
+``Run `node tools/check.mjs`; pass `--local` when requested.``, the command is
 one invocation and the option span is not another. In
-`` Run `/status` and `node tools/smoke.mjs`. ``, the second span is not
+``Run `/status` and `node tools/smoke.mjs`.``, the second span is not
 recognized because its preceding visible paragraph text is no longer exactly
 the cue. Chained commands, alternatives, and secondary spans are deliberately
 deferred.
@@ -1471,11 +1477,11 @@ evaluation date, entrypoint, and supplied revision value.
 
 The artifact exposes three complementary identities:
 
-| Identity | Produced by | What it binds |
+| Identity         | Produced by                     | What it binds                                                         |
 | --- | --- | --- |
-| `sourceRevision` | Caller, optional and unverified | A supplied revision provenance value |
-| `evidenceDigest` | Renma, always present | The selected execution-contract evidence projection |
-| External SHA-256 | Caller, optional | Exact serialized JSON bytes, including `sourceRevision` when supplied |
+| `sourceRevision` | Caller, optional and unverified | A supplied revision provenance value                                  |
+| `evidenceDigest` | Renma, always present           | The selected execution-contract evidence projection                   |
+| External SHA-256 | Caller, optional                | Exact serialized JSON bytes, including `sourceRevision` when supplied |
 
 `evidenceDigest` uses SHA-256 with scope
 `selected_execution_contract_evidence_v1`. Renma calculates it from a
@@ -1720,14 +1726,14 @@ human reviews its stop, ask, retry, handoff, and completion behavior.
 
 The graph forms answer distinct questions:
 
-| Form | Question |
+| Form                      | Question                                                                                                                                                          |
 | --- | --- |
-| `full` without focus | What is in the whole catalog graph? |
-| `full` with focus | What is the direct incoming and outgoing neighborhood? |
-| `composition` with focus | What is in the transitive outgoing composition closure? |
-| `impact` with focus | What is in the transitive incoming composition closure? |
+| `full` without focus      | What is in the whole catalog graph?                                                                                                                               |
+| `full` with focus         | What is the direct incoming and outgoing neighborhood?                                                                                                            |
+| `composition` with focus  | What is in the transitive outgoing composition closure?                                                                                                           |
+| `impact` with focus       | What is in the transitive incoming composition closure?                                                                                                           |
 | `discovery` without focus | Which eligible Skills are reachable from explicit published entrypoints through usable declared continuations, and is that evidence descriptive or authoritative? |
-| `discovery` with focus | What global reachability state and direct incoming/outgoing declarations touch this exact Skill while repository adoption and coverage stay repository-scoped? |
+| `discovery` with focus    | What global reachability state and direct incoming/outgoing declarations touch this exact Skill while repository adoption and coverage stay repository-scoped?    |
 
 #### Focusing The Graph
 
@@ -1940,8 +1946,11 @@ terminology, omit complete fingerprints, and do not enter
 readiness score, failure threshold, or review policy. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
-`skillDiscoveryPolicy`; the existing nested `diff` remains Discovery- and
-policy-free. Diff endpoints also expose the readiness ownership numerator,
+`skillDiscoveryPolicy`. It also includes one
+`renma.security-policy-ci-policy.v1` evaluation at top-level `securityPolicy`;
+the nested `diff.security.policyTransitions` array is the canonical per-asset
+scalar/list transition evidence consumed by that evaluation. The existing nested `diff`
+remains Discovery-policy-free. Diff endpoints also expose the readiness ownership numerator,
 eligible-asset denominator, and coverage percentage while retaining the
 existing `summary.ownershipCoverageDelta` field.
 
@@ -2005,13 +2014,77 @@ sorted list bounded by the shared presentation limit; JSON retains every asset
 and every value. Declaration reordering and duplicate list values do not create
 semantic changes, and Markdown does not print policy fingerprints.
 
+JSON also exposes `diff.security.policyTransitions` for matched assets. Each
+row retains canonical asset ID/path/kind, property, provenance, and a `kind`
+discriminator. Scalar rows contain exact boolean-or-`unspecified`
+`fromState`/`toState`; list rows contain complete normalized `added`/`removed`
+values. New and deleted assets do not produce transition rows. Aggregate
+inventory counts are summaries only; CI policy consumes these per-asset rows,
+so a relaxation on one asset and a tightening on another cannot cancel.
+
+For network, external upload, and secrets, effective `false` is restrictive:
+`false -> true` and `false -> unspecified` are relaxations. For human approval,
+effective `true` is restrictive: `true -> false` and `true -> unspecified` are
+relaxations. Under current effective diagnostic semantics,
+`true <-> unspecified` is neutral for permission fields and
+`false <-> unspecified` is neutral for approval; moving from `unspecified` to
+the restrictive state is tightening. `Unspecified` remains absence of an
+effective declaration, not a runtime permission grant.
+
+Adding an approved network destination, approved upload destination, or
+allowed-data value expands an effective allow boundary and is a relaxation.
+Removing a forbidden input or disallowed command reduces an effective deny
+boundary and is also a relaxation. The opposite list directions are
+tightening. When one list replacement contains both directions, canonical
+transition evidence retains both, while the CI match identifies only the
+weakening values.
+
 These policy details are a deterministic projection of static declared and
 effective Renma evidence. An approved destination is not the same as a
 destination mentioned in instructions, and neither is evidence that a runtime
 connection or upload occurred. The projection adds no target detector, runtime
-monitoring, permission inference, or enforcement. It does not classify a policy
-change as an improvement or regression and does not change CI status or exit
-behavior, `scan --fail-on`, Readiness score, or Readiness level.
+monitoring, permission inference, or enforcement. The security transition gate
+classifies the scalar and list relaxations above for revision review; it does not
+change `scan --fail-on`, Readiness score, or Readiness level.
+
+Direct `diff` Markdown shows a bounded `Security policy relaxations` list before
+an explicit `Aggregate security metrics` subsection. CI-report keeps a matching
+policy outcome and per-asset transitions visible above the collapsed details.
+Stable match IDs are `security_policy_ci.network_relaxed`,
+`security_policy_ci.approved_network_destination_added`,
+`security_policy_ci.external_upload_relaxed`,
+`security_policy_ci.approved_upload_destination_added`,
+`security_policy_ci.allowed_data_added`,
+`security_policy_ci.forbidden_input_removed`,
+`security_policy_ci.secrets_relaxed`,
+`security_policy_ci.human_approval_removed`, and
+`security_policy_ci.disallowed_command_removed`. CI matches carry canonical
+asset identity, property, provenance, an explicit relaxation direction, and
+either scalar from/to states or exact added/removed weakening values.
+
+Configure this review policy independently from Skill Discovery:
+
+```json
+{
+  "security": {
+    "ci_policy": "fail"
+  }
+}
+```
+
+The default is `fail`. CI reads both archived revisions and selects the stricter
+mode under `off < warn < fail`; a simultaneous `fail -> off` change therefore
+cannot bypass the gate. A match under `fail` makes CI-report `FAIL` and exit
+`1`; under `warn` it promotes `PASS` to `WARN`; under `off` it has no status
+effect, while transition evidence and matches remain visible. No security
+outcome downgrades an existing failure.
+
+Renma permits declared security policies to evolve, but weakening a security
+boundary is a reviewable security event. A reduction in scan findings caused by
+policy relaxation is not considered verified remediation. CI-report suppresses
+the generic `Scan findings decreased.` praise and explicitly says the decrease
+is not verified remediation when both occur. Removing or correcting the
+contradictory instruction without relaxing policy remains valid remediation.
 
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so
@@ -2058,7 +2131,9 @@ behavior.
 Serialized reports that predate the Discovery fields continue to format without
 a synthetic Discovery section. A report that contains `skillDiscovery` but no
 `skillDiscoveryPolicy` retains its observation-only Discovery section without an
-invented policy result.
+invented policy result. Earlier serialized reports without `securityPolicy` or
+`diff.security.policyTransitions` also continue to format, while newly built
+reports always emit both fields.
 
 Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 
@@ -2290,7 +2365,7 @@ command help lists that shortcut. `scaffold` supports JSON only through
 `--json` with a non-JSON `--format`; the other commands that accept `--json`
 let it select JSON.
 
-| Command | Formats |
+| Command                  | Formats                       |
 | --- | --- |
 | `scan` | `text`, `json` |
 | `bom` | `json`, `markdown` |

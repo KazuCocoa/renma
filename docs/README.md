@@ -24,10 +24,10 @@ document.
   compatibility-sensitive identifiers, repair constraints, and verification
   expectations.
 - [Security Policy Guide](security-policy.md) defines effective-policy
-  semantics and bounded agent-facing instruction analysis; the User Manual
-  owns the complete security field mapping. The guide also defines the boundary
-  between Renma, SAST, secret scanning, dependency scanning, and runtime
-  controls.
+  semantics, revision-transition governance, and bounded agent-facing
+  instruction analysis; the User Manual owns the complete security field
+  mapping. The guide also defines the boundary between Renma, SAST, secret
+  scanning, dependency scanning, and runtime controls.
 - [Renma Quality Profile](quality-profile.md) records the exact deterministic
   thresholds, units, provenance, rationale, and configuration status used by
   quality checks.

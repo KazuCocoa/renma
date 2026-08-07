@@ -11,6 +11,7 @@ import {
   buildSecurityPolicyChanges,
   type SecurityPolicyAssetChange,
   type SecurityPolicyDiffInput,
+  type SecurityPolicyTransition,
   type SharedSecurityPolicyChange,
 } from "./security-policy-diff.js";
 
@@ -56,6 +57,7 @@ export interface SecurityDiffSummary {
   posture: SecurityPostureDelta;
   policyInventory: SecurityPolicyInventoryDelta;
   policyChanges: SecurityPolicyAssetChange[];
+  policyTransitions: SecurityPolicyTransition[];
   sharedPolicyChanges: SharedSecurityPolicyChange[];
 }
 
