@@ -16,6 +16,7 @@ import fc from "fast-check";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type { Nodes } from "mdast";
 import { main } from "../src/cli.js";
+import { ConfigError } from "../src/config.js";
 import {
   buildCiReportFromDiff,
   ciReport,
@@ -3189,6 +3190,45 @@ test("coverage regression stays WARN and --fail-on-status warn blocks it", async
   );
 });
 
+test("ci-report rejects conflicting aliases in either archived endpoint", async () => {
+  const repo = await createArchivedAliasConflictRepo();
+  try {
+    for (const [fromRef, toRef] of [
+      ["valid-profile", "conflicting-profile"],
+      ["conflicting-profile", "fixed-profile"],
+    ] as const) {
+      await assert.rejects(
+        ciReport(repo, { fromRef, toRef }),
+        (error: unknown) =>
+          error instanceof ConfigError &&
+          /security\.profiles\.restricted/.test(error.message) &&
+          /conflicting aliases for networkAllowed/.test(error.message),
+      );
+    }
+
+    const command = await withCapturedConsole(() =>
+      main([
+        "ci-report",
+        repo,
+        "--from",
+        "valid-profile",
+        "--to",
+        "conflicting-profile",
+        "--format",
+        "json",
+      ]),
+    );
+
+    assert.equal(command.code, 2);
+    assert.equal(command.stdout, "");
+    assert.match(command.stderr, /security\.profiles\.restricted/);
+    assert.match(command.stderr, /conflicting aliases for networkAllowed/);
+    assert.doesNotMatch(command.stderr, /SEC-|QUAL-|strict_scan\./);
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("Skill directory symlink is a subtree coverage regression from an exact path", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
   await fixture.initializeGit();
@@ -3460,6 +3500,54 @@ async function createGovernanceVisibilityRepo(): Promise<string> {
   await writePublishedGovernedSkill(repo);
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-m", "head"]);
+  return repo;
+}
+
+async function createArchivedAliasConflictRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-ci-config-aliases-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: { restricted: { networkAllowed: false } },
+      },
+    }),
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "valid security profile"]);
+  await git(repo, ["tag", "valid-profile"]);
+
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: {
+          restricted: {
+            networkAllowed: false,
+            network_allowed: true,
+          },
+        },
+      },
+    }),
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "ambiguous security profile"]);
+  await git(repo, ["tag", "conflicting-profile"]);
+
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: { restricted: { network_allowed: false } },
+      },
+    }),
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "fix security profile"]);
+  await git(repo, ["tag", "fixed-profile"]);
   return repo;
 }
 
@@ -3902,6 +3990,31 @@ async function withCapturedStdout(
     return { code, stdout };
   } finally {
     process.stdout.write = stdoutWrite;
+  }
+}
+
+async function withCapturedConsole(
+  callback: () => Promise<number>,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const stdoutWrite = process.stdout.write;
+  const stderrWrite = process.stderr.write;
+  let stdout = "";
+  let stderr = "";
+
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += chunk.toString();
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    return { code: await callback(), stdout, stderr };
+  } finally {
+    process.stdout.write = stdoutWrite;
+    process.stderr.write = stderrWrite;
   }
 }
 

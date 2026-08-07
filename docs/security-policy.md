@@ -229,6 +229,28 @@ Configure profiles under `security.profiles`:
 }
 ```
 
+Use the camelCase names in that example as the canonical profile spelling:
+
+| Canonical profile field | Accepted compatibility aliases                                                |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `allowedDataClass`      | `allowed_data_class`                                                          |
+| `networkAllowed`        | `network_allowed`                                                             |
+| `externalUploadAllowed` | `external_upload_allowed`                                                     |
+| `secretsAllowed`        | `secrets_allowed`                                                             |
+| `humanApprovalRequired` | `human_approval_required`, `requiresHumanApproval`, `requires_human_approval` |
+| `securityProfile`       | `security_profile`                                                            |
+| `allowedData`           | `allowed_data`                                                                |
+| `forbiddenInputs`       | `forbidden_inputs`                                                            |
+| `approvedDomains`       | —                                                                             |
+| `approvedUploadDomains` | —                                                                             |
+| `disallowedCommands`    | —                                                                             |
+
+Compatibility aliases remain accepted when used individually. If a profile
+supplies more than one spelling for the same field, every spelling is validated
+and the normalized values must be equivalent; conflicting values are rejected
+as a configuration error. Prefer one canonical spelling and do not duplicate
+aliases in new configuration.
+
 Select the profile from a Skill with canonical metadata:
 
 ```yaml
