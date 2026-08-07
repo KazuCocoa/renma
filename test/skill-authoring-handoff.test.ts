@@ -14,8 +14,10 @@ import test from "node:test";
 import { Ajv2020, type AnySchemaObject } from "ajv/dist/2020.js";
 
 import { main } from "../src/cli.js";
+import { classifyCliError, CLI_EXIT, CliUserError } from "../src/cli-errors.js";
 import { buildSkillAuthoringGuidance } from "../src/guidance/skill-authoring.js";
 import {
+  classifySkillAuthoringHandoffReadError,
   SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
   type SkillAuthoringHandoff,
 } from "../src/skill-authoring-handoff.js";
@@ -163,6 +165,138 @@ test("scaffold handoff prompt passes caller decisions through without epistemic 
   assert.match(
     result.stdout,
     /Re-enter clarification if new evidence creates a Blocking/,
+  );
+});
+
+test("supporting Context and Lens relationships accept Renma ID-or-path forms without rewriting", async (t) => {
+  const cases: Array<{
+    name: string;
+    field: "requiresContext" | "optionalContext" | "requiresLens";
+    index: number;
+    reference: string;
+    metadataKey:
+      | "renma.requires-context"
+      | "renma.optional-context"
+      | "renma.requires-lens";
+  }> = [
+    {
+      name: "required Context by ID",
+      field: "requiresContext",
+      index: 0,
+      reference: "context.testing.boundaries",
+      metadataKey: "renma.requires-context",
+    },
+    {
+      name: "required Context by repository-relative path",
+      field: "requiresContext",
+      index: 0,
+      reference: "contexts/testing/boundaries.md",
+      metadataKey: "renma.requires-context",
+    },
+    {
+      name: "required Context by dot-relative repository path",
+      field: "requiresContext",
+      index: 0,
+      reference: "./contexts/testing/boundaries.md",
+      metadataKey: "renma.requires-context",
+    },
+    {
+      name: "optional Context by path",
+      field: "optionalContext",
+      index: 0,
+      reference: "contexts/testing/examples.md",
+      metadataKey: "renma.optional-context",
+    },
+    {
+      name: "required Lens by path",
+      field: "requiresLens",
+      index: 0,
+      reference: "lenses/testing/risk.md",
+      metadataKey: "renma.requires-lens",
+    },
+  ];
+
+  for (const fixture of cases) {
+    await t.test(fixture.name, async () => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), "renma-handoff-relationship-"),
+      );
+      const handoffPath = path.join(root, "handoff.json");
+      const target = path.join(root, "skills", "example", "SKILL.md");
+      const handoff = gateReadyHandoff();
+      handoff.assetGraph.skill[fixture.field][fixture.index] =
+        fixture.reference;
+      await writeHandoff(handoffPath, handoff);
+
+      const result = await capture(() =>
+        main([
+          "scaffold",
+          "skill",
+          target,
+          "--handoff",
+          handoffPath,
+          "--format",
+          "json",
+        ]),
+      );
+
+      assert.equal(result.code, 0);
+      assert.equal(result.stderr, "");
+      const bundle = JSON.parse(result.stdout) as {
+        content: string;
+        handoff: SkillAuthoringHandoff;
+      };
+      assert.equal(
+        bundle.handoff.assetGraph.skill[fixture.field][fixture.index],
+        fixture.reference,
+      );
+      assert.ok(
+        bundle.content.includes(
+          `  ${fixture.metadataKey}: '${JSON.stringify(bundle.handoff.assetGraph.skill[fixture.field])}'`,
+        ),
+      );
+    });
+  }
+});
+
+test("a supporting asset cannot be satisfied by a relationship of the wrong kind", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-handoff-wrong-kind-"),
+  );
+  const handoffPath = path.join(root, "handoff.json");
+  const target = path.join(root, "skills", "example", "SKILL.md");
+  const handoff = gateReadyHandoff();
+  handoff.assetGraph.skill.requiresContext = ["context.testing.other"];
+  handoff.assetGraph.skill.requiresLens.push(
+    "./contexts/testing/boundaries.md",
+  );
+  handoff.assetGraph.supportingAssets.push({
+    kind: "context",
+    id: "context.testing.other",
+    path: "contexts/testing/other.md",
+    disposition: "reuse",
+    relationship: "required",
+    justification: "A separate maintained testing policy.",
+  });
+  await writeHandoff(handoffPath, handoff);
+
+  const result = await capture(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--handoff",
+      handoffPath,
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(
+    result.stderr,
+    /Supporting context "context\.testing\.boundaries" is marked required but is absent from the matching Skill relationship list/,
   );
 });
 
@@ -341,6 +475,38 @@ test("missing handoff and mixed structural CLI authorities return exit 2", async
   assert.equal(wrongKind.code, 2);
   assert.match(wrongKind.stderr, /supported only for skill scaffolds/);
   await assertNoScaffoldSideEffects(target);
+});
+
+test("handoff read error classification preserves PR #188 exit taxonomy", () => {
+  for (const code of ["ENOENT", "EACCES", "EPERM", "EISDIR", "ENOTDIR"]) {
+    const error = errorWithCode(code);
+    const classified = classifySkillAuthoringHandoffReadError(
+      error,
+      "/tmp/handoff.json",
+    );
+    assert.ok(classified instanceof CliUserError, code);
+    assert.equal(classified.cause, error, code);
+    assert.equal(
+      classifyCliError(classified).exitCode,
+      CLI_EXIT.userError,
+      code,
+    );
+  }
+
+  for (const code of ["EIO", "EMFILE"]) {
+    const error = errorWithCode(code);
+    const classified = classifySkillAuthoringHandoffReadError(
+      error,
+      "/tmp/handoff.json",
+    );
+    assert.equal(classified, error, code);
+    assert.equal(classified instanceof CliUserError, false, code);
+    assert.equal(
+      classifyCliError(classified).exitCode,
+      CLI_EXIT.internalError,
+      code,
+    );
+  }
 });
 
 test("guide prompt and JSON expose the v1 handoff construction contract", async () => {
@@ -554,6 +720,10 @@ async function assertNoScaffoldSideEffects(target: string): Promise<void> {
   await assert.rejects(stat(path.join(path.dirname(target), "references")));
   await assert.rejects(stat(path.join(path.dirname(target), "scripts")));
   await assert.rejects(stat(path.join(path.dirname(target), "assets")));
+}
+
+function errorWithCode(code: string): Error & { code: string } {
+  return Object.assign(new Error(`${code} fixture`), { code });
 }
 
 async function capture(

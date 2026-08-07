@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeAgentSkillDirectoryName } from "./agent-skills.js";
 import { CliUserError } from "./cli-errors.js";
+import { normalizeDependencyReference } from "./dependency-resolution.js";
 import {
   classifyRepositorySkillEntrypointPath,
   normalizeAssetRepositoryRelativePath,
@@ -107,10 +108,7 @@ export async function readSkillAuthoringHandoff(
   try {
     source = await readFile(handoffPath, "utf8");
   } catch (error) {
-    throw new CliUserError(
-      `Cannot read Skill authoring handoff "${handoffPath}": ${errorMessage(error)}.`,
-      { cause: error },
-    );
+    throw classifySkillAuthoringHandoffReadError(error, handoffPath);
   }
 
   let input: unknown;
@@ -123,6 +121,18 @@ export async function readSkillAuthoringHandoff(
     );
   }
   return validateSkillAuthoringHandoff(input);
+}
+
+/** Preserve unexpected read failures while classifying narrow caller-correctable path errors. */
+export function classifySkillAuthoringHandoffReadError(
+  error: unknown,
+  handoffPath: string,
+): unknown {
+  if (!isCallerCorrectableHandoffReadError(error)) return error;
+  return new CliUserError(
+    `Cannot read Skill authoring handoff "${handoffPath}": ${errorMessage(error)}.`,
+    { cause: error },
+  );
 }
 
 /** Validate the v1 contract and cross-field consistency of caller-supplied state. */
@@ -576,11 +586,28 @@ function validateSupportingRelationship(
       : asset.relationship === "required"
         ? skill.requiresLens
         : skill.optionalLens;
-  if (!relationshipSet.includes(asset.id)) {
+  const normalizedAssetPath = normalizeDependencyReference(asset.path);
+  const represented = relationshipSet.some(
+    (reference) =>
+      reference === asset.id ||
+      normalizeDependencyReference(reference) === normalizedAssetPath,
+  );
+  if (!represented) {
     throw new CliUserError(
       `Supporting ${asset.kind} "${asset.id}" is marked ${asset.relationship} but is absent from the matching Skill relationship list.`,
     );
   }
+}
+
+function isCallerCorrectableHandoffReadError(error: unknown): boolean {
+  const code = nodeErrorCode(error);
+  return (
+    code === "EACCES" ||
+    code === "EISDIR" ||
+    code === "ENOENT" ||
+    code === "ENOTDIR" ||
+    code === "EPERM"
+  );
 }
 
 function requestedRepositorySkillPath(targetPath: string): string | undefined {
@@ -732,4 +759,12 @@ function firstDuplicate(values: readonly string[]): string | undefined {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function nodeErrorCode(error: unknown): string | undefined {
+  return error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+    ? error.code
+    : undefined;
 }
