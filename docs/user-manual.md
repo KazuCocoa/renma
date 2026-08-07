@@ -1938,7 +1938,29 @@ renma readiness . --format json
 
 Readiness combines catalog diagnostics, Context Lens governance diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, selected scan findings, and a compact projection of the prepared Skill Discovery index.
 
-Output includes a readiness score and level, workflow checks, Context Lens counts, diagnostics, scan findings that affect readiness, graph or ownership summary data, and `summary.skillDiscovery`. The Skill Discovery summary reports the existing adoption state and counts for effective published entrypoints, route-eligible Skills, reachable and not-reached Skills, unrouted Skills, usable and unusable routes, unresolved routes, and maximal cyclic components. It does not embed the complete Skill or route graph.
+Readiness answers whether the repository currently passes Renma's readiness
+gates. The authoritative JSON `level` remains `ready`, `needs_attention`, or
+`not_ready`: a score of at least 90 with no failing check is `ready`, 70-89
+with no failing check is `needs_attention`, and a score below 70 or any failing
+check is `not_ready`. `renma readiness` exits `0` only for `ready`; both other
+levels exit `1`.
+
+Markdown adds a presentation-only `Status` so actionable evidence does not
+look contradictory beside a `ready` level:
+
+- `Ready`: level is `ready`, with no warning check, warning diagnostic, or finding.
+- `Ready with advisories`: level is still `ready`, with at least one warning check, warning diagnostic, or finding. An info diagnostic alone is not an advisory.
+- `Needs attention`: level is `needs_attention`.
+- `Not ready`: level is `not_ready`.
+
+`Ready with advisories` is not a fourth machine state and still exits `0`.
+Warning-check and finding counts are shown separately because the underlying
+evidence can overlap. Findings on a `ready` report appear as non-blocking
+findings: they remain actionable, but they do not make the repository Not Ready
+unless an existing readiness score or check rule says so. Finding severity and
+Readiness blocking status are separate dimensions.
+
+Output includes a readiness score and level, workflow checks, Context Lens counts, diagnostics, scan findings, graph or ownership summary data, and `summary.skillDiscovery`. The Skill Discovery summary reports the existing adoption state and counts for effective published entrypoints, route-eligible Skills, reachable and not-reached Skills, unrouted Skills, usable and unusable routes, unresolved routes, and maximal cyclic components. It does not embed the complete Skill or route graph.
 
 The focused checks are `discovery.publication`,
 `discovery.route_validity`, `discovery.coverage`,
