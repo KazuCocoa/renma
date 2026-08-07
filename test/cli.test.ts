@@ -498,6 +498,44 @@ test("CLI reports concise JSONC syntax locations without stack traces", async ()
   assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
+test("commands fail closed on conflicting security profile aliases", async () => {
+  const root = await fixture();
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: {
+          restricted: {
+            humanApprovalRequired: true,
+            requires_human_approval: false,
+          },
+        },
+      },
+    }),
+  );
+  const commands = [
+    ["scan", root, "--json"],
+    ["scan", root, "--json", "--strict"],
+    ["readiness", root, "--format", "json"],
+  ];
+
+  for (const args of commands) {
+    const result = await withCapturedConsole(() => main(args));
+
+    assert.equal(result.code, 2, args.join(" "));
+    assert.equal(result.stdout, "", args.join(" "));
+    assert.match(result.stderr, /security\.profiles\.restricted/);
+    assert.match(
+      result.stderr,
+      /conflicting aliases for humanApprovalRequired/,
+    );
+    assert.match(result.stderr, /humanApprovalRequired=true/);
+    assert.match(result.stderr, /requires_human_approval=false/);
+    assert.doesNotMatch(result.stderr, /strict_scan\.|SEC-|QUAL-/);
+    assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
+  }
+});
+
 test("CLI rejects executable explicit config extensions", async () => {
   const root = await fixture();
   const configPath = path.join(root, "renma.config.mjs");

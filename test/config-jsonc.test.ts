@@ -185,6 +185,35 @@ test("JSONC retains unknown-field and semantic validation", async (t) => {
   }
 });
 
+test("JSONC rejects conflicting security profile aliases", async (t) => {
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.jsonc"),
+    `{
+  "security": {
+    "profiles": {
+      "restricted": {
+        // These aliases express one security boundary and must agree.
+        "networkAllowed": false,
+        "network_allowed": true
+      }
+    }
+  }
+}
+`,
+  );
+
+  await assert.rejects(
+    loadConfig(root, {}),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      /security\.profiles\.restricted/.test(error.message) &&
+      /conflicting aliases for networkAllowed/.test(error.message) &&
+      /networkAllowed=false/.test(error.message) &&
+      /network_allowed=true/.test(error.message),
+  );
+});
+
 async function fixture(t: test.TestContext): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "renma-jsonc-config-"));
   t.after(() => rm(root, { force: true, recursive: true }));

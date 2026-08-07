@@ -7,6 +7,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { buildCiReportFromDiff } from "../src/commands/ci-report.js";
 import { buildDiffReport, diff, formatDiff } from "../src/commands/diff.js";
+import { ConfigError } from "../src/config.js";
 import {
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
@@ -1139,6 +1140,28 @@ test("diff collects and prepares each archived ref exactly once", async () => {
   }
 });
 
+test("diff rejects conflicting aliases in either archived endpoint", async () => {
+  const repo = await createArchivedAliasConflictRepo();
+  try {
+    for (const [fromRef, toRef] of [
+      ["valid-profile", "conflicting-profile"],
+      ["conflicting-profile", "fixed-profile"],
+    ] as const) {
+      await assert.rejects(
+        diff(repo, { fromRef, toRef }),
+        (error: unknown) =>
+          error instanceof ConfigError &&
+          /security\.profiles\.restricted/.test(error.message) &&
+          /conflicting aliases for networkAllowed/.test(error.message) &&
+          /networkAllowed=false/.test(error.message) &&
+          /network_allowed=true/.test(error.message),
+      );
+    }
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("formatDiff tolerates legacy reports without security diff", () => {
   const report = buildDiffReport(
     "/repo",
@@ -1546,6 +1569,51 @@ async function createGitRepo(): Promise<string> {
   await writeSkill(repo, "extra", "stable");
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-m", "head"]);
+  return repo;
+}
+
+async function createArchivedAliasConflictRepo(): Promise<string> {
+  const repo = await createGitRepo();
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: { restricted: { networkAllowed: false } },
+      },
+    }),
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "valid security profile"]);
+  await git(repo, ["tag", "valid-profile"]);
+
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: {
+          restricted: {
+            networkAllowed: false,
+            network_allowed: true,
+          },
+        },
+      },
+    }),
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "ambiguous security profile"]);
+  await git(repo, ["tag", "conflicting-profile"]);
+
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        profiles: { restricted: { network_allowed: false } },
+      },
+    }),
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "fix security profile"]);
+  await git(repo, ["tag", "fixed-profile"]);
   return repo;
 }
 

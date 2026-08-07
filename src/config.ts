@@ -19,6 +19,21 @@ const FORMATS = ["text", "json"] as const;
 const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const SECURITY_PROFILE_ALIAS_GROUPS = {
+  allowedDataClass: ["allowedDataClass", "allowed_data_class"],
+  networkAllowed: ["networkAllowed", "network_allowed"],
+  externalUploadAllowed: ["externalUploadAllowed", "external_upload_allowed"],
+  secretsAllowed: ["secretsAllowed", "secrets_allowed"],
+  humanApprovalRequired: [
+    "humanApprovalRequired",
+    "human_approval_required",
+    "requiresHumanApproval",
+    "requires_human_approval",
+  ],
+  securityProfile: ["securityProfile", "security_profile"],
+  allowedData: ["allowedData", "allowed_data"],
+  forbiddenInputs: ["forbiddenInputs", "forbidden_inputs"],
+} as const;
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = [
@@ -451,24 +466,7 @@ function securityProfiles(
     }
     const source = profile as Record<string, unknown>;
     const allowed = new Set([
-      "allowedDataClass",
-      "allowed_data_class",
-      "networkAllowed",
-      "network_allowed",
-      "externalUploadAllowed",
-      "external_upload_allowed",
-      "secretsAllowed",
-      "secrets_allowed",
-      "humanApprovalRequired",
-      "human_approval_required",
-      "requiresHumanApproval",
-      "requires_human_approval",
-      "securityProfile",
-      "security_profile",
-      "allowedData",
-      "allowed_data",
-      "forbiddenInputs",
-      "forbidden_inputs",
+      ...Object.values(SECURITY_PROFILE_ALIAS_GROUPS).flat(),
       "approvedDomains",
       "approvedUploadDomains",
       "disallowedCommands",
@@ -480,42 +478,70 @@ function securityProfiles(
         );
       }
     }
+    const profilePath = `security.profiles.${name}`;
     normalized[name] = {
-      allowedDataClass: optionalString(
-        `security.profiles.${name}.allowedDataClass`,
-        source.allowedDataClass ?? source.allowed_data_class,
-      ),
-      networkAllowed: optionalBoolean(
-        `security.profiles.${name}.networkAllowed`,
-        source.networkAllowed ?? source.network_allowed,
-      ),
-      externalUploadAllowed: optionalBoolean(
-        `security.profiles.${name}.externalUploadAllowed`,
-        source.externalUploadAllowed ?? source.external_upload_allowed,
-      ),
-      secretsAllowed: optionalBoolean(
-        `security.profiles.${name}.secretsAllowed`,
-        source.secretsAllowed ?? source.secrets_allowed,
-      ),
-      humanApprovalRequired: optionalBoolean(
-        `security.profiles.${name}.humanApprovalRequired`,
-        source.humanApprovalRequired ??
-          source.human_approval_required ??
-          source.requiresHumanApproval ??
-          source.requires_human_approval,
-      ),
-      securityProfile: optionalString(
-        `security.profiles.${name}.securityProfile`,
-        source.securityProfile ?? source.security_profile,
-      ),
-      allowedData: stringList(
-        `security.profiles.${name}.allowedData`,
-        source.allowedData ?? source.allowed_data ?? [],
-      ),
-      forbiddenInputs: stringList(
-        `security.profiles.${name}.forbiddenInputs`,
-        source.forbiddenInputs ?? source.forbidden_inputs ?? [],
-      ),
+      allowedDataClass: resolveAliasedValue({
+        profilePath,
+        field: "allowedDataClass",
+        aliases: SECURITY_PROFILE_ALIAS_GROUPS.allowedDataClass,
+        source,
+        parse: optionalString,
+      }),
+      networkAllowed: resolveAliasedValue({
+        profilePath,
+        field: "networkAllowed",
+        aliases: SECURITY_PROFILE_ALIAS_GROUPS.networkAllowed,
+        source,
+        parse: optionalBoolean,
+      }),
+      externalUploadAllowed: resolveAliasedValue({
+        profilePath,
+        field: "externalUploadAllowed",
+        aliases: SECURITY_PROFILE_ALIAS_GROUPS.externalUploadAllowed,
+        source,
+        parse: optionalBoolean,
+      }),
+      secretsAllowed: resolveAliasedValue({
+        profilePath,
+        field: "secretsAllowed",
+        aliases: SECURITY_PROFILE_ALIAS_GROUPS.secretsAllowed,
+        source,
+        parse: optionalBoolean,
+      }),
+      humanApprovalRequired: resolveAliasedValue({
+        profilePath,
+        field: "humanApprovalRequired",
+        aliases: SECURITY_PROFILE_ALIAS_GROUPS.humanApprovalRequired,
+        source,
+        parse: optionalBoolean,
+      }),
+      securityProfile: resolveAliasedValue({
+        profilePath,
+        field: "securityProfile",
+        aliases: SECURITY_PROFILE_ALIAS_GROUPS.securityProfile,
+        source,
+        parse: optionalString,
+      }),
+      allowedData:
+        resolveAliasedValue({
+          profilePath,
+          field: "allowedData",
+          aliases: SECURITY_PROFILE_ALIAS_GROUPS.allowedData,
+          source,
+          parse: stringList,
+          // The first allowed-data value remains a compatibility class fallback.
+          equals: sameOrderedStringListSemantics,
+        }) ?? [],
+      forbiddenInputs:
+        resolveAliasedValue({
+          profilePath,
+          field: "forbiddenInputs",
+          aliases: SECURITY_PROFILE_ALIAS_GROUPS.forbiddenInputs,
+          source,
+          parse: stringList,
+          // Forbidden-input evaluation and normalized evidence are set-like.
+          equals: sameStringSetSemantics,
+        }) ?? [],
       approvedDomains: stringList(
         `security.profiles.${name}.approvedDomains`,
         source.approvedDomains ?? [],
@@ -531,6 +557,60 @@ function securityProfiles(
     };
   }
   return normalized;
+}
+
+function resolveAliasedValue<T>(options: {
+  profilePath: string;
+  field: string;
+  aliases: readonly string[];
+  source: Record<string, unknown>;
+  parse: (name: string, value: unknown) => T;
+  equals?: (left: T, right: T) => boolean;
+}): T | undefined {
+  const present = options.aliases.filter((alias) =>
+    Object.prototype.hasOwnProperty.call(options.source, alias),
+  );
+  if (present.length === 0) return undefined;
+
+  const parsed = present.map((alias) =>
+    options.parse(`${options.profilePath}.${alias}`, options.source[alias]),
+  );
+  const first = parsed[0]!;
+  const equals = options.equals ?? Object.is;
+  if (parsed.some((value) => !equals(first, value))) {
+    const supplied = present
+      .map((alias) => `${alias}=${describeConfigValue(options.source[alias])}`)
+      .join(", ");
+    throw new ConfigError(
+      `${options.profilePath} has conflicting aliases for ${options.field}: ${supplied}. Use only one spelling or make all aliases equivalent.`,
+    );
+  }
+  return first;
+}
+
+function sameOrderedStringListSemantics(
+  left: string[],
+  right: string[],
+): boolean {
+  const normalizedLeft = [...new Set(left)];
+  const normalizedRight = [...new Set(right)];
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  );
+}
+
+function sameStringSetSemantics(left: string[], right: string[]): boolean {
+  const leftValues = new Set(left);
+  const rightValues = new Set(right);
+  return (
+    leftValues.size === rightValues.size &&
+    [...leftValues].every((value) => rightValues.has(value))
+  );
+}
+
+function describeConfigValue(value: unknown): string {
+  return JSON.stringify(value) ?? String(value);
 }
 
 function optionalString(name: string, value: unknown): string | undefined {

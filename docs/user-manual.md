@@ -323,7 +323,11 @@ an alias for Renma security permission.
   is suspended.
 - A security profile is a non-empty selected name. The name must resolve in
   `security.profiles`; a missing or cyclic chain is diagnosed rather than
-  silently substituted.
+  silently substituted. Profile configuration uses the canonical camelCase
+  field names documented in the
+  [Security Policy Guide](security-policy.md#reusable-security-profiles).
+  Legacy aliases remain accepted individually, but conflicting aliases for one
+  semantic profile field are rejected as a configuration error.
 - Floating-dependency allowances have an exact lowercase `npm:` or `pypi:`
   prefix followed by one supported package name and a selector classified as
   bare, dist-tag, range, or wildcard. They do not accept exact versions,
