@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-08-08
+
 ### Added
 
 - Added the versioned `renma.skill-authoring-handoff.v1` exchange contract,
@@ -2097,7 +2099,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/KazuCocoa/renma/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/KazuCocoa/renma/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/KazuCocoa/renma/compare/v0.28.5...v0.29.0
 [0.28.5]: https://github.com/KazuCocoa/renma/compare/v0.28.4...v0.28.5
