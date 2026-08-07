@@ -1966,6 +1966,37 @@ deltas. Each detail collection uses the shared presentation limit and directs
 reviewers to JSON when more items exist. JSON remains the complete, unbounded
 machine-readable report and is unaffected by Markdown disclosure.
 
+When an asset's normalized effective security boundary changes, the `Security
+Changes` section under `Full report details` adds only the non-empty policy
+details. Scalar network, external-upload, secret-handling, and human-approval
+fields render as `before -> after`. Approved network destinations, approved
+upload destinations, allowed-data values, forbidden inputs, and disallowed
+commands render as separate added and removed values. Removed forbidden inputs
+and removed disallowed commands remain visible. If network or upload access
+becomes enabled while the resulting effective destination list is empty, the
+Markdown says `none declared`; it does not call that state unrestricted.
+
+JSON exposes the additive `diff.security.policyChanges` array with the complete
+normalized before/after effective-policy state, changed fields, canonical asset
+ID/path, and field-level provenance. Provenance labels a change `direct`,
+`inherited`, or `mixed` and names the asset, owning Skill, selected or changed
+security profile, and/or repository security configuration supported by the
+existing evidence. `diff.security.sharedPolicyChanges` groups a changed reusable
+profile or repository security configuration with the complete, deterministically
+sorted list of assets that receive an effective-policy change. Markdown shows
+the affected count and a sorted list bounded by the shared presentation limit;
+JSON retains every asset and every value. Declaration reordering and duplicate
+list values do not create semantic changes, and Markdown does not print policy
+fingerprints.
+
+These policy details are a deterministic projection of static declared and
+effective Renma evidence. An approved destination is not the same as a
+destination mentioned in instructions, and neither is evidence that a runtime
+connection or upload occurred. The projection adds no target detector, runtime
+monitoring, permission inference, or enforcement. It does not classify a policy
+change as an improvement or regression and does not change CI status or exit
+behavior, `scan --fail-on`, Readiness score, or Readiness level.
+
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so
 declared, inherited, and unowned states remain explicit.
