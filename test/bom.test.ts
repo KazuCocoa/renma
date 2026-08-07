@@ -525,6 +525,7 @@ test("bom markdown is a compact human-review report", async () => {
   assert.match(markdown, /\| Policy assets \| 2 \|/);
   assert.match(markdown, /\| Assets without effective policy \| 2 \|/);
   assert.match(markdown, /\| Network unspecified \| 2 \|/);
+  assert.match(markdown, /\| Upload permission unspecified \| 2 \|/);
 });
 
 test("bom markdown escapes repository-derived table cells", async () => {
@@ -1593,6 +1594,13 @@ function expectedBomContract(): BomReport {
             false: 2,
             unspecified: 0,
           },
+          externalUploadGovernance: {
+            denied: 2,
+            allowedApprovalRequired: 0,
+            allowedNoApprovalRequired: 0,
+            allowedApprovalUnspecified: 0,
+            unspecified: 0,
+          },
           secretsAllowed: {
             true: 0,
             false: 2,
@@ -1672,6 +1680,13 @@ function expectedBomContract(): BomReport {
       externalUploadAllowed: {
         true: 0,
         false: 2,
+        unspecified: 0,
+      },
+      externalUploadGovernance: {
+        denied: 2,
+        allowedApprovalRequired: 0,
+        allowedNoApprovalRequired: 0,
+        allowedApprovalUnspecified: 0,
         unspecified: 0,
       },
       secretsAllowed: {

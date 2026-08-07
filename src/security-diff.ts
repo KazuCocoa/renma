@@ -4,6 +4,7 @@ import {
 } from "./security-posture.js";
 import {
   zeroSecurityPolicyInventorySummary,
+  type ExternalUploadGovernanceCounts,
   type PolicyBooleanCounts,
   type SecurityPolicyInventorySummary,
 } from "./security-policy-inventory.js";
@@ -26,6 +27,8 @@ export interface PolicyBooleanDelta {
   unspecified: number;
 }
 
+export type ExternalUploadGovernanceDelta = ExternalUploadGovernanceCounts;
+
 export interface SecurityPolicyInventoryDelta {
   totalPolicyAssets: number;
   assetsWithLocalPolicyMetadata: number;
@@ -38,6 +41,7 @@ export interface SecurityPolicyInventoryDelta {
   >;
   networkAllowed: PolicyBooleanDelta;
   externalUploadAllowed: PolicyBooleanDelta;
+  externalUploadGovernance: ExternalUploadGovernanceDelta;
   secretsAllowed: PolicyBooleanDelta;
   humanApprovalRequired: PolicyBooleanDelta;
   approvedNetworkDestinationCount: number;
@@ -139,6 +143,7 @@ export function zeroSecurityPolicyInventoryDelta(): SecurityPolicyInventoryDelta
     },
     networkAllowed: zeroPolicyBooleanDelta(),
     externalUploadAllowed: zeroPolicyBooleanDelta(),
+    externalUploadGovernance: zeroExternalUploadGovernanceDelta(),
     secretsAllowed: zeroPolicyBooleanDelta(),
     humanApprovalRequired: zeroPolicyBooleanDelta(),
     approvedNetworkDestinationCount: 0,
@@ -200,6 +205,10 @@ function deltaSecurityPolicyInventory(
       to.externalUploadAllowed,
       from.externalUploadAllowed,
     ),
+    externalUploadGovernance: deltaExternalUploadGovernance(
+      to.externalUploadGovernance,
+      from.externalUploadGovernance,
+    ),
     secretsAllowed: deltaPolicyBoolean(to.secretsAllowed, from.secretsAllowed),
     humanApprovalRequired: deltaPolicyBoolean(
       to.humanApprovalRequired,
@@ -233,5 +242,37 @@ function zeroPolicyBooleanDelta(): PolicyBooleanDelta {
     true: 0,
     false: 0,
     unspecified: 0,
+  };
+}
+
+function zeroExternalUploadGovernanceDelta(): ExternalUploadGovernanceDelta {
+  return {
+    denied: 0,
+    allowedApprovalRequired: 0,
+    allowedNoApprovalRequired: 0,
+    allowedApprovalUnspecified: 0,
+    unspecified: 0,
+  };
+}
+
+function deltaExternalUploadGovernance(
+  to: ExternalUploadGovernanceCounts,
+  from: ExternalUploadGovernanceCounts,
+): ExternalUploadGovernanceDelta {
+  return {
+    denied: deltaNumber(to.denied, from.denied),
+    allowedApprovalRequired: deltaNumber(
+      to.allowedApprovalRequired,
+      from.allowedApprovalRequired,
+    ),
+    allowedNoApprovalRequired: deltaNumber(
+      to.allowedNoApprovalRequired,
+      from.allowedNoApprovalRequired,
+    ),
+    allowedApprovalUnspecified: deltaNumber(
+      to.allowedApprovalUnspecified,
+      from.allowedApprovalUnspecified,
+    ),
+    unspecified: deltaNumber(to.unspecified, from.unspecified),
   };
 }

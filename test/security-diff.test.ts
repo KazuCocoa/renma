@@ -120,6 +120,11 @@ test("policy boolean deltas are computed per bucket", () => {
     summary.externalUploadAllowed.true = 2;
     summary.externalUploadAllowed.false = 1;
     summary.externalUploadAllowed.unspecified = 0;
+    summary.externalUploadGovernance.denied = 1;
+    summary.externalUploadGovernance.allowedApprovalRequired = 1;
+    summary.externalUploadGovernance.allowedNoApprovalRequired = 1;
+    summary.externalUploadGovernance.allowedApprovalUnspecified = 0;
+    summary.externalUploadGovernance.unspecified = 0;
   });
   const to = inventory((summary) => {
     summary.networkAllowed.true = 3;
@@ -128,6 +133,11 @@ test("policy boolean deltas are computed per bucket", () => {
     summary.externalUploadAllowed.true = 1;
     summary.externalUploadAllowed.false = 4;
     summary.externalUploadAllowed.unspecified = 2;
+    summary.externalUploadGovernance.denied = 4;
+    summary.externalUploadGovernance.allowedApprovalRequired = 0;
+    summary.externalUploadGovernance.allowedNoApprovalRequired = 1;
+    summary.externalUploadGovernance.allowedApprovalUnspecified = 0;
+    summary.externalUploadGovernance.unspecified = 2;
   });
 
   const summary = buildSecurityDiffSummary({
@@ -145,6 +155,13 @@ test("policy boolean deltas are computed per bucket", () => {
   assert.deepEqual(summary.policyInventory.externalUploadAllowed, {
     true: -1,
     false: 3,
+    unspecified: 2,
+  });
+  assert.deepEqual(summary.policyInventory.externalUploadGovernance, {
+    denied: 3,
+    allowedApprovalRequired: -1,
+    allowedNoApprovalRequired: 0,
+    allowedApprovalUnspecified: 0,
     unspecified: 2,
   });
 });

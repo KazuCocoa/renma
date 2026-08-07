@@ -650,6 +650,98 @@ test("asset-local booleans count true false and unspecified effective values", (
   });
 });
 
+test("external upload governance counts all five effective states", () => {
+  const summary = summarizeSecurityPolicyInventory([
+    artifact(
+      "skills/denied/SKILL.md",
+      "skill",
+      policy({
+        externalUploadAllowed: false,
+        humanApprovalRequired: true,
+      }),
+    ),
+    artifact(
+      "skills/approval-required/SKILL.md",
+      "skill",
+      policy({
+        externalUploadAllowed: true,
+        humanApprovalRequired: true,
+      }),
+    ),
+    artifact(
+      "skills/approval-not-required/SKILL.md",
+      "skill",
+      policy({
+        externalUploadAllowed: true,
+        humanApprovalRequired: false,
+      }),
+    ),
+    artifact(
+      "skills/approval-unspecified/SKILL.md",
+      "skill",
+      policy({ externalUploadAllowed: true }),
+    ),
+    artifact(
+      "skills/upload-unspecified/SKILL.md",
+      "skill",
+      policy({ humanApprovalRequired: true }),
+    ),
+  ]);
+
+  assert.deepEqual(summary.externalUploadGovernance, {
+    denied: 1,
+    allowedApprovalRequired: 1,
+    allowedNoApprovalRequired: 1,
+    allowedApprovalUnspecified: 1,
+    unspecified: 1,
+  });
+  assert.equal(
+    Object.values(summary.externalUploadGovernance).reduce(
+      (total, count) => total + count,
+      0,
+    ),
+    summary.totalPolicyAssets,
+  );
+  assert.equal(
+    summary.externalUploadAllowed.true +
+      summary.externalUploadAllowed.false +
+      summary.externalUploadAllowed.unspecified,
+    summary.totalPolicyAssets,
+  );
+  assert.equal(
+    summary.humanApprovalRequired.true +
+      summary.humanApprovalRequired.false +
+      summary.humanApprovalRequired.unspecified,
+    summary.totalPolicyAssets,
+  );
+});
+
+test("upload denial wins and approval never implies unspecified permission", () => {
+  const summary = summarizeSecurityPolicyInventory([
+    artifact(
+      "skills/denied/SKILL.md",
+      "skill",
+      policy({
+        externalUploadAllowed: false,
+        humanApprovalRequired: false,
+      }),
+    ),
+    artifact(
+      "skills/unspecified/SKILL.md",
+      "skill",
+      policy({ humanApprovalRequired: false }),
+    ),
+  ]);
+
+  assert.deepEqual(summary.externalUploadGovernance, {
+    denied: 1,
+    allowedApprovalRequired: 0,
+    allowedNoApprovalRequired: 0,
+    allowedApprovalUnspecified: 0,
+    unspecified: 1,
+  });
+});
+
 test("destinations and forbidden inputs are deduped per asset", () => {
   const summary = summarizeSecurityPolicyInventory([
     artifact(
@@ -802,6 +894,41 @@ test("resolved security profiles count as referenced and contribute policy", () 
   assert.equal(summary.approvedNetworkDestinationCount, 1);
   assert.equal(summary.approvedUploadDestinationCount, 1);
   assert.equal(summary.disallowedCommandCount, 1);
+});
+
+test("external upload governance uses profile-resolved and local effective values", () => {
+  const inputs = [
+    artifact(
+      "skills/profile-upload/SKILL.md",
+      "skill",
+      policy({
+        securityProfile: "upload-permitted",
+        humanApprovalRequired: true,
+      }),
+    ),
+  ];
+  const config = {
+    ...baseSecurityConfig(),
+    profiles: {
+      "upload-permitted": profile({ externalUploadAllowed: true }),
+    },
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(inputs, config);
+  const asset = evidence[0];
+  const summary = summarizeSecurityPolicyAssetEvidence(evidence);
+
+  assert.equal(asset?.declaredPolicy?.externalUploadAllowed, null);
+  assert.equal(asset?.declaredPolicy?.humanApprovalRequired, true);
+  assert.equal(asset?.effectivePolicy.externalUploadAllowed, true);
+  assert.equal(asset?.effectivePolicy.humanApprovalRequired, true);
+  assert.deepEqual(asset?.policySources, ["local", "security_profile"]);
+  assert.deepEqual(summary.externalUploadGovernance, {
+    denied: 0,
+    allowedApprovalRequired: 1,
+    allowedNoApprovalRequired: 0,
+    allowedApprovalUnspecified: 0,
+    unspecified: 0,
+  });
 });
 
 test("missing security profiles increment missing profile counts", () => {

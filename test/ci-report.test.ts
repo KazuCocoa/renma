@@ -631,6 +631,7 @@ test("formatCiReport includes target security policy inventory", () => {
   assert.match(markdown, /^## Security Policy Inventory$/m);
   assert.match(markdown, /- Target assets with local policy metadata: 3/);
   assert.match(markdown, /- Target assets without effective policy: 1/);
+  assert.match(markdown, /- Target upload permission unspecified: 5/);
   assert.match(markdown, /- Target referenced security profiles: 2/);
   assert.match(markdown, /- Target missing security profiles: 1/);
   assert.match(markdown, /- Target approved network destinations: 4/);
@@ -690,14 +691,14 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   assert.match(markdown, /- Assets with local policy metadata: \+2/);
   assert.match(markdown, /- Assets without effective policy: -1/);
   assert.match(markdown, /- Network denied: \+1/);
-  assert.match(markdown, /- External upload denied: \+1/);
+  assert.match(markdown, /- Upload denied: \+1/);
   assert.match(markdown, /- Secrets denied: \+1/);
   assert.match(markdown, /- Human approval required: \+1/);
   assert.match(markdown, /- Forbidden inputs: \+1/);
   assert.match(markdown, /- Missing security profiles: \+1/);
   assert.match(
     markdown.slice(0, markdown.indexOf("<details>")),
-    /- Finding\/policy changes: findings \+1\/-1; security policy metrics ~9/,
+    /- Finding\/policy changes: findings \+1\/-1; security policy metrics ~11/,
   );
 });
 
@@ -2212,7 +2213,7 @@ test("ci report keeps an owner-covered Skill, resolved edge, and fail-closed pol
       /- `assets\.minimum_inventory`: pass\/info -> pass\/info; summary changed: yes/,
     );
     assert.match(markdown, /- Network denied: \+1/);
-    assert.match(markdown, /- External upload denied: \+1/);
+    assert.match(markdown, /- Upload denied: \+1/);
     assert.match(markdown, /- Secrets denied: \+1/);
     assert.match(markdown, /- Human approval required: \+1/);
     assert.match(markdown, /- Forbidden inputs: \+1/);
@@ -2993,6 +2994,11 @@ function policyInventory(
     input.assetsWithoutEffectivePolicy ?? 0;
   inventory.networkAllowed.false = input.networkDenied ?? 0;
   inventory.externalUploadAllowed.false = input.externalUploadDenied ?? 0;
+  inventory.externalUploadGovernance.denied = input.externalUploadDenied ?? 0;
+  inventory.externalUploadGovernance.unspecified = Math.max(
+    0,
+    inventory.totalPolicyAssets - inventory.externalUploadGovernance.denied,
+  );
   inventory.secretsAllowed.false = input.secretsDenied ?? 0;
   inventory.humanApprovalRequired.true = input.humanApprovalRequired ?? 0;
   inventory.forbiddenInputCount = input.forbiddenInputCount ?? 0;

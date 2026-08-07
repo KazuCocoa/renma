@@ -628,6 +628,39 @@ test("readiness markdown includes security policy inventory", async () => {
   assert.match(markdown, /- credentials: 1/);
 });
 
+test("readiness reports combined external upload governance states", async () => {
+  const root = await fixture();
+  await writeUploadPolicySkill(root, "upload-denied", false, true);
+  await writeUploadPolicySkill(root, "upload-approved", true, true);
+  await writeUploadPolicySkill(root, "upload-direct", true, false);
+
+  const report = await readiness(root);
+  const markdown = formatReadinessMarkdown(report);
+  const parsed = JSON.parse(formatReadinessJson(report)) as ReadinessReport;
+
+  assert.match(markdown, /\| Upload denied \| 1 \|/);
+  assert.match(markdown, /\| Upload allowed; approval required \| 1 \|/);
+  assert.match(markdown, /\| Upload allowed; approval not required \| 1 \|/);
+  assert.deepEqual(
+    parsed.summary.securityPolicyInventory.externalUploadGovernance,
+    {
+      denied: 1,
+      allowedApprovalRequired: 1,
+      allowedNoApprovalRequired: 1,
+      allowedApprovalUnspecified: 0,
+      unspecified: 0,
+    },
+  );
+  assert.deepEqual(
+    parsed.summary.securityPolicyInventory.externalUploadAllowed,
+    { true: 2, false: 1, unspecified: 0 },
+  );
+  assert.deepEqual(
+    parsed.summary.securityPolicyInventory.humanApprovalRequired,
+    { true: 2, false: 1, unspecified: 0 },
+  );
+});
+
 test("readiness markdown prints a compact reviewable report", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform" });
@@ -1055,6 +1088,31 @@ async function writePolicySkill(root: string): Promise<void> {
       `  renma.forbidden-inputs: '["credentials"]'`,
       "---",
       workflowReadySkillBody("policy"),
+    ].join("\n"),
+  );
+}
+
+async function writeUploadPolicySkill(
+  root: string,
+  id: string,
+  externalUploadAllowed: boolean,
+  humanApprovalRequired: boolean,
+): Promise<void> {
+  await mkdir(path.join(root, "skills", id), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", id, "SKILL.md"),
+    [
+      "---",
+      `name: ${id}`,
+      "description: Review a deterministic upload-governance fixture. Use when reporting combined static policy evidence.",
+      "metadata:",
+      `  renma.id: ${id}`,
+      "  renma.owner: platform",
+      "  renma.status: stable",
+      `  renma.external-upload-allowed: "${externalUploadAllowed}"`,
+      `  renma.requires-human-approval: "${humanApprovalRequired}"`,
+      "---",
+      workflowReadySkillBody(id),
     ].join("\n"),
   );
 }
