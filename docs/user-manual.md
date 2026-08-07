@@ -1197,6 +1197,26 @@ renma commands fall into a few groups:
 
 Use `renma --version` (or `renma -v`) to print the installed package version.
 
+### Exit codes
+
+The Renma CLI exposes one process-level exit-code contract:
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | The command completed successfully. |
+| `1` | The command completed and emitted its normal report, but the requested Renma policy or status gate did not pass. |
+| `2` | The invocation, configuration, requested target, or Git comparison ref is invalid or unavailable and can be corrected by the caller. |
+| `3` | Renma encountered an unexpected internal failure. |
+
+Exit `1` is a completed semantic outcome, not a command-execution error. For
+example, a `ci-report` that is generated successfully with status `FAIL` exits
+`1`. A `ci-report` that cannot resolve its requested baseline ref exits `2`
+without generating a report. An unexpected invariant or implementation failure
+exits `3` with a concise stderr message. Successful reports and completed
+exit-`1` reports remain on stdout; invocation, configuration, input, and
+internal error messages use stderr. Exit codes are process metadata and do not
+add fields to Renma's JSON report schemas.
+
 ## Scan, Catalog, Graph, Trust Graph, Readiness, And BOM
 
 These commands are related, but they answer different repository-review questions.
@@ -2010,12 +2030,22 @@ Security posture, Context Lens, and Skill Discovery summaries remain static repo
 Compares deterministic repository evidence for two git refs.
 
 ```bash
+renma diff . --base origin/main
+renma diff . --from main
 renma diff . --from main --to HEAD
 renma diff . --from main --to HEAD --format markdown
 ```
 
 Use this to review changes in Renma evidence between branches or commits. This is
 not a generic source-code diff.
+
+Exactly one baseline is required: `--from <ref>` or its ergonomic alias
+`--base <ref>`. Renma does not guess a baseline, and supplying both options is
+an exit-`2` usage error even when their values match. `--to <ref>` defaults to
+the concrete Git ref `HEAD`; it does not mean the uncommitted working tree.
+Explicit `--to` still selects another target ref. Renma compares the requested
+refs directly and does not substitute a merge base. Invalid baseline or target
+refs exit `2`, with no generated comparison report.
 
 Output includes readiness deltas, changed assets, graph edge changes, check
 changes, added or removed findings, and an additive
@@ -2066,18 +2096,25 @@ readers to JSON for omitted entries.
 Formats a diff result for CI or pull-request review.
 
 ```bash
+renma ci-report . --base origin/main
+renma ci-report . --from main
 renma ci-report . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format json
 renma ci-report . --from main --to HEAD --fail-on-status warn
 ```
+
+`ci-report` uses exactly the same ref contract as `diff`: one mandatory
+`--from` or `--base` baseline, a `--to` default of the Git ref `HEAD`, a
+from/base conflict error, and exit `2` for an invalid requested ref.
 
 The report summarizes readiness deltas, graph-resolution changes, added and
 removed findings, inspection-coverage regressions, and policy-relevant status.
 By default (`--fail-on-status fail`), `PASS` and `WARN` exit `0` and `FAIL`
 exits `1`. With `--fail-on-status warn`, `PASS` exits `0` while `WARN` and
 `FAIL` exit `1`. The threshold never changes the semantic report status and is
-never read from repository configuration. Usage, command, or configuration
-errors exit `2`.
+never read from repository configuration. Usage, command, configuration,
+target, or ref errors exit `2`; unexpected Renma failures exit `3`. See
+[Exit codes](#exit-codes) for the authoritative process contract.
 
 A worse readiness level, a previously passing readiness check becoming
 failing/error, a new blocking readiness check, or a newly introduced blocking
@@ -2674,9 +2711,9 @@ A typical CI flow is:
 1. Build renma.
 2. Run `renma scan . --fail-on high --strict`.
 3. Run `renma readiness . --format json` and store the result as an artifact.
-4. Compare refs with `renma diff . --from main --to HEAD`.
+4. Compare refs with `renma diff . --base origin/main`.
 5. Publish and enforce
-   `renma ci-report . --from main --to HEAD --format markdown --fail-on-status warn`
+   `renma ci-report . --base origin/main --format markdown --fail-on-status warn`
    in the pull-request summary.
 
 Example:
@@ -2685,7 +2722,7 @@ Example:
 npm run build
 renma scan . --fail-on high --strict
 renma readiness . --format json > renma-readiness.json
-renma ci-report . --from main --to HEAD --format markdown --fail-on-status warn
+renma ci-report . --base origin/main --format markdown --fail-on-status warn
 ```
 
 These gates are complementary: strict scan validates the current target state,

@@ -1,6 +1,7 @@
 import packageJson from "../../package.json" with { type: "json" };
 
 import { canonicalSha256 } from "../canonical-json.js";
+import { CliUserError } from "../cli-errors.js";
 import type { ConfigOverrides } from "../config.js";
 import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
 import {
@@ -391,7 +392,7 @@ function resolveExecutionContractSubject(
 ): Asset & { kind: "skill" } {
   const normalized = normalizeSkillRouteTarget(entrypoint);
   if (normalized.rejection) {
-    throw new Error(
+    throw new CliUserError(
       `execution-contract --entrypoint is not a safe repository Skill identity or path (${normalized.rejection}): ${entrypoint}`,
     );
   }
@@ -407,18 +408,18 @@ function resolveExecutionContractSubject(
     ).values(),
   ].sort(compareAssets);
   if (idMatches.length > 1 || matches.length > 1) {
-    throw new Error(
+    throw new CliUserError(
       `execution-contract --entrypoint is ambiguous; use one exact repository-relative SKILL.md path: ${entrypoint}`,
     );
   }
   const selected = matches[0];
   if (!selected) {
-    throw new Error(
+    throw new CliUserError(
       `execution-contract --entrypoint did not match any asset ID or repository-relative path: ${entrypoint}`,
     );
   }
   if (selected.kind !== "skill") {
-    throw new Error(
+    throw new CliUserError(
       `execution-contract --entrypoint resolved to non-Skill asset ${selected.id} (${selected.kind}) at ${selected.sourcePath}`,
     );
   }
@@ -434,7 +435,7 @@ function assertExecutableSubjectIdentityIsSafe(
     .map((asset) => asset.sourcePath)
     .sort((left, right) => left.localeCompare(right));
   if (duplicatePaths.length > 1) {
-    throw new Error(
+    throw new CliUserError(
       `execution-contract cannot build a safe executable projection for ${subject.sourcePath} because Skill ID ${subject.id} is duplicated at: ${duplicatePaths.join(", ")}`,
     );
   }
@@ -461,7 +462,7 @@ function assertExecutableGraphIdentityNamespaceIsSafe(
     }))
     .sort((left, right) => left.value.localeCompare(right.value));
   if (collisions.length === 0) return;
-  throw new Error(
+  throw new CliUserError(
     `execution-contract cannot build a safe executable projection because Skill IDs collide with repository-script paths: ${collisions
       .map(
         (collision) =>
@@ -484,6 +485,7 @@ function executableProjection(
       focus,
     );
   } catch (error) {
+    if (error instanceof CliUserError) throw error;
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(
       `execution-contract could not build the canonical executable projection safely: ${reason}`,

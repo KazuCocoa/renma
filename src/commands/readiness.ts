@@ -33,6 +33,7 @@ import {
   type SkillDiscoveryIndex,
   type SkillRouteUsabilityReason,
 } from "../skill-discovery.js";
+import { CLI_EXIT } from "../cli-errors.js";
 
 export type ReadinessFormat = "json" | "markdown";
 
@@ -159,7 +160,7 @@ export async function runReadinessCommand(
 ): Promise<number> {
   const report = await readiness(targetPath, options.overrides ?? {});
   process.stdout.write(formatReadiness(report, options.format));
-  return report.level === "ready" ? 0 : 1;
+  return report.level === "ready" ? CLI_EXIT.success : CLI_EXIT.policyFailure;
 }
 
 export async function readiness(

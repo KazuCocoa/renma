@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { CliUserError } from "../cli-errors.js";
 import type { ConfigOverrides } from "../config.js";
 import {
   prepareDeclaredCompositionIndex,
@@ -164,7 +165,7 @@ export async function runGraphCommand(
     report = discoveryGraphReport(fullReport, discovery);
   } else if (view === "composition" || view === "impact") {
     if (!options.focus) {
-      throw new Error(
+      throw new CliUserError(
         `graph --view ${view} requires --focus <asset-id-or-path>.`,
       );
     }
@@ -275,7 +276,7 @@ function resolveFocusNode(report: GraphReport, focus: string): GraphNode {
     matchesFocus(candidate, report.root, focus),
   );
   if (!node) {
-    throw new Error(
+    throw new CliUserError(
       `graph --focus did not match any asset id or source path: ${focus}`,
     );
   }

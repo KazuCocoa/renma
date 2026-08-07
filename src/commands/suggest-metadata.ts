@@ -1,5 +1,6 @@
 import { lstat, realpath, stat } from "node:fs/promises";
 import path from "node:path";
+import { CliUserError } from "../cli-errors.js";
 import type { SkillParentResolution } from "../catalog.js";
 import { renmaCommand } from "../command-invocation.js";
 import {
@@ -40,7 +41,7 @@ export interface SuggestMetadataOptions {
   owner?: string;
 }
 
-export class SuggestMetadataTargetError extends Error {
+export class SuggestMetadataTargetError extends CliUserError {
   constructor(target: string, cause: unknown) {
     super(
       `Could not read metadata target ${target}: ${readErrorReason(cause)}`,
@@ -73,7 +74,10 @@ export async function buildMetadataSuggestion(
       unresolvedArtifactPath: "input",
     });
   } catch (error) {
-    throw new SuggestMetadataTargetError(target, error);
+    if (isTargetReadError(error)) {
+      throw new SuggestMetadataTargetError(target, error);
+    }
+    throw error;
   }
   const {
     absolutePath,
@@ -523,6 +527,20 @@ function isMissingFileError(error: unknown): boolean {
     error !== null &&
     "code" in error &&
     (error as { code?: unknown }).code === "ENOENT"
+  );
+}
+
+function isTargetReadError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return false;
+  }
+  const code = (error as { code?: unknown }).code;
+  return (
+    code === "EACCES" ||
+    code === "EISDIR" ||
+    code === "ENOENT" ||
+    code === "ENOTDIR" ||
+    code === "EPERM"
   );
 }
 

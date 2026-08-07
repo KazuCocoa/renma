@@ -4,7 +4,9 @@ import { test } from "node:test";
 import fc from "fast-check";
 
 import { COMMAND_HELP, type CommandName } from "../src/cli-help.js";
-import { COMMAND_REGISTRY, main } from "../src/cli.js";
+import { COMMAND_REGISTRY, comparisonRefs, main } from "../src/cli.js";
+import { classifyCliError, CLI_EXIT, CliUserError } from "../src/cli-errors.js";
+import { ConfigError } from "../src/config.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
 const DEFAULT_FORMATS: Partial<Record<CommandName, string>> = {
@@ -157,12 +159,14 @@ test("the registry dispatches every command to its command-specific parser", asy
     {
       name: "diff",
       argv: ["diff"],
-      expectedError: /diff requires --from <ref> and --to <ref>/,
+      expectedError:
+        /diff requires a comparison baseline via --from <ref> or --base <ref>/,
     },
     {
       name: "ci-report",
       argv: ["ci-report"],
-      expectedError: /ci-report requires --from <ref> and --to <ref>/,
+      expectedError:
+        /ci-report requires a comparison baseline via --from <ref> or --base <ref>/,
     },
     {
       name: "inspect",
@@ -197,6 +201,164 @@ test("the registry dispatches every command to its command-specific parser", asy
     assert.equal(result.stdout, "", item.name);
     assert.match(result.stderr, item.expectedError, item.name);
     assert.match(result.stderr, new RegExp(`renma ${item.name} --help`));
+  }
+});
+
+test("comparison refs share aliases, conflict handling, and the HEAD default", () => {
+  for (const command of ["diff", "ci-report"] as const) {
+    assert.deepEqual(comparisonRefs({ from: "main" }, command), {
+      fromRef: "main",
+      toRef: "HEAD",
+    });
+    assert.deepEqual(comparisonRefs({ base: "main" }, command), {
+      fromRef: "main",
+      toRef: "HEAD",
+    });
+    assert.deepEqual(
+      comparisonRefs({ from: "main", to: "candidate" }, command),
+      { fromRef: "main", toRef: "candidate" },
+    );
+    assert.deepEqual(
+      comparisonRefs({ base: "main", to: "candidate" }, command),
+      { fromRef: "main", toRef: "candidate" },
+    );
+    assert.deepEqual(comparisonRefs({ from: "main", base: "main" }, command), {
+      error: "Use either --from or --base, not both.",
+    });
+    const missing = comparisonRefs({}, command);
+    assert.match(
+      "error" in missing ? missing.error : "",
+      /requires a comparison baseline/,
+    );
+  }
+});
+
+test("CLI error classification reserves exit 3 for unexpected failures", () => {
+  assert.deepEqual(classifyCliError(new ConfigError("bad config")), {
+    exitCode: CLI_EXIT.userError,
+    message: "bad config",
+  });
+  assert.deepEqual(classifyCliError(new CliUserError("bad input")), {
+    exitCode: CLI_EXIT.userError,
+    message: "bad input",
+  });
+  assert.deepEqual(classifyCliError(new Error("broken invariant")), {
+    exitCode: CLI_EXIT.internalError,
+    message: "Renma internal error: broken invariant",
+  });
+});
+
+test("main reports an injected unexpected command failure as exit 3", async () => {
+  const originalExecute = COMMAND_REGISTRY.scan.execute;
+  COMMAND_REGISTRY.scan.execute = async () => {
+    throw new Error("injected command failure");
+  };
+  try {
+    const result = await captureConsole(() => main(["scan", "."]));
+    assert.equal(result.code, CLI_EXIT.internalError);
+    assert.equal(result.stdout, "");
+    assert.equal(
+      result.stderr,
+      "Renma internal error: injected command failure\n",
+    );
+    assert.doesNotMatch(result.stderr, /\n\s+at\s+/);
+  } finally {
+    COMMAND_REGISTRY.scan.execute = originalExecute;
+  }
+});
+
+test("diff and ci-report expose the same comparison-ref CLI contract", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-comparison-refs-",
+    testContext: t,
+  });
+  await fixture.initializeGit();
+  await fixture.write("README.md", "# Baseline\n");
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "baseline"]);
+  await fixture.git(["checkout", "-b", "feature"]);
+  await fixture.write("README.md", "# Feature\n");
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "feature"]);
+
+  for (const command of ["diff", "ci-report"] as const) {
+    for (const refs of [
+      ["--from", "main", "--to", "HEAD"],
+      ["--base", "main", "--to", "HEAD"],
+      ["--from", "main"],
+      ["--base", "main"],
+    ]) {
+      const result = await captureConsole(() =>
+        main([command, fixture.root, ...refs, "--format", "json"]),
+      );
+      assert.equal(
+        result.code,
+        CLI_EXIT.success,
+        `${command} ${refs.join(" ")}`,
+      );
+      assert.equal(result.stderr, "");
+      const report = JSON.parse(result.stdout) as {
+        from: { ref: string };
+        to: { ref: string };
+      };
+      assert.equal(report.from.ref, "main");
+      assert.equal(report.to.ref, "HEAD");
+    }
+
+    const conflict = await captureConsole(() =>
+      main([command, fixture.root, "--from", "main", "--base", "main"]),
+    );
+    assert.equal(conflict.code, CLI_EXIT.userError);
+    assert.equal(conflict.stdout, "");
+    assert.match(conflict.stderr, /Use either --from or --base, not both/);
+
+    const missing = await captureConsole(() => main([command, fixture.root]));
+    assert.equal(missing.code, CLI_EXIT.userError);
+    assert.equal(missing.stdout, "");
+    assert.match(missing.stderr, /requires a comparison baseline/);
+
+    for (const refs of [
+      ["--from", "missing-from"],
+      ["--base", "missing-base"],
+      ["--base", "main", "--to", "missing-to"],
+    ]) {
+      const invalid = await captureConsole(() =>
+        main([command, fixture.root, ...refs, "--format", "json"]),
+      );
+      assert.equal(
+        invalid.code,
+        CLI_EXIT.userError,
+        `${command} ${refs.join(" ")}`,
+      );
+      assert.equal(invalid.stdout, "");
+      assert.match(invalid.stderr, /Could not resolve Git comparison ref/);
+      assert.match(invalid.stderr, /missing-(?:from|base|to)/);
+      assert.doesNotMatch(invalid.stderr, /Renma internal error/);
+    }
+  }
+});
+
+test("diff and ci-report classify invalid comparison targets as user errors", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-invalid-comparison-target-",
+    testContext: t,
+  });
+  await fixture.write("README.md", "# Not a Git repository\n");
+
+  for (const command of ["diff", "ci-report"] as const) {
+    const notGit = await captureConsole(() =>
+      main([command, fixture.root, "--base", "HEAD"]),
+    );
+    assert.equal(notGit.code, CLI_EXIT.userError);
+    assert.equal(notGit.stdout, "");
+    assert.match(notGit.stderr, /not an appropriate Git repository/);
+
+    const missing = await captureConsole(() =>
+      main([command, fixture.resolve("missing"), "--base", "HEAD"]),
+    );
+    assert.equal(missing.code, CLI_EXIT.userError);
+    assert.equal(missing.stdout, "");
+    assert.match(missing.stderr, /Could not read diff target/);
   }
 });
 

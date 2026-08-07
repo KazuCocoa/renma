@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
+import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { graphFromRepositorySnapshot, type GraphReport } from "./graph.js";
 import {
   buildReadinessReport,
@@ -81,6 +82,23 @@ import type {
 } from "../types/diagnostics.js";
 
 const execFile = promisify(execFileCallback);
+
+export class DiffInputError extends CliUserError {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "DiffInputError";
+  }
+}
+
+class GitCommandError extends Error {
+  readonly commandExited: boolean;
+
+  constructor(message: string, commandExited: boolean, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "GitCommandError";
+    this.commandExited = commandExited;
+  }
+}
 
 export type DiffFormat = "json" | "markdown";
 
@@ -279,7 +297,7 @@ export async function runDiffCommand(
 ): Promise<number> {
   const report = await diff(targetPath, options);
   process.stdout.write(formatDiff(report, options.format));
-  return 0;
+  return CLI_EXIT.success;
 }
 
 export async function diff(
@@ -320,10 +338,21 @@ async function executeDiffWithProjection(
   options: DiffOptions,
   includeSkillDiscovery: boolean,
 ): Promise<DiffExecutionContext | DiffReportWithoutSkillDiscovery> {
-  const absoluteTarget = await realpath(resolve(process.cwd(), targetPath));
-  const repoRoot = await realpath(
-    await gitOutput(absoluteTarget, ["rev-parse", "--show-toplevel"]),
+  const absoluteTarget = await comparisonTarget(targetPath);
+  const unresolvedRepoRoot = await gitInputOutput(
+    absoluteTarget,
+    ["rev-parse", "--show-toplevel"],
+    `Diff target is not an appropriate Git repository: ${absoluteTarget}`,
   );
+  let repoRoot: string;
+  try {
+    repoRoot = await realpath(unresolvedRepoRoot);
+  } catch (error) {
+    throw new DiffInputError(
+      `Could not resolve the Git repository for diff target ${absoluteTarget}: ${errorMessage(error)}`,
+      { cause: error },
+    );
+  }
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
   let result:
@@ -1423,13 +1452,11 @@ async function snapshot(
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
   await mkdir(root, { recursive: true });
-  await gitOutput(repoRoot, [
-    "archive",
-    "--format=tar",
-    "--output",
-    archivePath,
-    ref,
-  ]);
+  await gitInputOutput(
+    repoRoot,
+    ["archive", "--format=tar", "--output", archivePath, ref],
+    `Could not resolve Git comparison ref "${ref}"`,
+  );
   await execFile("tar", ["-xf", archivePath, "-C", root]);
   const target = relativeTarget === "." ? root : join(root, relativeTarget);
   const repositorySnapshot = await collectRepositorySnapshot(
@@ -1771,7 +1798,7 @@ function pathWithinRepo(repoRoot: string, absoluteTarget: string): string {
   ) {
     return relativeTarget === "" ? "." : relativeTarget;
   }
-  throw new Error(
+  throw new DiffInputError(
     `Diff target must be inside the git repository: ${absoluteTarget}`,
   );
 }
@@ -1812,12 +1839,46 @@ async function gitOutput(cwd: string, args: string[]): Promise<string> {
         .map((item) => item.trim())
         .filter(Boolean)
         .join("\n");
-      throw new Error(`git ${args.join(" ")} failed: ${output}`, {
+      throw new GitCommandError(
+        `git ${args.join(" ")} failed: ${output}`,
+        typeof (error as Error & { code?: unknown }).code === "number",
+        { cause: error },
+      );
+    }
+    throw error;
+  }
+}
+
+async function comparisonTarget(targetPath: string): Promise<string> {
+  try {
+    return await realpath(resolve(process.cwd(), targetPath));
+  } catch (error) {
+    throw new DiffInputError(
+      `Could not read diff target ${targetPath}: ${errorMessage(error)}`,
+      { cause: error },
+    );
+  }
+}
+
+async function gitInputOutput(
+  cwd: string,
+  args: string[],
+  message: string,
+): Promise<string> {
+  try {
+    return await gitOutput(cwd, args);
+  } catch (error) {
+    if (error instanceof GitCommandError && error.commandExited) {
+      throw new DiffInputError(`${message}: ${error.message}`, {
         cause: error,
       });
     }
     throw error;
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function stringErrorField(error: Error, field: "stdout" | "stderr"): string {

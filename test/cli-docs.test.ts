@@ -125,6 +125,25 @@ test("User Manual mentions every CLI option exposed by command help", async () =
   }
 });
 
+test("User Manual documents the authoritative CLI exit-code contract", async () => {
+  const manual = await readRepoFile("docs/user-manual.md");
+  assert.match(manual, /^### Exit codes$/m);
+  assert.match(manual, /\| `0` \| The command completed successfully/);
+  assert.match(
+    manual,
+    /\| `1` \| The command completed and emitted its normal report/,
+  );
+  assert.match(
+    manual,
+    /\| `2` \| The invocation, configuration, requested target, or Git comparison ref/,
+  );
+  assert.match(
+    manual,
+    /\| `3` \| Renma encountered an unexpected internal failure/,
+  );
+  assert.match(manual, /Exit `1` is a completed semantic outcome/);
+});
+
 test("User Manual output format table matches supported command formats", async () => {
   const manual = await readRepoFile("docs/user-manual.md");
   const documented = parseOutputFormatsTable(manual);

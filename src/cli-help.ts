@@ -7,6 +7,7 @@ export interface CommandHelp {
   doNotUseFor: readonly string[];
   examples: readonly string[];
   interpretation: readonly string[];
+  exitBehavior?: readonly string[];
   nextSteps: readonly string[];
   options: readonly CommandOptionHelp[];
 }
@@ -50,6 +51,10 @@ const OPTION_HELP = {
   from: {
     flags: "--from <ref>",
     description: "Git ref to use as the comparison baseline.",
+  },
+  base: {
+    flags: "--base <ref>",
+    description: "Alias for --from; comparison baseline.",
   },
   "fail-on-status": {
     flags: "--fail-on-status <status>",
@@ -111,7 +116,7 @@ const OPTION_HELP = {
   },
   to: {
     flags: "--to <ref>",
-    description: "Git ref to use as the comparison target.",
+    description: "Comparison target. Defaults to HEAD for diff and ci-report.",
   },
   version: {
     flags: "-v, --version",
@@ -130,6 +135,8 @@ const AUTHORING_GUIDE_URL =
   "https://github.com/KazuCocoa/renma/blob/main/docs/authoring-guide.md";
 const CONTEXT_LENS_GUIDE_URL =
   "https://github.com/KazuCocoa/renma/blob/main/docs/context-lens.md";
+const GLOBAL_ERROR_EXIT_REFERENCE =
+  "Exit 2 and 3 follow the global CLI contract; run renma --help for caller-correctable and unexpected failure handling.";
 
 export const COMMAND_HELP = [
   {
@@ -191,6 +198,12 @@ export const COMMAND_HELP = [
       "Without --strict, scan exits according to the active finding threshold. Strict mode additionally rejects invalid Agent Skills, error diagnostics, and blocking inspection-coverage issues; warnings and suppressed findings are not generally made fatal.",
       "Inspection coverage reports whether expected first-class agent-facing paths were actually inspected. Renma does not follow symlinks.",
     ],
+    exitBehavior: [
+      "0: No finding reaches the active threshold; in strict mode, strict evaluation passes.",
+      "1: The active finding threshold is reached, or strict evaluation fails.",
+      "A valid scan report is still emitted to stdout on exit 1.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
+    ],
     nextSteps: [
       "Inspect evidence before editing.",
       "Use suggest-metadata only when metadata retrofit or Skill migration work is needed.",
@@ -233,6 +246,11 @@ export const COMMAND_HELP = [
       "Catalog output is deterministic inventory evidence.",
       "Missing, duplicate, or unresolved metadata may appear as diagnostics, but catalog is not a substitute for scan.",
       "Dependencies are declared relationships discovered from repository metadata and references.",
+    ],
+    exitBehavior: [
+      "0: The catalog report contains no error diagnostics.",
+      "1: The generated catalog report contains an error diagnostic; the valid report is still emitted to stdout.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
     ],
     nextSteps: [
       "Run graph to inspect relationships.",
@@ -285,6 +303,11 @@ export const COMMAND_HELP = [
       "The discovery view derives cycle-safe reachability from explicit published entrypoints through usable declared continuations, with descriptive partial coverage and authoritative adopted coverage; optional focus keeps repository-wide adoption and coverage while filtering visible arrays and summary counts to one Skill's direct neighborhood.",
       "The executable view shows canonical Skill/script invocation and script dependency edges separately from deterministic Skill-local structural containment; optional focus supports either a Skill ID/path or executable path.",
     ],
+    exitBehavior: [
+      "0: The graph report contains no error diagnostics.",
+      "1: The generated graph report contains an error diagnostic; the valid report is still emitted to stdout.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
+    ],
     nextSteps: [
       "Use catalog to inspect the assets behind graph nodes.",
       "Use scan to fix concrete relationship findings.",
@@ -333,6 +356,11 @@ export const COMMAND_HELP = [
       "A caller-supplied source revision is recorded verbatim and marked unverified by Renma.",
       "Zero unresolved rows does not prove complete runtime behavior because the static analyzers are intentionally bounded.",
     ],
+    exitBehavior: [
+      "0: The execution-contract report contains no error diagnostics.",
+      "1: The generated execution-contract report contains an error diagnostic; the valid report is still emitted to stdout.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
+    ],
     nextSteps: [
       "Use the embedded evidence digest for selected-evidence identity and bind the exact serialized JSON externally with SHA-256 when a correlator needs artifact identity.",
       "Use a caller-created detached worktree when generating historical evidence.",
@@ -376,8 +404,13 @@ export const COMMAND_HELP = [
       "Markdown is the default; JSON uses the canonical renma.skill-index.v1 schema.",
       "Coverage is repository-scoped. Summary counts and visible ID arrays are projection-scoped when --focus is present.",
       "Focus accepts only one exact effective Skill ID or repository-relative SKILL.md path and retains direct incoming and outgoing declarations.",
-      "Repository diagnostics and Discovery diagnostics remain separate; warning-only reports exit 0, while an error in either collection exits 1.",
+      "Repository diagnostics and Discovery diagnostics remain separate.",
       "The command reads one shared repository snapshot and writes only to stdout.",
+    ],
+    exitBehavior: [
+      "0: Repository and Discovery diagnostics are warning-only or clear.",
+      "1: An error exists in either diagnostic collection; the valid Skill Index report is still emitted to stdout.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
     ],
     nextSteps: [
       "Open the referenced source SKILL.md and apply its description and routing conditions to the current request.",
@@ -461,6 +494,12 @@ export const COMMAND_HELP = [
       "Readiness scores and checks are static repository review signals.",
       "Security posture and context lens summaries remain deterministic evidence, not runtime decisions.",
     ],
+    exitBehavior: [
+      "0: Readiness level is ready, including Ready with advisories.",
+      "1: Readiness level is needs_attention or not_ready.",
+      "The readiness report is still emitted to stdout on exit 1.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
+    ],
     nextSteps: [
       "Use scan to fix specific findings behind readiness failures.",
       "Use catalog and graph to inspect inventory or relationship causes.",
@@ -504,6 +543,11 @@ export const COMMAND_HELP = [
       "With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated --omit-generated-at JSON runs should be byte-identical.",
       "The option does not remove freshness metadata, suppress freshness diagnostics, normalize absolute root or configPath values, hide file moves, or make output portable across runners.",
     ],
+    exitBehavior: [
+      "0: The BOM report contains no error diagnostics.",
+      "1: The generated BOM report contains an error diagnostic; the valid report is still emitted to stdout.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
+    ],
     nextSteps: [
       "Review diagnostics and readiness sections before merging.",
       "Use scan, catalog, or graph for focused follow-up.",
@@ -546,6 +590,11 @@ export const COMMAND_HELP = [
       "Missing ownership normally requires confirmation from a human or an existing source of truth.",
       "Owner filters keep repository-level totals while adding owner-specific details.",
     ],
+    exitBehavior: [
+      "0: The ownership report contains no error diagnostics.",
+      "1: The generated ownership report contains an error diagnostic; the valid report is still emitted to stdout.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
+    ],
     nextSteps: [
       "Confirm missing owners before editing metadata.",
       "Use suggest-metadata when preparing a metadata-only retrofit.",
@@ -569,7 +618,8 @@ export const COMMAND_HELP = [
   },
   {
     name: "diff",
-    usage: "renma diff [path] --from <ref> --to <ref> [options]",
+    usage:
+      "renma diff [path] (--from <ref> | --base <ref>) [--to <ref>] [options]",
     question: "What deterministic repository evidence changed between refs?",
     purpose:
       "Diff compares deterministic repository evidence between Git refs for context and skill review.",
@@ -584,13 +634,19 @@ export const COMMAND_HELP = [
       "Replacing human review of semantic changes.",
     ],
     examples: [
+      "renma diff . --base origin/main",
       "renma diff . --from main --to HEAD",
       "renma diff . --from origin/main --to HEAD --format markdown",
     ],
     interpretation: [
       "The report compares Renma evidence generated at two refs.",
+      "Supply one comparison baseline with --from or its --base alias; using both is an error. --to defaults to the Git ref HEAD.",
       "Added or removed findings show deterministic review signal changes, not arbitrary source hunks.",
-      "Usage errors exit 2; generated comparison output follows command status rules.",
+    ],
+    exitBehavior: [
+      "0: The requested comparison was generated successfully, regardless of whether the report contains changes or regressions.",
+      "Diff does not use exit 1 merely because evidence changed.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
     ],
     nextSteps: [
       "Use ci-report when a PR-oriented summary is needed.",
@@ -600,6 +656,7 @@ export const COMMAND_HELP = [
     options: [
       "config",
       "from",
+      "base",
       "to",
       {
         name: "format",
@@ -611,7 +668,8 @@ export const COMMAND_HELP = [
   },
   {
     name: "ci-report",
-    usage: "renma ci-report [path] --from <ref> --to <ref> [options]",
+    usage:
+      "renma ci-report [path] (--from <ref> | --base <ref>) [--to <ref>] [options]",
     question: "What should a CI or PR reviewer inspect?",
     purpose:
       "CI report produces a pull-request-oriented summary from deterministic Renma evidence.",
@@ -626,15 +684,23 @@ export const COMMAND_HELP = [
       "Certifying that all semantic changes are correct.",
     ],
     examples: [
+      "renma ci-report . --base origin/main",
       "renma ci-report . --from main --to HEAD --format markdown",
       "renma ci-report . --from origin/main --to HEAD --format json",
       "renma ci-report . --from origin/main --to HEAD --fail-on-status warn",
     ],
     interpretation: [
       "The report combines deterministic evidence for review.",
+      "Supply one comparison baseline with --from or its --base alias; using both is an error. --to defaults to the Git ref HEAD.",
       "Skill Discovery changes are observation-only and do not affect CI status or exits.",
-      "PASS and WARN exit 0; FAIL exits 1 by default. With --fail-on-status warn, WARN and FAIL exit 1. The option changes execution policy, not report status, and is never read from repository configuration.",
+      "The failure threshold changes execution policy, not report status, and is never read from repository configuration.",
       "Reviewers should still inspect meaningful semantic changes.",
+    ],
+    exitBehavior: [
+      "With the default --fail-on-status fail, PASS and WARN exit 0; FAIL exits 1.",
+      "With --fail-on-status warn, PASS exits 0; WARN and FAIL exit 1.",
+      "A valid CI report is still emitted to stdout on exit 1.",
+      GLOBAL_ERROR_EXIT_REFERENCE,
     ],
     nextSteps: [
       "Fix or explain new failures and warnings.",
@@ -644,6 +710,7 @@ export const COMMAND_HELP = [
     options: [
       "config",
       "from",
+      "base",
       "to",
       "fail-on-status",
       {
@@ -998,6 +1065,16 @@ export function renderGlobalHelp(version: string): string {
     `  ${OPTION_HELP.help.flags.padEnd(28)} ${OPTION_HELP.help.description}`,
     `  ${OPTION_HELP.version.flags.padEnd(28)} ${OPTION_HELP.version.description}`,
     "",
+    "Exit codes",
+    "  0  Command completed successfully.",
+    "  1  Command completed, but the requested Renma policy/status gate did not pass.",
+    "     A valid report remains on stdout; inspect its findings/status and act on them.",
+    "  2  Caller-correctable invocation, configuration, target, or comparison-ref error.",
+    "     Read stderr, correct the input, and retry; the requested operation did not validly complete.",
+    "  3  Unexpected Renma internal failure.",
+    "     Preserve or report stderr; do not treat it as a policy finding or guess input changes to make it pass.",
+    "  Report-producing commands use stdout for completed results (0/1) and stderr for errors (2/3).",
+    "",
     "Run `renma <command> --help` for command-specific purpose, boundaries, examples, and options.",
   ].join("\n");
 }
@@ -1025,6 +1102,9 @@ export function renderCommandHelp(name: CommandName, version: string): string {
     "",
     "How to interpret the result",
     ...renderBullets(command.interpretation),
+    ...(command.exitBehavior
+      ? ["", "Exit behavior", ...renderBullets(command.exitBehavior)]
+      : []),
     "",
     "Typical next steps",
     ...renderBullets(command.nextSteps),

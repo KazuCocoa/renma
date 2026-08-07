@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { CliUserError } from "../cli-errors.js";
 import type { SkillParentIndex } from "../catalog.js";
 import { logicalSkillDirectory } from "../discovery.js";
 import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
@@ -213,7 +214,7 @@ export function executableGraphReport(
       matchesFocus(node, report.root, focus),
     );
     if (!selected) {
-      throw new Error(
+      throw new CliUserError(
         `graph --view executable --focus did not match any known Skill or executable surface: ${focus}. Run renma scan . --format json and inspect executableSurfaceInventory for unresolved evidence.`,
       );
     }

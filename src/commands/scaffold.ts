@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 import {
   classifyAbsoluteSkillEntrypointPath,
@@ -48,12 +49,12 @@ export async function runScaffoldCommand(
 
   if (options.format === "json") {
     process.stdout.write(formatJsonDocument(bundle));
-    return 0;
+    return CLI_EXIT.success;
   }
 
   if (options.format === "prompt") {
     process.stdout.write(bundle.prompt);
-    return 0;
+    return CLI_EXIT.success;
   }
 
   await mkdir(path.dirname(options.targetPath), { recursive: true });
@@ -68,7 +69,7 @@ export async function runScaffoldCommand(
       options.kind === "skill" ? `\n${renderSkillNextSteps()}\n` : ""
     }`,
   );
-  return 0;
+  return CLI_EXIT.success;
 }
 
 export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
@@ -79,7 +80,9 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
     options.tags && options.tags.length > 0 ? options.tags : ["authoring"];
   const resources = [...new Set(options.resources ?? [])].sort();
   if (options.kind !== "skill" && resources.length > 0) {
-    throw new Error("--resources is supported only for skill scaffolds.");
+    throw new CliUserError(
+      "--resources is supported only for skill scaffolds.",
+    );
   }
   const content =
     options.kind === "skill"
@@ -373,7 +376,9 @@ ${tags.map((tag) => `  - ${tag}`).join("\n")}`;
 function canonicalSkillName(targetPath: string): string {
   const normalizedPath = targetPath.replaceAll("\\", "/");
   if (path.posix.basename(normalizedPath) !== "SKILL.md") {
-    throw new Error("Skill scaffolds require the canonical SKILL.md filename.");
+    throw new CliUserError(
+      "Skill scaffolds require the canonical SKILL.md filename.",
+    );
   }
   const repositoryBoundary = repositoryClassificationPath(normalizedPath);
   const entrypoint =
@@ -382,14 +387,14 @@ function canonicalSkillName(targetPath: string): string {
       : (classifyRepositorySkillEntrypointPath(normalizedPath) ??
         classifyAbsoluteSkillEntrypointPath(normalizedPath));
   if (entrypoint?.kind !== "canonical") {
-    throw new Error(
+    throw new CliUserError(
       `Skill scaffolds require a canonical target under skills/ or .agents/skills/ with at least one Skill directory and without reserved Skill-support segments (${RESERVED_SKILL_SUPPORT_DIRS.join(", ")}).`,
     );
   }
   const directory = path.posix.basename(path.posix.dirname(normalizedPath));
   const validation = normalizeAgentSkillDirectoryName(directory);
   if (validation.normalized === undefined || validation.problems.length > 0) {
-    throw new Error(
+    throw new CliUserError(
       `Skill scaffold directory "${directory}" is not a valid Agent Skills name: ${validation.problems.join("; ")}.`,
     );
   }
