@@ -397,98 +397,74 @@ function configuredBoundaryCanSelectDescendant(
   boundary: InspectionCoverageBoundary,
   config: Pick<ScanConfig, "globs" | "exclude">,
 ): boolean {
-  const candidates = subtreeProbePaths(blockedPath, boundary);
-  for (const pattern of config.globs) {
-    const exactCandidate = exactConfiguredDescendant(pattern, blockedPath);
-    if (exactCandidate) candidates.add(exactCandidate);
-    for (const candidate of patternGuidedSubtreeProbePaths(
+  return config.globs.some((pattern) =>
+    configuredGlobMaySelectDescendant(
       blockedPath,
       boundary,
       pattern,
-    )) {
-      candidates.add(candidate);
-    }
-  }
-  return [...candidates].some((candidate) => {
-    if (isExcluded(candidate, config.exclude)) return false;
-    if (
-      !EXPECTED_AGENT_FACING_RULES.has(classifyAssetPath(candidate).matchedRule)
-    ) {
-      return false;
-    }
-    return config.globs.some((pattern) => path.matchesGlob(candidate, pattern));
-  });
-}
-
-function patternGuidedSubtreeProbePaths(
-  blockedPath: string,
-  boundary: InspectionCoverageBoundary,
-  pattern: string,
-): string[] {
-  const normalized = pattern.replaceAll("\\", "/").replace(/^\.\//, "");
-  const segments = normalized.split("/").filter(Boolean);
-  if (segments.length === 0) return [];
-  const directoryPattern = segments.slice(0, -1);
-  const filenames =
-    boundary === "skills" || boundary === ".agents/skills"
-      ? ["SKILL.md", "skill.md", "entry.skill.md"]
-      : ["__renma_coverage__.md"];
-  const candidates = new Set<string>();
-  for (let cut = 0; cut <= directoryPattern.length; cut += 1) {
-    const suffix = directoryPattern.slice(cut);
-    const materialized = suffix.map(materializeGlobSegment);
-    const withoutGlobstar = suffix
-      .filter((segment) => segment !== "**")
-      .map(materializeGlobSegment);
-    for (const directories of [materialized, withoutGlobstar]) {
-      for (const filename of filenames) {
-        candidates.add(
-          [blockedPath, ...directories, filename].filter(Boolean).join("/"),
-        );
-      }
-    }
-  }
-  return [...candidates];
-}
-
-function materializeGlobSegment(segment: string): string {
-  const firstBraceAlternative = segment.replace(
-    /\{([^{}]*)\}/g,
-    (_match, alternatives: string) => alternatives.split(",")[0] ?? "",
+      config.exclude,
+    ),
   );
-  return firstBraceAlternative
-    .replace(/\[[^\]]*\]/g, "x")
-    .replaceAll("*", "renma")
-    .replaceAll("?", "x");
 }
 
-function subtreeProbePaths(
+function configuredGlobMaySelectDescendant(
   blockedPath: string,
   boundary: InspectionCoverageBoundary,
-): Set<string> {
-  if (boundary === "skills" || boundary === ".agents/skills") {
-    return new Set([
-      `${blockedPath}/SKILL.md`,
-      `${blockedPath}/skill.md`,
-      `${blockedPath}/entry.skill.md`,
-      `${blockedPath}/__renma_coverage__/SKILL.md`,
-      `${blockedPath}/__renma_coverage__/entry.skill.md`,
-    ]);
+  pattern: string,
+  excludes: string[],
+): boolean {
+  const normalized = runtimeGlobPath(pattern);
+  const segments = normalized.split("/");
+  const firstMagicIndex = segments.findIndex(hasGlobMagic);
+  if (firstMagicIndex < 0) {
+    return exactConfiguredPathIsRelevant(
+      normalized,
+      pattern,
+      blockedPath,
+      excludes,
+    );
   }
-  return new Set([
-    `${blockedPath}/__renma_coverage__.md`,
-    `${blockedPath}/__renma_coverage__/asset.md`,
-    `${blockedPath}/__renma_coverage__/nested/asset.md`,
-  ]);
+
+  const literalPrefix = segments.slice(0, firstMagicIndex).join("/");
+  if (!literalPrefix) return true;
+  const boundaryRoot = boundary;
+  return (
+    pathsOverlapByPrefix(literalPrefix, boundaryRoot) &&
+    pathsOverlapByPrefix(literalPrefix, blockedPath)
+  );
 }
 
-function exactConfiguredDescendant(
+function exactConfiguredPathIsRelevant(
+  candidate: string,
   pattern: string,
   blockedPath: string,
-): string | undefined {
-  const normalized = pattern.replaceAll("\\", "/").replace(/^\.\//, "");
-  if (/[*?{}[\]]/.test(normalized)) return undefined;
-  return isPathAtOrBelow(normalized, blockedPath) && normalized !== blockedPath
-    ? normalized
-    : undefined;
+  excludes: string[],
+): boolean {
+  if (
+    !candidate ||
+    candidate.startsWith("/") ||
+    candidate
+      .split("/")
+      .some((segment) => !segment || segment === "." || segment === "..") ||
+    !isPathAtOrBelow(candidate, blockedPath) ||
+    isExcluded(candidate, excludes) ||
+    !path.matchesGlob(candidate, pattern)
+  ) {
+    return false;
+  }
+  return EXPECTED_AGENT_FACING_RULES.has(
+    classifyAssetPath(candidate).matchedRule,
+  );
+}
+
+function pathsOverlapByPrefix(left: string, right: string): boolean {
+  return isPathAtOrBelow(left, right) || isPathAtOrBelow(right, left);
+}
+
+function runtimeGlobPath(pattern: string): string {
+  return path.sep === "\\" ? pattern.replaceAll("\\", "/") : pattern;
+}
+
+function hasGlobMagic(segment: string): boolean {
+  return /[*?\[\]{}()!+@|]/.test(segment);
 }

@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, matchesGlob } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import fc from "fast-check";
@@ -3279,6 +3279,77 @@ test("Skill directory symlink is a subtree coverage regression from an exact pat
       scope,
     })),
     [{ path: "skills/payment", scope: "subtree" }],
+  );
+});
+
+test("character-class glob retains subtree coverage across revisions", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  const configuredGlob = "skills/domain/[ab]/payment/SKILL.md";
+  const baselineSkillPath = "skills/domain/a/payment/SKILL.md";
+  assert.equal(matchesGlob(baselineSkillPath, configuredGlob), true);
+  await fixture.initializeGit();
+  await fixture.writeConfig({ globs: [configuredGlob] });
+  await fixture.skill(baselineSkillPath, {
+    owner: "payments",
+    status: "stable",
+  });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await rm(fixture.resolve("skills/domain"), { recursive: true });
+  await fixture.skill("hidden-domain/a/payment/SKILL.md", {
+    owner: "payments",
+    status: "stable",
+  });
+  await symlink("../hidden-domain", fixture.resolve("skills/domain"));
+  await fixture.git(["add", "-A"]);
+  await fixture.git(["commit", "-m", "block custom-glob Skill subtree"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const command = await withCapturedStdout(() =>
+    main([
+      "ci-report",
+      fixture.root,
+      "--from",
+      "base",
+      "--to",
+      "HEAD",
+      "--format",
+      "markdown",
+      "--fail-on-status",
+      "warn",
+    ]),
+  );
+
+  assert.equal(report.status, "warn");
+  assert.equal(command.code, 1);
+  assert.deepEqual(
+    report.diff.inspectionCoverage.regressions.map((change) => ({
+      path: change.path,
+      fromState: change.fromState,
+      toState: change.toState,
+      scope: change.scope,
+      affectedBoundary: change.affectedBoundary,
+      previouslyInspectedPaths: change.previouslyInspectedPaths,
+    })),
+    [
+      {
+        path: "skills/domain",
+        fromState: "parsed",
+        toState: "symlink",
+        scope: "subtree",
+        affectedBoundary: "skills",
+        previouslyInspectedPaths: [baselineSkillPath],
+      },
+    ],
+  );
+  assert.match(
+    command.stdout,
+    /skills\/domain[\s\S]*parsed -> symlink \(subtree; skills boundary\)[\s\S]*skills\/domain\/a\/payment\/SKILL\.md/,
   );
 });
 

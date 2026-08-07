@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { symlink } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 
 import { main } from "../src/cli.js";
@@ -181,6 +182,62 @@ test("directory symlink under a Skill root blocks the untraversed subtree", asyn
   );
 });
 
+test("custom glob magic conservatively retains blocked Skill subtree coverage", async (t) => {
+  const cases = [
+    {
+      label: "character class",
+      glob: "skills/domain/[ab]/payment/SKILL.md",
+    },
+    {
+      label: "extglob",
+      glob: "skills/domain/@(a|b)/payment/SKILL.md",
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    await t.test(fixtureCase.label, async (subtest) => {
+      const fixture = await RepositoryFixture.create({ testContext: subtest });
+      await fixture.writeConfig({ globs: [fixtureCase.glob] });
+      await fixture.skill("hidden-domain/a/payment/SKILL.md", {
+        owner: "payments",
+      });
+      await fixture.write("skills/.keep", "fixture\n");
+      await symlink("../hidden-domain", fixture.resolve("skills/domain"));
+
+      const matchingPath = "skills/domain/a/payment/SKILL.md";
+      assert.equal(path.matchesGlob(matchingPath, fixtureCase.glob), true);
+
+      const result = await scan(fixture.root, { failOn: "high" });
+      const command = await captureStdout(() =>
+        runScanCommand(
+          fixture.root,
+          { failOn: "high", format: "json" },
+          { strict: true },
+        ),
+      );
+
+      assert.equal(command.code, 1);
+      assert.equal(result.agentSkills.totalSkillCount, 0);
+      assert.deepEqual(
+        result.inspectionCoverage.blockingIssues.map((issue) => ({
+          path: issue.path,
+          state: issue.state,
+          scope: issue.scope,
+          affectedBoundary: issue.affectedBoundary,
+        })),
+        [
+          {
+            path: "skills/domain",
+            state: "symlink",
+            scope: "subtree",
+            affectedBoundary: "skills",
+          },
+        ],
+      );
+    });
+  }
+});
+
 test("oversized canonical Skill is a blocking coverage issue", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
   await fixture.writeConfig({ max_file_size_bytes: 64 });
@@ -290,6 +347,9 @@ test("strict coverage does not turn an ordinary skipped file into a failure", as
 
 test("blocked non-agent subtree does not become strict coverage failure", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.writeConfig({
+    globs: ["skills/**/SKILL.md", "contexts/**/*.md"],
+  });
   await fixture.write("hidden-cache/blob.md", "# Cached vendor content\n");
   await fixture.write("tools/.keep", "fixture\n");
   await symlink("../hidden-cache", fixture.resolve("tools/vendor-cache"));
@@ -334,6 +394,11 @@ test("subtree diff reports new unknown coverage and does not repeat baseline iss
     { globs: ["skills/*/payment/SKILL.md"], exclude: [] },
     new Set(["skills/domain"]),
   );
+  const disjointSkillSubtree = buildInspectionCoverage(
+    new Map([["skills/bar", "symlink"]]),
+    { globs: ["skills/foo/**/SKILL.md"], exclude: [] },
+    new Set(["skills/bar"]),
+  );
 
   assert.deepEqual(
     introduced.regressions.map((change) => ({
@@ -354,6 +419,7 @@ test("subtree diff reports new unknown coverage and does not repeat baseline iss
   assert.equal(unchanged.regressions.length, 0);
   assert.equal(outsideConfiguredBoundary.blockingIssues.length, 0);
   assert.equal(explicitlyExcluded.blockingIssues.length, 0);
+  assert.equal(disjointSkillSubtree.blockingIssues.length, 0);
   assert.deepEqual(
     customGlobDescendant.blockingIssues.map((issue) => [
       issue.path,

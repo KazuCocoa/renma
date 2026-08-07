@@ -1245,7 +1245,11 @@ expected artifacts from `subtree` traversal boundaries. A symlinked,
 unreadable, or depth-limited directory under `skills`, `.agents/skills`,
 `contexts`, `context`, `lenses`, or `.agents` is a subtree issue when the
 configured globs can select first-class descendants there; the evidence names
-the affected boundary without guessing a hidden descendant path. Explicit
+the affected boundary without guessing a hidden descendant path. Relevance is
+decided conservatively from the glob's literal prefix before its first magic
+segment: a provably disjoint prefix is ignored, while character classes,
+extglobs, braces, and other magic remain potentially overlapping. Exact
+non-glob paths use precise descendant and classification checks. Explicit
 scan-boundary exclusion is not a single-revision coverage failure. Ordinary
 unsupported repository subtrees such as `tools/vendor-cache` do not turn
 strict scan into a requirement to parse every file. Renma never follows a
