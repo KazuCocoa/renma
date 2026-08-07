@@ -66,6 +66,60 @@ const REQUIRED_INPUTS_PATTERN =
   /\b(?:required inputs?|inputs|input requirements?|required information|prerequisites?|required context|required files|required permissions?|permission requirements?|environment requirements?|before running,\s*provide|before you begin,\s*provide|the user must provide|needs the following|target files|permissions required|environment required)\b|\brequires:/;
 const COMPLETION_CRITERIA_PATTERN =
   /\b(?:completion criteria|completion checklist|success criteria|success requirements|done criteria|done when|definition of done|acceptance criteria|deliverables?|final response|final answer|expected outcomes?|expected results?|expected output|required output|output requirements?|report should include|patch should include|when complete|workflow is complete|the workflow is complete after|task is complete|counts as complete|completion requirements?|stop when|do not finish until)\b/;
+const VERIFICATION_HEADING_PATTERNS: readonly RegExp[] = [
+  /^(?:success\s+)?verification$/iu,
+  /^verify$/iu,
+  /^validation$/iu,
+  /^validate$/iu,
+  /^testing$/iu,
+  /^tests?$/iu,
+  /^post[-\s]checks$/iu,
+];
+const VERIFICATION_BODY_PATTERNS: readonly RegExp[] = [
+  /\b(?:verify|verified|verifies|verifying)\b/iu,
+  /\b(?:validate|validated|validates|validating)\b/iu,
+  /\b(?:run|perform|complete)\s+(?:the\s+)?(?:verification|validation)\b/iu,
+  /\b(?:verification|validation)\s+(?:is|runs?|occurs?|happens?|completes?|starts?|begins?|must|should|before|after)\b/iu,
+  /\b(?:authoritative|source\s+of\s+truth)\b[^.!?;]{0,120}\b(?:verification|validation)\b/iu,
+  /\b(?:run|execute)\s+(?:(?:the|an?)\s+)?(?:(?:unit|integration|end-to-end|e2e|acceptance|regression|smoke)\s+)?tests?\b/iu,
+  /\b(?:run|execute)\s+(?:npm|pnpm|yarn|bun)\s+tests?\b/iu,
+  /^(?:npm|pnpm|yarn|bun)\s+tests?\b/iu,
+  /\b(?:is|are|was|were|be|been)\s+tested\b/iu,
+  /\btests?\s+(?:runs?|pass(?:es|ed)?|fail(?:s|ed)?|complete[sd]?)\b/iu,
+  /\btesting\s+(?:runs?|occurs?|happens?|completes?|starts?|begins?|must|should|is)\b/iu,
+  /^test\s+(?:the|this|generated)\b/iu,
+  /\b(?:command|script|suite|check)\s+tests?\b/iu,
+  /\bconfirm\s+(?:the\s+)?(?:results?|outputs?)\b/iu,
+  /\bexpected\s+(?:outputs?|results?|behaviou?r)\b/iu,
+];
+const NEGATED_VERIFICATION_PATTERNS: readonly RegExp[] = [
+  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not|cannot|can['’]t)\s+(?:be\s+)?(?:verify|verified|verifies|verifying|validate|validated|validates|validating|test|tested|testing|confirm)\b/iu,
+  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not)\s+(?:run|execute|perform)\s+(?:(?:(?:the|an?)\s+)?(?:(?:unit|integration|end-to-end|e2e|acceptance|regression|smoke)\s+)?(?:tests?|verification|validation)|(?:npm|pnpm|yarn|bun)\s+tests?)\b/iu,
+];
+const ROUTING_HEADING_PATTERNS: readonly RegExp[] = [
+  /^when\s+to\s+use$/iu,
+  /^use\s+when$/iu,
+  /^use\s+(?:this\s+skill\s+|this\s+)?for$/iu,
+  /^use\s+this\s+skill$/iu,
+  /^choose\s+this\s+skill\s+(?:when|for)$/iu,
+  /^when\s+this\s+skill\s+applies$/iu,
+  /^routing$/iu,
+  /^triggers?$/iu,
+  /^context\s+route$/iu,
+  /^mixin$/iu,
+];
+const ROUTING_BODY_PATTERNS: readonly RegExp[] = [
+  /^(?:please\s+)?use\s+this\s+skill\s+(?:to|for|when)\b/iu,
+  /^(?:please\s+)?when\s+to\s+use\b/iu,
+  /^(?:please\s+)?use\s+when\b/iu,
+  /^(?:please\s+)?use\s+(?:this\s+)?for\b/iu,
+  /^(?:please\s+)?choose\s+this\s+skill\s+(?:when|for)\b/iu,
+  /^when\s+this\s+skill\s+applies\b/iu,
+  /^(?:routing|triggers?|mixin|context\s+route)\s*:\s*\S/iu,
+];
+const ROUTING_DESCRIPTION_PATTERNS: readonly RegExp[] = [
+  ...ROUTING_BODY_PATTERNS,
+];
 const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
   [/\bplatform facts?\b/i, "Platform Facts"],
   [/\breusable troubleshooting\b/i, "Reusable Troubleshooting"],
@@ -966,9 +1020,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
-  if (
-    !/use this skill|when to use|trigger|routing|context route|mixin/.test(text)
-  ) {
+  if (!hasRoutingClarity(document, metadataText(description) ?? "")) {
     findings.push(
       documentFinding(
         document,
@@ -1077,7 +1129,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
-  if (!/verify|validation|test|confirm result|expected output/.test(text)) {
+  if (!hasVerificationGuidance(document)) {
     findings.push(
       documentFinding(
         document,
@@ -1116,6 +1168,82 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   return findings;
+}
+
+function hasVerificationGuidance(document: ParsedDocument): boolean {
+  if (
+    document.headings.some((heading) =>
+      VERIFICATION_HEADING_PATTERNS.some((pattern) =>
+        pattern.test(heading.text.trim()),
+      ),
+    )
+  ) {
+    return true;
+  }
+
+  return markdownBodyGuidanceStatements(document).some((statement) => {
+    const normalized = normalizeInlineCodeForGuidance(statement);
+    return (
+      !NEGATED_VERIFICATION_PATTERNS.some((pattern) =>
+        pattern.test(normalized),
+      ) &&
+      VERIFICATION_BODY_PATTERNS.some((pattern) => pattern.test(normalized))
+    );
+  });
+}
+
+function hasRoutingClarity(
+  document: ParsedDocument,
+  description: string,
+): boolean {
+  if (hasPositiveRoutingStatement(description, ROUTING_DESCRIPTION_PATTERNS)) {
+    return true;
+  }
+  if (
+    document.headings.some((heading) =>
+      ROUTING_HEADING_PATTERNS.some((pattern) =>
+        pattern.test(heading.text.trim()),
+      ),
+    )
+  ) {
+    return true;
+  }
+
+  return markdownBodyGuidanceStatements(document).some((statement) =>
+    hasPositiveRoutingStatement(statement, ROUTING_BODY_PATTERNS),
+  );
+}
+
+function hasPositiveRoutingStatement(
+  value: string,
+  patterns: readonly RegExp[],
+): boolean {
+  return guidanceStatements(value).some((statement) =>
+    patterns.some((pattern) => pattern.test(statement)),
+  );
+}
+
+function markdownBodyGuidanceStatements(document: ParsedDocument): string[] {
+  return markdownBodyLineIndexes(document).flatMap((index) =>
+    guidanceStatements(document.lines[index] ?? ""),
+  );
+}
+
+function guidanceStatements(value: string): string[] {
+  return value
+    .split(/(?:\r?\n|[.!?;](?:\s+|$)|,\s+(?:but|however)\s+)/iu)
+    .map((statement) =>
+      statement
+        .trim()
+        .replace(/^["'“”‘’]+|["'“”‘’]+$/gu, "")
+        .trim()
+        .replace(/^(?:(?:>\s*)|(?:[-*+]\s+)|(?:\d+[.)]\s+))+/u, ""),
+    )
+    .filter(Boolean);
+}
+
+function normalizeInlineCodeForGuidance(value: string): string {
+  return value.replace(/(`+)([^`\r\n]+)\1/gu, "$2");
 }
 
 function reusableContextCandidateFinding(

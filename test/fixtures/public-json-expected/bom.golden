@@ -20,7 +20,7 @@
     "unresolvedDependencyCount": 1,
     "ownedAssetCount": 6,
     "unownedAssetCount": 1,
-    "readinessScore": 57,
+    "readinessScore": 67,
     "readinessLevel": "not_ready",
     "diagnosticCounts": {
       "error": 0,
@@ -411,7 +411,7 @@
     }
   ],
   "readiness": {
-    "score": 57,
+    "score": 67,
     "level": "not_ready",
     "checks": [
       {
@@ -492,16 +492,9 @@
       {
         "id": "workflow.clarity",
         "title": "Workflow clarity",
-        "status": "warn",
-        "severity": "warning",
-        "summary": "1 workflow clarity finding matched skill entrypoints.",
-        "evidence": [
-          {
-            "id": "QUAL-MISSING-ROUTING-CLARITY",
-            "path": "skills/review/SKILL.md",
-            "message": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
-          }
-        ]
+        "status": "pass",
+        "severity": "info",
+        "summary": "All skill workflow entrypoints include static routing clarity."
       },
       {
         "id": "workflow.required_inputs",
@@ -613,10 +606,10 @@
       "workflow": {
         "skillEntrypoints": 1,
         "checks": 6,
-        "pass": 4,
-        "warn": 1,
+        "pass": 5,
+        "warn": 0,
         "fail": 1,
-        "readinessPercent": 67
+        "readinessPercent": 83
       },
       "contextLens": {
         "enabled": true,

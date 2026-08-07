@@ -2,7 +2,7 @@
   "root": "<ROOT>",
   "configPath": "renma.config.json",
   "scannedFileCount": 7,
-  "score": 57,
+  "score": 67,
   "level": "not_ready",
   "summary": {
     "totalAssets": 7,
@@ -22,10 +22,10 @@
     "workflow": {
       "skillEntrypoints": 1,
       "checks": 6,
-      "pass": 4,
-      "warn": 1,
+      "pass": 5,
+      "warn": 0,
       "fail": 1,
-      "readinessPercent": 67
+      "readinessPercent": 83
     },
     "contextLens": {
       "enabled": true,
@@ -216,16 +216,9 @@
     {
       "id": "workflow.clarity",
       "title": "Workflow clarity",
-      "status": "warn",
-      "severity": "warning",
-      "summary": "1 workflow clarity finding matched skill entrypoints.",
-      "evidence": [
-        {
-          "id": "QUAL-MISSING-ROUTING-CLARITY",
-          "path": "skills/review/SKILL.md",
-          "message": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
-        }
-      ]
+      "status": "pass",
+      "severity": "info",
+      "summary": "All skill workflow entrypoints include static routing clarity."
     },
     {
       "id": "workflow.required_inputs",
@@ -505,21 +498,6 @@
           "recognizedRoot": "contexts"
         }
       }
-    },
-    {
-      "id": "QUAL-MISSING-ROUTING-CLARITY",
-      "title": "Skill lacks routing clarity",
-      "category": "quality",
-      "severity": "low",
-      "confidence": "medium",
-      "evidence": {
-        "path": "skills/review/SKILL.md",
-        "startLine": 1,
-        "endLine": 1,
-        "snippet": "---"
-      },
-      "whyItMatters": "Clear skill structure helps agents choose the right workflow and report useful evidence.",
-      "remediation": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
     },
     {
       "id": "META-UNKNOWN-REFERENCE",
