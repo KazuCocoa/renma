@@ -48,12 +48,13 @@ jobs:
           node dist/index.js ci-report . \
             --from origin/${{ github.base_ref }} \
             --to HEAD \
-            --format markdown > renma-reports/ci-report.md
+            --format markdown \
+            --fail-on-status warn > renma-reports/ci-report.md
 
       - name: Validate Renma Skills and Context
         id: scan
         continue-on-error: true
-        run: node dist/index.js scan . --fail-on high
+        run: node dist/index.js scan . --fail-on high --strict
 
       - name: Upload Renma Skill reports
         uses: actions/upload-artifact@v7

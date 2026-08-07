@@ -54,6 +54,7 @@ import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import {
   buildInspectionCoverageDiff,
   type InspectionCoverage,
+  type InspectionCoverageChange,
   type InspectionCoverageDiff,
   zeroInspectionCoverage,
 } from "../inspection-coverage.js";
@@ -688,8 +689,7 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
           "### Inspection coverage regressions",
           "",
           ...report.inspectionCoverage.regressions.map(
-            (change) =>
-              `- ${formatMarkdownInlineCode(change.path)}: ${change.fromState} -> ${change.toState}`,
+            (change) => `- ${formatInspectionCoverageChange(change)}`,
           ),
         ]
       : []),
@@ -758,6 +758,22 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+export function formatInspectionCoverageChange(
+  change: InspectionCoverageChange,
+): string {
+  const subtree =
+    change.scope === "subtree"
+      ? ` (subtree; ${change.affectedBoundary ?? "agent-facing"} boundary)`
+      : "";
+  const prior =
+    change.previouslyInspectedPaths.length > 0
+      ? `; previously inspected ${change.previouslyInspectedPaths
+          .map(formatMarkdownInlineCode)
+          .join(", ")}`
+      : "";
+  return `${formatMarkdownInlineCode(change.path)}: ${change.fromState} -> ${change.toState}${subtree}${prior}`;
 }
 
 function formatScanBoundaryChange(

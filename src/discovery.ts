@@ -817,9 +817,12 @@ export async function discoverArtifacts(
   diagnostics: Diagnostic[];
   discoveredPaths: ReadonlySet<string>;
   skippedPathStates: ReadonlyMap<string, RepositoryPathState>;
+  blockedTraversalPaths: ReadonlySet<string>;
+  traversedDirectoryPaths: ReadonlySet<string>;
 }> {
   const diagnostics: Diagnostic[] = [];
   const skippedPathStates = new Map<string, RepositoryPathState>();
+  const blockedTraversalPaths = new Set<string>();
   const walked = await walkRepositoryFiles(root, {
     maxDepth: config.maxDepth,
     excluded: (relativePath) => isExcluded(relativePath, config.exclude),
@@ -837,9 +840,13 @@ export async function discoverArtifacts(
   );
   for (const symlinkPath of walked.symlinks) {
     skippedPathStates.set(symlinkPath, "symlink");
+    blockedTraversalPaths.add(symlinkPath);
   }
-  for (const deepPath of walked.depthLimited) {
+  for (const { path: deepPath, kind } of walked.depthLimited) {
     skippedPathStates.set(deepPath, "deep");
+    if (kind === "directory" || kind === "symlink") {
+      blockedTraversalPaths.add(deepPath);
+    }
   }
   diagnostics.push(
     ...walked.unreadable.map(({ path: unreadablePath, error }) => ({
@@ -850,6 +857,7 @@ export async function discoverArtifacts(
   );
   for (const { path: unreadablePath } of walked.unreadable) {
     skippedPathStates.set(unreadablePath, "unreadable");
+    blockedTraversalPaths.add(unreadablePath);
   }
   const paths = new Set(
     walked.files.filter((relativePath) =>
@@ -881,6 +889,7 @@ export async function discoverArtifacts(
         const inspected = await safeRepositoryPath(root, relativePath);
         if (inspected.state === "symlink") {
           skippedPathStates.set(relativePath, "symlink");
+          blockedTraversalPaths.add(relativePath);
           diagnostics.push({
             severity: "warning",
             path: relativePath,
@@ -947,6 +956,8 @@ export async function discoverArtifacts(
     // Preserve existence evidence before exclusion/depth/content parsing.
     discoveredPaths,
     skippedPathStates,
+    blockedTraversalPaths,
+    traversedDirectoryPaths: new Set(walked.traversedDirectories),
   };
 }
 

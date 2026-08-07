@@ -1741,6 +1741,8 @@ test("ci report policy warns on a newly blocking inspection-coverage issue", () 
         path: "skills/payment/SKILL.md",
         fromState: "parsed",
         toState: "symlink",
+        scope: "exact",
+        previouslyInspectedPaths: ["skills/payment/SKILL.md"],
         classification: {
           kind: "skill",
           scope: "independent",
@@ -3184,6 +3186,99 @@ test("coverage regression stays WARN and --fail-on-status warn blocks it", async
   assert.match(
     command.stdout,
     /Inspection coverage regressions:[\s\S]*skills\/payment\/SKILL\.md[\s\S]*parsed -> symlink/,
+  );
+});
+
+test("Skill directory symlink is a subtree coverage regression from an exact path", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  await fixture.skill("payment", {
+    owner: "payments",
+    status: "stable",
+  });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await rm(fixture.resolve("skills/payment"), { recursive: true });
+  await fixture.skill("hidden-payment/SKILL.md", {
+    owner: "payments",
+    status: "stable",
+  });
+  await symlink("../hidden-payment", fixture.resolve("skills/payment"));
+  await fixture.git(["add", "-A"]);
+  await fixture.git(["commit", "-m", "replace Skill directory with symlink"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const ciCommand = await withCapturedStdout(() =>
+    main([
+      "ci-report",
+      fixture.root,
+      "--from",
+      "base",
+      "--to",
+      "HEAD",
+      "--format",
+      "markdown",
+      "--fail-on-status",
+      "warn",
+    ]),
+  );
+  const strictCommand = await withCapturedStdout(() =>
+    main([
+      "scan",
+      fixture.root,
+      "--fail-on",
+      "high",
+      "--format",
+      "json",
+      "--strict",
+    ]),
+  );
+
+  assert.equal(report.status, "warn");
+  assert.equal(ciCommand.code, 1);
+  assert.equal(strictCommand.code, 1);
+  assert.deepEqual(
+    report.diff.inspectionCoverage.regressions.map((change) => ({
+      path: change.path,
+      fromState: change.fromState,
+      toState: change.toState,
+      scope: change.scope,
+      affectedBoundary: change.affectedBoundary,
+      previouslyInspectedPaths: change.previouslyInspectedPaths,
+    })),
+    [
+      {
+        path: "skills/payment",
+        fromState: "parsed",
+        toState: "symlink",
+        scope: "subtree",
+        affectedBoundary: "skills",
+        previouslyInspectedPaths: ["skills/payment/SKILL.md"],
+      },
+    ],
+  );
+  assert.match(
+    ciCommand.stdout,
+    /skills\/payment[\s\S]*parsed -> symlink \(subtree; skills boundary\)[\s\S]*previously inspected[\s\S]*skills\/payment\/SKILL\.md/,
+  );
+  const strictJson = JSON.parse(strictCommand.stdout) as {
+    agentSkills: { totalSkillCount: number };
+    inspectionCoverage: {
+      blockingIssues: Array<{ path: string; scope: string }>;
+    };
+  };
+  assert.equal(strictJson.agentSkills.totalSkillCount, 0);
+  assert.deepEqual(
+    strictJson.inspectionCoverage.blockingIssues.map(({ path, scope }) => ({
+      path,
+      scope,
+    })),
+    [{ path: "skills/payment", scope: "subtree" }],
   );
 });
 

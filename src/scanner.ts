@@ -152,6 +152,7 @@ export function scanFromRepositorySnapshot(
     inspectionCoverage: buildInspectionCoverage(
       snapshot.repositoryPathStates,
       snapshot.core.repositoryPathConfig,
+      snapshot.core.blockedTraversalPaths,
     ),
     scannedFileCount: snapshot.scannedFileCount,
     format: snapshot.config.format,

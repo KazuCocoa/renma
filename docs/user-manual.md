@@ -1240,10 +1240,16 @@ expected first-class agent-facing paths, paths actually represented in parsed
 semantic evidence, and blocking issues. Canonical Skill entrypoints and other
 deterministically classified first-class agent-facing assets are blocking when
 they are symlinks, unreadable, oversized, depth-limited, or otherwise present
-but unavailable to semantic inspection. Explicit scan-boundary exclusion is
-not a single-revision coverage failure. Ordinary unsupported repository files
-do not turn strict scan into a requirement to parse every file. Renma never
-follows repository symlinks.
+but unavailable to semantic inspection. Blocking issues distinguish `exact`
+expected artifacts from `subtree` traversal boundaries. A symlinked,
+unreadable, or depth-limited directory under `skills`, `.agents/skills`,
+`contexts`, `context`, `lenses`, or `.agents` is a subtree issue when the
+configured globs can select first-class descendants there; the evidence names
+the affected boundary without guessing a hidden descendant path. Explicit
+scan-boundary exclusion is not a single-revision coverage failure. Ordinary
+unsupported repository subtrees such as `tools/vendor-cache` do not turn
+strict scan into a requirement to parse every file. Renma never follows a
+blocked subtree or repository symlink.
 
 Human-readable output states whether inspection was complete, so zero findings
 with blocking coverage issues is not described as a complete result. The JSON
@@ -1988,8 +1994,12 @@ A worse readiness level, a previously passing readiness check becoming
 failing/error, a new blocking readiness check, or a newly introduced blocking
 inspection-coverage issue makes the report at least `WARN`; an independently
 failing condition remains `FAIL`. Existing baseline coverage issues are not
-revision regressions. Target-state rejection of an already-existing issue is
-the responsibility of `scan --strict`.
+revision regressions. Coverage diff containment is subtree-aware: a baseline
+exact path that was parsed and then falls below a target blocked subtree is
+reported as a meaningful regression, and a newly blocked agent-facing subtree
+is reviewable even when no exact baseline asset path is known. Target-state
+rejection of an already-existing issue is the responsibility of
+`scan --strict`.
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness
 changes, graph changes, review-focused finding changes, and Skill Discovery

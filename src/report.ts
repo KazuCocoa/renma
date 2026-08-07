@@ -72,8 +72,12 @@ export function formatText(result: ScanResult): string {
   if (result.inspectionCoverage.blockingIssues.length > 0) {
     lines.push("", "Inspection Coverage Issues");
     for (const issue of result.inspectionCoverage.blockingIssues) {
+      const scope =
+        issue.scope === "subtree"
+          ? `subtree; ${issue.affectedBoundary ?? "agent-facing"} boundary`
+          : `exact ${issue.classification.kind}`;
       lines.push(
-        `  BLOCKING ${issue.path}: ${issue.state} (${issue.classification.kind}) — ${issue.reason}`,
+        `  BLOCKING ${issue.path}: ${issue.state} (${scope}) — ${issue.reason}`,
       );
     }
   }

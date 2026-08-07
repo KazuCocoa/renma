@@ -1,5 +1,6 @@
 import {
   executeDiff,
+  formatInspectionCoverageChange,
   formatSecurityChanges,
   type AssetChange,
   type AssetDelta,
@@ -575,8 +576,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
           "### Inspection coverage regressions",
           "",
           ...inspectionCoverage.regressions.map(
-            (change) =>
-              `- ${formatMarkdownInlineCode(change.path)}: ${change.fromState} -> ${change.toState}`,
+            (change) => `- ${formatInspectionCoverageChange(change)}`,
           ),
         ]
       : []),
