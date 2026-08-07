@@ -1078,6 +1078,12 @@ parent candidate. Local metadata overrides remain supported where valid, but
 are not required. `tools/**` is shared repository implementation, and a Skill
 uses `scripts/`, not `tools/`, for canonical local executable support.
 
+Do not author or scaffold a Skill entrypoint below one of those reserved
+support segments. A Skill-looking filename there remains support content, even
+at deeper nesting such as `references/vendor/SKILL.md`. Ordinary non-reserved
+domain nesting remains valid. See the canonical
+[entrypoint path contract](agent-skills-compatibility.md#entrypoint-paths).
+
 The Skill-local path rule establishes only a structural parent candidate. The
 catalog must resolve exactly one parent entrypoint before Renma reports
 inherited governance. A missing or ambiguous parent remains structurally

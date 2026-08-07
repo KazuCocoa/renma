@@ -23,7 +23,7 @@
       "skills/**/assets/**/*",
       "skills/**/examples/**/*.md",
       "skills/**/profiles/**/*.md",
-      "skills/**/references/**/*.md",
+      "skills/**/references/**/*",
       "skills/**/scripts/**/*",
       "skills/**/skill.md",
       "skills/**/SKILL.md",

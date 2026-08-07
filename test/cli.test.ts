@@ -2311,6 +2311,79 @@ test("scaffold file mode requires owner", async () => {
   assert.match(result.stderr, /requires --owner/);
 });
 
+test("scaffold rejects canonical-looking targets under reserved Skill-support directories", async () => {
+  const root = await fixture();
+  for (const relativeTarget of [
+    "skills/SKILL.md",
+    "skills/examples/SKILL.md",
+    "skills/demo/references/new/SKILL.md",
+    ".agents/skills/SKILL.md",
+    ".agents/skills/profiles/SKILL.md",
+    ".agents/skills/demo/assets/new/SKILL.md",
+  ]) {
+    const target = path.join(root, ...relativeTarget.split("/"));
+    const result = await withCapturedConsole(() =>
+      main(["scaffold", "skill", target, "--owner", "qa-platform"]),
+    );
+
+    assert.equal(result.code, 2, relativeTarget);
+    assert.match(result.stderr, /without reserved Skill-support segments/);
+    await assert.rejects(readFile(target, "utf8"), { code: "ENOENT" });
+  }
+});
+
+test("scaffold resolves a marked repository below an ancestor skills directory", async () => {
+  const workspace = await fixture();
+  const repository = path.join(workspace, "skills", "project");
+  await mkdir(path.join(repository, ".git"), { recursive: true });
+
+  for (const fixture of [
+    {
+      relativePath: "skills/demo/SKILL.md",
+      id: "skill.demo",
+      name: "demo",
+    },
+    {
+      relativePath: ".agents/skills/agent-demo/SKILL.md",
+      id: "skill.agent-demo",
+      name: "agent-demo",
+    },
+  ]) {
+    const target = path.join(repository, ...fixture.relativePath.split("/"));
+    const result = await withCapturedConsole(() =>
+      main([
+        "scaffold",
+        "skill",
+        target,
+        "--id",
+        fixture.id,
+        "--owner",
+        "qa-platform",
+      ]),
+    );
+
+    assert.equal(result.code, 0, fixture.relativePath);
+    assert.equal(result.stderr, "", fixture.relativePath);
+    assert.match(
+      await readFile(target, "utf8"),
+      new RegExp(`^name: ${fixture.name}$`, "m"),
+      fixture.relativePath,
+    );
+  }
+
+  const scanResult = await scan(repository);
+  for (const sourcePath of [
+    "skills/demo/SKILL.md",
+    ".agents/skills/agent-demo/SKILL.md",
+  ]) {
+    const validation = scanResult.agentSkills.results.find(
+      ({ path: candidatePath }) => candidatePath === sourcePath,
+    );
+    assert.equal(validation?.format, "agent-skills", sourcePath);
+    assert.equal(validation?.valid, true, sourcePath);
+  }
+});
+
 test("scaffold context can emit json", async () => {
   const result = await withCapturedConsole(() =>
     main([

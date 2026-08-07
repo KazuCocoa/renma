@@ -80,10 +80,14 @@ flowchart LR
 
 ## Agent Skills And Renma
 
-Canonical Agent Skills entrypoints are:
+Canonical Agent Skills entrypoints use `SKILL.md` under either recognized root:
 
 - `skills/**/SKILL.md`
 - `.agents/skills/**/SKILL.md`
+
+The `**` notation is shorthand, not an unconditional path grammar: no segment
+between the Skill root and `SKILL.md` may be a reserved Skill-support directory.
+See the precise [entrypoint path contract](docs/agent-skills-compatibility.md#entrypoint-paths).
 
 Renma also discovers historical `skill.md` and `*.skill.md` spellings under
 those roots for migration diagnostics. Discovery does not make those spellings

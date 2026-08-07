@@ -13,6 +13,10 @@ import type {
   SuppressionExpiration,
 } from "./types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import {
+  DEFAULT_SKILL_ENTRYPOINT_GLOBS,
+  DEFAULT_SKILL_SUPPORT_GLOBS,
+} from "./skill-path-contract.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
@@ -47,28 +51,14 @@ export const DEFAULT_CONFIG: ScanConfig = {
   failOn: "high",
   format: "text",
   globs: [
-    "skills/**/SKILL.md",
-    "skills/**/skill.md",
-    "skills/**/*.skill.md",
-    ".agents/skills/**/SKILL.md",
-    ".agents/skills/**/skill.md",
-    ".agents/skills/**/*.skill.md",
+    ...DEFAULT_SKILL_ENTRYPOINT_GLOBS,
     ".agents/**/*.md",
     "AGENTS.md",
     "README.md",
     "context/**/*.md",
     "contexts/**/*.md",
     "lenses/**/*.md",
-    "skills/**/profiles/**/*.md",
-    "skills/**/references/**/*.md",
-    "skills/**/examples/**/*.md",
-    "skills/**/scripts/**/*",
-    "skills/**/assets/**/*",
-    ".agents/skills/**/profiles/**/*.md",
-    ".agents/skills/**/references/**/*",
-    ".agents/skills/**/examples/**/*.md",
-    ".agents/skills/**/scripts/**/*",
-    ".agents/skills/**/assets/**/*",
+    ...DEFAULT_SKILL_SUPPORT_GLOBS,
     "tools/**/*",
   ],
   exclude: ["node_modules", "dist", ".git"],

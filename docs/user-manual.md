@@ -67,10 +67,13 @@ unchanged.
 
 renma is most useful when agent knowledge is stored in predictable places:
 
-- `skills/**/SKILL.md` and `.agents/skills/**/SKILL.md` are the canonical Agent
-  Skills entrypoints. Renma still discovers historical `skill.md` and
-  `*.skill.md` spellings under those roots for migration diagnostics, but those
-  spellings are not Agent Skills-compatible.
+- `skills/**/SKILL.md` and `.agents/skills/**/SKILL.md` are shorthand for the
+  canonical Agent Skills roots and exact filename. A path crossing a reserved
+  Skill-support directory is support, not an entrypoint; see the precise
+  [entrypoint path contract](agent-skills-compatibility.md#entrypoint-paths).
+  Renma still discovers historical `skill.md` and `*.skill.md` spellings under
+  those roots for migration diagnostics.
+  Historical spellings are not Agent Skills-compatible.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
 - `renma.config.jsonc` is the recommended repository configuration filename;
@@ -120,7 +123,10 @@ Avoid using reserved support directory names as skill names. Paths such as
 `skills/references/SKILL.md`, `skills/scripts/SKILL.md`, and
 `skills/profiles/SKILL.md` are not treated as skill entrypoints by default. If
 one of those files is intended to define a Renma skill, rename the directory, for example to
-`skills/example-review/SKILL.md`.
+`skills/example-review/SKILL.md`. The same rule applies under `.agents/skills/`
+and at any deeper level: `skills/demo/references/vendor/SKILL.md` remains
+Skill-local Reference content owned structurally by `skills/demo`, not a nested
+Skill.
 
 Specification-valid Agent Skills declare governance and security values as
 flat string-valued `metadata.renma.*` entries. JSON-array strings represent lists;
@@ -1078,6 +1084,10 @@ are rejected.
 
 Canonical Agent Skills entrypoints are:
 
+These are qualified discovery shorthand globs; the structural exclusions in the
+[entrypoint path contract](agent-skills-compatibility.md#entrypoint-paths) still
+apply after a glob matches:
+
 - `skills/**/SKILL.md`
 - `.agents/skills/**/SKILL.md`
 
@@ -1097,7 +1107,7 @@ Other default scan glob families are:
 - `contexts/**/*.md`
 - `lenses/**/*.md`
 - `skills/**/profiles/**/*.md`
-- `skills/**/references/**/*.md`
+- `skills/**/references/**/*`
 - `skills/**/examples/**/*.md`
 - `skills/**/scripts/**/*`
 - `skills/**/assets/**/*`
@@ -1107,6 +1117,12 @@ Other default scan glob families are:
 - `.agents/skills/**/scripts/**/*`
 - `.agents/skills/**/assets/**/*`
 - `tools/**/*`
+
+The two Skill roots intentionally use the same support discovery modes.
+Profiles and examples are Markdown-oriented. References, scripts, and assets
+may contain arbitrary file types. A discovered non-Markdown Reference remains
+`reference` support and is not Markdown-parser eligible merely because the
+default glob includes it.
 
 ## Where To Go Next
 

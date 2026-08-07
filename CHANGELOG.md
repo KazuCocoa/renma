@@ -36,6 +36,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Made the canonical Skill-root grammar explicit and symmetric across
+  `skills/` and `.agents/skills/`, centralized reserved support discovery
+  rules, broadened `skills/**/references/**/*` to include non-Markdown
+  resources like the existing `.agents/skills/` root, and made scaffold reject
+  targets the shared classifier treats as reserved support.
 - Changed suppression application to keep active findings disjoint from a
   complete suppression ledger. CI trusts a common exact rule ID and normalized
   path scope only while active on both revisions and uses the stricter endpoint

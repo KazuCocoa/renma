@@ -121,6 +121,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "metadata-definitions.ts",
         "model.ts",
         "quality-profile.ts",
+        "skill-path-contract.ts",
         "types.ts",
       ],
     ),
