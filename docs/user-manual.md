@@ -1989,7 +1989,15 @@ decision and inherited evidence contributed to the effective boundary
 transition; unrelated local and shared declarations changing in the same diff
 do not make the result mixed. `unresolved` means exact field-level attribution
 cannot be established without guessing; known partial sources may remain in its
-source list. `diff.security.sharedPolicyChanges` groups a changed reusable
+source list. For accumulating lists, Renma compares each changed shared source's
+normalized effective declaration additions and removals with the effective field
+transition. If several changed profiles or repository configuration supply the
+same added or removed value, each source is retained consistently in field-level
+provenance and `diff.security.sharedPolicyChanges`; one redundant contributor
+does not erase another. Local replacement lists and invalid fail-closed
+destinations still exclude suppressed sources, while a changed profile parent
+link remains attributable when its reachable contributor-chain delta supplies
+the transition. `diff.security.sharedPolicyChanges` groups a changed reusable
 profile or repository security configuration only with the complete,
 deterministically sorted list of assets for which that shared change contributed
 to an effective-policy transition. Markdown shows the affected count and a

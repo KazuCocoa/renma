@@ -334,8 +334,9 @@ function fieldProvenance(
     ...(after?.evidence.profileChain ?? []),
   ])) {
     if (!profileFieldChanged(input, profile, field)) continue;
-    const contribution = changedProfileContributesToTransition(
+    const contribution = changedProfileAttribution(
       input,
+      before,
       after,
       profile,
       field,
@@ -362,10 +363,17 @@ function fieldProvenance(
     );
     const afterContributors = inheritedFieldSources(input, after, "to", field);
     sources.push(...beforeContributors.sources, ...afterContributors.sources);
-    exact = beforeContributors.exact && afterContributors.exact;
+    exact = exact && beforeContributors.exact && afterContributors.exact;
   }
 
-  if (repositoryFieldChanged(input, field)) {
+  const repositoryContribution = changedRepositoryAttribution(
+    input,
+    before,
+    after,
+    field,
+  );
+  exact = exact && repositoryContribution.exact;
+  if (repositoryContribution.contributes) {
     const source = repositorySource(input);
     sources.push(source);
     changedSharedSources.push(source);
@@ -685,12 +693,22 @@ function profileFieldChanged(
   );
 }
 
-function changedProfileContributesToTransition(
+function changedProfileAttribution(
   input: SecurityPolicyDiffInput,
+  before: PreparedAsset | undefined,
   after: PreparedAsset | undefined,
   profile: string,
   field: ReviewableSecurityPolicyField,
 ): { contributes: boolean; exact: boolean } {
+  if (!SCALAR_FIELDS.has(field)) {
+    return changedProfileListAttribution(
+      input,
+      before,
+      after,
+      profile,
+      field as ListSecurityPolicyField,
+    );
+  }
   if (!after) return { contributes: false, exact: true };
   if (
     input.fromConfig === undefined ||
@@ -724,6 +742,170 @@ function changedProfileContributesToTransition(
       after.evidence.effectivePolicy[field],
       counterfactualValue,
     ),
+    exact: true,
+  };
+}
+
+function changedProfileListAttribution(
+  input: SecurityPolicyDiffInput,
+  before: PreparedAsset | undefined,
+  after: PreparedAsset | undefined,
+  profile: string,
+  field: ListSecurityPolicyField,
+): { contributes: boolean; exact: boolean } {
+  if (!after) return { contributes: false, exact: true };
+  if (input.fromConfig === undefined || input.toConfig === undefined) {
+    return { contributes: false, exact: false };
+  }
+
+  const beforeProfile = input.fromConfig.profiles?.[profile];
+  const afterProfile = input.toConfig.profiles?.[profile];
+  const parentLinkChanged =
+    (beforeProfile?.securityProfile ?? null) !==
+    (afterProfile?.securityProfile ?? null);
+  const beforeContribution = profileEndpointListContribution(
+    before,
+    input.fromConfig,
+    profile,
+    field,
+    parentLinkChanged,
+  );
+  const afterContribution = profileEndpointListContribution(
+    after,
+    input.toConfig,
+    profile,
+    field,
+    parentLinkChanged,
+  );
+  return listContributionAttribution(
+    before,
+    after,
+    field,
+    beforeContribution,
+    afterContribution,
+  );
+}
+
+function changedRepositoryAttribution(
+  input: SecurityPolicyDiffInput,
+  before: PreparedAsset | undefined,
+  after: PreparedAsset | undefined,
+  field: ReviewableSecurityPolicyField,
+): { contributes: boolean; exact: boolean } {
+  const key = repositoryConfigKey(field);
+  if (!key || !repositoryFieldChanged(input, field) || !after) {
+    return { contributes: false, exact: true };
+  }
+  if (input.fromConfig === undefined || input.toConfig === undefined) {
+    return { contributes: false, exact: false };
+  }
+  const listField = field as ListSecurityPolicyField;
+  return listContributionAttribution(
+    before,
+    after,
+    listField,
+    repositoryEndpointListContribution(before, input.fromConfig, listField),
+    repositoryEndpointListContribution(after, input.toConfig, listField),
+  );
+}
+
+function profileEndpointListContribution(
+  asset: PreparedAsset | undefined,
+  config: SecurityConfig,
+  profile: string,
+  field: ListSecurityPolicyField,
+  includeLinkedAncestors: boolean,
+): { values: string[]; exact: boolean } {
+  if (!asset) return { values: [], exact: true };
+  const evidence = asset.evidence;
+  if (evidence.declaredPolicy === undefined) {
+    return { values: [], exact: false };
+  }
+  const profileIndex = evidence.profileChain.indexOf(profile);
+  if (profileIndex < 0) return { values: [], exact: true };
+
+  const contributors = includeLinkedAncestors
+    ? evidence.profileChain.slice(0, profileIndex + 1)
+    : [profile];
+  return {
+    values: uniqueStrings(
+      contributors.flatMap((name) =>
+        profileEffectiveListContribution(evidence, config, name, field),
+      ),
+    ),
+    exact: true,
+  };
+}
+
+function profileEffectiveListContribution(
+  evidence: SecurityPolicyAssetEvidence,
+  config: SecurityConfig,
+  profile: string,
+  field: ListSecurityPolicyField,
+): string[] {
+  if (!profileSuppliesFieldValue(evidence, config, profile, field)) return [];
+  const candidate = config.profiles?.[profile];
+  if (!candidate) return [];
+  const effectiveValues = new Set(evidence.effectivePolicy[field]);
+  return profileListContribution(
+    candidate,
+    profile,
+    evidence.profileChain,
+    config,
+    field,
+  ).filter((value) => effectiveValues.has(value));
+}
+
+function repositoryEndpointListContribution(
+  asset: PreparedAsset | undefined,
+  config: SecurityConfig,
+  field: ListSecurityPolicyField,
+): { values: string[]; exact: boolean } {
+  if (!asset) return { values: [], exact: true };
+  const evidence = asset.evidence;
+  if (evidence.declaredPolicy === undefined) {
+    return { values: [], exact: false };
+  }
+  const key = repositoryConfigKey(field);
+  if (!key || !repositorySuppliesFieldValue(evidence, config, field)) {
+    return { values: [], exact: true };
+  }
+  const effectiveValues = new Set(evidence.effectivePolicy[field]);
+  return {
+    values: uniqueStrings(config[key] ?? []).filter((value) =>
+      effectiveValues.has(value),
+    ),
+    exact: true,
+  };
+}
+
+function listContributionAttribution(
+  before: PreparedAsset | undefined,
+  after: PreparedAsset,
+  field: ListSecurityPolicyField,
+  beforeContribution: { values: string[]; exact: boolean },
+  afterContribution: { values: string[]; exact: boolean },
+): { contributes: boolean; exact: boolean } {
+  // Compare normalized declaration deltas with the effective transition instead
+  // of removing one source at a time, so redundant changed sources stay symmetric.
+  const exact = beforeContribution.exact && afterContribution.exact;
+  if (!exact) return { contributes: false, exact: false };
+  const effectiveBefore = before?.evidence.effectivePolicy[field] ?? [];
+  const effectiveAfter = after.evidence.effectivePolicy[field];
+  const sourceAdded = difference(
+    afterContribution.values,
+    beforeContribution.values,
+  );
+  const sourceRemoved = difference(
+    beforeContribution.values,
+    afterContribution.values,
+  );
+  const effectiveAdded = new Set(difference(effectiveAfter, effectiveBefore));
+  const effectiveRemoved = new Set(difference(effectiveBefore, effectiveAfter));
+  return {
+    contributes:
+      sourceAdded.some((value) => effectiveAdded.has(value)) ||
+      sourceRemoved.some((value) => effectiveRemoved.has(value)),
     exact: true,
   };
 }

@@ -605,6 +605,80 @@ test("a changed profile parent link remains a shared source when it changes the 
   ]);
 });
 
+test("a changed parent link retains accumulating attribution beside a redundant repository source", () => {
+  const path = "contexts/parent-link-list.md";
+  const input = artifact(path, "context", policy({ securityProfile: "child" }));
+  const fromConfig = securityConfig({
+    profiles: {
+      "parent-old": profile({}),
+      "parent-new": profile({ approvedDomains: ["api.example.com"] }),
+      child: profile({ securityProfile: "parent-old" }),
+    },
+  });
+  const toConfig = securityConfig({
+    approvedDomains: ["api.example.com"],
+    profiles: {
+      "parent-old": profile({}),
+      "parent-new": profile({ approvedDomains: ["api.example.com"] }),
+      child: profile({ securityProfile: "parent-new" }),
+    },
+  });
+  const ids = new Map([[path, "context.parent-link-list"]]);
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+    mode: "inherited",
+    sources: [
+      {
+        type: "repository_config",
+        id: "security",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "parent-new",
+        path: "renma.config.jsonc",
+      },
+    ],
+  });
+  assert.deepEqual(
+    result.sharedPolicyChanges.map((change) => change.source),
+    [
+      {
+        type: "repository_config",
+        id: "security",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+    ],
+  );
+  assert.ok(
+    result.sharedPolicyChanges.every(
+      (change) =>
+        change.changedFields[0] === "approvedNetworkDestinations" &&
+        change.affectedAssets[0]?.id === "context.parent-link-list",
+    ),
+  );
+});
+
 test("changed accumulating profile lists retain genuine shared contributors", () => {
   const path = "contexts/accumulating-profile.md";
   const input = artifact(
@@ -666,6 +740,329 @@ test("changed accumulating profile lists retain genuine shared contributors", ()
       ],
     },
   ]);
+});
+
+test("profile and repository additions retain the same approved network destination", () => {
+  const path = "contexts/redundant-network.md";
+  const input = artifact(
+    path,
+    "context",
+    policy({ securityProfile: "shared" }),
+  );
+  const fromConfig = securityConfig({
+    profiles: { shared: profile({}) },
+  });
+  const toConfig = securityConfig({
+    approvedDomains: ["api.example.com"],
+    profiles: {
+      shared: profile({ approvedDomains: ["api.example.com"] }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.redundant-network"]]),
+    toAssetIdsByPath: new Map([[path, "context.redundant-network"]]),
+  });
+
+  assertConsistentSharedListAttribution(
+    result,
+    "approvedNetworkDestinations",
+    { id: "context.redundant-network", path, kind: "context" },
+    [
+      {
+        type: "repository_config",
+        id: "security",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "shared",
+        path: "renma.config.jsonc",
+      },
+    ],
+  );
+});
+
+test("profile and repository additions retain the same approved upload destination", () => {
+  const path = "contexts/redundant-upload.md";
+  const input = artifact(
+    path,
+    "context",
+    policy({ securityProfile: "shared" }),
+  );
+  const fromConfig = securityConfig({
+    profiles: { shared: profile({}) },
+  });
+  const toConfig = securityConfig({
+    approvedUploadDomains: ["uploads.example.com"],
+    profiles: {
+      shared: profile({
+        approvedUploadDomains: ["uploads.example.com"],
+      }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.redundant-upload"]]),
+    toAssetIdsByPath: new Map([[path, "context.redundant-upload"]]),
+  });
+
+  assertConsistentSharedListAttribution(
+    result,
+    "approvedUploadDestinations",
+    { id: "context.redundant-upload", path, kind: "context" },
+    [
+      {
+        type: "repository_config",
+        id: "security",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "shared",
+        path: "renma.config.jsonc",
+      },
+    ],
+  );
+});
+
+test("parent and child profile additions retain the same accumulating destination", () => {
+  const path = "contexts/redundant-profile-chain.md";
+  const input = artifact(path, "context", policy({ securityProfile: "child" }));
+  const fromConfig = securityConfig({
+    profiles: {
+      parent: profile({}),
+      child: profile({ securityProfile: "parent" }),
+    },
+  });
+  const toConfig = securityConfig({
+    profiles: {
+      parent: profile({ approvedDomains: ["api.example.com"] }),
+      child: profile({
+        securityProfile: "parent",
+        approvedDomains: ["api.example.com"],
+      }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.redundant-chain"]]),
+    toAssetIdsByPath: new Map([[path, "context.redundant-chain"]]),
+  });
+
+  assertConsistentSharedListAttribution(
+    result,
+    "approvedNetworkDestinations",
+    { id: "context.redundant-chain", path, kind: "context" },
+    [
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "parent",
+        path: "renma.config.jsonc",
+      },
+    ],
+  );
+});
+
+test("duplicate disallowed commands retain every changed shared source", () => {
+  const path = "contexts/redundant-commands.md";
+  const input = artifact(path, "context", policy({ securityProfile: "child" }));
+  const fromConfig = securityConfig({
+    profiles: {
+      parent: profile({}),
+      child: profile({ securityProfile: "parent" }),
+    },
+  });
+  const toConfig = securityConfig({
+    disallowedCommands: ["curl"],
+    profiles: {
+      parent: profile({ disallowedCommands: ["curl"] }),
+      child: profile({
+        securityProfile: "parent",
+        disallowedCommands: ["curl"],
+      }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.redundant-commands"]]),
+    toAssetIdsByPath: new Map([[path, "context.redundant-commands"]]),
+  });
+
+  assertConsistentSharedListAttribution(
+    result,
+    "disallowedCommands",
+    { id: "context.redundant-commands", path, kind: "context" },
+    [
+      {
+        type: "repository_config",
+        id: "security",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "parent",
+        path: "renma.config.jsonc",
+      },
+    ],
+  );
+});
+
+test("redundant inherited data and input values retain every changed profile", () => {
+  const path = "contexts/redundant-inherited-lists.md";
+  const input = artifact(path, "context", policy({ securityProfile: "child" }));
+  const fromConfig = securityConfig({
+    profiles: {
+      parent: profile({}),
+      child: profile({ securityProfile: "parent" }),
+    },
+  });
+  const toConfig = securityConfig({
+    profiles: {
+      parent: profile({
+        allowedData: ["internal"],
+        forbiddenInputs: ["credentials"],
+      }),
+      child: profile({
+        securityProfile: "parent",
+        allowedData: ["internal"],
+        forbiddenInputs: ["credentials"],
+      }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.redundant-lists"]]),
+    toAssetIdsByPath: new Map([[path, "context.redundant-lists"]]),
+  });
+  const sources = [
+    {
+      type: "security_profile" as const,
+      id: "child",
+      path: "renma.config.jsonc",
+    },
+    {
+      type: "security_profile" as const,
+      id: "parent",
+      path: "renma.config.jsonc",
+    },
+  ];
+
+  assert.deepEqual(
+    result.policyChanges[0]?.fields.map((field) => ({
+      field: field.field,
+      provenance: field.provenance,
+    })),
+    ["allowedData", "forbiddenInputs"].map((field) => ({
+      field,
+      provenance: { mode: "inherited", sources },
+    })),
+  );
+  assert.deepEqual(
+    result.sharedPolicyChanges,
+    sources.map((source) => ({
+      source,
+      changedFields: ["allowedData", "forbiddenInputs"],
+      affectedAssets: [
+        {
+          id: "context.redundant-lists",
+          path,
+          kind: "context",
+        },
+      ],
+    })),
+  );
+});
+
+test("unique and redundant additions retain only genuine changed contributors", () => {
+  const path = "contexts/unique-and-redundant.md";
+  const input = artifact(
+    path,
+    "context",
+    policy({ securityProfile: "shared" }),
+  );
+  const fromConfig = securityConfig({
+    profiles: { shared: profile({}) },
+  });
+  const toConfig = securityConfig({
+    approvedDomains: ["duplicate.example.com"],
+    profiles: {
+      shared: profile({
+        approvedDomains: ["duplicate.example.com", "profile-only.example.com"],
+      }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.unique-and-redundant"]]),
+    toAssetIdsByPath: new Map([[path, "context.unique-and-redundant"]]),
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0], {
+    kind: "list",
+    field: "approvedNetworkDestinations",
+    added: ["duplicate.example.com", "profile-only.example.com"],
+    removed: [],
+    provenance: {
+      mode: "inherited",
+      sources: [
+        {
+          type: "repository_config",
+          id: "security",
+          path: "renma.config.jsonc",
+        },
+        {
+          type: "security_profile",
+          id: "shared",
+          path: "renma.config.jsonc",
+        },
+      ],
+    },
+  });
+  assert.deepEqual(
+    result.sharedPolicyChanges.map((change) => change.source),
+    result.policyChanges[0]?.fields[0]?.provenance.sources,
+  );
 });
 
 test("removing a local override records direct declaration and inherited profile provenance", () => {
@@ -980,6 +1377,81 @@ test("missing contributor evidence reports unresolved provenance without guessin
     sources: [],
   });
 });
+
+test("incomplete compatibility evidence leaves interacting shared attribution unresolved", () => {
+  const path = "contexts/compatibility-shared.md";
+  const input = artifact(
+    path,
+    "context",
+    policy({ securityProfile: "shared" }),
+  );
+  const fromConfig = securityConfig({
+    profiles: { shared: profile({}) },
+  });
+  const toConfig = securityConfig({
+    approvedDomains: ["api.example.com"],
+    profiles: {
+      shared: profile({ approvedDomains: ["api.example.com"] }),
+    },
+  });
+  const ids = new Map([[path, "context.compatibility-shared"]]);
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+    mode: "unresolved",
+    sources: [
+      {
+        type: "repository_config",
+        id: "security",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "shared",
+        path: "renma.config.jsonc",
+      },
+    ],
+  });
+  assert.deepEqual(result.sharedPolicyChanges, []);
+});
+
+function assertConsistentSharedListAttribution(
+  result: ReturnType<typeof buildSecurityPolicyChanges>,
+  field:
+    | "approvedNetworkDestinations"
+    | "approvedUploadDestinations"
+    | "disallowedCommands",
+  asset: { id: string; path: string; kind: ArtifactKind },
+  sources: Array<{
+    type: "security_profile" | "repository_config";
+    id: string;
+    path: string;
+  }>,
+): void {
+  const change = result.policyChanges[0]?.fields.find(
+    (candidate) => candidate.field === field,
+  );
+  assert.deepEqual(change?.provenance, {
+    mode: "inherited",
+    sources,
+  });
+  assert.deepEqual(
+    result.sharedPolicyChanges,
+    sources.map((source) => ({
+      source,
+      changedFields: [field],
+      affectedAssets: [asset],
+    })),
+  );
+}
 
 interface PolicyInput {
   securityProfile?: string;

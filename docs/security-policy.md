@@ -814,8 +814,15 @@ evidence contributed to that effective boundary change.
 Asset addition or removal is direct only when the existing endpoint contains a
 local field declaration or profile selection. Scalar profile provenance names
 the last effective profile declaration, while accumulating lists retain every
-contributing profile. If the retained evidence cannot establish an exact
-field-level source, provenance is reported as unresolved instead of guessing.
+contributing profile. For accumulating lists, each changed profile or repository
+source is compared by its normalized effective declaration additions and
+removals against the effective field transition. When multiple changed sources
+supply the same added or removed value, every such source remains attributable;
+local replacements and invalid fail-closed destinations still suppress sources
+that cannot contribute. A changed profile parent link is retained when its
+reachable contributor-chain delta supplies the transition. If the retained
+evidence cannot establish an exact field-level source, provenance is reported as
+unresolved instead of guessing.
 This is declared/effective-policy provenance, not an inference about which
 runtime action used the policy. A profile or repository-policy change also
 records its effective-policy blast radius: JSON retains the complete sorted

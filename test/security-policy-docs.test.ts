@@ -65,6 +65,10 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
   );
   assert.match(
     manual,
+    /accumulating lists[\s\S]*normalized effective declaration additions and removals[\s\S]*same added or removed value, each source is retained[\s\S]*redundant contributor[\s\S]*does not erase another/,
+  );
+  assert.match(
+    manual,
     /access[\s\S]*becomes enabled[\s\S]*effective destination scope[\s\S]*shared\s+presentation limit[\s\S]*JSON retains the complete/,
   );
   assert.match(
