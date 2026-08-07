@@ -31,6 +31,29 @@ is appropriate only when the user confirms the long-form asset is intentionally
 coherent or ordered; it is not a general ignore mechanism. Renma validates the
 declaration but cannot prove that human review occurred.
 
+When one of these advisory limits is exceeded, the finding exposes `measured`,
+`limit`, `overBy`, and the deterministic rounded `overPercent` in
+`estimated_tokens`, and repeats the comparison in normal scan guidance. For a
+support asset, `limit` is the effective threshold: the default when an override
+is absent or invalid, and the active declared override when one is in force.
+The finding retains both `defaultLimit` and `effectiveLimit`, so an active
+override does not hide Renma's normal policy. Invalid metadata never raises the
+effective limit, and a valid override suppresses no finding above its own
+effective value.
+
+Markdown findings can also include up to three largest heading-based review
+candidates. Renma selects H2 sections beneath a single H1 title when available;
+otherwise it uses the shallowest useful heading depth. A section runs until the
+next heading at the same or a shallower depth, so nested headings remain part of
+their parent. Candidates are ordered by descending estimated size and then
+source line. They help locate concentrated content; they are not automatic
+split instructions or semantic classifications. Keep core routing, ordered
+workflow, constraints, and completion criteria in `SKILL.md`; use
+`references/`, `scripts/`, `assets/`, or independently owned `contexts/`
+according to semantic responsibility. Any support-asset split or override
+change still requires an explicit human decision. When no useful heading
+structure exists, the finding calls for manual semantic review.
+
 ## Agent Skills requirements and recommendations
 
 | Field | Value | Unit and trigger | Severity | Source | Rationale and false-positive risk | Diagnostic | Reviewed | Configurable later |

@@ -1748,7 +1748,20 @@ Verify the result with a test.
   );
   await writeFile(
     path.join(skillDir, "references", "large.md"),
-    `# Large Reference\n\n${repeatWords("context", 5001)}\n`,
+    `# Large Reference
+
+## Core Workflow
+${repeatWords("workflow", 700)}
+
+## Troubleshooting
+${repeatWords("troubleshooting", 3301)}
+
+### Nested Details
+${repeatWords("nested", 300)}
+
+## Examples
+${repeatWords("example", 1000)}
+`,
   );
 
   const result = await scan(root);
@@ -1791,6 +1804,71 @@ Verify the result with a test.
   assert.equal(contextBudgetFinding?.details?.effectiveLimit, 5000);
   assert.equal(contextBudgetFinding?.details?.overrideActive, false);
   assert.equal(contextBudgetFinding?.details?.measurement, "full_file");
+  assert.equal(contextBudgetFinding?.details?.limit, 5000);
+  assert.equal(
+    contextBudgetFinding?.details?.overBy,
+    Number(contextBudgetFinding?.details?.measured) - 5000,
+  );
+  assert.equal(
+    contextBudgetFinding?.details?.overPercent,
+    Math.round((Number(contextBudgetFinding?.details?.overBy) / 5000) * 100),
+  );
+  assert.equal(
+    contextBudgetFinding?.details?.sectionMeasurement,
+    "markdown_body_sections",
+  );
+  const sectionCandidates = contextBudgetFinding?.details?.sectionCandidates as
+    | Array<{
+        heading: string;
+        line: number;
+        estimatedTokens: number;
+        sharePercent: number;
+      }>
+    | undefined;
+  assert.equal(sectionCandidates?.length, 3);
+  assert.deepEqual(
+    sectionCandidates?.map((candidate) => candidate.heading),
+    ["Troubleshooting", "Examples", "Core Workflow"],
+  );
+  assert.equal(sectionCandidates?.[0]?.line, 6);
+  assert.ok(
+    Number(sectionCandidates?.[0]?.estimatedTokens) >
+      Number(sectionCandidates?.[1]?.estimatedTokens),
+  );
+  assert.ok(Number(sectionCandidates?.[0]?.sharePercent) > 0);
+  const analyzedSectionTokens =
+    sectionCandidates?.reduce(
+      (total, candidate) => total + candidate.estimatedTokens,
+      0,
+    ) ?? 0;
+  for (const candidate of sectionCandidates ?? []) {
+    assert.equal(
+      candidate.sharePercent,
+      Math.round((candidate.estimatedTokens / analyzedSectionTokens) * 100),
+    );
+  }
+  assert.match(
+    contextBudgetFinding?.remediation ?? "",
+    /default 5000-token advisory limit/,
+  );
+
+  const diagnosticV2 = result.diagnosticsV2.find(
+    (diagnostic) =>
+      diagnostic.code === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+      diagnostic.location?.path === "skills/demo/references/large.md",
+  );
+  assert.equal(
+    diagnosticV2?.details?.overBy,
+    contextBudgetFinding?.details?.overBy,
+  );
+  assert.equal(
+    diagnosticV2?.details?.overPercent,
+    contextBudgetFinding?.details?.overPercent,
+  );
+  assert.deepEqual(
+    diagnosticV2?.details?.sectionCandidates,
+    contextBudgetFinding?.details?.sectionCandidates,
+  );
 });
 
 test("support-asset token budgets honor only valid intentional overrides", async () => {
@@ -1948,6 +2026,27 @@ token_budget_rationale: Intentionally coherent.`,
       tokenBudgetRationale: "Intentionally coherent.",
     },
   );
+  assert.equal(
+    overOverride?.details?.overBy,
+    Number(overOverride?.details?.measured) - 5200,
+  );
+  assert.equal(
+    overOverride?.details?.overPercent,
+    Math.round((Number(overOverride?.details?.overBy) / 5200) * 100),
+  );
+  assert.match(
+    overOverride?.remediation ?? "",
+    /default advisory limit is 5000 tokens/,
+  );
+  assert.match(
+    overOverride?.remediation ?? "",
+    /active declared override is 5200 tokens/,
+  );
+  assert.doesNotMatch(overOverride?.remediation ?? "", /reviewed override/i);
+  assert.doesNotMatch(
+    overOverride?.remediation ?? "",
+    /increase token_budget_override|increase the override/i,
+  );
 
   for (const file of ["unsafe-positive.md", "unsafe-negative.md"]) {
     const unsafe = result.findings.find(
@@ -2097,6 +2196,16 @@ test("support-asset token-budget decisions fail closed with exact metadata evide
   await mkdir(referenceDir, { recursive: true });
   const cases = [
     {
+      file: "multiple-reasons.md",
+      metadata: `token_budget_override: nope
+token_budget_reviewed_at: "2026-02-30"`,
+      words: 5050,
+      evidenceLine: 2,
+      evidenceSnippet: "token_budget_override: nope",
+      reason: "token_budget_override must be an integer",
+      overBudget: true,
+    },
+    {
       file: "duplicate-override.md",
       metadata: `token_budget_override: 5200
 token_budget_override: 5300
@@ -2212,6 +2321,27 @@ token_budget_rationale: Intentionally coherent.`,
       `${fixtureCase.file} default budget remains active`,
     );
   }
+
+  const multipleReasons = result.findings.find(
+    (finding) =>
+      finding.id === "QUAL-INVALID-TOKEN-BUDGET-OVERRIDE" &&
+      finding.evidence.path.endsWith("multiple-reasons.md"),
+  );
+  const expectedReasons = [
+    "token_budget_override must be an integer",
+    "token_budget_rationale must be a non-empty string when an override is present",
+    "token_budget_reviewed_at must be a valid YYYY-MM-DD date",
+  ];
+  assert.deepEqual(multipleReasons?.details?.invalidReasons, expectedReasons);
+  assert.equal(multipleReasons?.details?.effectiveLimit, 5000);
+  assert.equal(multipleReasons?.details?.limit, 5000);
+  let previousReasonIndex = -1;
+  for (const reason of expectedReasons) {
+    const reasonIndex = (multipleReasons?.remediation ?? "").indexOf(reason);
+    assert.ok(reasonIndex > previousReasonIndex, reason);
+    previousReasonIndex = reasonIndex;
+    assert.match(multipleReasons?.llmHint ?? "", new RegExp(reason));
+  }
 });
 
 test("scan emits actionable guidance for oversized skills", async () => {
@@ -2231,8 +2361,16 @@ Use for repository governance review.
 Do not use for runtime context selection.
 ## Preflight
 Collect the target repository path.
-## Procedure
-${repeatWords("procedure", 2001)}
+## Core Workflow
+${repeatWords("workflow", 500)}
+## Troubleshooting
+${repeatWords("troubleshooting", 1300)}
+### Platform Details
+${repeatWords("platform", 200)}
+## Examples
+${repeatWords("example", 400)}
+## Completion Criteria
+The review is complete when the findings are reported.
 ## Verification
 Run npm test.
 `,
@@ -2251,6 +2389,14 @@ Run npm test.
   assert.equal(typeof skillBudgetFinding?.details?.measured, "number");
   assert.ok(Number(skillBudgetFinding?.details?.measured) > 2000);
   assert.equal(skillBudgetFinding?.details?.limit, 2000);
+  assert.equal(
+    skillBudgetFinding?.details?.overBy,
+    Number(skillBudgetFinding?.details?.measured) - 2000,
+  );
+  assert.equal(
+    skillBudgetFinding?.details?.overPercent,
+    Math.round((Number(skillBudgetFinding?.details?.overBy) / 2000) * 100),
+  );
   assert.equal(skillBudgetFinding?.details?.unit, "estimated_tokens");
   assert.match(skillBudgetFinding?.whyItMatters ?? "", /Long Skill bodies/);
   assert.ok(
@@ -2266,6 +2412,68 @@ Run npm test.
   );
   assert.ok(!skillBudgetFinding?.verificationSteps?.includes("Run npm test."));
   assert.match(skillBudgetFinding?.llmHint ?? "", /progressive disclosure/);
+  const sectionCandidates = skillBudgetFinding?.details?.sectionCandidates as
+    | Array<{
+        heading: string;
+        line: number;
+        estimatedTokens: number;
+        sharePercent: number;
+      }>
+    | undefined;
+  assert.equal(sectionCandidates?.length, 3);
+  assert.deepEqual(
+    sectionCandidates?.map((candidate) => candidate.heading),
+    ["Troubleshooting", "Core Workflow", "Examples"],
+  );
+  assert.equal(sectionCandidates?.[0]?.line, 14);
+  assert.ok(
+    Number(sectionCandidates?.[0]?.estimatedTokens) >
+      Number(sectionCandidates?.[1]?.estimatedTokens),
+  );
+  assert.ok(Number(sectionCandidates?.[0]?.sharePercent) > 0);
+  const textReport = formatText(result);
+  assert.match(
+    textReport,
+    new RegExp(`${skillBudgetFinding?.details?.measured} estimated tokens`),
+  );
+  assert.match(textReport, /2000-token advisory limit/);
+  assert.match(
+    textReport,
+    new RegExp(
+      `${skillBudgetFinding?.details?.overBy} tokens \\(~${skillBudgetFinding?.details?.overPercent}%\\) over`,
+    ),
+  );
+  assert.match(textReport, /Troubleshooting/);
+});
+
+test("oversized Skills without headings retain manual semantic guidance", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "headingless");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: headingless
+description: Review content. Use when a large linear workflow needs review.
+---
+${repeatWords("linear", 2100)}`,
+  );
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "QUAL-SKILL-TOKEN-BUDGET",
+  );
+
+  assert.ok(finding);
+  assert.deepEqual(finding.details?.sectionCandidates, []);
+  assert.match(
+    finding.remediation,
+    /No clear heading-based split candidates were detected/,
+  );
+  assert.match(
+    finding.remediation,
+    /Review the Skill manually for semantic progressive-disclosure boundaries/,
+  );
+  assert.doesNotMatch(finding.remediation, /Review these sections/);
 });
 
 test("scan does not advise tiny skill-local references as shared context candidates", async () => {

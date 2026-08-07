@@ -19,6 +19,11 @@ import { parseAssetMetadata } from "./metadata.js";
 import { NON_SKILL_AUXILIARY_METADATA_KEYS } from "./metadata-definitions.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import {
+  formatTokenBudgetSectionReview,
+  tokenBudgetOverage,
+  tokenBudgetSectionCandidates,
+} from "./token-budget-analysis.js";
 import { estimateTokens, markdownBody } from "./token-estimator.js";
 import type { Evidence, Finding, Severity } from "./types/diagnostics.js";
 import type {
@@ -981,6 +986,14 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         : QUALITY.skillTokenWarn;
     const severity =
       bodyTokenCount > QUALITY.skillTokenStrongWarn ? "medium" : "low";
+    const overage = tokenBudgetOverage(bodyTokenCount, limit);
+    const sectionCandidates = tokenBudgetSectionCandidates(document);
+    const measurementSummary = `The Skill is approximately ${bodyTokenCount} estimated tokens against the ${limit}-token advisory limit, ${overage.overBy} tokens (~${overage.overPercent}%) over the limit.`;
+    const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
+    const progressiveDisclosureGuidance =
+      sectionCandidates.length > 0
+        ? "Review these sections for progressive disclosure without deleting workflow steps."
+        : "Review the Skill manually for semantic progressive-disclosure boundaries without deleting workflow steps.";
     findings.push(
       documentFinding(
         document,
@@ -988,7 +1001,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "Skill body exceeds advisory token budget",
         "quality",
         severity,
-        "Review progressive disclosure without deleting workflow steps. Keep selection boundaries, read conditions, ordered workflow, constraints, and completion criteria in SKILL.md. Move Skill-specific conditional detail to references/, deterministic repeated implementation to scripts/, output material to assets/, and independently owned cross-Skill knowledge to contexts/.",
+        `${measurementSummary} ${sectionReview} ${progressiveDisclosureGuidance} Keep selection boundaries, read conditions, ordered workflow, constraints, and completion criteria in SKILL.md. Move Skill-specific conditional detail to references/, deterministic repeated implementation to scripts/, output material to assets/, and independently owned cross-Skill knowledge to contexts/. Do not split automatically or choose a destination from heading text alone.`,
         {
           whyItMatters:
             "Long Skill bodies can make activated workflows harder to navigate. Size is advisory evidence only; Agent Skills recommends staying under 5,000 tokens and Renma adds an earlier low review point at 2,000 estimated tokens.",
@@ -1004,14 +1017,16 @@ function shapeFindings(document: ParsedDocument): Finding[] {
             "Run any project-specific validation checks that apply to this repository.",
             "Confirm any moved material remains statically reachable and semantically owned by its destination.",
           ],
-          llmHint:
-            "Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge.",
+          llmHint: `${measurementSummary} ${sectionReview} Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge. Treat the listed sections only as review candidates.`,
           details: {
             measured: bodyTokenCount,
             limit,
+            ...overage,
             unit: "estimated_tokens",
             profile: QUALITY.profile,
             measurement: "markdown_body_after_frontmatter",
+            sectionMeasurement: "markdown_body_sections",
+            sectionCandidates,
             source:
               limit === QUALITY.skillTokenStrongWarn
                 ? "agent_skills_recommendation_and_renma_severity"
@@ -1914,16 +1929,22 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
     tokenBudget.estimatedTokens ?? estimateTokens(document.artifact.content);
   const effectiveLimit = tokenBudget.effectiveLimit ?? defaultLimit;
   const overrideActive = tokenBudget.status === "active";
+  const sectionCandidates = tokenBudgetSectionCandidates(document);
   const findings: Finding[] = [];
 
   if (tokenBudget.status === "invalid") {
+    const invalidReasonSummary = `Token-budget metadata is invalid: ${tokenBudget.invalidReasons.join("; ")}.`;
+    const invalidOverage =
+      estimatedTokens > effectiveLimit
+        ? tokenBudgetOverage(estimatedTokens, effectiveLimit)
+        : undefined;
     const invalidFinding = documentFinding(
       document,
       DIAGNOSTIC_IDS.QUAL_INVALID_TOKEN_BUDGET_OVERRIDE,
       "Support asset has invalid token-budget override metadata",
       "quality",
       "low",
-      "Correct or remove the malformed token-budget decision metadata. An override is valid only after a human decides the asset should remain intentionally coherent or ordered; do not add or increase an override merely to make diagnostics pass.",
+      `${invalidReasonSummary} Correct or remove the malformed token-budget decision metadata without inferring the intended values. An override is valid only after a human decides the asset should remain intentionally coherent or ordered; do not add or increase an override merely to make diagnostics pass.`,
       {
         whyItMatters:
           "Token-budget overrides record a declared human decision. Malformed, ambiguous, incomplete, orphaned, or unnecessary metadata cannot safely replace the default advisory limit.",
@@ -1933,15 +1954,18 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
           "Ask whether a meaningful split preserves coherence and execution order before proposing an override.",
         ],
         verificationSteps: ["Run renma scan."],
-        llmHint:
-          "Report the invalid fields to the user. First ask whether the asset can be split along meaningful boundaries without harming coherence or execution order. Only if the user confirms it should remain long should you repair explicit override metadata with their rationale.",
+        llmHint: `${invalidReasonSummary} Report these reasons to the user in their existing order without inferring a correction. First ask whether the asset can be split along meaningful boundaries without harming coherence or execution order. Only if the user confirms it should remain long should you repair explicit override metadata with their rationale.`,
         details: {
           estimatedTokens,
+          measured: estimatedTokens,
           defaultLimit,
           ...(tokenBudget.overrideLimit !== undefined
             ? { overrideLimit: tokenBudget.overrideLimit }
             : {}),
           effectiveLimit,
+          limit: effectiveLimit,
+          ...(invalidOverage ?? {}),
+          unit: "estimated_tokens",
           overrideActive,
           ...(tokenBudget.tokenBudgetRationale
             ? { tokenBudgetRationale: tokenBudget.tokenBudgetRationale }
@@ -1960,6 +1984,17 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
 
   if (estimatedTokens <= effectiveLimit) return findings;
 
+  const overage = tokenBudgetOverage(estimatedTokens, effectiveLimit);
+  const measurementSummary = overrideActive
+    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The default advisory limit is ${defaultLimit} tokens, and the active declared override is ${effectiveLimit} tokens. It is ${overage.overBy} tokens (~${overage.overPercent}%) over the active limit.`
+    : `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens against the default ${defaultLimit}-token advisory limit, ${overage.overBy} tokens (~${overage.overPercent}%) over the limit.`;
+  const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
+  const candidateGuidance =
+    sectionCandidates.length > 0 ? "Inspect these large sections. " : "";
+  const decisionGuidance = overrideActive
+    ? `${candidateGuidance}Ask the user whether a meaningful semantic split preserves coherence and execution order. Split it only after the user agrees. If the asset should remain intentionally long, review the existing explicit token-budget decision with the user; never increase it merely to make this diagnostic disappear.`
+    : `${candidateGuidance}Ask the user whether a meaningful semantic split preserves coherence and execution order. Split it only after the user agrees. If the user confirms the asset should remain intentionally long, a declared override may record that decision; never add one only to silence the finding.`;
+
   findings.push(
     documentFinding(
       document,
@@ -1967,7 +2002,7 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
       "Support asset exceeds token guidance",
       "quality",
       "low",
-      `Ask the user whether this ${document.artifact.kind} asset can be split along meaningful boundaries without harming coherence or execution order. Split it only after the user agrees. If the user confirms it should remain intentionally long, they may record an explicit token-budget override and rationale; do not recommend an override merely to make this diagnostic pass.`,
+      `${measurementSummary} ${sectionReview} ${decisionGuidance}`,
       {
         whyItMatters:
           "Large content assets deserve a low-advisory coherence review. A meaningful split is preferred when it preserves semantic boundaries, while an explicit override can record the user's declared decision for an intentionally coherent or ordered long-form asset.",
@@ -1985,8 +2020,7 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
           "Run the repository-specific validation or test command, if one exists.",
           "Confirm every agreed split part remains reachable, or that an intentional-long decision uses valid declared metadata.",
         ],
-        llmHint:
-          "Ask the user whether the asset can be split along meaningful boundaries without harming coherence or execution order. Split only with agreement. If the user confirms it must remain intentionally long, use their explicit rationale for a valid override; never add one only to silence the finding.",
+        llmHint: `${measurementSummary} ${sectionReview} ${decisionGuidance} Treat headings only as review candidates; choose destinations by semantic ownership, not heading names.`,
         details: {
           estimatedTokens,
           defaultLimit,
@@ -2000,9 +2034,14 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
             : {}),
           measured: estimatedTokens,
           limit: effectiveLimit,
+          ...overage,
           unit: "estimated_tokens",
           profile: QUALITY.profile,
           measurement: "full_file",
+          ...(document.artifact.markdownParserEligible === true
+            ? { sectionMeasurement: "markdown_body_sections" }
+            : {}),
+          sectionCandidates,
         },
       },
     ),

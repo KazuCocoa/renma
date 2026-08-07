@@ -1003,6 +1003,25 @@ repository allowances, and network approvals remain separate from upload
 approvals. See the [Security Policy Guide](security-policy.md) for complete
 examples by asset kind.
 
+Token-budget findings use deterministic `estimated_tokens`, not exact token
+counts for a particular model. `QUAL-SKILL-TOKEN-BUDGET` measures the Markdown
+body after frontmatter; `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` continues to measure
+the full file. Each exceeded-budget finding reports measured and active limits,
+absolute and rounded-percent overage, and up to three largest heading-based
+review candidates when useful structure exists. The candidates are ranked by
+estimated section size with source-line tie-breaking, and nested headings stay
+within the selected parent section. They locate material for semantic review;
+they do not direct an automatic split or infer a destination from a heading.
+
+For support assets, the active limit is the default unless an active declared
+override is in force. An active override remains visible alongside the default
+and is not a suppression: exceeding it still produces the advisory. Invalid
+override metadata exposes its parser-provided reasons in human-facing guidance
+and leaves the default limit active. Splitting an asset, recording an override,
+or changing one requires an explicit human decision. Semantic ownership—not
+section size or heading text—determines whether content belongs in `SKILL.md`,
+`references/`, `scripts/`, `assets/`, or `contexts/`.
+
 | Identifier                                       | Meaning                                              | Typical cause                                                                                      | How to fix                                                                                             |
 | ------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `COMPOSITION-DECLARED-CONFLICT`                  | Required declared composition contains conflicting assets. | Two assets connected to the same focused composition through required routes have an explicit `conflicts` declaration. | Review both inclusion routes and the conflict declaration; change relationships only from reviewed intent and never select a winner from order. |
@@ -1072,7 +1091,7 @@ examples by asset kind.
 | `QUAL-SKILL-PROGRESSIVE-DISCLOSURE`              | Progressive disclosure needs review.                 | Reserved 0.18 focused-workflow contract identifier.                                                | Keep read conditions and core workflow in `SKILL.md`; place details by semantic responsibility.        |
 | `QUAL-SKILL-TOKEN-BUDGET`                        | Skill body exceeds an advisory estimate.             | Markdown body exceeds 2,000 or 5,000 estimated tokens.                                             | Review progressive disclosure without splitting or moving content by size alone.                       |
 | `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE`             | Support-asset decision metadata is invalid.           | The decision is malformed, unsafe to represent exactly, ambiguous, incomplete, orphaned, duplicated, or unnecessary while the asset remains within its default. | Correct or remove the declaration. Ask about a meaningful split first; use an override only after the user confirms the asset should remain intentionally long. |
-| `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`                | Support asset exceeds its effective advisory estimate. | A context, reference, profile, or example exceeds its default or valid declared override.          | Ask whether a semantic split preserves coherence and execution order. Split only with user agreement; otherwise record an explicit rationale, never an override added merely to pass diagnostics. |
+| `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`                | Support asset exceeds its effective advisory estimate. | A context, reference, profile, or example exceeds its default or active declared override.         | Ask whether a semantic split preserves coherence and execution order. Split only with user agreement; otherwise record an explicit rationale, never an override added merely to pass diagnostics. |
 | `QUAL-USER-LOCAL-PATHS`                          | User-local path appears in content.                  | Guidance includes machine-specific paths such as home directories.                                 | Replace local paths with repository-relative or configurable paths.                                    |
 | `SEC-DESTRUCTIVE-COMMAND`                        | Destructive command appears.                         | Content includes risky commands such as forced deletion or reset.                                  | Remove it, gate it with explicit safety guidance, or use a safer command.                              |
 | `SEC-ENV-COPY`                                   | Environment copying is suggested.                    | Content copies broad environment or secret-bearing files.                                          | Narrow the copied data and document secret handling.                                                   |
