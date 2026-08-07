@@ -4,6 +4,7 @@ import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 import {
   classifyAbsoluteSkillEntrypointPath,
   classifyRepositorySkillEntrypointPath,
+  repositoryClassificationPath,
   RESERVED_SKILL_SUPPORT_DIRS,
 } from "../discovery.js";
 import {
@@ -374,12 +375,15 @@ function canonicalSkillName(targetPath: string): string {
   if (path.posix.basename(normalizedPath) !== "SKILL.md") {
     throw new Error("Skill scaffolds require the canonical SKILL.md filename.");
   }
+  const repositoryBoundary = repositoryClassificationPath(normalizedPath);
   const entrypoint =
-    classifyRepositorySkillEntrypointPath(normalizedPath) ??
-    classifyAbsoluteSkillEntrypointPath(normalizedPath);
+    repositoryBoundary.state === "resolved"
+      ? classifyRepositorySkillEntrypointPath(repositoryBoundary.relativePath)
+      : (classifyRepositorySkillEntrypointPath(normalizedPath) ??
+        classifyAbsoluteSkillEntrypointPath(normalizedPath));
   if (entrypoint?.kind !== "canonical") {
     throw new Error(
-      `Skill scaffolds require a canonical target under skills/ or .agents/skills/ without reserved Skill-support segments (${RESERVED_SKILL_SUPPORT_DIRS.join(", ")}).`,
+      `Skill scaffolds require a canonical target under skills/ or .agents/skills/ with at least one Skill directory and without reserved Skill-support segments (${RESERVED_SKILL_SUPPORT_DIRS.join(", ")}).`,
     );
   }
   const directory = path.posix.basename(path.posix.dirname(normalizedPath));

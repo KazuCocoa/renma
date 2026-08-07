@@ -72,6 +72,80 @@ test("repository Skill roots are anchored and do not restart in nested directori
   }
 });
 
+test("directory-based Skill entrypoints require a Skill directory below either root", () => {
+  for (const root of SKILL_ROOTS) {
+    const rootEntrypoint = `${root}/SKILL.md`;
+    const rootLowercaseEntrypoint = `${root}/skill.md`;
+    const canonicalEntrypoint = `${root}/demo/SKILL.md`;
+    const lowercaseEntrypoint = `${root}/demo/skill.md`;
+    const historicalFlatEntrypoint = `${root}/demo.skill.md`;
+
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(rootEntrypoint),
+      undefined,
+      rootEntrypoint,
+    );
+    assert.equal(
+      classifyRepositorySkillPath(rootEntrypoint),
+      undefined,
+      rootEntrypoint,
+    );
+    assert.equal(
+      classifyAbsoluteSkillEntrypointPath(`/tmp/repository/${rootEntrypoint}`),
+      undefined,
+      rootEntrypoint,
+    );
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(rootLowercaseEntrypoint),
+      undefined,
+      rootLowercaseEntrypoint,
+    );
+    assert.equal(
+      classifyAbsoluteSkillEntrypointPath(
+        `/tmp/repository/${rootLowercaseEntrypoint}`,
+      ),
+      undefined,
+      rootLowercaseEntrypoint,
+    );
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(canonicalEntrypoint)?.kind,
+      "canonical",
+      canonicalEntrypoint,
+    );
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(lowercaseEntrypoint)?.kind,
+      "lowercase-entrypoint",
+      lowercaseEntrypoint,
+    );
+    assert.equal(
+      classifyAbsoluteSkillEntrypointPath(
+        `/tmp/repository/${lowercaseEntrypoint}`,
+      )?.kind,
+      "lowercase-entrypoint",
+      lowercaseEntrypoint,
+    );
+    assert.equal(
+      classifyAbsoluteSkillEntrypointPath(
+        `/tmp/repository/${canonicalEntrypoint}`,
+      )?.kind,
+      "canonical",
+      canonicalEntrypoint,
+    );
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(historicalFlatEntrypoint)?.kind,
+      "flat-legacy-entrypoint",
+      historicalFlatEntrypoint,
+    );
+    assert.equal(
+      classifyAbsoluteSkillEntrypointPath(
+        `/tmp/repository/${historicalFlatEntrypoint}`,
+      )?.kind,
+      "flat-legacy-entrypoint",
+      historicalFlatEntrypoint,
+    );
+  }
+});
+
 test("every reserved support directory has identical classification at both Skill roots", () => {
   for (const root of SKILL_ROOTS) {
     for (const supportDirectory of RESERVED_SKILL_SUPPORT_DIRS) {

@@ -783,6 +783,10 @@ function classifySkillEntrypointAtRoot(
   }
 
   if (basename === "SKILL.md" || basename === "skill.md") {
+    // Directory-based canonical and lowercase entrypoints require one logical
+    // Skill directory below the recognized root. Flat *.skill.md migration
+    // sources intentionally remain valid directly below that root.
+    if (localDirectories.length === 0) return undefined;
     const candidateName = path.posix.basename(directory);
     if (!candidateName || candidateName === ".") return undefined;
     return {
