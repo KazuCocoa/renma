@@ -1678,6 +1678,27 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
     help.stdout,
     /https:\/\/github\.com\/KazuCocoa\/renma\/blob\/main\/docs\/context-lens\.md/,
   );
+  assert.match(help.stdout, /Exit codes/);
+  assert.match(help.stdout, /0  Command completed successfully/);
+  assert.match(
+    help.stdout,
+    /1  Command completed, but the requested Renma policy\/status gate did not pass/,
+  );
+  assert.match(
+    help.stdout,
+    /A valid report remains on stdout; inspect its findings\/status and act on them/,
+  );
+  assert.match(
+    help.stdout,
+    /2  Caller-correctable invocation, configuration, target, or comparison-ref error/,
+  );
+  assert.match(help.stdout, /correct the input, and retry/);
+  assert.match(help.stdout, /3  Unexpected Renma internal failure/);
+  assert.match(help.stdout, /do not treat it as a policy finding/);
+  assert.match(
+    help.stdout,
+    /stdout for completed results \(0\/1\) and stderr for errors \(2\/3\)/,
+  );
   assert.doesNotMatch(help.stdout, /Authoring Guide: docs\//);
   for (const command of COMMAND_HELP) {
     assert.match(
@@ -1719,8 +1740,63 @@ test("command-specific help is deterministic and does not execute commands", asy
     assert.match(result.stdout, /Do not use for/);
     assert.match(result.stdout, /Examples/);
     assert.match(result.stdout, /How to interpret the result/);
+    if ("exitBehavior" in command) {
+      assert.match(result.stdout, /Exit behavior/);
+    } else {
+      assert.doesNotMatch(result.stdout, /Exit behavior/);
+    }
     assert.match(result.stdout, /Typical next steps/);
     assert.match(result.stdout, /Options/);
+  }
+});
+
+test("policy-producing command help explains command-specific exit behavior", async () => {
+  const cases = [
+    {
+      command: "scan",
+      patterns: [
+        /0: No finding reaches the active threshold; in strict mode, strict evaluation passes/,
+        /1: The active finding threshold is reached, or strict evaluation fails/,
+        /valid scan report is still emitted to stdout on exit 1/i,
+        /Exit 2 and 3 follow the global CLI contract/,
+      ],
+    },
+    {
+      command: "readiness",
+      patterns: [
+        /0: Readiness level is ready, including Ready with advisories/,
+        /1: Readiness level is needs_attention or not_ready/,
+        /readiness report is still emitted to stdout on exit 1/i,
+        /Exit 2 and 3 follow the global CLI contract/,
+      ],
+    },
+    {
+      command: "diff",
+      patterns: [
+        /0: The requested comparison was generated successfully, regardless of whether the report contains changes or regressions/,
+        /Diff does not use exit 1 merely because evidence changed/,
+        /Exit 2 and 3 follow the global CLI contract/,
+      ],
+    },
+    {
+      command: "ci-report",
+      patterns: [
+        /default --fail-on-status fail, PASS and WARN exit 0; FAIL exits 1/,
+        /--fail-on-status warn, PASS exits 0; WARN and FAIL exit 1/,
+        /valid CI report is still emitted to stdout on exit 1/i,
+        /Exit 2 and 3 follow the global CLI contract/,
+      ],
+    },
+  ] as const;
+
+  for (const { command, patterns } of cases) {
+    const help = await withCapturedConsole(() => main([command, "--help"]));
+    assert.equal(help.code, 0, command);
+    assert.equal(help.stderr, "", command);
+    assert.match(help.stdout, /Exit behavior/, command);
+    for (const pattern of patterns) {
+      assert.match(help.stdout, pattern, command);
+    }
   }
 });
 
