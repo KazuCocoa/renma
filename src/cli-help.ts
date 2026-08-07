@@ -51,6 +51,10 @@ const OPTION_HELP = {
     flags: "--from <ref>",
     description: "Git ref to use as the comparison baseline.",
   },
+  base: {
+    flags: "--base <ref>",
+    description: "Alias for --from; comparison baseline.",
+  },
   "fail-on-status": {
     flags: "--fail-on-status <status>",
     description: "CI-report execution threshold: fail (default) or warn.",
@@ -111,7 +115,7 @@ const OPTION_HELP = {
   },
   to: {
     flags: "--to <ref>",
-    description: "Git ref to use as the comparison target.",
+    description: "Comparison target. Defaults to HEAD for diff and ci-report.",
   },
   version: {
     flags: "-v, --version",
@@ -569,7 +573,8 @@ export const COMMAND_HELP = [
   },
   {
     name: "diff",
-    usage: "renma diff [path] --from <ref> --to <ref> [options]",
+    usage:
+      "renma diff [path] (--from <ref> | --base <ref>) [--to <ref>] [options]",
     question: "What deterministic repository evidence changed between refs?",
     purpose:
       "Diff compares deterministic repository evidence between Git refs for context and skill review.",
@@ -584,11 +589,13 @@ export const COMMAND_HELP = [
       "Replacing human review of semantic changes.",
     ],
     examples: [
+      "renma diff . --base origin/main",
       "renma diff . --from main --to HEAD",
       "renma diff . --from origin/main --to HEAD --format markdown",
     ],
     interpretation: [
       "The report compares Renma evidence generated at two refs.",
+      "Supply one comparison baseline with --from or its --base alias; using both is an error. --to defaults to the Git ref HEAD.",
       "Added or removed findings show deterministic review signal changes, not arbitrary source hunks.",
       "Usage errors exit 2; generated comparison output follows command status rules.",
     ],
@@ -600,6 +607,7 @@ export const COMMAND_HELP = [
     options: [
       "config",
       "from",
+      "base",
       "to",
       {
         name: "format",
@@ -611,7 +619,8 @@ export const COMMAND_HELP = [
   },
   {
     name: "ci-report",
-    usage: "renma ci-report [path] --from <ref> --to <ref> [options]",
+    usage:
+      "renma ci-report [path] (--from <ref> | --base <ref>) [--to <ref>] [options]",
     question: "What should a CI or PR reviewer inspect?",
     purpose:
       "CI report produces a pull-request-oriented summary from deterministic Renma evidence.",
@@ -626,12 +635,14 @@ export const COMMAND_HELP = [
       "Certifying that all semantic changes are correct.",
     ],
     examples: [
+      "renma ci-report . --base origin/main",
       "renma ci-report . --from main --to HEAD --format markdown",
       "renma ci-report . --from origin/main --to HEAD --format json",
       "renma ci-report . --from origin/main --to HEAD --fail-on-status warn",
     ],
     interpretation: [
       "The report combines deterministic evidence for review.",
+      "Supply one comparison baseline with --from or its --base alias; using both is an error. --to defaults to the Git ref HEAD.",
       "Skill Discovery changes are observation-only and do not affect CI status or exits.",
       "PASS and WARN exit 0; FAIL exits 1 by default. With --fail-on-status warn, WARN and FAIL exit 1. The option changes execution policy, not report status, and is never read from repository configuration.",
       "Reviewers should still inspect meaningful semantic changes.",
@@ -644,6 +655,7 @@ export const COMMAND_HELP = [
     options: [
       "config",
       "from",
+      "base",
       "to",
       "fail-on-status",
       {

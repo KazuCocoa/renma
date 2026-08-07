@@ -1927,7 +1927,9 @@ test("representative command help shows relevant boundaries and options", async 
       name: "diff",
       argv: ["diff", "/path/that/does/not/exist", "--help"],
       includes: [
-        /renma diff \[path\] --from <ref> --to <ref> \[options\]/,
+        /renma diff \[path\] \(--from <ref> \| --base <ref>\) \[--to <ref>\] \[options\]/,
+        /--base <ref>/,
+        /Defaults to HEAD for diff and ci-report/,
         /not arbitrary source hunks/,
         /Output format: json or markdown\. Defaults to json\./,
       ],
@@ -1937,7 +1939,9 @@ test("representative command help shows relevant boundaries and options", async 
       name: "ci-report",
       argv: ["ci-report", "/path/that/does/not/exist", "--help"],
       includes: [
-        /renma ci-report \[path\] --from <ref> --to <ref> \[options\]/,
+        /renma ci-report \[path\] \(--from <ref> \| --base <ref>\) \[--to <ref>\] \[options\]/,
+        /--base <ref>/,
+        /Defaults to HEAD for diff and ci-report/,
         /pull-request-oriented summary/,
         /Output format: json or markdown\. Defaults to markdown\./,
         /PASS and WARN exit 0; FAIL exits 1/,

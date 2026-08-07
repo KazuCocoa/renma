@@ -22,10 +22,7 @@ import {
 } from "./commands/scaffold.js";
 import { runScanCommand } from "./commands/scan.js";
 import { runSkillIndexCommand } from "./commands/skill-index.js";
-import {
-  runSuggestMetadataCommand,
-  SuggestMetadataTargetError,
-} from "./commands/suggest-metadata.js";
+import { runSuggestMetadataCommand } from "./commands/suggest-metadata.js";
 import { runSuggestSemanticSplitCommand } from "./commands/suggest-semantic-split.js";
 import { runTrustGraphCommand } from "./commands/trust-graph.js";
 import {
@@ -38,6 +35,7 @@ import {
   type CommandHelp,
   type CommandName,
 } from "./cli-help.js";
+import { classifyCliError, CLI_EXIT, CliUserError } from "./cli-errors.js";
 import { ConfigError, type ConfigOverrides } from "./config.js";
 import type { Severity } from "./types/diagnostics.js";
 
@@ -57,6 +55,7 @@ const CLI_OPTIONS = {
   focus: { type: "string" },
   format: { type: "string" },
   from: { type: "string" },
+  base: { type: "string" },
   "include-owned": { type: "boolean" },
   id: { type: "string" },
   json: { type: "boolean" },
@@ -272,64 +271,70 @@ export const COMMAND_REGISTRY = {
 } satisfies Record<CommandName, CommandSpec>;
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
-  let parsed;
   try {
-    parsed = parseArgs({
-      args: argv,
-      allowPositionals: true,
-      options: CLI_OPTIONS,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const requestedCommand = argv[0];
-    return requestedCommand && isCommandName(requestedCommand)
-      ? usageError(requestedCommand, message)
-      : globalUsageError(message);
-  }
-
-  const [command = "scan", target = "."] = parsed.positionals;
-
-  if (parsed.values.help) {
-    if (parsed.positionals.length === 0) {
-      console.log(renderGlobalHelp(packageJson.version));
-      return 0;
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: argv,
+        allowPositionals: true,
+        options: CLI_OPTIONS,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const requestedCommand = argv[0];
+      return requestedCommand && isCommandName(requestedCommand)
+        ? usageError(requestedCommand, message)
+        : globalUsageError(message);
     }
 
-    if (isCommandName(command)) {
-      console.log(renderCommandHelp(command, packageJson.version));
-      return 0;
+    const [command = "scan", target = "."] = parsed.positionals;
+
+    if (parsed.values.help) {
+      if (parsed.positionals.length === 0) {
+        console.log(renderGlobalHelp(packageJson.version));
+        return CLI_EXIT.success;
+      }
+
+      if (isCommandName(command)) {
+        console.log(renderCommandHelp(command, packageJson.version));
+        return CLI_EXIT.success;
+      }
     }
-  }
 
-  if (parsed.values.version) {
-    console.log(packageJson.version);
-    return 0;
-  }
+    if (parsed.values.version) {
+      console.log(packageJson.version);
+      return CLI_EXIT.success;
+    }
 
-  if (!isCommandName(command)) {
-    console.error(
-      command ? `Unknown command "${command}".` : "Missing command.",
-    );
-    console.error("Run renma --help for usage.");
-    return 2;
-  }
+    if (!isCommandName(command)) {
+      console.error(
+        command ? `Unknown command "${command}".` : "Missing command.",
+      );
+      console.error("Run renma --help for usage.");
+      return CLI_EXIT.userError;
+    }
 
-  const spec = COMMAND_REGISTRY[command];
-  const context: CommandExecutionContext = {
-    values: parsed.values,
-    positionals: parsed.positionals,
-    target,
-  };
-  const contractError = validateCommandInvocation(spec, context);
-  if (contractError) return usageError(command, contractError);
+    const spec = COMMAND_REGISTRY[command];
+    const context: CommandExecutionContext = {
+      values: parsed.values,
+      positionals: parsed.positionals,
+      target,
+    };
+    const contractError = validateCommandInvocation(spec, context);
+    if (contractError) return usageError(command, contractError);
 
-  try {
-    const result = spec.execute(context);
-    return typeof result === "number" ? result : await result;
+    try {
+      const result = spec.execute(context);
+      return typeof result === "number" ? result : await result;
+    } catch (error) {
+      const message = spec.expectedError?.(context, error);
+      if (message) return usageError(command, message);
+      throw error;
+    }
   } catch (error) {
-    const message = spec.expectedError?.(context, error);
-    if (message) return usageError(command, message);
-    throw error;
+    const classified = classifyCliError(error);
+    console.error(classified.message);
+    return classified.exitCode;
   }
 }
 
@@ -391,24 +396,30 @@ async function runScaffold(
     );
   }
 
+  const scaffoldOptions: ScaffoldOptions = {
+    kind: kindValue,
+    targetPath,
+    format,
+  };
+  const id = stringValue(values.id);
+  const title = stringValue(values.title);
+  const tags = stringListValue(values.tags);
+  const resources = scaffoldResources(stringValue(values.resources));
+  if (id) scaffoldOptions.id = id;
+  if (title) scaffoldOptions.title = title;
+  if (owner) scaffoldOptions.owner = owner;
+  if (tags.length > 0) scaffoldOptions.tags = tags;
+  if (resources.length > 0) scaffoldOptions.resources = resources;
   try {
-    const scaffoldOptions: ScaffoldOptions = {
-      kind: kindValue,
-      targetPath,
-      format,
-    };
-    const id = stringValue(values.id);
-    const title = stringValue(values.title);
-    const tags = stringListValue(values.tags);
-    const resources = scaffoldResources(stringValue(values.resources));
-    if (id) scaffoldOptions.id = id;
-    if (title) scaffoldOptions.title = title;
-    if (owner) scaffoldOptions.owner = owner;
-    if (tags.length > 0) scaffoldOptions.tags = tags;
-    if (resources.length > 0) scaffoldOptions.resources = resources;
     return await runScaffoldCommand(scaffoldOptions);
   } catch (error) {
-    return reportCommandError(error);
+    if (isUserTargetFileError(error)) {
+      throw new CliUserError(
+        error instanceof Error ? error.message : String(error),
+        { cause: error },
+      );
+    }
+    throw error;
   }
 }
 
@@ -425,7 +436,7 @@ function scaffoldResources(value: string | undefined): ScaffoldResource[] {
   ]);
   for (const resource of resources) {
     if (!allowed.has(resource)) {
-      throw new Error(
+      throw new CliUserError(
         "--resources must be a comma-separated list of references,scripts,assets.",
       );
     }
@@ -457,13 +468,9 @@ async function runScan(values: CliValues, target: string): Promise<number> {
     ...(failOn ? { failOn } : {}),
     ...(format ? { format } : {}),
   };
-  try {
-    return await runScanCommand(target, overrides, {
-      strict: values.strict === true,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runScanCommand(target, overrides, {
+    strict: values.strict === true,
+  });
 }
 
 async function runCatalog(values: CliValues, target: string): Promise<number> {
@@ -476,14 +483,10 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
 
   const overrides = configOverrides(values);
 
-  try {
-    return await runCatalogCommand(target, {
-      format,
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runCatalogCommand(target, {
+    format,
+    overrides,
+  });
 }
 
 async function runBom(values: CliValues, target: string): Promise<number> {
@@ -496,23 +499,16 @@ async function runBom(values: CliValues, target: string): Promise<number> {
 
   const overrides = configOverrides(values);
 
-  try {
-    return await runBomCommand(target, {
-      format,
-      overrides,
-      omitGeneratedAt: values["omit-generated-at"] === true,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runBomCommand(target, {
+    format,
+    overrides,
+    omitGeneratedAt: values["omit-generated-at"] === true,
+  });
 }
 
 async function runDiff(values: CliValues, target: string): Promise<number> {
-  const fromRef = stringValue(values.from);
-  const toRef = stringValue(values.to);
-  if (!fromRef || !toRef) {
-    return usageError("diff", "diff requires --from <ref> and --to <ref>.");
-  }
+  const refs = comparisonRefs(values, "diff");
+  if ("error" in refs) return usageError("diff", refs.error);
 
   const format = values.json
     ? "json"
@@ -523,27 +519,16 @@ async function runDiff(values: CliValues, target: string): Promise<number> {
 
   const overrides = configOverrides(values);
 
-  try {
-    return await runDiffCommand(target, {
-      fromRef,
-      toRef,
-      format,
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runDiffCommand(target, {
+    ...refs,
+    format,
+    overrides,
+  });
 }
 
 async function runCiReport(values: CliValues, target: string): Promise<number> {
-  const fromRef = stringValue(values.from);
-  const toRef = stringValue(values.to);
-  if (!fromRef || !toRef) {
-    return usageError(
-      "ci-report",
-      "ci-report requires --from <ref> and --to <ref>.",
-    );
-  }
+  const refs = comparisonRefs(values, "ci-report");
+  if ("error" in refs) return usageError("ci-report", refs.error);
 
   const format = values.json
     ? "json"
@@ -566,17 +551,12 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
 
   const overrides = configOverrides(values);
 
-  try {
-    return await runCiReportCommand(target, {
-      fromRef,
-      toRef,
-      format,
-      failOnStatus: failOnStatusValue ?? "fail",
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runCiReportCommand(target, {
+    ...refs,
+    format,
+    failOnStatus: failOnStatusValue ?? "fail",
+    overrides,
+  });
 }
 
 async function runGraph(values: CliValues, target: string): Promise<number> {
@@ -601,25 +581,21 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
 
   const overrides = configOverrides(values);
 
-  try {
-    const graphOptions: {
-      format: GraphFormat;
-      view: GraphView;
-      focus?: string;
-      overrides: ConfigOverrides;
-    } = {
-      format,
-      view,
-      overrides,
-    };
-    const focus = stringValue(values.focus);
-    if (focus) {
-      graphOptions.focus = focus;
-    }
-    return await runGraphCommand(target, graphOptions);
-  } catch (error) {
-    return reportCommandError(error);
+  const graphOptions: {
+    format: GraphFormat;
+    view: GraphView;
+    focus?: string;
+    overrides: ConfigOverrides;
+  } = {
+    format,
+    view,
+    overrides,
+  };
+  const focus = stringValue(values.focus);
+  if (focus) {
+    graphOptions.focus = focus;
   }
+  return runGraphCommand(target, graphOptions);
 }
 
 async function runExecutionContract(
@@ -644,15 +620,11 @@ async function runExecutionContract(
     );
   }
   const sourceRevision = stringValue(values["source-revision"]);
-  try {
-    return await runExecutionContractCommand(target, {
-      entrypoint,
-      ...(sourceRevision === undefined ? {} : { sourceRevision }),
-      overrides: configOverrides(values),
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runExecutionContractCommand(target, {
+    entrypoint,
+    ...(sourceRevision === undefined ? {} : { sourceRevision }),
+    overrides: configOverrides(values),
+  });
 }
 
 async function runSkillIndex(
@@ -679,15 +651,11 @@ async function runSkillIndex(
   const overrides = configOverrides(values);
   const focus = stringValue(values.focus);
 
-  try {
-    return await runSkillIndexCommand(target, {
-      format,
-      ...(focus !== undefined ? { focus } : {}),
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runSkillIndexCommand(target, {
+    format,
+    ...(focus !== undefined ? { focus } : {}),
+    overrides,
+  });
 }
 
 async function runTrustGraph(
@@ -706,14 +674,10 @@ async function runTrustGraph(
 
   const overrides = configOverrides(values);
 
-  try {
-    return await runTrustGraphCommand(target, {
-      format,
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runTrustGraphCommand(target, {
+    format,
+    overrides,
+  });
 }
 
 function normalizeGraphView(value: string): GraphView | undefined {
@@ -746,17 +710,13 @@ async function runOwnership(
 
   const overrides = configOverrides(values);
 
-  try {
-    const owner = stringValue(values.owner)?.trim();
-    return await runOwnershipCommand(target, {
-      format,
-      includeOwned: values["include-owned"] === true,
-      ...(owner ? { owner } : {}),
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  const owner = stringValue(values.owner)?.trim();
+  return runOwnershipCommand(target, {
+    format,
+    includeOwned: values["include-owned"] === true,
+    ...(owner ? { owner } : {}),
+    overrides,
+  });
 }
 
 async function runReadiness(
@@ -772,14 +732,10 @@ async function runReadiness(
 
   const overrides = configOverrides(values);
 
-  try {
-    return await runReadinessCommand(target, {
-      format,
-      overrides,
-    });
-  } catch (error) {
-    return reportCommandError(error);
-  }
+  return runReadinessCommand(target, {
+    format,
+    overrides,
+  });
 }
 
 function runSuggestSemanticSplit(
@@ -854,12 +810,6 @@ function runSuggestMetadata(
   return runSuggestMetadataCommand(target, {
     format,
     ...(owner ? { owner } : {}),
-  }).catch((error: unknown) => {
-    if (error instanceof SuggestMetadataTargetError) {
-      console.error(error.message);
-      return 2;
-    }
-    throw error;
   });
 }
 
@@ -880,26 +830,46 @@ function runInspect(values: CliValues, target: string): Promise<number> {
   });
 }
 
-function usageError(command: CommandName, message: string): 2 {
+function usageError(
+  command: CommandName,
+  message: string,
+): typeof CLI_EXIT.userError {
   console.error(message);
   console.error(`Run \`renma ${command} --help\` for usage.`);
-  return 2;
+  return CLI_EXIT.userError;
 }
 
-function globalUsageError(message: string): 2 {
+function globalUsageError(message: string): typeof CLI_EXIT.userError {
   console.error(message);
   console.error("Run `renma --help` for usage.");
-  return 2;
-}
-
-function reportCommandError(error: unknown): 2 {
-  console.error(error instanceof Error ? error.message : String(error));
-  return 2;
+  return CLI_EXIT.userError;
 }
 
 function configOverrides(values: CliValues): ConfigOverrides {
   const configPath = stringValue(values.config);
   return configPath ? { configPath } : {};
+}
+
+export function comparisonRefs(
+  values: { from?: unknown; base?: unknown; to?: unknown },
+  command: "diff" | "ci-report",
+): { fromRef: string; toRef: string } | { error: string } {
+  const fromProvided = values.from !== undefined;
+  const baseProvided = values.base !== undefined;
+  if (fromProvided && baseProvided) {
+    return { error: "Use either --from or --base, not both." };
+  }
+
+  const fromRef = stringValue(values.from) ?? stringValue(values.base);
+  if (!fromRef) {
+    return {
+      error: `${command} requires a comparison baseline via --from <ref> or --base <ref>.`,
+    };
+  }
+  return {
+    fromRef,
+    toRef: stringValue(values.to) || "HEAD",
+  };
 }
 
 function validateCommandInvocation(
@@ -962,6 +932,18 @@ function nodeErrorCode(error: unknown): string | undefined {
     typeof error.code === "string"
     ? error.code
     : undefined;
+}
+
+function isUserTargetFileError(error: unknown): boolean {
+  const code = nodeErrorCode(error);
+  return (
+    code === "EACCES" ||
+    code === "EEXIST" ||
+    code === "EISDIR" ||
+    code === "ENOENT" ||
+    code === "ENOTDIR" ||
+    code === "EPERM"
+  );
 }
 
 function stringValue(value: unknown): string | undefined {

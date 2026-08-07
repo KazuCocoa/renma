@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { CliUserError } from "./cli-errors.js";
 import {
   validateAgentSkills,
   type AgentSkillValidationResult,
@@ -515,12 +516,12 @@ export function focusSkillDiscoveryIndex(
   );
   const matches = uniqueSkillsByPath([...idMatches, ...pathMatches]);
   if (matches.length === 0) {
-    throw new Error(
+    throw new CliUserError(
       `${commandName} --focus did not match any Skill id or source path: ${focus}`,
     );
   }
   if (idMatches.length > 1 || matches.length > 1) {
-    throw new Error(
+    throw new CliUserError(
       `${commandName} --focus is ambiguous; use one exact repository-relative SKILL.md path: ${focus}`,
     );
   }

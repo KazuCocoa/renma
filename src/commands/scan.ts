@@ -3,6 +3,7 @@ import { formatJson, formatText } from "../report.js";
 import { scan } from "../scanner.js";
 import { severityMeets } from "../rules.js";
 import { evaluateStrictScan } from "../strict-scan.js";
+import { CLI_EXIT } from "../cli-errors.js";
 
 /** Execute the scan command, write its report to stdout, and return an exit code. */
 export async function runScanCommand(
@@ -16,12 +17,14 @@ export async function runScanCommand(
   );
 
   if (options.strict) {
-    return evaluateStrictScan(result).outcome === "fail" ? 1 : 0;
+    return evaluateStrictScan(result).outcome === "fail"
+      ? CLI_EXIT.policyFailure
+      : CLI_EXIT.success;
   }
 
   return result.findings.some((finding) =>
     severityMeets(finding.severity, result.exitThreshold),
   )
-    ? 1
-    : 0;
+    ? CLI_EXIT.policyFailure
+    : CLI_EXIT.success;
 }

@@ -65,6 +65,7 @@ import {
   zeroInspectionCoverageDiff,
   type InspectionCoverageDiff,
 } from "../inspection-coverage.js";
+import { CLI_EXIT } from "../cli-errors.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -176,8 +177,8 @@ export async function runCiReportCommand(
   const report = await ciReport(targetPath, options);
   process.stdout.write(formatCiReport(report, options.format));
   return ciReportStatusMeets(report.status, options.failOnStatus ?? "fail")
-    ? 1
-    : 0;
+    ? CLI_EXIT.policyFailure
+    : CLI_EXIT.success;
 }
 
 /** Keep semantic report status independent from the caller's exit policy. */

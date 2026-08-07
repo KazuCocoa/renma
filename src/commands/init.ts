@@ -1,5 +1,6 @@
 import { lstat, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { renmaCommand } from "../command-invocation.js";
 import { CONFIG_FILENAMES } from "../config.js";
 
@@ -27,7 +28,7 @@ export interface InitResult {
 export async function initializeRepository(root: string): Promise<InitResult> {
   const rootStat = await stat(root);
   if (!rootStat.isDirectory()) {
-    throw new Error(`Initialization root ${root} is not a directory.`);
+    throw new CliUserError(`Initialization root ${root} is not a directory.`);
   }
 
   const [primaryName] = CONFIG_FILENAMES;
@@ -62,10 +63,13 @@ export async function runInitCommand(root: string): Promise<number> {
   try {
     result = await initializeRepository(root);
   } catch (error) {
-    console.error(
-      `Could not initialize Renma at ${root}: ${errorMessage(error)}`,
-    );
-    return 2;
+    if (error instanceof CliUserError || isUserTargetError(error)) {
+      throw new CliUserError(
+        `Could not initialize Renma at ${root}: ${errorMessage(error)}`,
+        { cause: error },
+      );
+    }
+    throw error;
   }
 
   const primary = displayPath(result.primaryPath);
@@ -85,7 +89,7 @@ export async function runInitCommand(root: string): Promise<number> {
         "To create a new Skill:\n" +
         "  renma guide skill\n",
     );
-    return 0;
+    return CLI_EXIT.success;
   }
 
   if (result.state === "conflicting") {
@@ -96,7 +100,7 @@ export async function runInitCommand(root: string): Promise<number> {
           ", ",
         )}. Renma requires one unambiguous repository configuration. Keep ${primary} when comments are desired and remove the other supported configuration files. No files were changed.`,
     );
-    return 2;
+    return CLI_EXIT.userError;
   }
 
   const existing = displayPath(result.existingPaths[0] ?? primary);
@@ -104,7 +108,7 @@ export async function runInitCommand(root: string): Promise<number> {
     `Renma is already initialized with ${existing}.\n` +
       "No files were changed.\n",
   );
-  return 0;
+  return CLI_EXIT.success;
 }
 
 async function existingState(conventionalPaths: readonly string[]): Promise<
@@ -153,6 +157,17 @@ function nodeErrorCode(error: unknown): string | undefined {
     typeof error.code === "string"
     ? error.code
     : undefined;
+}
+
+function isUserTargetError(error: unknown): boolean {
+  const code = nodeErrorCode(error);
+  return (
+    code === "EACCES" ||
+    code === "EISDIR" ||
+    code === "ENOENT" ||
+    code === "ENOTDIR" ||
+    code === "EPERM"
+  );
 }
 
 function errorMessage(error: unknown): string {
