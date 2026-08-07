@@ -38,6 +38,13 @@ export interface ScanBoundaryConfig {
   ciPolicy: ScanBoundaryCiPolicyMode;
 }
 
+export type ExecutableSurfaceCiPolicyMode = "off" | "warn" | "fail";
+
+export interface ExecutableSurfaceConfig {
+  /** CI review mode for high-signal executable-surface changes. Defaults to off. */
+  ciPolicy: ExecutableSurfaceCiPolicyMode;
+}
+
 export type SkillDiscoveryCiPolicyMode = "off" | "warn";
 
 export interface SkillDiscoveryConfig {
@@ -56,6 +63,7 @@ export interface ScanConfig {
   concurrency: number;
   suppressions: SuppressionConfig[];
   scanBoundary: ScanBoundaryConfig;
+  executableSurface: ExecutableSurfaceConfig;
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;

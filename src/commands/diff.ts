@@ -34,6 +34,7 @@ import { DEFAULT_CONFIG, type ConfigOverrides } from "../config.js";
 import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
 import type { SecurityCiPolicyMode } from "../types/configuration.js";
 import type { ScanBoundaryCiPolicyMode } from "../types/configuration.js";
+import type { ExecutableSurfaceCiPolicyMode } from "../types/configuration.js";
 import type { SecurityConfig } from "../types/configuration.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
@@ -252,6 +253,10 @@ export interface DiffExecutionContext {
     from: ScanBoundaryCiPolicyMode;
     to: ScanBoundaryCiPolicyMode;
   };
+  executableSurfaceCiPolicy: {
+    from: ExecutableSurfaceCiPolicyMode;
+    to: ExecutableSurfaceCiPolicyMode;
+  };
   effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence;
 }
 
@@ -409,6 +414,10 @@ async function executeDiffWithProjection(
         scanBoundaryCiPolicy: {
           from: fromCollected.scanBoundaryCiPolicy,
           to: toCollected.scanBoundaryCiPolicy,
+        },
+        executableSurfaceCiPolicy: {
+          from: fromCollected.executableSurfaceCiPolicy,
+          to: toCollected.executableSurfaceCiPolicy,
         },
         ...(effectiveCiBoundary
           ? { effectiveCiScanBoundary: effectiveCiBoundary }
@@ -1399,6 +1408,7 @@ async function snapshot(
   skillDiscoveryCiPolicy: SkillDiscoveryCiPolicyMode;
   securityPolicyCiPolicy: SecurityCiPolicyMode;
   scanBoundaryCiPolicy: ScanBoundaryCiPolicyMode;
+  executableSurfaceCiPolicy: ExecutableSurfaceCiPolicyMode;
 }> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
@@ -1435,6 +1445,8 @@ async function snapshot(
     securityPolicyCiPolicy:
       repositorySnapshot.config.security.ciPolicy ?? "fail",
     scanBoundaryCiPolicy: repositorySnapshot.config.scanBoundary.ciPolicy,
+    executableSurfaceCiPolicy:
+      repositorySnapshot.config.executableSurface.ciPolicy,
   };
 }
 

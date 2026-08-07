@@ -53,6 +53,13 @@ import {
   type ScanBoundaryCiEvaluation,
   type ScanBoundaryCiMatch,
 } from "../scan-boundary-ci-policy.js";
+import {
+  EXECUTABLE_SURFACE_CI_MATCH_IDS,
+  evaluateExecutableSurfaceCiPolicy,
+  type ExecutableSurfaceCiConfiguration,
+  type ExecutableSurfaceCiEvaluation,
+  type ExecutableSurfaceCiMatch,
+} from "../executable-surface-ci-policy.js";
 import type { EffectiveCiScanBoundaryEvidence } from "../scan-boundary.js";
 import {
   zeroInspectionCoverageDiff,
@@ -104,6 +111,7 @@ export interface CiReport {
   skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation;
   securityPolicy: SecurityPolicyCiEvaluation;
   scanBoundaryPolicy: ScanBoundaryCiEvaluation;
+  executableSurfacePolicy: ExecutableSurfaceCiEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -116,7 +124,11 @@ export type CiReportFormatInput =
   | CiReport
   | (Omit<
       CiReport,
-      "diff" | "skillDiscoveryPolicy" | "securityPolicy" | "scanBoundaryPolicy"
+      | "diff"
+      | "skillDiscoveryPolicy"
+      | "securityPolicy"
+      | "scanBoundaryPolicy"
+      | "executableSurfacePolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     })
@@ -127,6 +139,7 @@ export type CiReportFormatInput =
       | "skillDiscoveryPolicy"
       | "securityPolicy"
       | "scanBoundaryPolicy"
+      | "executableSurfacePolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     });
@@ -189,6 +202,7 @@ export async function ciReport(
     execution.securityPolicyCiPolicy,
     execution.scanBoundaryCiPolicy,
     execution.effectiveCiScanBoundary,
+    execution.executableSurfaceCiPolicy,
   );
 }
 
@@ -207,6 +221,10 @@ export function buildCiReportFromDiff(
     to: "fail",
   },
   effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence,
+  configuredExecutableSurfacePolicy: ExecutableSurfaceCiConfiguration = {
+    from: "off",
+    to: "off",
+  },
 ): CiReport {
   const { discovery, ...ciCompatibleDiff } = report;
   const existingStatus = determineCiReportStatus(ciCompatibleDiff);
@@ -223,11 +241,20 @@ export function buildCiReportFromDiff(
     configuredScanBoundaryPolicy,
     effectiveCiScanBoundary,
   );
+  const executableSurfacePolicy = evaluateExecutableSurfaceCiPolicy(
+    ciCompatibleDiff.executableSurface ??
+      buildExecutableSurfaceDiff(
+        zeroExecutableSurfaceInventory(),
+        zeroExecutableSurfaceInventory(),
+      ),
+    configuredExecutableSurfacePolicy,
+  );
   const status = composeCiReportStatus(
     existingStatus,
     skillDiscoveryPolicy.outcome,
     securityPolicy.outcome,
     scanBoundaryPolicy.outcome,
+    executableSurfacePolicy.outcome,
   );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
@@ -244,6 +271,7 @@ export function buildCiReportFromDiff(
     skillDiscoveryPolicy,
     securityPolicy,
     scanBoundaryPolicy,
+    executableSurfacePolicy,
     securityPosture,
     notes: reviewNotes(
       ciCompatibleDiff,
@@ -252,6 +280,7 @@ export function buildCiReportFromDiff(
       skillDiscoveryPolicy,
       securityPolicy,
       scanBoundaryPolicy,
+      executableSurfacePolicy,
     ),
     diff: ciCompatibleDiff,
   };
@@ -319,18 +348,21 @@ export function composeCiReportStatus(
   discoveryPolicyOutcome: SkillDiscoveryCiPolicyEvaluation["outcome"],
   securityPolicyOutcome: SecurityPolicyCiEvaluation["outcome"] = "pass",
   scanBoundaryPolicyOutcome: ScanBoundaryCiEvaluation["outcome"] = "pass",
+  executableSurfacePolicyOutcome: ExecutableSurfaceCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
   if (
     existingStatus === "fail" ||
     securityPolicyOutcome === "fail" ||
-    scanBoundaryPolicyOutcome === "fail"
+    scanBoundaryPolicyOutcome === "fail" ||
+    executableSurfacePolicyOutcome === "fail"
   )
     return "fail";
   if (
     existingStatus === "warn" ||
     discoveryPolicyOutcome === "warn" ||
     securityPolicyOutcome === "warn" ||
-    scanBoundaryPolicyOutcome === "warn"
+    scanBoundaryPolicyOutcome === "warn" ||
+    executableSurfacePolicyOutcome === "warn"
   )
     return "warn";
   return "pass";
@@ -369,6 +401,7 @@ function reviewNotes(
   skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation,
   securityPolicy: SecurityPolicyCiEvaluation,
   scanBoundaryPolicy: ScanBoundaryCiEvaluation,
+  executableSurfacePolicy: ExecutableSurfaceCiEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -429,6 +462,23 @@ function reviewNotes(
     if (report.summary.findingsDelta < 0) {
       notes.push(
         "Scan findings decreased alongside a declared security policy relaxation; this is not treated as verified remediation.",
+      );
+    }
+  }
+  if (executableSurfacePolicy.matchCount > 0) {
+    if (executableSurfacePolicy.configured.effective === "off") {
+      const suffix =
+        executableSurfacePolicy.matchCount === 1
+          ? "matching change remains"
+          : "matching changes remain";
+      notes.push(
+        `Executable-surface CI policy is off; ${executableSurfacePolicy.matchCount} ${suffix} informational.`,
+      );
+    } else {
+      const suffix =
+        executableSurfacePolicy.matchCount === 1 ? "change" : "changes";
+      notes.push(
+        `Executable-surface CI policy matched ${executableSurfacePolicy.matchCount} review-triggering ${suffix}.`,
       );
     }
   }
@@ -533,6 +583,24 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     scanBoundaryPolicy && scanBoundaryPolicy.matchCount > 0
       ? ["", ...formatScanBoundaryWeakeningSection(scanBoundaryPolicy)]
       : [];
+  const executableSurfacePolicy =
+    "executableSurfacePolicy" in report
+      ? report.executableSurfacePolicy
+      : undefined;
+  if (executableSurfacePolicy && executableSurfacePolicy.matchCount > 0) {
+    const effect =
+      executableSurfacePolicy.configured.effective === "off"
+        ? "GATE OFF"
+        : executableSurfacePolicy.outcome.toUpperCase();
+    const suffix =
+      executableSurfacePolicy.matchCount === 1 ? "change" : "changes";
+    summaryLines.push(
+      `- Executable-surface CI policy: ${effect} — ${executableSurfacePolicy.matchCount} review-triggering ${suffix}`,
+    );
+  }
+  const executableSurfacePolicyLines = executableSurfacePolicy
+    ? ["", ...formatExecutableSurfaceCiPolicySection(executableSurfacePolicy)]
+    : [];
 
   const detailLines = [
     "## Readiness",
@@ -638,6 +706,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...formatChangeOverview(report, executableSurface),
     ...securityPolicyLines,
     ...scanBoundaryPolicyLines,
+    ...executableSurfacePolicyLines,
     "",
     "## Review Notes",
     "",
@@ -780,6 +849,12 @@ function formatChangeOverview(
       "scan boundary weakenings",
       "scanBoundaryPolicy" in report ? report.scanBoundaryPolicy.matchCount : 0,
     ],
+    [
+      "executable-surface CI matches",
+      "executableSurfacePolicy" in report
+        ? report.executableSurfacePolicy.matchCount
+        : 0,
+    ],
   ]);
 
   return [
@@ -873,6 +948,56 @@ function formatSecurityPolicyRelaxationSection(
       .map((match) => `- ${formatSecurityPolicyCiMatch(match)}`),
     ...formatOverflow(policy.matches.length),
   ];
+}
+
+function formatExecutableSurfaceCiPolicySection(
+  policy: ExecutableSurfaceCiEvaluation,
+): string[] {
+  const { from, to, effective } = policy.configured;
+  return [
+    "## Executable Surface CI Policy",
+    "",
+    `- Configured: ${from} -> ${to}`,
+    `- Effective: ${effective}`,
+    `- Outcome: ${policy.outcome.toUpperCase()}`,
+    `- Matches: ${policy.matchCount}`,
+    ...(policy.matchCount > 0
+      ? [
+          "",
+          ...policy.matches
+            .slice(0, MAX_LIST_ITEMS)
+            .map((match) => `- ${formatExecutableSurfaceCiMatch(match)}`),
+          ...formatOverflow(policy.matches.length),
+        ]
+      : []),
+  ];
+}
+
+function formatExecutableSurfaceCiMatch(
+  match: ExecutableSurfaceCiMatch,
+): string {
+  const id = formatMarkdownInlineCode(match.id);
+  if (match.kind === "surface") {
+    return `${id}: ${formatMarkdownInlineCode(match.path)}`;
+  }
+  const location = formatMarkdownInlineCode(
+    `${match.sourcePath}:L${"line" in match ? match.line : match.toLine}`,
+  );
+  const target = formatMarkdownInlineCode(match.target);
+  if (
+    match.id === EXECUTABLE_SURFACE_CI_MATCH_IDS.PROBLEMATIC_INVOCATION_ADDED
+  ) {
+    return `${id}: ${location} -> ${target} (${match.resolution})`;
+  }
+  if (
+    match.id === EXECUTABLE_SURFACE_CI_MATCH_IDS.PROBLEMATIC_DEPENDENCY_ADDED
+  ) {
+    return `${id}: ${location} ${match.analyzer} ${match.relation} -> ${target} (${match.resolution})`;
+  }
+  if (match.transition === "added") {
+    return `${id}: ${location} -> ${target}; effective fingerprints: ${match.distinctEffectivePolicyFingerprints.length}`;
+  }
+  return `${id}: ${location} -> ${target}; policy evidence ${match.fromHasEffectivePolicyEvidence ? "present" : "missing"} -> ${match.toHasEffectivePolicyEvidence ? "present" : "missing"}; effective fingerprints ${match.fromDistinctEffectivePolicyFingerprints.length} -> ${match.toDistinctEffectivePolicyFingerprints.length}`;
 }
 
 function formatScanBoundaryWeakeningSection(

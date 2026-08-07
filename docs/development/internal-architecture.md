@@ -563,9 +563,10 @@ governance fingerprint covers only owning-Skill resolution and normalized
 policy relationships. It excludes line numbers, snippets, unrelated invocation
 resolution, absolute paths, and time-dependent values.
 
-The inventory is visibility evidence, not general language analysis, SAST, a
-safety verdict, or an enforcement policy. Diff and CI sections are
-informational. Findings,
+The inventory is visibility evidence, not general language analysis, SAST, or
+a safety verdict. The canonical diff remains observation-only; `ci-report` may
+separately apply repository-configured policy to a bounded set of its
+high-signal transitions. Findings,
 diagnostics, Readiness, the Security Policy Inventory, and Trust Graph
 intentionally do not consume dependency or invocation-governance relationships
 in this slice. Executable dependency edges never become normal BOM Context
@@ -583,7 +584,8 @@ CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as
 `skillDiscoveryPolicy`, evaluates both snapshot `security.ci_policy` modes as
 `securityPolicy`, evaluates both `scan_boundary.ci_policy` modes as
-`scanBoundaryPolicy`, and retains a compatibility-shaped nested diff. Endpoint
+`scanBoundaryPolicy`, evaluates both `executable_surface.ci_policy` modes as
+`executableSurfacePolicy`, and retains a compatibility-shaped nested diff. Endpoint
 snapshots remain revision-local for semantic configuration. For CI only, target
 paths are collected once more through the independent union of both endpoint
 coverage predicates; the target's semantic configuration is still used for
@@ -621,6 +623,19 @@ matches exact weakening rows under `scan_boundary_ci.*`, and composes its
 outcome with existing CI status. Suppression application returns disjoint
 active and suppressed-finding arrays; Diagnostics v2 and Trust Graph continue
 to consume only active findings.
+
+The pure `executable-surface-ci-policy` module selects the stricter
+`off < warn < fail` archived mode and consumes only the canonical
+`ExecutableSurfaceDiff` already built for the enforcement-view target. It does
+not scan, parse rendered output, infer aggregate deltas, or add policy state to
+the semantic diff. Stable discriminated matches cover added surfaces, new
+problematic invocations or dependencies, missing/lost/ambiguous invocation
+policy evidence, lost Skill-local or static invocation reachability, and newly
+static transitive surfaces. Directional filtering excludes ambiguity and
+reachability improvements. Match ordering is stable, and overlapping reasons
+remain separate rows. The evaluator outcome composes as a peer with semantic,
+Discovery, security, and scan-boundary outcomes; the caller-selected
+`--fail-on-status` threshold remains a separate exit decision.
 
 CI Markdown uses the shared presentation cap, while JSON retains the complete
 diff and policy evaluation once each. Formatters accept reports that lack the
