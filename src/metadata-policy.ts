@@ -4,7 +4,9 @@ import { DIAGNOSTIC_IDS, withDiagnosticId } from "./diagnostic-ids.js";
 import { parseCanonicalCatalogListValue } from "./metadata.js";
 import type { AssetMetadata, CatalogEntry } from "./model.js";
 import {
+  AGENT_SKILL_TOP_LEVEL_KEYS,
   RENMA_REQUIRED_METADATA_DEFINITIONS,
+  REQUIRED_METADATA_CONFIGURATION_KEY,
   type RequiredMetadataPolicyDefinition,
   type RequiredMetadataPolicyField,
 } from "./metadata-definitions.js";
@@ -56,7 +58,7 @@ export function requiredMetadataPolicyDiagnostics(
     if (presence.state === "valid") return [];
     const skill = kind === "skill";
     const serializedKey = skill
-      ? `metadata.${definition.skillKey}`
+      ? `${AGENT_SKILL_TOP_LEVEL_KEYS.metadata}.${definition.skillKey}`
       : definition.nonSkillKey;
     const valueGuidance =
       definition.policyValueKind === "list"
@@ -95,7 +97,7 @@ export function requiredMetadataPolicyDiagnostics(
           expectedSerializedKey: serializedKey,
           presenceState: presence.state,
           policySource: "repository_configuration",
-          configurationKey: "metadata.required",
+          configurationKey: REQUIRED_METADATA_CONFIGURATION_KEY,
           configurationPath: options.configPath ?? null,
           declarationRequirement: "explicit",
         },
@@ -120,7 +122,7 @@ function canonicalSkillPresence(
 ): RequiredMetadataPresence {
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
   const metadataMappings = frontmatter.fields.filter(
-    (field) => field.key === "metadata",
+    (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
   const fields = frontmatter.metadataFields.filter(
     (field) => field.key === definition.skillKey,
@@ -128,7 +130,9 @@ function canonicalSkillPresence(
   const first = fields[0];
   const evidence = first ? yamlFieldEvidence(document, first) : undefined;
   if (
-    frontmatter.duplicateFields.some((field) => field.key === "metadata") ||
+    frontmatter.duplicateFields.some(
+      (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
+    ) ||
     fields.length > 1
   ) {
     return { state: "ambiguous", ...(evidence ? { evidence } : {}) };

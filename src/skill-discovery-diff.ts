@@ -12,6 +12,9 @@ import {
   type SkillRouteUsabilityReason,
 } from "./skill-discovery.js";
 
+export const SKILL_DISCOVERY_DIFF_SCHEMA_VERSION =
+  "renma.skill-discovery-diff.v1" as const;
+
 export interface SkillDiscoveryDiffSkill {
   id: string;
   path: string;
@@ -85,7 +88,7 @@ export interface SkillDiscoveryCycleDiff {
 }
 
 export interface SkillDiscoveryDiff {
-  schemaVersion: "renma.skill-discovery-diff.v1";
+  schemaVersion: typeof SKILL_DISCOVERY_DIFF_SCHEMA_VERSION;
   adoption: {
     from: SkillDiscoveryAdoptionState;
     to: SkillDiscoveryAdoptionState;
@@ -143,7 +146,7 @@ export function buildSkillDiscoveryDiff(
   const toRoutes = routeMap(to);
 
   return {
-    schemaVersion: "renma.skill-discovery-diff.v1",
+    schemaVersion: SKILL_DISCOVERY_DIFF_SCHEMA_VERSION,
     adoption: {
       from: from.adoption.state,
       to: to.adoption.state,

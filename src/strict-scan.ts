@@ -1,6 +1,9 @@
 import { severityMeets } from "./rules.js";
 import type { ScanResult } from "./types/scan-result.js";
 
+export const STRICT_SCAN_EVALUATION_SCHEMA_VERSION =
+  "renma.strict-scan-evaluation.v1" as const;
+
 export const STRICT_SCAN_MATCH_IDS = {
   FINDING_THRESHOLD: "strict_scan.finding_threshold",
   INVALID_AGENT_SKILL: "strict_scan.invalid_agent_skill",
@@ -18,7 +21,7 @@ export interface StrictScanMatch {
 }
 
 export interface StrictScanEvaluation {
-  schemaVersion: "renma.strict-scan-evaluation.v1";
+  schemaVersion: typeof STRICT_SCAN_EVALUATION_SCHEMA_VERSION;
   outcome: "pass" | "fail";
   matches: StrictScanMatch[];
 }
@@ -62,7 +65,7 @@ export function evaluateStrictScan(result: ScanResult): StrictScanEvaluation {
     });
   }
   return {
-    schemaVersion: "renma.strict-scan-evaluation.v1",
+    schemaVersion: STRICT_SCAN_EVALUATION_SCHEMA_VERSION,
     outcome: matches.length > 0 ? "fail" : "pass",
     matches,
   };

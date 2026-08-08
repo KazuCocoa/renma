@@ -65,7 +65,10 @@ import {
   zeroInspectionCoverageDiff,
   type InspectionCoverageDiff,
 } from "../inspection-coverage.js";
-import type { QualityPolicyThresholdChange } from "../quality-policy-diff.js";
+import {
+  QUALITY_POLICY_DIFF_SCHEMA_VERSION,
+  type QualityPolicyThresholdChange,
+} from "../quality-policy-diff.js";
 import {
   evaluateQualityPolicyCiPolicy,
   type QualityPolicyCiConfiguration,
@@ -78,6 +81,7 @@ import {
   type MetadataPolicyCiConfiguration,
   type MetadataPolicyCiEvaluation,
 } from "../metadata-policy-ci-policy.js";
+import { REQUIRED_METADATA_CONFIGURATION_KEY } from "../metadata-definitions.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -281,7 +285,7 @@ export function buildCiReportFromDiff(
   );
   const qualityPolicy = evaluateQualityPolicyCiPolicy(
     ciCompatibleDiff.qualityPolicy ?? {
-      schemaVersion: "renma.quality-policy-diff.v1",
+      schemaVersion: QUALITY_POLICY_DIFF_SCHEMA_VERSION,
       changes: [],
     },
     configuredQualityPolicy,
@@ -626,7 +630,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
       zeroExecutableSurfaceInventory(),
     );
   const qualityDiff = report.diff.qualityPolicy ?? {
-    schemaVersion: "renma.quality-policy-diff.v1" as const,
+    schemaVersion: QUALITY_POLICY_DIFF_SCHEMA_VERSION,
     changes: [],
   };
   const metadataDiff = report.diff.metadataPolicy;
@@ -2052,7 +2056,7 @@ function formatFinding(finding: ReportFinding): string {
   const presence = reportDetailString(finding.details, "presenceState");
   const policyEvidence =
     requiredField && expectedKey
-      ? `; required ${formatMarkdownInlineCode(requiredField)} as ${formatMarkdownInlineCode(expectedKey)} by ${formatMarkdownInlineCode("metadata.required")}${presence ? ` (${presence})` : ""}`
+      ? `; required ${formatMarkdownInlineCode(requiredField)} as ${formatMarkdownInlineCode(expectedKey)} by ${formatMarkdownInlineCode(REQUIRED_METADATA_CONFIGURATION_KEY)}${presence ? ` (${presence})` : ""}`
       : "";
   return `- ${finding.severity.toUpperCase()}${risk} \`${finding.id}\` \`${location}\` — ${finding.title}${policyEvidence}`;
 }

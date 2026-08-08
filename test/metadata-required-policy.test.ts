@@ -8,12 +8,17 @@ import { validateAgentSkill } from "../src/agent-skills.js";
 import { buildCatalog } from "../src/catalog.js";
 import { catalogDiagnosticFindings } from "../src/catalog-findings.js";
 import { ConfigError, DEFAULT_CONFIG, loadConfig } from "../src/config.js";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { parseDocument } from "../src/markdown.js";
 import { scan } from "../src/scanner.js";
 import type { MetadataConfig } from "../src/types/configuration.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
 
 const REQUIRED_ID = "META-POLICY-REQUIRED-FIELD-MISSING";
+
+test("required metadata keeps its exact public identifier in the registry", () => {
+  assert.equal(DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING, REQUIRED_ID);
+});
 
 test("no required metadata configuration produces no policy findings", () => {
   const built = buildCatalog([

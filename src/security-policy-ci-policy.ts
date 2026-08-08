@@ -9,6 +9,9 @@ import type {
 } from "./security-policy-diff.js";
 import type { SecurityCiPolicyMode } from "./types/configuration.js";
 
+export const SECURITY_POLICY_CI_POLICY_SCHEMA_VERSION =
+  "renma.security-policy-ci-policy.v1" as const;
+
 export const SECURITY_POLICY_CI_MATCH_IDS = {
   NETWORK_RELAXED: "security_policy_ci.network_relaxed",
   APPROVED_NETWORK_DESTINATION_ADDED:
@@ -77,7 +80,7 @@ export interface SecurityPolicyCiConfiguration {
 }
 
 export interface SecurityPolicyCiEvaluation {
-  schemaVersion: "renma.security-policy-ci-policy.v1";
+  schemaVersion: typeof SECURITY_POLICY_CI_POLICY_SCHEMA_VERSION;
   configured: SecurityPolicyCiConfiguration & {
     effective: SecurityCiPolicyMode;
   };
@@ -222,7 +225,7 @@ export function evaluateSecurityPolicyCiPolicy(
 
   if (effective === "off") {
     return {
-      schemaVersion: "renma.security-policy-ci-policy.v1",
+      schemaVersion: SECURITY_POLICY_CI_POLICY_SCHEMA_VERSION,
       configured: configuredResult,
       outcome: "pass",
       matchCount: matches.length,
@@ -231,7 +234,7 @@ export function evaluateSecurityPolicyCiPolicy(
   }
 
   return {
-    schemaVersion: "renma.security-policy-ci-policy.v1",
+    schemaVersion: SECURITY_POLICY_CI_POLICY_SCHEMA_VERSION,
     configured: configuredResult,
     outcome:
       matches.length === 0 ? "pass" : effective === "fail" ? "fail" : "warn",

@@ -5,15 +5,46 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
+  AGENT_SKILLS_TOP_LEVEL_FIELDS,
   AGENT_SKILLS_SPECIFICATION,
   validateAgentSkill,
   validateAgentSkills,
 } from "../src/agent-skills.js";
 import { main } from "../src/cli.js";
 import { parseDocument } from "../src/markdown.js";
+import { AGENT_SKILL_TOP_LEVEL_KEYS } from "../src/metadata-definitions.js";
 import { formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { Artifact } from "../src/types.js";
+
+test("canonical Agent Skills top-level vocabulary is exact, derived, and unique", () => {
+  const publicKeys = [
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools",
+  ];
+
+  assert.deepEqual(AGENT_SKILL_TOP_LEVEL_KEYS, {
+    name: "name",
+    description: "description",
+    license: "license",
+    compatibility: "compatibility",
+    metadata: "metadata",
+    allowedTools: "allowed-tools",
+  });
+  assert.deepEqual(AGENT_SKILLS_TOP_LEVEL_FIELDS, publicKeys);
+  assert.deepEqual(
+    AGENT_SKILLS_TOP_LEVEL_FIELDS,
+    Object.values(AGENT_SKILL_TOP_LEVEL_KEYS),
+  );
+  assert.equal(
+    new Set(AGENT_SKILLS_TOP_LEVEL_FIELDS).size,
+    Object.keys(AGENT_SKILL_TOP_LEVEL_KEYS).length,
+  );
+});
 
 test("validates canonical Agent Skills YAML forms", () => {
   const cases = [

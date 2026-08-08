@@ -8,6 +8,7 @@ import {
   type Node,
   type Pair,
 } from "yaml";
+import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
 
 export interface YamlFrontmatterError {
   code: string;
@@ -107,7 +108,9 @@ export function parseAgentSkillFrontmatter(
   // declaration parsers need the exact field evidence even when the canonical
   // marker appears only in a later ambiguous mapping.
   const metadataFields = yaml.contents.items
-    .filter((pair) => scalarString(pair.key) === "metadata")
+    .filter(
+      (pair) => scalarString(pair.key) === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
+    )
     .flatMap((pair) =>
       isMap(pair.value) ? mapFields(yaml, pair.value.items, lineCounter) : [],
     );

@@ -1,7 +1,6 @@
 import { stringify } from "yaml";
 
 import {
-  AGENT_SKILLS_TOP_LEVEL_FIELDS,
   agentSkillFenceLines,
   legacyRenmaMetadataKey,
   LEGACY_RENMA_SKILL_FIELDS,
@@ -11,6 +10,12 @@ import {
   type AgentSkillFormat,
   type AgentSkillValidationResult,
 } from "./agent-skills.js";
+import {
+  AGENT_SKILLS_TOP_LEVEL_FIELDS,
+  AGENT_SKILL_TOP_LEVEL_KEYS,
+  CANONICAL_SKILL_METADATA_KEYS,
+  RENMA_METADATA_NAMESPACE_PREFIX,
+} from "./metadata-definitions.js";
 import type { SkillEntrypointPath } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import { validateCanonicalSecurityMetadata } from "./security-policy.js";
@@ -114,17 +119,20 @@ export function buildAgentSkillMigrationSuggestion(
   const preservedMetadata: Record<string, string> = {};
   collectStructuralBlocks(document, frontmatter, blocked);
   const duplicateTopLevelMetadata = frontmatter.duplicateFields.some(
-    (field) => field.key === "metadata",
+    (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
   const duplicateMetadataKeys = new Set(
     frontmatter.duplicateMetadataKeys.map((field) => field.key),
   );
-  const existingMetadata = frontmatter.values.metadata;
+  const existingMetadata =
+    frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.metadata];
   if (!duplicateTopLevelMetadata && isStringRecord(existingMetadata)) {
     for (const [key, value] of Object.entries(existingMetadata)) {
       if (duplicateMetadataKeys.has(key)) continue;
       preservedMetadata[key] = value;
-      if (key.startsWith("renma.")) candidateRenmaMetadata[key] = value;
+      if (key.startsWith(RENMA_METADATA_NAMESPACE_PREFIX)) {
+        candidateRenmaMetadata[key] = value;
+      }
     }
   }
 
@@ -175,23 +183,25 @@ export function buildAgentSkillMigrationSuggestion(
     } else if (
       requestedOwner &&
       !duplicateTopLevelMetadata &&
-      !duplicateMetadataKeys.has("renma.owner")
+      !duplicateMetadataKeys.has(CANONICAL_SKILL_METADATA_KEYS.owner)
     ) {
-      const existingOwner = preservedMetadata["renma.owner"];
+      const existingOwner =
+        preservedMetadata[CANONICAL_SKILL_METADATA_KEYS.owner];
       if (existingOwner !== undefined && existingOwner !== requestedOwner) {
         blocked.push({
           field: "owner",
           reason: `Existing owner "${existingOwner}" differs from explicitly provided owner "${requestedOwner}". Human review is required before changing canonical Agent Skills metadata.`,
         });
       } else if (existingOwner === undefined) {
-        preservedMetadata["renma.owner"] = requestedOwner;
-        candidateRenmaMetadata["renma.owner"] = requestedOwner;
+        preservedMetadata[CANONICAL_SKILL_METADATA_KEYS.owner] = requestedOwner;
+        candidateRenmaMetadata[CANONICAL_SKILL_METADATA_KEYS.owner] =
+          requestedOwner;
       }
     }
 
     let canonicalFrontmatter =
-      candidateRenmaMetadata["renma.owner"] !== undefined &&
-      blocked.length === 0
+      candidateRenmaMetadata[CANONICAL_SKILL_METADATA_KEYS.owner] !==
+        undefined && blocked.length === 0
         ? renderCanonicalFrontmatter(
             frontmatter.values,
             {
@@ -326,17 +336,19 @@ export function buildAgentSkillMigrationSuggestion(
   if (
     requestedOwner &&
     !duplicateTopLevelMetadata &&
-    !duplicateMetadataKeys.has("renma.owner")
+    !duplicateMetadataKeys.has(CANONICAL_SKILL_METADATA_KEYS.owner)
   ) {
-    const existingOwner = preservedMetadata["renma.owner"];
+    const existingOwner =
+      preservedMetadata[CANONICAL_SKILL_METADATA_KEYS.owner];
     if (existingOwner !== undefined && existingOwner !== requestedOwner) {
       blocked.push({
         field: "owner",
         reason: `Existing owner "${existingOwner}" differs from explicitly provided owner "${requestedOwner}". Human review is required before migration.`,
       });
     } else {
-      preservedMetadata["renma.owner"] = requestedOwner;
-      candidateRenmaMetadata["renma.owner"] = requestedOwner;
+      preservedMetadata[CANONICAL_SKILL_METADATA_KEYS.owner] = requestedOwner;
+      candidateRenmaMetadata[CANONICAL_SKILL_METADATA_KEYS.owner] =
+        requestedOwner;
     }
   }
 
@@ -481,16 +493,19 @@ function collectStructuralBlocks(
     });
   }
   if (
-    frontmatter.values.metadata !== undefined &&
-    !isStringRecord(frontmatter.values.metadata)
+    frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.metadata] !== undefined &&
+    !isStringRecord(frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.metadata])
   ) {
     blocked.push({
-      field: "metadata",
+      field: AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
       reason:
         "Migration is unsafe because metadata is not a string-to-string mapping.",
     });
   }
-  for (const field of ["license", "allowed-tools"] as const) {
+  for (const field of [
+    AGENT_SKILL_TOP_LEVEL_KEYS.license,
+    AGENT_SKILL_TOP_LEVEL_KEYS.allowedTools,
+  ] as const) {
     const value = frontmatter.values[field];
     if (value !== undefined && typeof value !== "string") {
       blocked.push({
@@ -499,7 +514,8 @@ function collectStructuralBlocks(
       });
     }
   }
-  const compatibility = frontmatter.values.compatibility;
+  const compatibility =
+    frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.compatibility];
   if (
     compatibility !== undefined &&
     (typeof compatibility !== "string" ||
@@ -507,7 +523,7 @@ function collectStructuralBlocks(
       Array.from(compatibility).length > 500)
   ) {
     blocked.push({
-      field: "compatibility",
+      field: AGENT_SKILL_TOP_LEVEL_KEYS.compatibility,
       reason:
         "Migration is unsafe because Agent Skills compatibility is not a non-empty string of at most 500 characters.",
     });
@@ -688,13 +704,19 @@ function renderCanonicalFrontmatter(
   metadata: Record<string, string>,
 ): string {
   const candidate: Record<string, unknown> = {
-    name: identity.name,
-    description: identity.description,
+    [AGENT_SKILL_TOP_LEVEL_KEYS.name]: identity.name,
+    [AGENT_SKILL_TOP_LEVEL_KEYS.description]: identity.description,
   };
-  for (const field of ["license", "compatibility", "allowed-tools"] as const) {
+  for (const field of [
+    AGENT_SKILL_TOP_LEVEL_KEYS.license,
+    AGENT_SKILL_TOP_LEVEL_KEYS.compatibility,
+    AGENT_SKILL_TOP_LEVEL_KEYS.allowedTools,
+  ] as const) {
     if (existing[field] !== undefined) candidate[field] = existing[field];
   }
-  if (Object.keys(metadata).length > 0) candidate.metadata = metadata;
+  if (Object.keys(metadata).length > 0) {
+    candidate[AGENT_SKILL_TOP_LEVEL_KEYS.metadata] = metadata;
+  }
   return `---\n${stringify(candidate, { lineWidth: 0 }).trimEnd()}\n---`;
 }
 

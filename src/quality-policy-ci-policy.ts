@@ -4,6 +4,9 @@ import type {
 } from "./quality-policy-diff.js";
 import type { QualityCiPolicyMode } from "./types/configuration.js";
 
+export const QUALITY_POLICY_CI_POLICY_SCHEMA_VERSION =
+  "renma.quality-policy-ci-policy.v1" as const;
+
 export const QUALITY_POLICY_CI_MATCH_IDS = {
   CI_POLICY_RELAXED: "quality_policy_ci.ci_policy_relaxed",
   THRESHOLD_INCREASED: "quality_policy_ci.threshold_increased",
@@ -39,7 +42,7 @@ export type QualityPolicyCiMatch =
   QualityPolicyCiModeRelaxedMatch | QualityPolicyThresholdIncreasedMatch;
 
 export interface QualityPolicyCiEvaluation {
-  schemaVersion: "renma.quality-policy-ci-policy.v1";
+  schemaVersion: typeof QUALITY_POLICY_CI_POLICY_SCHEMA_VERSION;
   configured: QualityPolicyCiConfiguration & {
     effective: QualityCiPolicyMode;
   };
@@ -109,7 +112,7 @@ export function evaluateQualityPolicyCiPolicy(
   const matches: QualityPolicyCiMatch[] = [...modeMatches, ...thresholdMatches];
 
   return {
-    schemaVersion: "renma.quality-policy-ci-policy.v1",
+    schemaVersion: QUALITY_POLICY_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },
     modeTransition,
     numericThresholdChanges: {

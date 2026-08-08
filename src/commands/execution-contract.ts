@@ -6,6 +6,7 @@ import type { ConfigOverrides } from "../config.js";
 import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
 import {
   canonicalExecutableInvocationGraphEdges,
+  EXECUTABLE_SURFACE_INVENTORY_SCHEMA,
   type ExecutableSurfaceDependency,
   type ExecutableSurfaceEntry,
   type ExecutableSurfaceInvocation,
@@ -66,7 +67,7 @@ export interface ExecutionContractReport {
   };
   subject: ExecutionContractSubject;
   executableEvidence: {
-    inventorySchema: "renma.executable-surface-inventory.v1";
+    inventorySchema: typeof EXECUTABLE_SURFACE_INVENTORY_SCHEMA;
     surfaces: ExecutionContractSurface[];
     relationships: ExecutionContractRelationship[];
     structuralRelationships: ExecutionContractStructuralRelationship[];

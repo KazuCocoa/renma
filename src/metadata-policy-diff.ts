@@ -1,8 +1,12 @@
 import {
+  REQUIRED_METADATA_CONFIGURATION_KEY,
   REQUIRED_METADATA_POLICY_FIELDS,
   type RequiredMetadataPolicyField,
 } from "./metadata-definitions.js";
 import type { MetadataConfig } from "./types/configuration.js";
+
+export const METADATA_POLICY_DIFF_SCHEMA_VERSION =
+  "renma.metadata-policy-diff.v1" as const;
 
 export type MetadataPolicyChangeDirection = "weakening" | "tightening";
 
@@ -10,7 +14,7 @@ export type MetadataPolicyProvenance =
   | { source: "renma_default" }
   | {
       source: "repository_configuration";
-      configKey: "metadata.required";
+      configKey: typeof REQUIRED_METADATA_CONFIGURATION_KEY;
       configPath: string | null;
     };
 
@@ -21,14 +25,14 @@ export interface MetadataPolicyRequirementEndpoint {
 
 export interface MetadataPolicyRequiredFieldChange {
   field: RequiredMetadataPolicyField;
-  configKey: "metadata.required";
+  configKey: typeof REQUIRED_METADATA_CONFIGURATION_KEY;
   direction: MetadataPolicyChangeDirection;
   from: MetadataPolicyRequirementEndpoint;
   to: MetadataPolicyRequirementEndpoint;
 }
 
 export interface MetadataPolicyDiff {
-  schemaVersion: "renma.metadata-policy-diff.v1";
+  schemaVersion: typeof METADATA_POLICY_DIFF_SCHEMA_VERSION;
   changes: MetadataPolicyRequiredFieldChange[];
   addedRequiredFields: RequiredMetadataPolicyField[];
   removedRequiredFields: RequiredMetadataPolicyField[];
@@ -50,7 +54,7 @@ export function buildMetadataPolicyDiff(
     return [
       {
         field,
-        configKey: "metadata.required" as const,
+        configKey: REQUIRED_METADATA_CONFIGURATION_KEY,
         direction: toRequired
           ? ("tightening" as const)
           : ("weakening" as const),
@@ -60,7 +64,7 @@ export function buildMetadataPolicyDiff(
     ];
   });
   return {
-    schemaVersion: "renma.metadata-policy-diff.v1",
+    schemaVersion: METADATA_POLICY_DIFF_SCHEMA_VERSION,
     changes,
     addedRequiredFields: changes
       .filter((change) => change.direction === "tightening")
@@ -82,7 +86,7 @@ function requirementEndpoint(
       policy.requiredSource === "repository_configuration"
         ? {
             source: "repository_configuration",
-            configKey: "metadata.required",
+            configKey: REQUIRED_METADATA_CONFIGURATION_KEY,
             configPath: configPath ?? null,
           }
         : { source: "renma_default" },

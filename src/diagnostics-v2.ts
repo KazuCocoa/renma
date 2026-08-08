@@ -1,5 +1,8 @@
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "./context-lens.js";
-import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import {
+  DIAGNOSTIC_IDS,
+  DISCOVERY_LAYOUT_DIAGNOSTIC_IDS,
+} from "./diagnostic-ids.js";
 import type {
   Diagnostic,
   DiagnosticLocation,
@@ -17,9 +20,9 @@ type BundleSeed = {
 };
 
 const RESERVED_DETAIL_KEYS = new Set(["diagnosticId", "source"]);
-const GUIDANCE_ONLY_DIAGNOSTIC_CODES = new Set([
-  "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
-  "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR",
+const GUIDANCE_ONLY_DIAGNOSTIC_CODES = new Set<string>([
+  DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR,
+  DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR,
 ]);
 
 /** Convert legacy diagnostics and findings into the LLM-actionable v2 shape. */

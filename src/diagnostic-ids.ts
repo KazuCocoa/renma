@@ -146,6 +146,14 @@ export const DIAGNOSTIC_IDS = {
   SUPPORT_UNREACHABLE_REFERENCE: "SUPPORT-UNREACHABLE-REFERENCE",
 } as const;
 
+/** Stable discovery layout diagnostics that do not become scan findings. */
+export const DISCOVERY_LAYOUT_DIAGNOSTIC_IDS = {
+  SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR:
+    "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+  SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR:
+    "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR",
+} as const;
+
 export type DiagnosticId = (typeof DIAGNOSTIC_IDS)[keyof typeof DIAGNOSTIC_IDS];
 
 const OMIT_FROM_CATALOG_FINDINGS = Symbol("omit-from-catalog-findings");

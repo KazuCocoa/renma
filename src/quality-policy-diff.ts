@@ -4,6 +4,9 @@ import type {
   QualityThresholdSource,
 } from "./types/configuration.js";
 
+export const QUALITY_POLICY_DIFF_SCHEMA_VERSION =
+  "renma.quality-policy-diff.v1" as const;
+
 export type QualityPolicyAssetKind = "skill" | ContentTokenBudgetKind;
 export type QualityPolicyThresholdType = "warning" | "high";
 export type QualityPolicyChangeDirection = "weakening" | "tightening";
@@ -23,7 +26,7 @@ export interface QualityPolicyThresholdChange {
 }
 
 export interface QualityPolicyDiff {
-  schemaVersion: "renma.quality-policy-diff.v1";
+  schemaVersion: typeof QUALITY_POLICY_DIFF_SCHEMA_VERSION;
   changes: QualityPolicyThresholdChange[];
 }
 
@@ -107,7 +110,7 @@ export function buildQualityPolicyDiff(
   });
 
   return {
-    schemaVersion: "renma.quality-policy-diff.v1",
+    schemaVersion: QUALITY_POLICY_DIFF_SCHEMA_VERSION,
     changes,
   };
 }
