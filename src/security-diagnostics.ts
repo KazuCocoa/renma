@@ -67,6 +67,7 @@ import {
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
 import { quotePairEnclosesOffset } from "./security-body-policy/statement-components.js";
+import { directiveIntentAt } from "./security-directive-intent.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -851,10 +852,6 @@ const EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE =
   /\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|lower|loosen|override|change|continue|proceed|execute|run|apply|upload|delete|publish)\b/i;
 const EXCLUDED_REGION_EXECUTION_ACTION_RE = /\b(run|execute|pipe)\b/i;
 const EXCLUDED_REGION_COMMAND_ACTION_RE = /\b(scp|curl|wget)\b/i;
-const EXCLUDED_REGION_DIRECT_IMPERATIVE_PREFIX_RE =
-  /(?:^\s*(?:(?:(?:first|next|then|after that|to continue)\s*,?\s*)|(?:(?:please|immediately|always)\s+))?|[;!?]\s*(?:(?:first|next|then|after that|to continue)\s*,?\s*)?|,\s*(?:first|next|then|after that|to continue)\s*,?\s*)$/i;
-const EXCLUDED_REGION_ACTOR_MODAL_PREFIX_RE =
-  /(?:^\s*|[;!?]\s*|,\s*(?:first|next|then|after that)\s*,?\s*)(?:you|the agent|agents?|the workflow|the tool)\s+(?:must|should|shall|needs? to|has to)\s+(?:(?:first|next|then|immediately|always)\s+)?$/i;
 const EXCLUDED_REGION_EXECUTABLE_COMMAND_RE =
   /^\s*(?:\$\s+)?(?:(?:env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*)(?:sudo\s+)?(?:scp|curl|wget)\b/i;
 const PASSIVE_SAFE_ACTION_RE =
@@ -1806,68 +1803,132 @@ function collectExcludedRegionSecurityReviewDetections(
         },
         destinationAnalysis: analysis,
       });
-      const directiveDisclosureActions = disclosureActions.filter(({ start }) =>
-        excludedRegionActionIsPositiveDirective(candidate, start),
-      );
-      const directiveNetworkAction = excludedRegionHasPositiveDirectiveMatch(
+      const networkActionRanges = excludedRegionActionRanges(
         candidate,
         EXCLUDED_REGION_NETWORK_ACTION_RE,
       );
-      const directiveSecretAction = excludedRegionHasPositiveDirectiveMatch(
+      const secretActionRanges = excludedRegionActionRanges(
         candidate,
         EXCLUDED_REGION_SECRET_ACTION_RE,
       );
+      const safeguardBypassActionRanges = excludedRegionActionRanges(
+        candidate,
+        EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE,
+      );
+      const executionActionRanges = excludedRegionActionRanges(
+        candidate,
+        EXCLUDED_REGION_EXECUTION_ACTION_RE,
+      );
+      const commandActionRanges = excludedRegionActionRanges(
+        candidate,
+        EXCLUDED_REGION_COMMAND_ACTION_RE,
+      );
+      const predicateOffsets = [
+        ...new Set(
+          [
+            ...networkActionRanges,
+            ...secretActionRanges,
+            ...safeguardBypassActionRanges,
+            ...executionActionRanges,
+            ...commandActionRanges,
+            ...disclosureActions,
+          ].map(({ start }) => start),
+        ),
+      ].sort((left, right) => left - right);
+      const directiveActionOffsets = new Set(
+        predicateOffsets.filter(
+          (offset) =>
+            directiveIntentAt(candidate, offset, predicateOffsets) !==
+            undefined,
+        ),
+      );
+      const directiveDisclosureActions = disclosureActions.filter(({ start }) =>
+        directiveActionOffsets.has(start),
+      );
+      const directiveNetworkAction = excludedRegionRangesHaveDirective(
+        networkActionRanges,
+        directiveActionOffsets,
+      );
+      const directiveSecretAction = excludedRegionRangesHaveDirective(
+        secretActionRanges,
+        directiveActionOffsets,
+      );
+      const nestedCommand = excludedRegionNestedCommandDirective(
+        candidate,
+        executionActionRanges,
+        commandActionRanges,
+        directiveActionOffsets,
+      );
       const executableCommand =
         excludedRegionIsExecutableCommand(candidate) ||
-        excludedRegionHasPositiveDirectiveMatch(
-          candidate,
-          EXCLUDED_REGION_COMMAND_ACTION_RE,
-        );
+        excludedRegionRangesHaveDirective(
+          commandActionRanges,
+          directiveActionOffsets,
+        ) ||
+        nestedCommand !== undefined;
+      const nestedDestinationAnalysis =
+        nestedCommand === undefined
+          ? undefined
+          : analyzeDestinations(nestedCommand);
+      const nestedCommandAnalysis =
+        nestedCommand === undefined || nestedDestinationAnalysis === undefined
+          ? undefined
+          : analyzeSecurityCommand({
+              source: {
+                text: nestedCommand,
+                startLine: region.startLine,
+                endLine: region.startLine,
+                lines: [nestedCommand],
+              },
+              destinationAnalysis: nestedDestinationAnalysis,
+            });
+      const operationalDestinations = [
+        ...analysis.operationalDestinations,
+        ...(nestedDestinationAnalysis?.operationalDestinations ?? []),
+      ];
+      const commandSinks = [
+        ...commandAnalysis.sinks,
+        ...(nestedCommandAnalysis?.sinks ?? []),
+      ];
+      const sensitiveSources = [
+        ...commandAnalysis.sensitiveSources,
+        ...(nestedCommandAnalysis?.sensitiveSources ?? []),
+      ];
       const safeguardBypassDirective =
         safeguardBypass &&
-        excludedRegionHasPositiveDirectiveMatch(
-          candidate,
-          EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE,
+        excludedRegionRangesHaveDirective(
+          safeguardBypassActionRanges,
+          directiveActionOffsets,
         );
+      const executionDirective = excludedRegionRangesHaveDirective(
+        executionActionRanges,
+        directiveActionOffsets,
+      );
       const remoteExecutionDirective =
-        remoteExecution &&
-        (executableCommand ||
-          excludedRegionHasPositiveDirectiveMatch(
-            candidate,
-            EXCLUDED_REGION_EXECUTION_ACTION_RE,
-          ) ||
-          excludedRegionHasPositiveDirectiveMatch(
-            candidate,
-            /\b(?:curl|wget)\b/i,
-          ));
+        remoteExecution && (executableCommand || executionDirective);
       const positiveDirective =
         directiveDisclosureActions.length > 0 ||
         directiveNetworkAction ||
         directiveSecretAction ||
         executableCommand ||
         safeguardBypassDirective ||
+        executionDirective ||
         remoteExecutionDirective;
       if (!positiveDirective) continue;
 
       const uploadAction =
-        (analysis.operationalDestinations.some(
-          ({ intent }) => intent === "upload",
-        ) &&
+        (operationalDestinations.some(({ intent }) => intent === "upload") &&
           (directiveNetworkAction ||
             directiveSecretAction ||
             executableCommand)) ||
         (executableCommand &&
-          commandAnalysis.sinks.some(
-            ({ kind }) => kind === "external-upload",
-          )) ||
+          commandSinks.some(({ kind }) => kind === "external-upload")) ||
         directiveDisclosureActions.some(
           ({ kind }) => kind === "external-upload",
         ) ||
         (isUploadInstruction(analysis) && directiveNetworkAction);
       const networkAction =
-        (analysis.operationalDestinations.some(
-          ({ intent }) => intent === "network",
-        ) &&
+        (operationalDestinations.some(({ intent }) => intent === "network") &&
           (uploadAction ||
             directiveDisclosureActions.some(({ kind }) =>
               ["network", "external-upload"].includes(kind),
@@ -1876,7 +1937,7 @@ function collectExcludedRegionSecurityReviewDetections(
             executableCommand)) ||
         (isNetworkInstruction(analysis) && directiveNetworkAction);
       const sensitiveMaterial =
-        commandAnalysis.sensitiveSources.length > 0 ||
+        sensitiveSources.length > 0 ||
         SECRET_WORD_RE.test(candidate) ||
         referencesHighRiskSensitiveFile(candidate);
       const secretExposure =
@@ -1884,7 +1945,7 @@ function collectExcludedRegionSecurityReviewDetections(
         (directiveSecretAction ||
           directiveDisclosureActions.length > 0 ||
           (executableCommand &&
-            commandAnalysis.sinks.some(({ kind }) =>
+            commandSinks.some(({ kind }) =>
               [
                 "stdout-or-log",
                 "prompt-or-context",
@@ -1929,34 +1990,60 @@ function collectExcludedRegionSecurityReviewDetections(
   return detections;
 }
 
-function excludedRegionHasPositiveDirectiveMatch(
+type ExcludedRegionActionRange = {
+  readonly start: number;
+  readonly end: number;
+};
+
+function excludedRegionActionRanges(
   candidate: string,
   pattern: RegExp,
-): boolean {
+): ExcludedRegionActionRange[] {
+  const ranges: ExcludedRegionActionRange[] = [];
   const flags = pattern.flags.includes("g")
     ? pattern.flags
     : `${pattern.flags}g`;
   for (const match of candidate.matchAll(new RegExp(pattern.source, flags))) {
-    if (
-      match.index !== undefined &&
-      excludedRegionActionIsPositiveDirective(candidate, match.index)
-    ) {
-      return true;
-    }
+    if (match.index === undefined || match[0].length === 0) continue;
+    ranges.push({
+      start: match.index,
+      end: match.index + match[0].length,
+    });
   }
-  return false;
+  return ranges;
 }
 
-function excludedRegionActionIsPositiveDirective(
-  candidate: string,
-  actionOffset: number,
+function excludedRegionRangesHaveDirective(
+  ranges: readonly ExcludedRegionActionRange[],
+  directiveActionOffsets: ReadonlySet<number>,
 ): boolean {
-  if (quotePairEnclosesOffset(candidate, actionOffset)) return false;
-  const prefix = candidate.slice(0, actionOffset);
-  return (
-    EXCLUDED_REGION_DIRECT_IMPERATIVE_PREFIX_RE.test(prefix) ||
-    EXCLUDED_REGION_ACTOR_MODAL_PREFIX_RE.test(prefix)
-  );
+  return ranges.some(({ start }) => directiveActionOffsets.has(start));
+}
+
+function excludedRegionNestedCommandDirective(
+  candidate: string,
+  executionRanges: readonly ExcludedRegionActionRange[],
+  commandRanges: readonly ExcludedRegionActionRange[],
+  directiveActionOffsets: ReadonlySet<number>,
+): string | undefined {
+  for (const execution of executionRanges) {
+    if (!directiveActionOffsets.has(execution.start)) continue;
+    for (const command of commandRanges) {
+      if (
+        command.start < execution.end ||
+        quotePairEnclosesOffset(candidate, command.start)
+      ) {
+        continue;
+      }
+      const bridge = candidate.slice(execution.end, command.start);
+      if (
+        /^[ \t]*(?:\$[ \t]*)?(?:(?:the[ \t]+)?command[ \t]+)?$/iu.test(bridge)
+      ) {
+        return candidate.slice(command.start);
+      }
+    }
+  }
+  return undefined;
 }
 
 function excludedRegionIsExecutableCommand(candidate: string): boolean {

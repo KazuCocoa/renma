@@ -77,6 +77,9 @@ They describe implementation rationale and are not normative user guidance.
   contains the machine-readable BOM v2, Trust Graph v2, and Skill Authoring
   Handoff v1 contracts shipped in the npm package.
 
+The development architecture, design, and roadmap documents below are
+source-repository-only and intentionally excluded from the npm package.
+
 ## Development
 
 - [Public Architecture](development/architecture.md) owns the high-level layers, data
