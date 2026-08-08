@@ -549,12 +549,15 @@ function buildDiffReportProjection(
     .filter(([key]) => !toFindings.has(key))
     .map(([, finding]) => finding);
   const catalogChanges = changedAssets(fromAssets, toAssets);
-  const contentIdentityComparable = [...toAssets].some(([key, toAsset]) => {
+  const sharedAssetPairs = [...toAssets].flatMap(([key, toAsset]) => {
     const fromAsset = fromAssets.get(key);
-    return (
-      fromAsset !== undefined && hasComparableContentHash(fromAsset, toAsset)
-    );
+    return fromAsset === undefined ? [] : [[fromAsset, toAsset] as const];
   });
+  const contentIdentityComparable =
+    sharedAssetPairs.length > 0 &&
+    sharedAssetPairs.every(([fromAsset, toAsset]) =>
+      hasComparableContentHash(fromAsset, toAsset),
+    );
 
   const shared = {
     root,
@@ -702,6 +705,10 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
   const discoveryLines = discovery
     ? ["", ...formatSkillDiscoveryChanges(discovery)]
     : [];
+  const contentChangeSummaryLines =
+    report.summary.contentChangedAssets === undefined
+      ? []
+      : [`- Content changes: ${report.summary.contentChangedAssets}`];
   const lines = [
     `# Renma semantic diff`,
     "",
@@ -722,7 +729,7 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Graph resolution: ${signed(report.summary.graphResolutionDelta)}`,
     `- Findings: ${signed(report.summary.findingsDelta)}`,
     `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
-    `- Content changes: ${report.summary.contentChangedAssets ?? contentChangedAssetCount(report.catalog.changedAssets)}`,
+    ...contentChangeSummaryLines,
     ...discoveryLines,
     "",
     "## Scan Boundary",
@@ -755,7 +762,9 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Added assets: ${report.catalog.addedAssets.length}`,
     `- Removed assets: ${report.catalog.removedAssets.length}`,
     `- Changed assets: ${report.catalog.changedAssets.length}`,
-    `- Content-changed assets: ${contentChangedAssetCount(report.catalog.changedAssets)}`,
+    ...(report.summary.contentChangedAssets === undefined
+      ? []
+      : [`- Content-changed assets: ${report.summary.contentChangedAssets}`]),
     ...(report.catalog.changedAssets.length > 0
       ? [
           "",
@@ -1627,15 +1636,15 @@ function changedAssets(
       );
       const contentChanged = hasComparableContentHash(fromAsset, toAsset)
         ? fromAsset.contentHash !== toAsset.contentHash
-        : false;
-      return changedFields.length === 0 && !contentChanged
+        : undefined;
+      return changedFields.length === 0 && contentChanged !== true
         ? []
         : [
             {
               id: toAsset.id,
               path: toAsset.path,
               changedFields,
-              contentChanged,
+              ...(contentChanged === undefined ? {} : { contentChanged }),
               from: fromAsset,
               to: toAsset,
             },
@@ -1719,10 +1728,6 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
 
 function hasComparableContentHash(from: AssetDelta, to: AssetDelta): boolean {
   return from.contentHash !== undefined && to.contentHash !== undefined;
-}
-
-function contentChangedAssetCount(changes: readonly AssetChange[]): number {
-  return changes.filter((change) => change.contentChanged === true).length;
 }
 
 function markdownValue(value: unknown): string {

@@ -526,7 +526,9 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
       report.to,
       report.summary.ownershipCoverageDelta,
     ),
-    `- Content changes: ${report.summary.contentChangedAssets ?? contentChangedAssetCount(report.diff.catalog.changedAssets)}`,
+    ...(report.summary.contentChangedAssets === undefined
+      ? []
+      : [`- Content changes: ${report.summary.contentChangedAssets}`]),
   ];
   if (report.summary.totalAssetsDelta !== 0) {
     summaryLines.push(
@@ -616,7 +618,9 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     `- Added assets: ${report.diff.catalog.addedAssets.length}`,
     `- Removed assets: ${report.diff.catalog.removedAssets.length}`,
     `- Changed assets: ${report.diff.catalog.changedAssets.length}`,
-    `- Content-changed assets: ${contentChangedAssetCount(report.diff.catalog.changedAssets)}`,
+    ...(report.summary.contentChangedAssets === undefined
+      ? []
+      : [`- Content-changed assets: ${report.summary.contentChangedAssets}`]),
     `- New unresolved required edges: ${newUnresolvedRequiredEdgeCount(report.diff)}`,
     `- Resolved edges: ${report.diff.graph.resolvedEdges.length}`,
     `- Added findings: ${report.diff.findings.added.length}`,
@@ -1437,10 +1441,6 @@ function formatChangedAsset(change: AssetChange): string[] {
         `  - ${formatComparableAssetField(field)}: ${formatCodeValue(change.from[field])} -> ${formatCodeValue(change.to[field])}`,
     ),
   ];
-}
-
-function contentChangedAssetCount(changes: readonly AssetChange[]): number {
-  return changes.filter((change) => change.contentChanged === true).length;
 }
 
 function formatComparableAssetField(field: string): string {

@@ -362,6 +362,121 @@ test("content identity changes are neutral, deterministic, reversible, and legac
   );
   assert.equal(legacy.catalog.changedAssets.length, 0);
   assert.equal(legacy.summary.contentChangedAssets, undefined);
+
+  const legacyGovernanceChange = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      nodes: [
+        node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
+      ],
+    }),
+    snapshot("head", {
+      nodes: [
+        node("skill", "skills/demo/SKILL.md", "skill", "security", "stable"),
+      ],
+    }),
+  );
+  const legacyChange = legacyGovernanceChange.catalog.changedAssets[0];
+  assert.ok(legacyChange);
+  assert.deepEqual(legacyChange.changedFields, [
+    "declaredOwner",
+    "effectiveOwner",
+  ]);
+  assert.equal(legacyChange.contentChanged, undefined);
+  assert.equal(legacyGovernanceChange.summary.contentChangedAssets, undefined);
+
+  const legacyDiffMarkdown = formatDiff(legacyGovernanceChange, "markdown");
+  const legacyCiMarkdown = formatCiReport(
+    buildCiReportFromDiff(legacyGovernanceChange),
+    "markdown",
+  );
+  for (const markdown of [legacyDiffMarkdown, legacyCiMarkdown]) {
+    assert.doesNotMatch(markdown, /Content changes:/iu);
+    assert.doesNotMatch(markdown, /Content-changed assets:/iu);
+    assert.doesNotMatch(markdown, /content changed: no/iu);
+  }
+
+  const oneSidedIdentity = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      nodes: [
+        {
+          ...node(
+            "skill",
+            "skills/demo/SKILL.md",
+            "skill",
+            "platform",
+            "stable",
+          ),
+          contentHash: `sha256:${"d".repeat(64)}`,
+        },
+      ],
+    }),
+    snapshot("head", {
+      nodes: [
+        node("skill", "skills/demo/SKILL.md", "skill", "security", "stable"),
+      ],
+    }),
+  );
+  assert.equal(
+    oneSidedIdentity.catalog.changedAssets[0]?.contentChanged,
+    undefined,
+  );
+  assert.equal(oneSidedIdentity.summary.contentChangedAssets, undefined);
+});
+
+test("partial content identity remains explicit without fabricating a complete summary", () => {
+  const comparableBefore = {
+    ...node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
+    contentHash: `sha256:${"a".repeat(64)}`,
+  };
+  const comparableAfter = {
+    ...comparableBefore,
+    contentHash: `sha256:${"b".repeat(64)}`,
+  };
+  const legacyBefore = node(
+    "context",
+    "contexts/context.md",
+    "context",
+    "docs",
+    "stable",
+  );
+  const legacyAfter = node(
+    "context",
+    "contexts/context.md",
+    "context",
+    "security",
+    "stable",
+  );
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", { nodes: [comparableBefore, legacyBefore] }),
+    snapshot("head", { nodes: [legacyAfter, comparableAfter] }),
+  );
+
+  assert.equal(report.summary.contentChangedAssets, undefined);
+  assert.equal(report.catalog.changedAssets.length, 2);
+  assert.equal(
+    report.catalog.changedAssets.find(({ id }) => id === "skill")
+      ?.contentChanged,
+    true,
+  );
+  assert.equal(
+    report.catalog.changedAssets.find(({ id }) => id === "context")
+      ?.contentChanged,
+    undefined,
+  );
+
+  const markdownReports = [
+    formatDiff(report, "markdown"),
+    formatCiReport(buildCiReportFromDiff(report), "markdown"),
+  ];
+  for (const markdown of markdownReports) {
+    assert.doesNotMatch(markdown, /Content changes:/iu);
+    assert.doesNotMatch(markdown, /Content-changed assets:/iu);
+    assert.match(markdown, /content changed: yes/iu);
+    assert.doesNotMatch(markdown, /content changed: no/iu);
+  }
 });
 
 test("buildDiffReport exposes canonical declared and effective owner changes", () => {

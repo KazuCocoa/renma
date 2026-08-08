@@ -2125,6 +2125,12 @@ empty. Markdown reports the content-change count and, for bounded changed-asset
 details, the before/after hashes. This remains semantic identity evidence, not
 a generic source-hunk renderer.
 
+Legacy or partially comparable snapshots do not assert that content stayed
+unchanged. `contentChanged` is omitted for an asset unless both endpoint hashes
+are present, and the aggregate content-change count is omitted unless every
+shared asset is comparable. Comparable changed rows may still retain their
+individual hash evidence in a partially comparable report.
+
 Skills are identified by repository-relative path and ID. Routes are grouped
 by normalized source Skill path and normalized declared target, so declaration
 reordering, YAML array position, and source-line movement do not create false
@@ -2223,8 +2229,8 @@ percentage while retaining the existing `summary.ownershipCoverageDelta` field.
 
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero
-summary deltas, the content-changed asset count, and review notes so `WARN` and
-`FAIL` reasons remain immediately
+summary deltas, the content-changed asset count when available, and review notes
+so `WARN` and `FAIL` reasons remain immediately
 visible in a pull request. When detailed evidence changes without affecting
 those net deltas, compact non-zero change groups also call out affected assets,
 graph edges, checks, Skill Discovery, executable surfaces and governance,

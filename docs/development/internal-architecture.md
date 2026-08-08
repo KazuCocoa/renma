@@ -586,6 +586,8 @@ discovery order. `contentChanged` is separate from governance
 `changedFields`, and `summary.contentChangedAssets` is a neutral count; neither
 field participates in CI status selection. Legacy formatter inputs without
 content identity remain accepted and do not fabricate a content transition.
+Per-asset `contentChanged` is omitted unless both endpoint hashes are present,
+and the aggregate count is omitted unless every shared asset is comparable.
 
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as

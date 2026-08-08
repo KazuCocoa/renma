@@ -16,11 +16,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Compatibility
 
 - Semantic diff and nested CI-report JSON add optional `contentHash` values to
-  asset endpoints, `contentChanged` to newly built changed-asset rows, and
-  `summary.contentChangedAssets` when endpoint snapshots provide comparable
-  content identity. `changedFields` remains the governance-metadata field list;
-  formatters continue to accept legacy rows and snapshots without the new
-  fields.
+  asset endpoints and `contentChanged` to newly built changed-asset rows when
+  both endpoints provide comparable content identity.
+  `summary.contentChangedAssets` appears only when every shared asset is
+  comparable. `changedFields` remains the governance-metadata field list;
+  formatters continue to accept legacy and partially comparable rows and
+  snapshots without fabricating a negative content-transition result.
 
 ## [0.31.0] - 2026-08-08
 
