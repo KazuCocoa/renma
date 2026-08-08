@@ -58,8 +58,9 @@ export type OperationalDestination = {
     | "direct-action"
     | "prepositional-action"
     | "curl-transfer"
+    | "scp-transfer"
     | "list-continuation";
-  tool?: "curl" | "wget" | "prose";
+  tool?: "curl" | "wget" | "scp" | "prose";
   destination?: NetworkDestination;
   candidateSpan: SourceSpan;
   commandSpan?: SourceSpan;

@@ -842,8 +842,6 @@ const SAFEGUARD_BYPASS_PATTERNS = [
 ] as const;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
-const EXCLUDED_REGION_DIRECTIVE_RE =
-  /^\s*(?:(?:[-*+]\s+|\d+[.)]\s+)|(?:(?:please|immediately|always)\s+))*(?:use\s+)?(?:upload|copy|print|cat|echo|paste|send|share|attach|submit|publish|post|put|provide|reveal|show|disclose|expose|exfiltrate|fetch|download|curl|wget|connect|request|call|access|open|visit|run|execute|pipe|ignore|bypass|circumvent|skip|omit|disable|deactivate|suppress|weaken|relax|continue|proceed)\b|\b(?:you|the agent|agents?|the workflow|the tool)\s+(?:must|should|shall|will|needs? to|has to)\s+(?:immediately\s+)?(?:upload|copy|print|cat|echo|paste|send|share|attach|submit|publish|post|put|provide|reveal|show|disclose|expose|exfiltrate|fetch|download|curl|wget|connect|request|call|access|open|visit|run|execute|pipe|ignore|bypass|circumvent|skip|omit|disable|deactivate|suppress|weaken|relax|continue|proceed)\b/i;
 const EXCLUDED_REGION_NETWORK_ACTION_RE =
   /\b(fetch|download|curl|wget|connect|request|call|access|open|visit|clone|install|upload|send|share|attach|submit|publish|post|put)\b/i;
 const EXCLUDED_REGION_SECRET_ACTION_RE =
@@ -851,7 +849,7 @@ const EXCLUDED_REGION_SECRET_ACTION_RE =
 const PASSIVE_SAFE_ACTION_RE =
   /\b(?:upload|network access|remote execution|external sharing|secret disclosure)\s+(?:is|are|remains?|must remain)\s+(?:disabled|blocked|forbidden|prohibited|denied|disallowed)\b/i;
 const SAFE_ENV_TEMPLATE_COPY_RE =
-  /^\s*(?:please\s+)?copy\s+\.env\.(?:example|sample|template)\s+(?:to\s+)?\.env(?:\.[a-z0-9_-]+)?\s*\.?\s*$/i;
+  /^\s*(?:please\s+)?copy\s+\.env\.(?:example|sample|template)\s+(?:to\s+)?\.env(?:\.[a-z0-9_-]+)?(?:\s+for\s+local\s+setup)?\s*\.?\s*$/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
@@ -1786,25 +1784,51 @@ function collectExcludedRegionSecurityReviewDetections(
         pattern.test(candidate),
       );
       const remoteExecution = REMOTE_SCRIPT_RE.test(candidate);
-      const directive =
-        EXCLUDED_REGION_DIRECTIVE_RE.test(candidate) ||
-        safeguardBypass ||
-        remoteExecution;
-      if (!directive) continue;
-
       const analysis = analyzeDestinations(candidate);
       const disclosureActions = positiveDisclosureActions(candidate);
+      const commandAnalysis = analyzeSecurityCommand({
+        source: {
+          text: candidate,
+          startLine: region.startLine,
+          endLine: region.startLine,
+          lines: [candidate],
+        },
+        destinationAnalysis: analysis,
+      });
       const uploadAction =
+        analysis.operationalDestinations.some(
+          ({ intent }) => intent === "upload",
+        ) ||
+        commandAnalysis.sinks.some(({ kind }) => kind === "external-upload") ||
         disclosureActions.some(({ kind }) => kind === "external-upload") ||
         (isUploadInstruction(analysis) &&
           EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate));
       const networkAction =
-        isNetworkInstruction(analysis) &&
-        EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate);
+        (analysis.operationalDestinations.some(
+          ({ intent }) => intent === "network",
+        ) &&
+          (uploadAction ||
+            disclosureActions.some(({ kind }) =>
+              ["network", "external-upload"].includes(kind),
+            ) ||
+            EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate))) ||
+        (isNetworkInstruction(analysis) &&
+          EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate));
+      const sensitiveMaterial =
+        commandAnalysis.sensitiveSources.length > 0 ||
+        SECRET_WORD_RE.test(candidate) ||
+        referencesHighRiskSensitiveFile(candidate);
       const secretExposure =
-        EXCLUDED_REGION_SECRET_ACTION_RE.test(candidate) &&
-        (SECRET_WORD_RE.test(candidate) ||
-          referencesHighRiskSensitiveFile(candidate));
+        sensitiveMaterial &&
+        (EXCLUDED_REGION_SECRET_ACTION_RE.test(candidate) ||
+          commandAnalysis.sinks.some(({ kind }) =>
+            [
+              "stdout-or-log",
+              "prompt-or-context",
+              "network",
+              "external-upload",
+            ].includes(kind),
+          ));
 
       if (secretExposure) signals.add("secret_exposure");
       if (
@@ -3079,6 +3103,7 @@ function forbiddenInputDetection(
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
   let lineLocalDetection: Detection | undefined;
   for (let index = scanStart; index < lines.length; index += 1) {
+    if (markdownView?.isBlockQuotedLine(index)) continue;
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
     if (SAFE_FORBIDDEN_INPUT_PATTERN.test(line)) continue;
