@@ -1948,6 +1948,10 @@ function contextBudgetFindings(
     tokenBudget.estimatedTokens ?? estimateTokens(document.artifact.content);
   const overrideActive = tokenBudget.status === "active";
   const overrideLimit = overrideActive ? tokenBudget.overrideLimit : undefined;
+  const overrideAffectsEffectiveWarning =
+    overrideActive &&
+    overrideLimit !== undefined &&
+    overrideLimit > policy.warning;
   const effectiveWarningThreshold = Math.max(
     policy.warning,
     overrideLimit ?? policy.warning,
@@ -1987,14 +1991,24 @@ function contextBudgetFindings(
           estimatedTokens,
           measured: estimatedTokens,
           defaultLimit,
+          ...(tokenBudget.overrideValidationBaseline !== undefined
+            ? {
+                overrideValidationBaseline:
+                  tokenBudget.overrideValidationBaseline,
+              }
+            : {}),
           ...(tokenBudget.overrideLimit !== undefined
-            ? { overrideLimit: tokenBudget.overrideLimit }
+            ? {
+                overrideLimit: tokenBudget.overrideLimit,
+                declaredOverrideLimit: tokenBudget.overrideLimit,
+              }
             : {}),
           effectiveLimit,
           limit: effectiveLimit,
           ...(invalidOverage ?? {}),
           unit: "estimated_tokens",
           overrideActive,
+          overrideAffectsEffectiveWarning,
           ...(tokenBudget.tokenBudgetRationale
             ? { tokenBudgetRationale: tokenBudget.tokenBudgetRationale }
             : {}),
@@ -2027,7 +2041,7 @@ function contextBudgetFindings(
     severity === "high" ? effectiveHighThreshold : effectiveWarningThreshold;
   const overage = tokenBudgetOverage(estimatedTokens, triggeredThreshold);
   const measurementSummary = overrideActive
-    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The Renma default warning threshold is ${defaultLimit} tokens, the repository warning and high thresholds are ${policy.warning} and ${policy.high} tokens, and the active declared override is ${overrideLimit} tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%).`
+    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The Renma default warning threshold is ${defaultLimit} tokens, the repository warning and high thresholds are ${policy.warning} and ${policy.high} tokens, and the active declared override is ${overrideLimit} tokens${overrideAffectsEffectiveWarning ? " and raises the effective warning" : " but does not raise the effective warning"}. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%).`
     : `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%). The effective warning and high thresholds are ${effectiveWarningThreshold} and ${effectiveHighThreshold} estimated tokens.`;
   const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
   const candidateGuidance =
@@ -2065,11 +2079,21 @@ function contextBudgetFindings(
         details: {
           estimatedTokens,
           defaultLimit,
+          ...(tokenBudget.overrideValidationBaseline !== undefined
+            ? {
+                overrideValidationBaseline:
+                  tokenBudget.overrideValidationBaseline,
+              }
+            : {}),
           ...(tokenBudget.overrideLimit !== undefined
-            ? { overrideLimit: tokenBudget.overrideLimit }
+            ? {
+                overrideLimit: tokenBudget.overrideLimit,
+                declaredOverrideLimit: tokenBudget.overrideLimit,
+              }
             : {}),
           effectiveLimit,
           overrideActive,
+          overrideAffectsEffectiveWarning,
           ...(tokenBudget.tokenBudgetRationale
             ? { tokenBudgetRationale: tokenBudget.tokenBudgetRationale }
             : {}),

@@ -47,6 +47,7 @@ import {
 } from "../src/security-posture.js";
 import { buildSecurityDiffSummary } from "../src/security-diff.js";
 import { visibleMarkdownInlineValue } from "../src/renderers/markdown-inline-code.js";
+import { evaluateQualityPolicyCiPolicy } from "../src/quality-policy-ci-policy.js";
 import type {
   ReviewableEffectiveSecurityPolicy,
   SecurityPolicyAssetChange,
@@ -2633,6 +2634,10 @@ function sampleReport(): CiReport {
       ),
       { from: "off", to: "off" },
     ),
+    qualityPolicy: evaluateQualityPolicyCiPolicy(
+      { changes: [] },
+      { from: "fail", to: "fail" },
+    ),
     securityPosture: {
       added: zeroSecurityPostureSummary(),
       resolved: zeroSecurityPostureSummary(),
@@ -3295,6 +3300,109 @@ test("ci-report evaluates content token budgets with revision-local quality conf
     assert.equal(report.status, "fail");
   } finally {
     await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("quality threshold relaxation fails CI and does not praise a vanished High finding", async () => {
+  const repo = await createQualityRelaxationCiRepo();
+  try {
+    const first = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const second = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const json = formatCiReport(first, "json");
+    const markdown = formatCiReport(first, "markdown");
+    const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+    assert.equal(first.status, "fail");
+    assert.deepEqual(first.qualityPolicy.configured, {
+      from: "fail",
+      to: "off",
+      effective: "fail",
+    });
+    assert.equal(first.qualityPolicy.outcome, "fail");
+    assert.equal(first.qualityPolicy.matchCount, 2);
+    assert.deepEqual(
+      first.diff.qualityPolicy.changes.map((change) => [
+        change.thresholdType,
+        change.direction,
+        change.from.value,
+        change.to.value,
+        change.from.source,
+        change.to.source,
+      ]),
+      [
+        [
+          "warning",
+          "weakening",
+          4000,
+          6500,
+          "repository_configuration",
+          "repository_configuration",
+        ],
+        [
+          "high",
+          "weakening",
+          5500,
+          7500,
+          "repository_configuration",
+          "repository_configuration",
+        ],
+      ],
+    );
+    assert.ok(
+      first.diff.findings.removed.some(
+        (finding) =>
+          finding.id === "QUAL-SKILL-TOKEN-BUDGET" &&
+          finding.severity === "high",
+      ),
+    );
+    assert.ok(!first.notes.includes("Scan findings decreased."));
+    assert.ok(
+      first.notes.some((note) =>
+        note.includes("not treated as verified remediation"),
+      ),
+    );
+    assert.match(visible, /^## Quality Token-Threshold Policy$/m);
+    assert.match(visible, /skill warning 4000 .* -> 6500 /);
+    assert.match(visible, /skill high 5500 .* -> 7500 /);
+    assert.equal(json, formatCiReport(second, "json"));
+    assert.equal(markdown, formatCiReport(second, "markdown"));
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("quality threshold relaxation honors warn and visible gate-off modes", async (t) => {
+  for (const [mode, expectedStatus] of [
+    ["warn", "warn"],
+    ["off", "pass"],
+  ] as const) {
+    await t.test(mode, async () => {
+      const repo = await createQualityRelaxationCiRepo({
+        from: mode,
+        to: mode,
+      });
+      try {
+        const report = await ciReport(repo, {
+          fromRef: "base",
+          toRef: "HEAD",
+        });
+        const markdown = formatCiReport(report, "markdown");
+        const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+        assert.equal(report.status, expectedStatus);
+        assert.equal(report.qualityPolicy.matchCount, 2);
+        assert.equal(
+          report.qualityPolicy.outcome,
+          mode === "warn" ? "warn" : "pass",
+        );
+        if (mode === "off") {
+          assert.match(visible, /Quality token thresholds: GATE OFF/);
+          assert.match(visible, /CI status effect: none — gate disabled/);
+        }
+      } finally {
+        await rm(repo, { force: true, recursive: true });
+      }
+    });
   }
 });
 
@@ -4174,6 +4282,49 @@ ${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
   );
   await git(repo, ["add", "renma.config.json"]);
   await git(repo, ["commit", "-m", "tighten content quality policy"]);
+  return repo;
+}
+
+async function createQualityRelaxationCiRepo(
+  modes: { from: "off" | "warn" | "fail"; to: "off" | "warn" | "fail" } = {
+    from: "fail",
+    to: "off",
+  },
+): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-relaxation-ci-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "token-budget");
+  await mkdir(skillDirectory, { recursive: true });
+  const skill = `---\nname: token-budget\ndescription: Review repositories. Use when token-budget governance needs review.\n---\n${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.equal(estimateTokens(markdownBody(skill)), 6000);
+  await writeFile(join(skillDirectory, "SKILL.md"), skill);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        ci_policy: modes.from,
+        skill_token_warning: 4000,
+        skill_token_high: 5500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base strict quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        ci_policy: modes.to,
+        skill_token_warning: 6500,
+        skill_token_high: 7500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "relax quality policy"]);
   return repo;
 }
 

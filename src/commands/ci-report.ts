@@ -65,6 +65,12 @@ import {
   zeroInspectionCoverageDiff,
   type InspectionCoverageDiff,
 } from "../inspection-coverage.js";
+import type { QualityPolicyThresholdChange } from "../quality-policy-diff.js";
+import {
+  evaluateQualityPolicyCiPolicy,
+  type QualityPolicyCiConfiguration,
+  type QualityPolicyCiEvaluation,
+} from "../quality-policy-ci-policy.js";
 import { CLI_EXIT } from "../cli-errors.js";
 
 export type CiReportFormat = DiffFormat;
@@ -113,6 +119,7 @@ export interface CiReport {
   securityPolicy: SecurityPolicyCiEvaluation;
   scanBoundaryPolicy: ScanBoundaryCiEvaluation;
   executableSurfacePolicy: ExecutableSurfaceCiEvaluation;
+  qualityPolicy: QualityPolicyCiEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -130,6 +137,7 @@ export type CiReportFormatInput =
       | "securityPolicy"
       | "scanBoundaryPolicy"
       | "executableSurfacePolicy"
+      | "qualityPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     })
@@ -141,6 +149,7 @@ export type CiReportFormatInput =
       | "securityPolicy"
       | "scanBoundaryPolicy"
       | "executableSurfacePolicy"
+      | "qualityPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     });
@@ -204,6 +213,7 @@ export async function ciReport(
     execution.scanBoundaryCiPolicy,
     execution.effectiveCiScanBoundary,
     execution.executableSurfaceCiPolicy,
+    execution.qualityCiPolicy,
   );
 }
 
@@ -225,6 +235,10 @@ export function buildCiReportFromDiff(
   configuredExecutableSurfacePolicy: ExecutableSurfaceCiConfiguration = {
     from: "off",
     to: "off",
+  },
+  configuredQualityPolicy: QualityPolicyCiConfiguration = {
+    from: "fail",
+    to: "fail",
   },
 ): CiReport {
   const { discovery, ...ciCompatibleDiff } = report;
@@ -250,12 +264,20 @@ export function buildCiReportFromDiff(
       ),
     configuredExecutableSurfacePolicy,
   );
+  const qualityPolicy = evaluateQualityPolicyCiPolicy(
+    ciCompatibleDiff.qualityPolicy ?? {
+      schemaVersion: "renma.quality-policy-diff.v1",
+      changes: [],
+    },
+    configuredQualityPolicy,
+  );
   const status = composeCiReportStatus(
     existingStatus,
     skillDiscoveryPolicy.outcome,
     securityPolicy.outcome,
     scanBoundaryPolicy.outcome,
     executableSurfacePolicy.outcome,
+    qualityPolicy.outcome,
   );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
@@ -273,6 +295,7 @@ export function buildCiReportFromDiff(
     securityPolicy,
     scanBoundaryPolicy,
     executableSurfacePolicy,
+    qualityPolicy,
     securityPosture,
     notes: reviewNotes(
       ciCompatibleDiff,
@@ -282,6 +305,7 @@ export function buildCiReportFromDiff(
       securityPolicy,
       scanBoundaryPolicy,
       executableSurfacePolicy,
+      qualityPolicy,
     ),
     diff: ciCompatibleDiff,
   };
@@ -350,12 +374,14 @@ export function composeCiReportStatus(
   securityPolicyOutcome: SecurityPolicyCiEvaluation["outcome"] = "pass",
   scanBoundaryPolicyOutcome: ScanBoundaryCiEvaluation["outcome"] = "pass",
   executableSurfacePolicyOutcome: ExecutableSurfaceCiEvaluation["outcome"] = "pass",
+  qualityPolicyOutcome: QualityPolicyCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
   if (
     existingStatus === "fail" ||
     securityPolicyOutcome === "fail" ||
     scanBoundaryPolicyOutcome === "fail" ||
-    executableSurfacePolicyOutcome === "fail"
+    executableSurfacePolicyOutcome === "fail" ||
+    qualityPolicyOutcome === "fail"
   )
     return "fail";
   if (
@@ -363,7 +389,8 @@ export function composeCiReportStatus(
     discoveryPolicyOutcome === "warn" ||
     securityPolicyOutcome === "warn" ||
     scanBoundaryPolicyOutcome === "warn" ||
-    executableSurfacePolicyOutcome === "warn"
+    executableSurfacePolicyOutcome === "warn" ||
+    qualityPolicyOutcome === "warn"
   )
     return "warn";
   return "pass";
@@ -403,6 +430,7 @@ function reviewNotes(
   securityPolicy: SecurityPolicyCiEvaluation,
   scanBoundaryPolicy: ScanBoundaryCiEvaluation,
   executableSurfacePolicy: ExecutableSurfaceCiEvaluation,
+  qualityPolicy: QualityPolicyCiEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -438,7 +466,8 @@ function reviewNotes(
   if (
     report.summary.findingsDelta < 0 &&
     securityPolicy.matchCount === 0 &&
-    scanBoundaryPolicy.matchCount === 0
+    scanBoundaryPolicy.matchCount === 0 &&
+    qualityPolicy.matchCount === 0
   ) {
     notes.push("Scan findings decreased.");
   }
@@ -463,6 +492,23 @@ function reviewNotes(
     if (report.summary.findingsDelta < 0) {
       notes.push(
         "Scan findings decreased alongside a declared security policy relaxation; this is not treated as verified remediation.",
+      );
+    }
+  }
+  if (qualityPolicy.matchCount > 0) {
+    const suffix = qualityPolicy.matchCount === 1 ? "increase" : "increases";
+    if (qualityPolicy.configured.effective === "off") {
+      notes.push(
+        `Quality-policy CI review is off; ${qualityPolicy.matchCount} threshold ${suffix} remain informational.`,
+      );
+    } else {
+      notes.push(
+        `Quality policy matched ${qualityPolicy.matchCount} token-threshold ${suffix}.`,
+      );
+    }
+    if (report.summary.findingsDelta < 0) {
+      notes.push(
+        "Scan findings decreased alongside a token-threshold weakening; this is not treated as verified remediation.",
       );
     }
   }
@@ -505,6 +551,10 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
       zeroExecutableSurfaceInventory(),
       zeroExecutableSurfaceInventory(),
     );
+  const qualityDiff = report.diff.qualityPolicy ?? {
+    schemaVersion: "renma.quality-policy-diff.v1" as const,
+    changes: [],
+  };
   const skillDiscoveryLines =
     "skillDiscovery" in report
       ? [
@@ -605,6 +655,22 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
   const executableSurfacePolicyLines = executableSurfacePolicy
     ? ["", ...formatExecutableSurfaceCiPolicySection(executableSurfacePolicy)]
     : [];
+  const qualityPolicy =
+    "qualityPolicy" in report ? report.qualityPolicy : undefined;
+  if (qualityPolicy && qualityDiff.changes.length > 0) {
+    const effect =
+      qualityPolicy.matchCount > 0 &&
+      qualityPolicy.configured.effective === "off"
+        ? "GATE OFF"
+        : qualityPolicy.outcome.toUpperCase();
+    summaryLines.push(
+      `- Quality token thresholds: ${effect} — ${qualityPolicy.matchCount} weakening / ${qualityDiff.changes.length - qualityPolicy.matchCount} tightening`,
+    );
+  }
+  const qualityPolicyLines =
+    qualityPolicy && qualityDiff.changes.length > 0
+      ? ["", ...formatQualityPolicySection(qualityPolicy, qualityDiff.changes)]
+      : [];
 
   const detailLines = [
     "## Readiness",
@@ -625,6 +691,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     `- Resolved edges: ${report.diff.graph.resolvedEdges.length}`,
     `- Added findings: ${report.diff.findings.added.length}`,
     `- Resolved findings: ${report.diff.findings.removed.length}`,
+    `- Quality token-threshold changes: ${qualityDiff.changes.length}`,
     "",
     "## Asset Changes",
     "",
@@ -714,6 +781,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...securityPolicyLines,
     ...scanBoundaryPolicyLines,
     ...executableSurfacePolicyLines,
+    ...qualityPolicyLines,
     "",
     "## Review Notes",
     "",
@@ -849,6 +917,12 @@ function formatChangeOverview(
       report.diff.security?.policyChanges?.length ?? 0,
     ],
     [
+      "quality token thresholds",
+      0,
+      0,
+      report.diff.qualityPolicy?.changes.length ?? 0,
+    ],
+    [
       "security policy relaxations",
       "securityPolicy" in report ? report.securityPolicy.matchCount : 0,
     ],
@@ -955,6 +1029,43 @@ function formatSecurityPolicyRelaxationSection(
       .map((match) => `- ${formatSecurityPolicyCiMatch(match)}`),
     ...formatOverflow(policy.matches.length),
   ];
+}
+
+function formatQualityPolicySection(
+  policy: QualityPolicyCiEvaluation,
+  changes: readonly QualityPolicyThresholdChange[],
+): string[] {
+  const { from, to, effective } = policy.configured;
+  const configured =
+    from === to
+      ? [`- CI review policy: ${from}`]
+      : [
+          `- CI review policy: ${from} -> ${to}`,
+          `- Effective CI review policy: ${effective}`,
+        ];
+  return [
+    "## Quality Token-Threshold Policy",
+    "",
+    ...configured,
+    ...(effective === "off" && policy.matchCount > 0
+      ? ["- CI status effect: none — gate disabled"]
+      : [`- Policy outcome: ${policy.outcome.toUpperCase()}`]),
+    `- Weakenings: ${policy.matchCount}`,
+    `- Tightenings: ${changes.length - policy.matchCount}`,
+    "",
+    ...changes
+      .slice(0, MAX_LIST_ITEMS)
+      .map((change) => `- ${formatQualityPolicyChange(change)}`),
+    ...formatOverflow(changes.length),
+  ];
+}
+
+function formatQualityPolicyChange(
+  change: QualityPolicyThresholdChange,
+): string {
+  const direction =
+    change.direction === "weakening" ? "WEAKENING" : "tightening";
+  return `${direction}: ${change.assetKind} ${change.thresholdType} ${change.from.value} (${change.from.source}) -> ${change.to.value} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
 }
 
 function formatExecutableSurfaceCiPolicySection(

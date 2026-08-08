@@ -55,6 +55,8 @@ export interface SkillDiscoveryConfig {
 export type QualityThresholdSource =
   "renma_default" | "repository_configuration";
 
+export type QualityCiPolicyMode = "off" | "warn" | "fail";
+
 export type ContentTokenBudgetKind =
   "context" | "reference" | "profile" | "example";
 
@@ -67,6 +69,8 @@ export interface ContentTokenBudgetConfig {
 
 /** Effective repository policy for governed Markdown token-budget diagnostics. */
 export interface QualityConfig {
+  /** CI review mode for token-budget threshold weakening. Defaults to fail. */
+  ciPolicy: QualityCiPolicyMode;
   skillTokenWarning: number;
   skillTokenHigh: number;
   skillTokenWarningSource: QualityThresholdSource;

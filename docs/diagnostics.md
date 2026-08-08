@@ -1007,8 +1007,10 @@ Token-budget findings use deterministic `estimated_tokens`, not exact token
 counts for a particular model. `QUAL-SKILL-TOKEN-BUDGET` measures the Markdown
 body after frontmatter; `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` measures the full
 Context, Reference, Profile, or Example file. The Renma defaults are Skill
-5,000/8,000, Context 4,000/8,000, Reference 5,000/10,000, Profile 2,000/4,000,
-and Example 2,500/5,000. Each pair produces no finding through warning, Medium
+6,400/8,000, Context 6,400/8,000, Reference 7,200/9,000, Profile 3,200/4,000,
+and Example 4,800/6,000. The portable Agent Skills recommendation remains 5,000
+Skill body tokens; it is distinct from Renma's 6,400 repository warning. Each
+pair produces no finding through warning, Medium
 above warning through High, and High above High. Repositories may set every
 effective pair through the
 [authoritative configuration contract](user-manual.md#configuration).

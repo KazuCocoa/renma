@@ -13,15 +13,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   `quality.*_token_warning` and `quality.*_token_high` keys, with independent
   defaulting, positive-safe-integer and ordering validation, structured policy
   provenance, and revision-local `diff` / `ci-report` evaluation.
+- Added deterministic `renma.quality-policy-diff.v1` threshold-transition
+  evidence and `quality.ci_policy` (`off`, `warn`, or `fail`, default `fail`).
+  CI uses the stricter endpoint mode, gates numeric threshold increases, keeps
+  tightening visible, and emits `renma.quality-policy-ci-policy.v1` outcomes.
 
 ### Changed
 
-- Changed the Renma Skill body defaults to no finding through 5,000 estimated
-  tokens, Medium above 5,000 through 8,000, and High above 8,000. The High result
-  uses the ordinary `--fail-on high` severity gate; token size remains review
-  evidence and never triggers automatic splitting or rewriting.
-- Extended that two-tier severity model to full-file Context (4,000/8,000),
-  Reference (5,000/10,000), Profile (2,000/4,000), and Example (2,500/5,000)
+- Tuned the Renma default to Skill (6,400/8,000): no finding
+  through 6,400 estimated tokens, Medium above 6,400 through 8,000, and High
+  above 8,000. The separate portable Agent Skills recommendation remains 5,000
+  tokens. The High result uses the ordinary `--fail-on high` severity gate;
+  token size remains review evidence and never triggers automatic splitting or
+  rewriting.
+- Extended that two-tier severity model to full-file Context (6,400/8,000),
+  Reference (7,200/9,000), Profile (3,200/4,000), and Example (4,800/6,000)
   budgets. Valid per-file overrides raise the effective warning floor while the
   effective High threshold remains at least that floor.
 - Changed semantic asset comparison to use canonical catalog content hashes.
@@ -34,9 +40,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Repositories without `quality` configuration continue to load without
   migration and receive the documented Renma defaults for every governed asset
   kind. Existing valid support-asset override declarations remain valid and now
-  compose with the repository warning/High pair. Metadata-size, Script, and
-  Asset policies are unchanged. Quality thresholds do not participate in
-  scan-boundary weakening policy.
+  compose with the repository warning/High pair. Declaration validation uses a
+  stable compatibility baseline, so an accepted override below a tuned warning
+  remains valid but cannot lower repository policy; its rationale is retained.
+  Metadata-size, Script, and Asset policies are unchanged. Quality thresholds
+  do not participate in scan-boundary weakening policy.
+- Semantic diff JSON adds `qualityPolicy`, and CI-report JSON adds top-level
+  `qualityPolicy`. A finding decrease alongside a threshold weakening is not
+  described as verified remediation. Existing fields remain compatible and
+  support-asset finding details add declaration, validation-baseline, and
+  effective-warning-impact evidence.
 - Semantic diff and nested CI-report JSON add optional `contentHash` values to
   asset endpoints and `contentChanged` to newly built changed-asset rows when
   both endpoints provide comparable content identity.

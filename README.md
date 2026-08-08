@@ -259,22 +259,26 @@ Skills and each governed Markdown content kind:
 ```jsonc
 {
   "quality": {
-    "skill_token_warning": 5000,
+    "ci_policy": "fail",
+    "skill_token_warning": 6400,
     "skill_token_high": 8000,
-    "context_token_warning": 4000,
+    "context_token_warning": 6400,
     "context_token_high": 8000,
-    "reference_token_warning": 5000,
-    "reference_token_high": 10000,
-    "profile_token_warning": 2000,
+    "reference_token_warning": 7200,
+    "reference_token_high": 9000,
+    "profile_token_warning": 3200,
     "profile_token_high": 4000,
-    "example_token_warning": 2500,
-    "example_token_high": 5000
+    "example_token_warning": 4800,
+    "example_token_high": 6000
   }
 }
 ```
 
 These are Renma repository-governance thresholds, not portable Agent Skills
-requirements. See the User Manual's
+requirements. The portable Agent Skills recommendation remains 5,000 Skill
+body tokens; Renma's default warning begins at 6,400. Increasing any threshold
+is a policy weakening governed by `quality.ci_policy`; the default `fail` mode
+uses the stricter mode from both compared revisions. See the User Manual's
 [authoritative configuration contract](docs/user-manual.md#configuration) for
 defaults, validation, and independent fallback behavior.
 

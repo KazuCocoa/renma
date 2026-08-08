@@ -386,7 +386,9 @@ mutating `DEFAULT_QUALITY_PROFILE` or consulting process-global state. These
 values do not enter `scan-boundary` identity because they change finding
 evaluation, not the repository paths or bytes Renma can inspect. A valid
 support-asset metadata override composes as an effective warning floor, while
-the effective High threshold remains at least that floor.
+the effective High threshold remains at least that floor. Override declaration
+validity uses a stable compatibility baseline independent from current warning
+defaults, so raising a default cannot invalidate an established decision.
 
 An explicit projection store derives and memoizes these facts from that stable
 input:
@@ -605,7 +607,10 @@ top level, evaluates the two snapshot policy modes as
 `skillDiscoveryPolicy`, evaluates both snapshot `security.ci_policy` modes as
 `securityPolicy`, evaluates both `scan_boundary.ci_policy` modes as
 `scanBoundaryPolicy`, evaluates both `executable_surface.ci_policy` modes as
-`executableSurfacePolicy`, and retains a compatibility-shaped nested diff. Endpoint
+`executableSurfacePolicy`, evaluates both `quality.ci_policy` modes as
+`qualityPolicy`, and retains a compatibility-shaped nested diff. The quality
+diff compares all ten numeric warning/High thresholds and the evaluator gates
+only increases using the stricter endpoint mode. Endpoint
 snapshots remain revision-local for semantic configuration. For CI only, target
 paths are collected once more through the independent union of both endpoint
 coverage predicates; the target's semantic configuration is still used for

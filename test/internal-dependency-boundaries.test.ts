@@ -175,6 +175,8 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "executable-surface-ci-policy.ts",
       "executable-surface-diff.ts",
       "hidden-unicode.ts",
+      "quality-policy-ci-policy.ts",
+      "quality-policy-diff.ts",
       "repeated-context.ts",
       "rule-engine.ts",
       "rules.ts",

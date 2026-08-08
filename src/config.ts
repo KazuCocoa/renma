@@ -28,6 +28,7 @@ const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const EXECUTABLE_SURFACE_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const QUALITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const CONTENT_TOKEN_BUDGET_KINDS = [
   "context",
   "reference",
@@ -35,6 +36,7 @@ const CONTENT_TOKEN_BUDGET_KINDS = [
   "example",
 ] as const satisfies readonly ContentTokenBudgetKind[];
 const QUALITY_CONFIG_KEYS = [
+  "ci_policy",
   "skill_token_warning",
   "skill_token_high",
   ...CONTENT_TOKEN_BUDGET_KINDS.flatMap((kind) => [
@@ -92,6 +94,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     ciPolicy: "off",
   },
   quality: {
+    ciPolicy: "fail",
     skillTokenWarning: DEFAULT_QUALITY_PROFILE.skillTokenWarning,
     skillTokenHigh: DEFAULT_QUALITY_PROFILE.skillTokenHigh,
     skillTokenWarningSource: "renma_default",
@@ -334,6 +337,14 @@ function qualityPolicy(value: unknown): ScanConfig["quality"] {
   }
 
   return {
+    ciPolicy:
+      value.ci_policy === undefined
+        ? "fail"
+        : enumValue(
+            "quality.ci_policy",
+            value.ci_policy,
+            QUALITY_CI_POLICY_MODES,
+          ),
     skillTokenWarning,
     skillTokenHigh,
     skillTokenWarningSource: hasWarning

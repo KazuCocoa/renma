@@ -1947,7 +1947,7 @@ token_budget_rationale: Intentionally coherent.`,
       metadata: `token_budget_override: 7200
 token_budget_rationale: Intentionally coherent.`,
       words: 7250,
-      invalid: true,
+      invalid: false,
       overBudget: true,
     },
     {
@@ -1955,8 +1955,32 @@ token_budget_rationale: Intentionally coherent.`,
       metadata: `token_budget_override: 7199
 token_budget_rationale: Intentionally coherent.`,
       words: 7250,
-      invalid: true,
+      invalid: false,
       overBudget: true,
+    },
+    {
+      file: "legacy-noop.md",
+      metadata: `token_budget_override: 6000
+token_budget_rationale: Kept coherent under the established validation contract.`,
+      words: 5500,
+      invalid: false,
+      overBudget: false,
+    },
+    {
+      file: "at-compatibility-baseline.md",
+      metadata: `token_budget_override: 5000
+token_budget_rationale: Boundary fixture.`,
+      words: 5500,
+      invalid: true,
+      overBudget: false,
+    },
+    {
+      file: "above-compatibility-baseline.md",
+      metadata: `token_budget_override: 5001
+token_budget_rationale: Boundary fixture.`,
+      words: 5500,
+      invalid: false,
+      overBudget: false,
     },
     {
       file: "not-positive.md",
@@ -2051,10 +2075,34 @@ token_budget_rationale: Intentionally coherent.`,
     overOverride?.remediation ?? "",
     /active declared override is 7400 tokens/,
   );
+  assert.equal(overOverride?.details?.overrideValidationBaseline, 5000);
+  assert.equal(overOverride?.details?.declaredOverrideLimit, 7400);
+  assert.equal(overOverride?.details?.overrideAffectsEffectiveWarning, true);
   assert.doesNotMatch(overOverride?.remediation ?? "", /reviewed override/i);
   assert.doesNotMatch(
     overOverride?.remediation ?? "",
     /increase token_budget_override|increase the override/i,
+  );
+
+  const noOpOverride = result.findings.find(
+    (finding) =>
+      finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+      finding.evidence.path.endsWith("at-default.md"),
+  );
+  assert.equal(noOpOverride?.details?.overrideValidationBaseline, 5000);
+  assert.equal(noOpOverride?.details?.declaredOverrideLimit, 7200);
+  assert.equal(noOpOverride?.details?.repositoryWarningThreshold, 7200);
+  assert.equal(noOpOverride?.details?.effectiveWarningThreshold, 7200);
+  assert.equal(noOpOverride?.details?.effectiveHighThreshold, 9000);
+  assert.equal(noOpOverride?.details?.overrideAffectsEffectiveWarning, false);
+
+  const legacyEntry = (await catalog(root)).catalog.entries.find((entry) =>
+    entry.sourcePath.endsWith("legacy-noop.md"),
+  );
+  assert.equal(legacyEntry?.metadata.tokenBudgetOverride, 6000);
+  assert.equal(
+    legacyEntry?.metadata.tokenBudgetRationale,
+    "Kept coherent under the established validation contract.",
   );
 
   for (const file of ["unsafe-positive.md", "unsafe-negative.md"]) {
@@ -2339,7 +2387,7 @@ token_budget_rationale: Intentionally coherent.`,
       evidenceLine: 2,
       evidenceSnippet: "token_budget_override: 7400",
       reason:
-        "token_budget_override is unnecessary because the asset is within the default limit of 7200",
+        "token_budget_override is unnecessary because the asset is within the compatibility validation baseline of 5000",
       overBudget: false,
     },
   ];

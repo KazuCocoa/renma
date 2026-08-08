@@ -41,6 +41,7 @@ test("quality token thresholds use Renma defaults when configuration is absent",
   const loaded = await loadConfig(root, {});
 
   assert.deepEqual(loaded.config.quality, {
+    ciPolicy: "fail",
     skillTokenWarning: 6400,
     skillTokenHigh: 8000,
     skillTokenWarningSource: "renma_default",
@@ -79,6 +80,7 @@ test("quality token thresholds fall back independently and retain their sources"
     {
       source: '{"quality":{"skill_token_warning":4000}}',
       expected: {
+        ciPolicy: "fail",
         skillTokenWarning: 4000,
         skillTokenHigh: 8000,
         skillTokenWarningSource: "repository_configuration",
@@ -89,6 +91,7 @@ test("quality token thresholds fall back independently and retain their sources"
     {
       source: '{"quality":{"skill_token_high":9000}}',
       expected: {
+        ciPolicy: "fail",
         skillTokenWarning: 6400,
         skillTokenHigh: 9000,
         skillTokenWarningSource: "renma_default",
@@ -273,6 +276,7 @@ test("equivalent JSON and JSONC normalize to the same configuration", async (t) 
   assert.equal(json.configPath, "renma.config.json");
   assert.equal(jsonc.configPath, "renma.config.jsonc");
   assert.deepEqual(json.config.quality, {
+    ciPolicy: "fail",
     skillTokenWarning: 6000,
     skillTokenHigh: 9000,
     skillTokenWarningSource: "repository_configuration",
@@ -362,7 +366,32 @@ test("quality configuration rejects unknown keys", async (t) => {
     (error: unknown) =>
       error instanceof ConfigError &&
       error.message ===
-        'Unknown quality config key "unknown". Allowed keys: skill_token_warning, skill_token_high, context_token_warning, context_token_high, reference_token_warning, reference_token_high, profile_token_warning, profile_token_high, example_token_warning, example_token_high.',
+        'Unknown quality config key "unknown". Allowed keys: ci_policy, skill_token_warning, skill_token_high, context_token_warning, context_token_high, reference_token_warning, reference_token_high, profile_token_warning, profile_token_high, example_token_warning, example_token_high.',
+  );
+});
+
+test("quality CI policy defaults to fail and accepts only off warn or fail", async (t) => {
+  for (const mode of ["off", "warn", "fail"] as const) {
+    await t.test(mode, async (caseContext) => {
+      const root = await fixture(caseContext);
+      await writeFile(
+        path.join(root, "renma.config.json"),
+        JSON.stringify({ quality: { ci_policy: mode } }),
+      );
+      assert.equal((await loadConfig(root, {})).config.quality.ciPolicy, mode);
+    });
+  }
+
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({ quality: { ci_policy: "ignore" } }),
+  );
+  await assert.rejects(
+    loadConfig(root, {}),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      error.message === "quality.ci_policy must be one of: off, warn, fail.",
   );
 });
 

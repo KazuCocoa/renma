@@ -10,22 +10,35 @@ import packageJson from "../package.json" with { type: "json" };
 export const RENMA_QUALITY_PROFILE_VERSION =
   `renma-quality@${packageJson.version}` as const;
 
+/**
+ * Stable floor used only to validate support-asset override declarations.
+ *
+ * This is intentionally independent from current repository warning defaults:
+ * raising an advisory must not retroactively invalidate an accepted decision.
+ */
+export const TOKEN_BUDGET_OVERRIDE_VALIDATION_BASELINE = {
+  context: 4_000,
+  reference: 5_000,
+  profile: 2_000,
+  example: 2_500,
+} as const;
+
 export const DEFAULT_QUALITY_PROFILE = {
   profile: RENMA_QUALITY_PROFILE_VERSION,
   descriptionMinChars: 0,
+  // Warning thresholds are 80% of High thresholds, leaving a review band
+  // before a large asset becomes a High-severity maintainability concern.
   skillTokenWarning: 6_400,
   skillTokenHigh: 8_000,
-  // These warning is 80% of high.
   contentTokenWarning: {
     context: 6_400,
     reference: 7_200,
     profile: 3_200,
     example: 4_800,
   },
-  // Magic numbers.
-  // Codex 5.5 tols me that general token amount in a skill was less than 6_000
-  // based on their experience, so lets set reasonable amount for them.
-  // Anyway, huge token could waist context token for LLM as well.
+  // Asset kinds have distinct coherence and completeness needs. These upper
+  // bounds keep long-form material reviewable without treating size alone as
+  // evidence that an asset should be split.
   contentTokenHigh: {
     context: 8_000,
     reference: 9_000,

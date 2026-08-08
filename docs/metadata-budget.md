@@ -19,13 +19,15 @@ token_budget_reviewed_at: "2026-07-12"
 ```
 
 `token_budget_override` must be a positive safe integer greater than the asset
-kind's Renma default warning threshold, and `token_budget_rationale` must be a
-non-empty string. `token_budget_reviewed_at` is optional and must be a real
+kind's stable compatibility validation baseline (Context 4,000, Reference
+5,000, Profile 2,000, Example 2,500), and `token_budget_rationale` must be a
+non-empty string. These baselines validate declaration compatibility; they are
+not the current repository warning defaults. `token_budget_reviewed_at` is optional and must be a real
 `YYYY-MM-DD` date when present. Invalid metadata does not change repository
 policy.
 The three fields form one decision bundle: rationale and review-date fields are
 invalid without an override. Duplicate fields, relevant YAML errors, and an
-override declared while the full file remains within its default limit also
+override declared while the full file remains within its compatibility validation baseline also
 produce `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE`. Renma selects no value from an
 ambiguous or invalid bundle, and catalog output omits all three normalized
 fields.
@@ -40,16 +42,19 @@ make diagnostics pass.
 Token-budget counts are deterministic estimates, not exact model-token counts.
 Exceeded-budget findings report the measured estimate, repository and effective
 warning/High thresholds, the triggered threshold, severity, absolute overage,
-and a rounded overage percentage. Repository defaults are Context 4,000/8,000,
-Reference 5,000/10,000, Profile 2,000/4,000, and Example 2,500/5,000. A result
+and a rounded overage percentage. Repository defaults are Context 6,400/8,000,
+Reference 7,200/9,000, Profile 3,200/4,000, and Example 4,800/6,000. A result
 above warning through High is Medium; a result above High is High.
 
-With an active declared override, Renma keeps both the original default and the
-repository policy visible. The effective warning threshold is the greater of
+With a valid declared override, Renma keeps the compatibility validation
+baseline, current Renma default, declared override, repository policy, and final
+effective thresholds visible. The effective warning threshold is the greater of
 the repository warning and override; the effective High threshold is the
 greater of the repository High threshold and effective warning. An active
 override is an explicit declared floor, not a suppression: an asset above its
-effective thresholds still produces `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`, while
+effective thresholds still produces `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`. A valid
+override below the repository warning is a no-op, remains compatible, and never
+lowers repository policy, while
 an asset at or below its effective warning threshold does not.
 
 For Markdown assets, the finding also lists at most three of the largest

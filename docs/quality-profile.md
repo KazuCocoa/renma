@@ -10,7 +10,9 @@ the active profile as `renma-quality@<Renma package version>`, derived from
 `package.json` at build time. The source is `src/quality-profile.ts`. Quality
 defaults remain fixed except for the explicitly documented Skill body and
 content-asset thresholds. Repositories may override those values through the
-corresponding `quality.*_token_warning` and `quality.*_token_high` keys; the
+corresponding `quality.*_token_warning` and `quality.*_token_high` keys. Numeric
+increases are governed by `quality.ci_policy` (`off`, `warn`, or `fail`, default
+`fail`) using the stricter mode from the compared revisions; the
 [User Manual configuration section](user-manual.md#configuration) is the
 authoritative configuration contract. The internal shape is versioned so
 effective policy remains centralized rather than scattering constants across
@@ -25,7 +27,9 @@ measure Markdown after frontmatter. Content-asset budgets measure the full file.
 Contexts, references, profiles, and examples may record a declared human
 decision and effective limit with top-level `token_budget_override` and
 `token_budget_rationale` metadata. The override must be a positive safe integer
-greater than the asset kind's Renma default warning threshold. Optional
+greater than the asset kind's stable compatibility validation baseline:
+Context 4,000, Reference 5,000, Profile 2,000, or Example 2,500. These values
+validate declarations independently from current repository warning defaults. Optional
 `token_budget_reviewed_at` must be a real `YYYY-MM-DD` date. Renma does not add
 these fields automatically. When an asset exceeds its default, an agent should
 first ask whether it can be split along meaningful boundaries without harming
@@ -37,8 +41,10 @@ declaration but cannot prove that human review occurred.
 When a Skill body threshold is exceeded, the finding exposes `measured`,
 `warningThreshold`, `highThreshold`, `triggeredThreshold`, `effectiveSeverity`,
 `overBy`, the deterministic rounded `overPercent`, `policySource`, and the
-source of each threshold. Content-asset findings expose the corresponding
-repository and effective warning/High thresholds. This keeps Renma defaults,
+source of each threshold. Content-asset findings expose the declared override,
+whether it affects the effective warning, its compatibility validation
+baseline, and the corresponding repository and effective warning/High
+thresholds. This keeps Renma defaults,
 repository-specific effective policy, the measurement scope, and the triggered
 comparison visible together.
 
@@ -50,7 +56,8 @@ nor an override can make High lower than the approved warning floor. Existing
 `defaultLimit` and `effectiveLimit` detail fields remain available for
 compatibility; they identify the Renma kind default and effective warning
 threshold. Invalid metadata never raises either effective threshold, and a
-valid override suppresses no finding above its effective thresholds.
+valid override suppresses no finding above its effective thresholds. A valid
+override below the repository warning remains compatible but is a no-op.
 
 Markdown findings can also include up to three largest heading-based review
 candidates. Renma selects H2 sections beneath a single H1 title when available;
@@ -73,7 +80,7 @@ structure exists, the finding calls for manual semantic review.
 | `agentSkills.descriptionMinChars` | 1 | characters; below is invalid | error | Agent Skills specification | Required discovery metadata | `AS-SKILL-MISSING-DESCRIPTION` / `AS-SKILL-INVALID-DESCRIPTION` | 0.18.0 | no |
 | `agentSkills.descriptionMaxChars` | 1,024 | characters; above is invalid | error | Agent Skills specification | Portable hard limit | `AS-SKILL-DESCRIPTION-TOO-LONG` | 0.18.0 | no |
 | `agentSkills.compatibilityMaxChars` | 500 | characters; above is invalid | error | Agent Skills specification | Keeps optional environment requirements concise | `AS-SKILL-COMPATIBILITY-TOO-LONG` | 0.18.0 | no |
-| `agentSkills.skillBodyRecommendedMaxTokens` | 5,000 | recommended body tokens | portable recommendation only; Renma's default Medium finding aligns above it | Agent Skills recommendation | Large focused workflows can still be valid | `QUAL-SKILL-TOKEN-BUDGET` | 0.18.0 | no |
+| `agentSkills.skillBodyRecommendedMaxTokens` | 5,000 | recommended body tokens | portable recommendation only; Renma's default Medium finding begins above its separate 6,400 warning | Agent Skills recommendation | Large focused workflows can still be valid | `QUAL-SKILL-TOKEN-BUDGET` | 0.18.0 | no |
 | `agentSkills.skillRecommendedMaxLines` | 500 | recommended `SKILL.md` lines | documented review evidence | Agent Skills recommendation | Line count alone does not prove mixed responsibility | none | 0.18.0 | no |
 | `agentSkills.recommendedReferenceDepth` | 1 | resource hop from `SKILL.md`; Renma accepts one additional index hop | low beyond two static hops | Agent Skills recommendation plus Renma reachability policy | An index may be useful; deep chains are easy to miss | `SUPPORT-DEEP-REFERENCE-CHAIN` | 0.18.0 | possibly |
 
@@ -88,16 +95,16 @@ and `assets/` directories are valid. See the official
 | Field | Value | Unit and trigger | Severity | Source | Rationale and false-positive risk | Diagnostic | Reviewed | Configurable later |
 | --- | ---: | --- | --- | --- | --- | --- | --- | --- |
 | `descriptionMinChars` | 0 | characters; disabled | none | Renma | Length does not establish selection clarity | `QUAL-SHORT-DESCRIPTION` removed from default behavior | 0.18.0 | possibly |
-| `skillTokenWarning` | 5,000 | `estimated_tokens`; Markdown body above | medium | Renma default, aligned with the separate Agent Skills recommendation | Progressive-disclosure review; focused workflows may validly exceed it | `QUAL-SKILL-TOKEN-BUDGET` | Unreleased | `quality.skill_token_warning` |
+| `skillTokenWarning` | 6,400 | `estimated_tokens`; Markdown body above | medium | Renma repository governance; separate from the portable 5,000 Agent Skills recommendation | Progressive-disclosure review; focused workflows may validly exceed it | `QUAL-SKILL-TOKEN-BUDGET` | Unreleased | `quality.skill_token_warning` |
 | `skillTokenHigh` | 8,000 | `estimated_tokens`; Markdown body above | high | Renma repository governance | High maintainability evidence, not proof that a split is required | `QUAL-SKILL-TOKEN-BUDGET` | Unreleased | `quality.skill_token_high` |
-| `contentTokenWarning.context` | 4,000 | `estimated_tokens`; full file above effective warning | medium | Renma | Prefer an agreed semantic split when coherence survives; intentionally coherent or ordered assets may record a declared decision | `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` | Unreleased | `quality.context_token_warning` plus metadata decision |
+| `contentTokenWarning.context` | 6,400 | `estimated_tokens`; full file above effective warning | medium | Renma | Prefer an agreed semantic split when coherence survives; intentionally coherent or ordered assets may record a declared decision | `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` | Unreleased | `quality.context_token_warning` plus metadata decision |
 | `contentTokenHigh.context` | 8,000 | `estimated_tokens`; full file above effective High | high | Renma | High maintainability evidence does not prove a split is required | same | Unreleased | `quality.context_token_high` plus metadata decision |
-| `contentTokenWarning.reference` | 5,000 | `estimated_tokens`; full file above effective warning | medium | Renma | Detailed local references may legitimately be long | same | Unreleased | `quality.reference_token_warning` plus metadata decision |
-| `contentTokenHigh.reference` | 10,000 | `estimated_tokens`; full file above effective High | high | Renma | Same false-positive risk at larger scale | same | Unreleased | `quality.reference_token_high` plus metadata decision |
-| `contentTokenWarning.profile` | 2,000 | `estimated_tokens`; full file above effective warning | medium | Renma | Profiles should remain reviewable overlays | same | Unreleased | `quality.profile_token_warning` plus metadata decision |
+| `contentTokenWarning.reference` | 7,200 | `estimated_tokens`; full file above effective warning | medium | Renma | Detailed local references may legitimately be long | same | Unreleased | `quality.reference_token_warning` plus metadata decision |
+| `contentTokenHigh.reference` | 9,000 | `estimated_tokens`; full file above effective High | high | Renma | Same false-positive risk at larger scale | same | Unreleased | `quality.reference_token_high` plus metadata decision |
+| `contentTokenWarning.profile` | 3,200 | `estimated_tokens`; full file above effective warning | medium | Renma | Profiles should remain reviewable overlays | same | Unreleased | `quality.profile_token_warning` plus metadata decision |
 | `contentTokenHigh.profile` | 4,000 | `estimated_tokens`; full file above effective High | high | Renma | Long focused overlays can still be valid | same | Unreleased | `quality.profile_token_high` plus metadata decision |
-| `contentTokenWarning.example` | 2,500 | `estimated_tokens`; full file above effective warning | medium | Renma | Complete examples may legitimately be long | same | Unreleased | `quality.example_token_warning` plus metadata decision |
-| `contentTokenHigh.example` | 5,000 | `estimated_tokens`; full file above effective High | high | Renma | Complete end-to-end examples can still be valid | same | Unreleased | `quality.example_token_high` plus metadata decision |
+| `contentTokenWarning.example` | 4,800 | `estimated_tokens`; full file above effective warning | medium | Renma | Complete examples may legitimately be long | same | Unreleased | `quality.example_token_warning` plus metadata decision |
+| `contentTokenHigh.example` | 6,000 | `estimated_tokens`; full file above effective High | high | Renma | Complete end-to-end examples can still be valid | same | Unreleased | `quality.example_token_high` plus metadata decision |
 | `lowHeadingDensityMinTokens` | 400 | body `estimated_tokens`, with fewer than 2 headings | low | Renma | Long prose can still be intentionally linear | `QUAL-LOW-HEADING-DENSITY` | 0.18.0 | possibly |
 | `lowHeadingDensityMinHeadings` | 2 | headings | low | Renma | Navigation heuristic only | same | 0.18.0 | possibly |
 
@@ -213,5 +220,6 @@ same list item, a directly associated paragraph, or a parent Human Approval,
 Safety, or Constraints heading. The two-line fast path does not cross a
 Markdown heading or frontmatter boundary, so a guard in an unrelated peer
 section cannot authorize a later action. Binary snippets are never exposed.
-Scan operational limits retain their existing public config fields; none of
-the quality or Readiness thresholds above are currently configurable.
+Scan operational limits retain their existing public config fields. Only the
+explicit Skill and governed content warning/High thresholds in the table are
+repository-configurable; other quality and Readiness thresholds are internal.
