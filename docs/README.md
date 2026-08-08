@@ -1,8 +1,17 @@
 # Renma Documentation
 
-Each document below has one primary responsibility. Follow the link whose
-authority matches the question instead of copying its contract into another
-document.
+For an initial overview, read `user-manual.md`.
+
+For authoring Skills and Context Assets, read `authoring-guide.md`.
+
+For diagnostics and remediation, read `diagnostics.md`.
+
+For security-related metadata and policy, read `security-policy.md`.
+
+For machine-readable contracts, use the schemas under `schemas/`.
+
+Development and internal design documents are under `development/`.
+They describe implementation rationale and are not normative user guidance.
 
 ## Start Here
 
