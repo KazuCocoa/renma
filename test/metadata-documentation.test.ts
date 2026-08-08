@@ -12,6 +12,7 @@ import {
   CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
   NON_SKILL_AUXILIARY_METADATA_DEFINITIONS,
   NON_SKILL_CATALOG_METADATA_KEYS,
+  RENMA_REQUIRED_METADATA_DEFINITIONS,
   RENMA_CATALOG_METADATA_DEFINITIONS,
   SECURITY_METADATA_FIELD_DEFINITIONS,
 } from "../src/metadata-definitions.js";
@@ -22,6 +23,10 @@ const PORTABLE_START_MARKER = "<!-- agent-skills-portable-fields:start -->";
 const PORTABLE_END_MARKER = "<!-- agent-skills-portable-fields:end -->";
 const OPERATIONAL_START_MARKER = "<!-- renma-operational-metadata:start -->";
 const OPERATIONAL_END_MARKER = "<!-- renma-operational-metadata:end -->";
+const REQUIRED_POLICY_START_MARKER =
+  "<!-- required-metadata-policy-fields:start -->";
+const REQUIRED_POLICY_END_MARKER =
+  "<!-- required-metadata-policy-fields:end -->";
 const MANUAL = readFileSync("docs/user-manual.md", "utf8");
 
 interface DocumentedPortableAgentSkillsRow {
@@ -43,6 +48,13 @@ interface DocumentedMetadataRow {
 interface ExpectedMetadataMapping {
   skillKey?: string;
   nonSkillKey?: string;
+}
+
+interface DocumentedRequiredMetadataPolicyRow {
+  policyKey: string;
+  skillSerialization: string;
+  nonSkillSerialization: string;
+  valueKind: string;
 }
 
 test("portable Agent Skills table exactly covers the specification registry", () => {
@@ -152,6 +164,45 @@ test("authoritative metadata table exactly covers operational registries", () =>
         (definition) => definition.nonSkillKey,
       ),
     ]),
+  );
+});
+
+test("required metadata policy vocabulary exactly matches the registry", () => {
+  const rows = parseRequiredMetadataPolicyTable(MANUAL);
+  assertUniqueValues(
+    rows.map((row) => row.policyKey),
+    "required metadata policy field",
+  );
+  assert.deepEqual(
+    rows,
+    RENMA_REQUIRED_METADATA_DEFINITIONS.map((definition) => ({
+      policyKey: definition.policyKey,
+      skillSerialization: `metadata.${definition.skillKey}`,
+      nonSkillSerialization: definition.nonSkillKey,
+      valueKind: definition.policyValueKind === "text" ? "Text" : "List",
+    })),
+  );
+});
+
+test("required metadata policy table rejects drift and duplicate fields", () => {
+  const ownerRow = MANUAL.match(
+    /^\| `owner` \| `metadata\.renma\.owner` \|.*$/m,
+  )?.[0];
+  assert.ok(ownerRow);
+  assert.throws(
+    () =>
+      parseRequiredMetadataPolicyTable(
+        MANUAL.replace(
+          REQUIRED_POLICY_END_MARKER,
+          `${ownerRow}\n${REQUIRED_POLICY_END_MARKER}`,
+        ),
+      ).forEach(() => undefined),
+    /duplicate|required metadata policy field/,
+  );
+  const missing = MANUAL.replace(`${ownerRow}\n`, "");
+  assert.notDeepEqual(
+    parseRequiredMetadataPolicyTable(missing),
+    RENMA_REQUIRED_METADATA_DEFINITIONS,
   );
 });
 
@@ -355,6 +406,58 @@ function parseOperationalMetadataTable(
       effects: cells[5]!,
     };
   });
+}
+
+function parseRequiredMetadataPolicyTable(
+  markdown: string,
+): DocumentedRequiredMetadataPolicyRow[] {
+  assert.equal(
+    occurrences(markdown, REQUIRED_POLICY_START_MARKER),
+    1,
+    "expected exactly one required-policy start marker",
+  );
+  assert.equal(
+    occurrences(markdown, REQUIRED_POLICY_END_MARKER),
+    1,
+    "expected exactly one required-policy end marker",
+  );
+  const start = markdown.indexOf(REQUIRED_POLICY_START_MARKER);
+  const end = markdown.indexOf(REQUIRED_POLICY_END_MARKER);
+  assert.ok(start < end, "required-policy table markers are out of order");
+  const lines = markdown
+    .slice(start + REQUIRED_POLICY_START_MARKER.length, end)
+    .trim()
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0);
+  assert.deepEqual(parseMarkdownRow(lines[0]!), [
+    "Policy field",
+    "Skill serialization",
+    "Non-Skill serialization",
+    "Value kind",
+  ]);
+  assert.match(lines[1]!, /^\|(?:\s*:?-+:?\s*\|){4}$/);
+  const rows = lines.slice(2).map((line, index) => {
+    const cells = parseMarkdownRow(line);
+    assert.equal(
+      cells.length,
+      4,
+      `required-policy row ${index + 1} has 4 cells`,
+    );
+    return {
+      policyKey: codeFormattedKey(cells[0]!, "policy field"),
+      skillSerialization: codeFormattedKey(cells[1]!, "Skill serialization"),
+      nonSkillSerialization: codeFormattedKey(
+        cells[2]!,
+        "non-Skill serialization",
+      ),
+      valueKind: cells[3]!,
+    };
+  });
+  assertUniqueValues(
+    rows.map((row) => row.policyKey),
+    "required metadata policy field",
+  );
+  return rows;
 }
 
 function parsePortableAgentSkillsTable(

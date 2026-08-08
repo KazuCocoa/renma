@@ -21,5 +21,8 @@
   ],
   "skill_discovery": {
     "adopted": true
+  },
+  "metadata": {
+    "required": ["owner"]
   }
 }

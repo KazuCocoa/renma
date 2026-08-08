@@ -70,6 +70,34 @@ The public deep-import type re-exports from `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` are also listed and checked exactly rather
 than allowing command modules to re-export arbitrary lower-layer contracts.
 
+## Repository-Required Metadata Policy
+
+`src/metadata-definitions.ts` is the single vocabulary authority. A catalog
+definition becomes eligible for `metadata.required` only through an explicit
+stable `policyKey`, a scalar/list value kind, and both Skill and non-Skill
+serialization mappings. Configuration validation and ordering consume the
+derived required-metadata definition list; they do not infer spellings from
+serializer output.
+
+`src/metadata-policy.ts` runs during catalog construction with request-local
+configuration. It evaluates declared source evidence before ownership
+inheritance and emits at most one
+`META-POLICY-REQUIRED-FIELD-MISSING` diagnostic per applicable asset/field.
+Canonical Skills fail closed through Agent Skills validity and exact
+`metadata.renma.*` evidence. Non-Skills use the registered top-level key.
+Binary, non-Markdown, config, unknown, and non-catalog runtime surfaces never
+receive a requirement.
+
+`src/metadata-policy-diff.ts` compares archived required-field sets in registry
+order and retains endpoint configuration provenance. The separate
+`src/metadata-policy-ci-policy.ts` evaluator counts additions and removals
+independently, matches removals and CI-mode weakening with stable IDs, and uses
+the stricter archived endpoint mode. `diff` and `ci-report` only add the new
+policy projection when there is transition evidence, preserving unconfigured
+public output. Finding details are retained in semantic diff only for this
+policy diagnostic so a vanished finding remains attributable to its exact
+field, asset, serialization key, and source configuration.
+
 ## Typed Catalog Diagnostic Identity
 
 Metadata and catalog producers assign stable `DIAGNOSTIC_IDS` identities when

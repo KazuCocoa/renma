@@ -63,6 +63,9 @@ export interface CatalogMetadataDefinition {
   operationalField: string;
   skillKey?: string;
   nonSkillKey?: string;
+  /** Stable repository-policy spelling; omitted when the field is not policy-eligible. */
+  policyKey?: string;
+  policyValueKind?: "text" | "list";
 }
 
 /** Skill/non-Skill serialization mappings for normalized catalog metadata. */
@@ -84,91 +87,127 @@ export const RENMA_CATALOG_METADATA_DEFINITIONS = [
     operationalField: "version",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.version,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.version,
+    policyKey: "version",
+    policyValueKind: "text",
   },
   {
     operationalField: "owner",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.owner,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.owner,
+    policyKey: "owner",
+    policyValueKind: "text",
   },
   {
     operationalField: "status",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.status,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.status,
+    policyKey: "status",
+    policyValueKind: "text",
   },
   {
     operationalField: "statusReason",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.status_reason,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.status_reason,
+    policyKey: "status_reason",
+    policyValueKind: "text",
   },
   {
     operationalField: "statusChangedAt",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.status_changed_at,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.status_changed_at,
+    policyKey: "status_changed_at",
+    policyValueKind: "text",
   },
   {
     operationalField: "purpose",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.purpose,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.purpose,
+    policyKey: "purpose",
+    policyValueKind: "text",
   },
   {
     operationalField: "lastReviewedAt",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.last_reviewed_at,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.last_reviewed_at,
+    policyKey: "last_reviewed_at",
+    policyValueKind: "text",
   },
   {
     operationalField: "reviewCycle",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.review_cycle,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.review_cycle,
+    policyKey: "review_cycle",
+    policyValueKind: "text",
   },
   {
     operationalField: "expiresAt",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.expires_at,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.expires_at,
+    policyKey: "expires_at",
+    policyValueKind: "text",
   },
   {
     operationalField: "tags",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.tags,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.tags,
+    policyKey: "tags",
+    policyValueKind: "list",
   },
   {
     operationalField: "whenToUse",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.when_to_use,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.when_to_use,
+    policyKey: "when_to_use",
+    policyValueKind: "list",
   },
   {
     operationalField: "whenNotToUse",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.when_not_to_use,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.when_not_to_use,
+    policyKey: "when_not_to_use",
+    policyValueKind: "list",
   },
   {
     operationalField: "requiresContext",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.requires_context,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.requires_context,
+    policyKey: "requires_context",
+    policyValueKind: "list",
   },
   {
     operationalField: "optionalContext",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.optional_context,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.optional_context,
+    policyKey: "optional_context",
+    policyValueKind: "list",
   },
   {
     operationalField: "requiresLens",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.requires_lens,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.requires_lens,
+    policyKey: "requires_lens",
+    policyValueKind: "list",
   },
   {
     operationalField: "optionalLens",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.optional_lens,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.optional_lens,
+    policyKey: "optional_lens",
+    policyValueKind: "list",
   },
   {
     operationalField: "conflicts",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.conflicts,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.conflicts,
+    policyKey: "conflicts",
+    policyValueKind: "list",
   },
   {
     operationalField: "supersededBy",
     skillKey: CANONICAL_SKILL_METADATA_KEYS.superseded_by,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.superseded_by,
+    policyKey: "superseded_by",
+    policyValueKind: "list",
   },
   {
     operationalField: "continuesWith",
@@ -199,6 +238,26 @@ export const RENMA_CATALOG_METADATA_DEFINITIONS = [
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.token_budget_reviewed_at,
   },
 ] as const satisfies readonly CatalogMetadataDefinition[];
+
+export type RequiredMetadataPolicyDefinition = Extract<
+  (typeof RENMA_CATALOG_METADATA_DEFINITIONS)[number],
+  { policyKey: string; policyValueKind: "text" | "list" }
+>;
+
+export type RequiredMetadataPolicyField =
+  RequiredMetadataPolicyDefinition["policyKey"];
+
+/** Exact repository-required vocabulary in deterministic diagnostic order. */
+export const RENMA_REQUIRED_METADATA_DEFINITIONS =
+  RENMA_CATALOG_METADATA_DEFINITIONS.filter(
+    (definition): definition is RequiredMetadataPolicyDefinition =>
+      "policyKey" in definition && "policyValueKind" in definition,
+  );
+
+export const REQUIRED_METADATA_POLICY_FIELDS =
+  RENMA_REQUIRED_METADATA_DEFINITIONS.map(
+    (definition) => definition.policyKey,
+  ) as readonly RequiredMetadataPolicyField[];
 
 /** Ordinary top-level list fields understood by the general non-Skill parser. */
 export const NON_SKILL_LIST_METADATA_KEYS = [

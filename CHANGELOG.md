@@ -8,6 +8,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added repository-level `metadata.required` policy for the registry-backed
+  Skill/non-Skill metadata vocabulary, with strict configuration validation,
+  declared-value presence semantics, canonical Skill enforcement, and the High
+  `META-POLICY-REQUIRED-FIELD-MISSING` finding. The list defaults to empty, so
+  existing repositories retain current metadata requirements.
+- Added deterministic `renma.metadata-policy-diff.v1` evidence and
+  `metadata.ci_policy` (`off`, `warn`, or `fail`, default `fail`). Required-field
+  removal and CI-mode weakening are independent stable CI matches governed by
+  the stricter archived endpoint; additions and mode tightening remain visible
+  non-blocking transitions.
+
 - Added repository-configurable warning and High token-budget policy for Skill,
   Context, Reference, Profile, and Example Markdown through the corresponding
   `quality.*_token_warning` and `quality.*_token_high` keys, with independent
@@ -38,6 +49,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   an independent finding or governance rule changes CI status.
 
 ### Compatibility
+
+- Portable Agent Skills requirements, ownership inheritance, scaffold and
+  migration behavior, Context Lens compatibility, security metadata, and token
+  budgets are unchanged. An inherited effective owner remains available to
+  ownership consumers but does not satisfy an explicit declared-field policy.
+  Binary, non-metadata-capable, configuration, unknown, and runtime-only assets
+  do not receive impossible metadata requirements.
 
 - Repositories without `quality` configuration continue to load without
   migration and receive the documented Renma defaults for every governed asset

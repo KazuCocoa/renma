@@ -1,4 +1,5 @@
 import type { Severity, SuppressionConfig } from "./diagnostics.js";
+import type { RequiredMetadataPolicyField } from "../metadata-definitions.js";
 
 /** Compatibility-only layout input retained without forcing local migration. */
 export interface LayoutPolicyConfig {
@@ -78,6 +79,20 @@ export interface QualityConfig {
   contentTokenBudgets: Record<ContentTokenBudgetKind, ContentTokenBudgetConfig>;
 }
 
+export type MetadataCiPolicyMode = "off" | "warn" | "fail";
+export type MetadataRequiredSource =
+  "renma_default" | "repository_configuration";
+
+/** Effective repository policy for explicitly declared catalog metadata. */
+export interface MetadataConfig {
+  /** CI review mode for required-field removal. Defaults to fail. */
+  ciPolicy: MetadataCiPolicyMode;
+  /** Registry-ordered fields that every applicable catalog asset must declare. */
+  required: RequiredMetadataPolicyField[];
+  /** Provenance of the required-field list, including an explicitly empty list. */
+  requiredSource: MetadataRequiredSource;
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -91,6 +106,7 @@ export interface ScanConfig {
   scanBoundary: ScanBoundaryConfig;
   executableSurface: ExecutableSurfaceConfig;
   quality: QualityConfig;
+  metadata: MetadataConfig;
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;
