@@ -286,7 +286,7 @@ implementation-owned registries.
 | —                                     | `applies_to`                    | YAML list or comma-separated scalar of Context IDs/paths                                              | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: required and target-validated; recommended authoring scope: Context Lens                         | Any catalog entry carrying a normalized value: metadata-declared `applies_to` dependency; Context Lens: requiredness, target resolution to Context Assets, Lens governance, inspect, graph, Readiness, BOM, Trust Graph, diff, and CI projections |
 | —                                     | `focus`                         | YAML list or comma-separated scalar                                                                   | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens                                              | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge                                                                                                                      |
 | —                                     | `expected_outputs`              | YAML list or comma-separated scalar                                                                   | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens                                              | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge                                                                                                                      |
-| —                                     | `token_budget_override`         | Positive safe integer greater than the kind's default limit                                           | Markdown assets initially classified as Context, Reference, Profile, or Example              | Conditional; requires `token_budget_rationale` and is invalid when content is within the default limit         | Scan token-budget decision and quality finding details only                                                                                                                                                                                       |
+| —                                     | `token_budget_override`         | Positive safe integer greater than the kind's stable compatibility validation baseline                | Markdown assets initially classified as Context, Reference, Profile, or Example              | Conditional; requires `token_budget_rationale` and is invalid when content is within that validation baseline  | Scan token-budget decision and quality finding details only; a valid declaration below the current repository warning remains accepted but does not lower policy                                                                                                                                               |
 | —                                     | `token_budget_rationale`        | Trimmed non-empty text                                                                                | Same eligible support-asset kinds as `token_budget_override`                                 | Required when an override is declared; otherwise non-operational                                               | Scan token-budget decision evidence only                                                                                                                                                                                                          |
 | —                                     | `token_budget_reviewed_at`      | Real ISO date `YYYY-MM-DD`                                                                            | Same eligible support-asset kinds as `token_budget_override`                                 | Optional only when an override is declared                                                                     | Scan token-budget review provenance only; it does not create recurring freshness review                                                                                                                                                           |
 | `renma.published-entrypoint`          | —                               | Exact string `"true"` only                                                                            | Canonical Skill only                                                                         | Optional one-state publication marker                                                                          | Parsed outside catalog metadata for prepared Skill Discovery, Skill Index, discovery graph, publication diagnostics, Readiness evidence, semantic diff, and CI reporting; no catalog dependency                                                   |
@@ -363,8 +363,10 @@ transition rules for upload permission and human approval.
   only `P<positive integer>D`, such as `P90D`; months, years, zero, signs,
   fractions, and composite ISO durations are unsupported.
 - `token_budget_override` must be a positive safe YAML integer, exceed the
-  eligible artifact kind's default limit, and be needed by the measured
-  content. It requires a non-empty rationale. `token_budget_reviewed_at` is
+  eligible artifact kind's stable compatibility validation baseline, and be
+  needed relative to that baseline. It requires a non-empty rationale. A valid
+  declaration below the current repository warning is retained as a no-op;
+  repository policy is never lowered. `token_budget_reviewed_at` is
   optional but valid only alongside an override and does not imply a recurring
   review cycle.
 - Lifecycle status is exactly `experimental`, `stable`, `suspended`,
@@ -1079,6 +1081,20 @@ For example:
     // High-signal executable contract changes require explicit review.
     "ci_policy": "warn"
   },
+  "quality": {
+    // Repository-specific effective Markdown token-budget policy.
+    "ci_policy": "fail",
+    "skill_token_warning": 6400,
+    "skill_token_high": 8000,
+    "context_token_warning": 6400,
+    "context_token_high": 8000,
+    "reference_token_warning": 7200,
+    "reference_token_high": 9000,
+    "profile_token_warning": 3200,
+    "profile_token_high": 4000,
+    "example_token_warning": 4800,
+    "example_token_high": 6000
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1114,6 +1130,35 @@ The configuration supports the same names used by the implementation, including:
   present in the canonical executable-surface diff. `ci_policy` supports
   `off`, `warn`, and `fail` and defaults to `off`. `renma init` does not enable
   it.
+- `quality`: repository-specific effective policy for the Skill body
+  `QUAL-SKILL-TOKEN-BUDGET` finding and the Context, Reference, Profile, and
+  Example `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` finding. The supported keys and
+  Renma defaults are shown below. `ci_policy` supports `off`, `warn`, and
+  `fail`, defaults to `fail`, and governs numeric threshold increases and
+  CI-mode weakening in `ci-report`. `fail -> warn`, `fail -> off`, and
+  `warn -> off` are weakenings.
+  CI uses the stricter base/target mode, so those transitions fail under an
+  effective `fail` mode and warn under an effective `warn` mode. `off -> warn`
+  and `warn -> fail` are visible, non-blocking tightenings.
+
+  | Asset measurement | Warning key and default | High key and default |
+  | --- | ---: | ---: |
+  | Skill Markdown body after frontmatter | `skill_token_warning`: 6,400 | `skill_token_high`: 8,000 |
+  | Context full file | `context_token_warning`: 6,400 | `context_token_high`: 8,000 |
+  | Reference full file | `reference_token_warning`: 7,200 | `reference_token_high`: 9,000 |
+  | Profile full file | `profile_token_warning`: 3,200 | `profile_token_high`: 4,000 |
+  | Example full file | `example_token_warning`: 4,800 | `example_token_high`: 6,000 |
+
+  Each omitted key falls back independently to its Renma default. Every value
+  must be a positive safe integer, and each asset kind's warning must be
+  strictly lower than its High threshold. Unknown keys, invalid values, and
+  invalid relationships are caller-correctable configuration errors with exit
+  code `2`. At exactly the effective warning threshold there is no finding;
+  above it through the effective High threshold the finding is Medium; above
+  the effective High threshold it is High. These values are not scan-boundary
+  settings. Scripts, assets, metadata-size checks, and other quality rules keep
+  their existing policies. The portable Agent Skills recommendation remains
+  5,000 Skill body tokens; Renma's repository warning default is 6,400.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1125,6 +1170,13 @@ values. `--strict` is caller-selected execution policy and is never loaded from
 repository configuration. Likewise, `ci-report --fail-on-status` is a
 CI-integrator exit threshold, not repository policy. Other commands use their
 documented command-specific format defaults and flags.
+
+High token-budget results use the ordinary severity model. For example,
+`renma scan . --fail-on high` gates a Skill or governed content asset above its
+effective High threshold without `--strict`; Medium results remain below that
+exit threshold. `diff` loads each archived endpoint's effective `quality`
+policy independently, and `ci-report` retains those revision-local semantic
+findings while separately applying its established CI status model.
 
 Within a canonical Skill entrypoint or one of its classified support documents,
 helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma
@@ -2226,6 +2278,27 @@ Only evidence coverage is fail-closed against target-only narrowing. The
 existing nested `diff` remains Discovery-policy-free. Diff endpoints also expose
 the readiness ownership numerator, eligible-asset denominator, and coverage
 percentage while retaining the existing `summary.ownershipCoverageDelta` field.
+
+Token-threshold changes appear in nested `diff.qualityPolicy` as
+`renma.quality-policy-diff.v1`, with asset kind, warning/High threshold type,
+old/new values, default/configured provenance, and weakening/tightening
+direction. Top-level `qualityPolicy` is
+`renma.quality-policy-ci-policy.v1`; it records archived `from`, `to`, and
+stricter effective modes plus outcome and complete weakening matches.
+`modeTransition` records configured endpoints and `unchanged`, `weakening`, or
+`tightening` direction; `numericThresholdChanges` independently counts numeric
+weakenings and tightenings. Increasing either threshold is weakening;
+decreasing one is tightening, and simultaneous changes retain both directions.
+A CI-mode weakening emits the stable
+`quality_policy_ci.ci_policy_relaxed` match. In effective `fail` mode any
+weakening makes the report `FAIL`; effective `warn` makes it at least `WARN`;
+when both endpoints use `off`, numeric threshold weakenings remain visible but
+do not change CI status. Mode tightening is visible but non-blocking. Markdown
+renders the Quality Policy section whenever the modes differ, numeric thresholds
+differ, or the evaluator has a match, so a mode-only relaxation never receives
+a no-regression review note. A finding that disappears alongside threshold
+weakening is not treated as verified remediation. This evaluator is separate
+from scan-boundary policy.
 
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { catalog } from "../src/commands/catalog.js";
 import { todayIsoDate } from "../src/freshness.js";
-import { formatText } from "../src/report.js";
+import { formatJson, formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { ScanResult } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -1754,7 +1754,7 @@ Verify the result with a test.
 ${repeatWords("workflow", 700)}
 
 ## Troubleshooting
-${repeatWords("troubleshooting", 3301)}
+${repeatWords("troubleshooting", 5501)}
 
 ### Nested Details
 ${repeatWords("nested", 300)}
@@ -1774,7 +1774,10 @@ ${repeatWords("example", 1000)}
     "skills/demo/references/large.md",
   );
   assert.match(contextBudgetFinding?.title ?? "", /Support asset exceeds/);
-  assert.match(contextBudgetFinding?.whyItMatters ?? "", /coherence review/);
+  assert.match(
+    contextBudgetFinding?.whyItMatters ?? "",
+    /coherence and maintainability review/,
+  );
   assert.ok(
     contextBudgetFinding?.constraints?.includes(
       "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
@@ -1800,18 +1803,24 @@ ${repeatWords("example", 1000)}
     contextBudgetFinding?.llmHint ?? "",
     /never add one only to silence the finding/,
   );
-  assert.equal(contextBudgetFinding?.details?.defaultLimit, 5000);
-  assert.equal(contextBudgetFinding?.details?.effectiveLimit, 5000);
+  assert.equal(contextBudgetFinding?.details?.defaultLimit, 7200);
+  assert.equal(contextBudgetFinding?.details?.effectiveLimit, 7200);
+  assert.equal(contextBudgetFinding?.severity, "medium");
+  assert.equal(contextBudgetFinding?.details?.repositoryWarningThreshold, 7200);
+  assert.equal(contextBudgetFinding?.details?.repositoryHighThreshold, 9000);
+  assert.equal(contextBudgetFinding?.details?.effectiveWarningThreshold, 7200);
+  assert.equal(contextBudgetFinding?.details?.effectiveHighThreshold, 9000);
+  assert.equal(contextBudgetFinding?.details?.effectiveSeverity, "medium");
   assert.equal(contextBudgetFinding?.details?.overrideActive, false);
   assert.equal(contextBudgetFinding?.details?.measurement, "full_file");
-  assert.equal(contextBudgetFinding?.details?.limit, 5000);
+  assert.equal(contextBudgetFinding?.details?.limit, 7200);
   assert.equal(
     contextBudgetFinding?.details?.overBy,
-    Number(contextBudgetFinding?.details?.measured) - 5000,
+    Number(contextBudgetFinding?.details?.measured) - 7200,
   );
   assert.equal(
     contextBudgetFinding?.details?.overPercent,
-    Math.round((Number(contextBudgetFinding?.details?.overBy) / 5000) * 100),
+    Math.round((Number(contextBudgetFinding?.details?.overBy) / 7200) * 100),
   );
   assert.equal(
     contextBudgetFinding?.details?.sectionMeasurement,
@@ -1849,7 +1858,7 @@ ${repeatWords("example", 1000)}
   }
   assert.match(
     contextBudgetFinding?.remediation ?? "",
-    /default 5000-token advisory limit/,
+    /effective 7200-token medium threshold/,
   );
 
   const diagnosticV2 = result.diagnosticsV2.find(
@@ -1879,33 +1888,33 @@ test("support-asset token budgets honor only valid intentional overrides", async
   const cases = [
     {
       file: "valid.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: "This is one ordered workflow and splitting would break execution order."
 token_budget_reviewed_at: "2026-07-12"`,
-      words: 5050,
+      words: 7250,
       invalid: false,
       overBudget: false,
     },
     {
       file: "missing-rationale.md",
-      metadata: "token_budget_override: 5200",
-      words: 5050,
+      metadata: "token_budget_override: 7400",
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
     {
       file: "non-integer.md",
-      metadata: `token_budget_override: "5200"
+      metadata: `token_budget_override: "7400"
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
     {
       file: "decimal.md",
-      metadata: `token_budget_override: 5200.5
+      metadata: `token_budget_override: 7400.5
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
@@ -1913,7 +1922,7 @@ token_budget_rationale: Intentionally coherent.`,
       file: "max-safe.md",
       metadata: `token_budget_override: ${Number.MAX_SAFE_INTEGER}
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       invalid: false,
       overBudget: false,
     },
@@ -1921,7 +1930,7 @@ token_budget_rationale: Intentionally coherent.`,
       file: "unsafe-positive.md",
       metadata: `token_budget_override: 9007199254740993
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
@@ -1929,48 +1938,72 @@ token_budget_rationale: Intentionally coherent.`,
       file: "unsafe-negative.md",
       metadata: `token_budget_override: -9007199254740993
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
     {
       file: "at-default.md",
-      metadata: `token_budget_override: 5000
+      metadata: `token_budget_override: 7200
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
-      invalid: true,
+      words: 7250,
+      invalid: false,
       overBudget: true,
     },
     {
       file: "below-default.md",
-      metadata: `token_budget_override: 4999
+      metadata: `token_budget_override: 7199
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
-      invalid: true,
+      words: 7250,
+      invalid: false,
       overBudget: true,
+    },
+    {
+      file: "legacy-noop.md",
+      metadata: `token_budget_override: 6000
+token_budget_rationale: Kept coherent under the established validation contract.`,
+      words: 5500,
+      invalid: false,
+      overBudget: false,
+    },
+    {
+      file: "at-compatibility-baseline.md",
+      metadata: `token_budget_override: 5000
+token_budget_rationale: Boundary fixture.`,
+      words: 5500,
+      invalid: true,
+      overBudget: false,
+    },
+    {
+      file: "above-compatibility-baseline.md",
+      metadata: `token_budget_override: 5001
+token_budget_rationale: Boundary fixture.`,
+      words: 5500,
+      invalid: false,
+      overBudget: false,
     },
     {
       file: "not-positive.md",
       metadata: `token_budget_override: 0
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
     {
       file: "invalid-date.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: Intentionally coherent.
 token_budget_reviewed_at: "2026-02-30"`,
-      words: 5050,
+      words: 7250,
       invalid: true,
       overBudget: true,
     },
     {
       file: "over-override.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: Intentionally coherent.`,
-      words: 5250,
+      words: 7450,
       invalid: false,
       overBudget: true,
     },
@@ -2019,33 +2052,57 @@ token_budget_rationale: Intentionally coherent.`,
       tokenBudgetRationale: overOverride?.details?.tokenBudgetRationale,
     },
     {
-      defaultLimit: 5000,
-      overrideLimit: 5200,
-      effectiveLimit: 5200,
+      defaultLimit: 7200,
+      overrideLimit: 7400,
+      effectiveLimit: 7400,
       overrideActive: true,
       tokenBudgetRationale: "Intentionally coherent.",
     },
   );
   assert.equal(
     overOverride?.details?.overBy,
-    Number(overOverride?.details?.measured) - 5200,
+    Number(overOverride?.details?.measured) - 7400,
   );
   assert.equal(
     overOverride?.details?.overPercent,
-    Math.round((Number(overOverride?.details?.overBy) / 5200) * 100),
+    Math.round((Number(overOverride?.details?.overBy) / 7400) * 100),
   );
   assert.match(
     overOverride?.remediation ?? "",
-    /default advisory limit is 5000 tokens/,
+    /Renma default warning threshold is 7200 tokens/,
   );
   assert.match(
     overOverride?.remediation ?? "",
-    /active declared override is 5200 tokens/,
+    /active declared override is 7400 tokens/,
   );
+  assert.equal(overOverride?.details?.overrideValidationBaseline, 5000);
+  assert.equal(overOverride?.details?.declaredOverrideLimit, 7400);
+  assert.equal(overOverride?.details?.overrideAffectsEffectiveWarning, true);
   assert.doesNotMatch(overOverride?.remediation ?? "", /reviewed override/i);
   assert.doesNotMatch(
     overOverride?.remediation ?? "",
     /increase token_budget_override|increase the override/i,
+  );
+
+  const noOpOverride = result.findings.find(
+    (finding) =>
+      finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+      finding.evidence.path.endsWith("at-default.md"),
+  );
+  assert.equal(noOpOverride?.details?.overrideValidationBaseline, 5000);
+  assert.equal(noOpOverride?.details?.declaredOverrideLimit, 7200);
+  assert.equal(noOpOverride?.details?.repositoryWarningThreshold, 7200);
+  assert.equal(noOpOverride?.details?.effectiveWarningThreshold, 7200);
+  assert.equal(noOpOverride?.details?.effectiveHighThreshold, 9000);
+  assert.equal(noOpOverride?.details?.overrideAffectsEffectiveWarning, false);
+
+  const legacyEntry = (await catalog(root)).catalog.entries.find((entry) =>
+    entry.sourcePath.endsWith("legacy-noop.md"),
+  );
+  assert.equal(legacyEntry?.metadata.tokenBudgetOverride, 6000);
+  assert.equal(
+    legacyEntry?.metadata.tokenBudgetRationale,
+    "Kept coherent under the established validation contract.",
   );
 
   for (const file of ["unsafe-positive.md", "unsafe-negative.md"]) {
@@ -2063,9 +2120,64 @@ token_budget_rationale: Intentionally coherent.`,
       file,
     );
     assert.equal(unsafe?.details?.overrideLimit, undefined, file);
-    assert.equal(unsafe?.details?.effectiveLimit, 5000, file);
+    assert.equal(unsafe?.details?.effectiveLimit, 7200, file);
     assert.equal(unsafe?.details?.overrideActive, false, file);
   }
+});
+
+test("support-asset overrides compose with repository warning and High thresholds", async () => {
+  const root = await fixture();
+  const referenceDir = path.join(root, "skills", "demo", "references");
+  await mkdir(referenceDir, { recursive: true });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      quality: {
+        reference_token_warning: 7300,
+        reference_token_high: 7350,
+      },
+    }),
+  );
+  await writeFile(
+    path.join(referenceDir, "over.md"),
+    `---
+token_budget_override: 7400
+token_budget_rationale: Intentionally coherent.
+---
+${repeatWords("reference", 7450)}`,
+  );
+  await writeFile(
+    path.join(referenceDir, "within.md"),
+    `---
+token_budget_override: 7400
+token_budget_rationale: Intentionally coherent.
+---
+${repeatWords("reference", 7250)}`,
+  );
+
+  const result = await scan(root);
+  const over = result.findings.find(
+    (finding) =>
+      finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+      finding.evidence.path.endsWith("over.md"),
+  );
+
+  assert.equal(over?.severity, "high");
+  assert.equal(over?.details?.repositoryWarningThreshold, 7300);
+  assert.equal(over?.details?.repositoryHighThreshold, 7350);
+  assert.equal(over?.details?.effectiveWarningThreshold, 7400);
+  assert.equal(over?.details?.effectiveHighThreshold, 7400);
+  assert.equal(over?.details?.triggeredThreshold, 7400);
+  assert.equal(over?.details?.overrideActive, true);
+  assert.equal(over?.details?.policySource, "repository_configuration");
+  assert.equal(
+    result.findings.some(
+      (finding) =>
+        finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+        finding.evidence.path.endsWith("within.md"),
+    ),
+    false,
+  );
 });
 
 test("token-budget override metadata does not affect unsupported asset kinds", async () => {
@@ -2120,21 +2232,21 @@ Read examples/config.yaml, references/data.yaml, and references/guide.md.
 `,
   );
   const decision = `---
-token_budget_override: 6000
+token_budget_override: 8000
 token_budget_rationale: example data
 token_budget_reviewed_at: "2026-07-12"
 ---`;
   await writeFile(
     path.join(skillDir, "examples", "config.yaml"),
-    `${decision}\n${repeatWords("example", 2550)}\n`,
+    `${decision}\n${repeatWords("example", 4850)}\n`,
   );
   await writeFile(
     path.join(skillDir, "references", "data.yaml"),
-    `${decision}\n${repeatWords("reference", 5050)}\n`,
+    `${decision}\n${repeatWords("reference", 7250)}\n`,
   );
   await writeFile(
     path.join(skillDir, "references", "guide.md"),
-    `${decision}\n${repeatWords("reference", 5050)}\n`,
+    `${decision}\n${repeatWords("reference", 7250)}\n`,
   );
 
   const catalogResult = await catalog(root);
@@ -2153,7 +2265,7 @@ token_budget_reviewed_at: "2026-07-12"
   }
   const markdown = byPath.get("skills/demo/references/guide.md");
   assert.equal(markdown?.markdownParserEligible, true);
-  assert.equal(markdown?.metadata.tokenBudgetOverride, 6000);
+  assert.equal(markdown?.metadata.tokenBudgetOverride, 8000);
   assert.equal(markdown?.metadata.tokenBudgetRationale, "example data");
   assert.equal(markdown?.metadata.tokenBudgetReviewedAt, "2026-07-12");
 
@@ -2167,8 +2279,8 @@ token_budget_reviewed_at: "2026-07-12"
     false,
   );
   for (const [sourcePath, defaultLimit] of [
-    ["skills/demo/examples/config.yaml", 2500],
-    ["skills/demo/references/data.yaml", 5000],
+    ["skills/demo/examples/config.yaml", 4800],
+    ["skills/demo/references/data.yaml", 7200],
   ] as const) {
     const budget = result.findings.find(
       (finding) =>
@@ -2199,7 +2311,7 @@ test("support-asset token-budget decisions fail closed with exact metadata evide
       file: "multiple-reasons.md",
       metadata: `token_budget_override: nope
 token_budget_reviewed_at: "2026-02-30"`,
-      words: 5050,
+      words: 7250,
       evidenceLine: 2,
       evidenceSnippet: "token_budget_override: nope",
       reason: "token_budget_override must be an integer",
@@ -2207,21 +2319,21 @@ token_budget_reviewed_at: "2026-02-30"`,
     },
     {
       file: "duplicate-override.md",
-      metadata: `token_budget_override: 5200
-token_budget_override: 5300
+      metadata: `token_budget_override: 7400
+token_budget_override: 7500
 token_budget_rationale: Intentionally coherent.`,
-      words: 5050,
+      words: 7250,
       evidenceLine: 3,
-      evidenceSnippet: "token_budget_override: 5300",
+      evidenceSnippet: "token_budget_override: 7500",
       reason: "token_budget_override is declared more than once",
       overBudget: true,
     },
     {
       file: "duplicate-rationale.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: First rationale.
 token_budget_rationale: Second rationale.`,
-      words: 5050,
+      words: 7250,
       evidenceLine: 4,
       evidenceSnippet: "token_budget_rationale: Second rationale.",
       reason: "token_budget_rationale is declared more than once",
@@ -2229,11 +2341,11 @@ token_budget_rationale: Second rationale.`,
     },
     {
       file: "duplicate-reviewed-at.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: Intentionally coherent.
 token_budget_reviewed_at: "2026-07-11"
 token_budget_reviewed_at: "2026-07-12"`,
-      words: 5050,
+      words: 7250,
       evidenceLine: 5,
       evidenceSnippet: 'token_budget_reviewed_at: "2026-07-12"',
       reason: "token_budget_reviewed_at is declared more than once",
@@ -2242,7 +2354,7 @@ token_budget_reviewed_at: "2026-07-12"`,
     {
       file: "orphan-rationale.md",
       metadata: "token_budget_rationale: Orphan rationale.",
-      words: 5050,
+      words: 7250,
       evidenceLine: 2,
       evidenceSnippet: "token_budget_rationale: Orphan rationale.",
       reason: "token_budget_rationale requires token_budget_override",
@@ -2251,7 +2363,7 @@ token_budget_reviewed_at: "2026-07-12"`,
     {
       file: "orphan-reviewed-at.md",
       metadata: 'token_budget_reviewed_at: "2026-07-12"',
-      words: 5050,
+      words: 7250,
       evidenceLine: 2,
       evidenceSnippet: 'token_budget_reviewed_at: "2026-07-12"',
       reason: "token_budget_reviewed_at requires token_budget_override",
@@ -2259,9 +2371,9 @@ token_budget_reviewed_at: "2026-07-12"`,
     },
     {
       file: "malformed-yaml.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: "unterminated`,
-      words: 5050,
+      words: 7250,
       evidenceLine: 3,
       evidenceSnippet: 'token_budget_rationale: "unterminated',
       reason: "token-budget decision metadata has invalid YAML",
@@ -2269,13 +2381,13 @@ token_budget_rationale: "unterminated`,
     },
     {
       file: "unnecessary.md",
-      metadata: `token_budget_override: 5200
+      metadata: `token_budget_override: 7400
 token_budget_rationale: Intentionally coherent.`,
       words: 100,
       evidenceLine: 2,
-      evidenceSnippet: "token_budget_override: 5200",
+      evidenceSnippet: "token_budget_override: 7400",
       reason:
-        "token_budget_override is unnecessary because the asset is within the default limit of 5000",
+        "token_budget_override is unnecessary because the asset is within the compatibility validation baseline of 5000",
       overBudget: false,
     },
   ];
@@ -2309,7 +2421,7 @@ token_budget_rationale: Intentionally coherent.`,
       ),
       `${fixtureCase.file} structured reason`,
     );
-    assert.equal(invalid.details?.effectiveLimit, 5000);
+    assert.equal(invalid.details?.effectiveLimit, 7200);
     assert.equal(invalid.details?.overrideActive, false);
     assert.equal(
       result.findings.some(
@@ -2333,8 +2445,8 @@ token_budget_rationale: Intentionally coherent.`,
     "token_budget_reviewed_at must be a valid YYYY-MM-DD date",
   ];
   assert.deepEqual(multipleReasons?.details?.invalidReasons, expectedReasons);
-  assert.equal(multipleReasons?.details?.effectiveLimit, 5000);
-  assert.equal(multipleReasons?.details?.limit, 5000);
+  assert.equal(multipleReasons?.details?.effectiveLimit, 7200);
+  assert.equal(multipleReasons?.details?.limit, 7200);
   let previousReasonIndex = -1;
   for (const reason of expectedReasons) {
     const reasonIndex = (multipleReasons?.remediation ?? "").indexOf(reason);
@@ -2362,13 +2474,13 @@ Do not use for runtime context selection.
 ## Preflight
 Collect the target repository path.
 ## Core Workflow
-${repeatWords("workflow", 500)}
+${repeatWords("workflow", 1500)}
 ## Troubleshooting
-${repeatWords("troubleshooting", 1300)}
+${repeatWords("troubleshooting", 4000)}
 ### Platform Details
-${repeatWords("platform", 200)}
+${repeatWords("platform", 400)}
 ## Examples
-${repeatWords("example", 400)}
+${repeatWords("example", 1000)}
 ## Completion Criteria
 The review is complete when the findings are reported.
 ## Verification
@@ -2387,15 +2499,24 @@ Run npm test.
   assert.equal(skillBudgetFinding?.evidence.snippet, "# Large Skill");
   assert.notEqual(skillBudgetFinding?.evidence.snippet, "---");
   assert.equal(typeof skillBudgetFinding?.details?.measured, "number");
-  assert.ok(Number(skillBudgetFinding?.details?.measured) > 2000);
-  assert.equal(skillBudgetFinding?.details?.limit, 2000);
+  assert.ok(Number(skillBudgetFinding?.details?.measured) > 6400);
+  assert.equal(skillBudgetFinding?.severity, "medium");
+  assert.equal(skillBudgetFinding?.details?.warningThreshold, 6400);
+  assert.equal(skillBudgetFinding?.details?.highThreshold, 8000);
+  assert.equal(skillBudgetFinding?.details?.triggeredThreshold, 6400);
+  assert.equal(skillBudgetFinding?.details?.effectiveSeverity, "medium");
+  assert.equal(skillBudgetFinding?.details?.policySource, "renma_defaults");
+  assert.deepEqual(skillBudgetFinding?.details?.thresholdSources, {
+    warning: "renma_default",
+    high: "renma_default",
+  });
   assert.equal(
     skillBudgetFinding?.details?.overBy,
-    Number(skillBudgetFinding?.details?.measured) - 2000,
+    Number(skillBudgetFinding?.details?.measured) - 6400,
   );
   assert.equal(
     skillBudgetFinding?.details?.overPercent,
-    Math.round((Number(skillBudgetFinding?.details?.overBy) / 2000) * 100),
+    Math.round((Number(skillBudgetFinding?.details?.overBy) / 6400) * 100),
   );
   assert.equal(skillBudgetFinding?.details?.unit, "estimated_tokens");
   assert.match(skillBudgetFinding?.whyItMatters ?? "", /Long Skill bodies/);
@@ -2436,14 +2557,25 @@ Run npm test.
     textReport,
     new RegExp(`${skillBudgetFinding?.details?.measured} estimated tokens`),
   );
-  assert.match(textReport, /2000-token advisory limit/);
+  assert.match(textReport, /effective 6400-token medium threshold/);
+  assert.match(textReport, /warning and high thresholds are 6400 and 8000/);
   assert.match(
     textReport,
     new RegExp(
-      `${skillBudgetFinding?.details?.overBy} tokens \\(~${skillBudgetFinding?.details?.overPercent}%\\) over`,
+      `by ${skillBudgetFinding?.details?.overBy} tokens \\(~${skillBudgetFinding?.details?.overPercent}%\\)`,
     ),
   );
   assert.match(textReport, /Troubleshooting/);
+  const repeated = await scan(root);
+  assert.equal(formatText(repeated), textReport);
+  assert.equal(formatJson(repeated), formatJson(result));
+  const jsonFinding = (
+    JSON.parse(formatJson(result)) as {
+      findings: Array<{ id: string; details?: Record<string, unknown> }>;
+    }
+  ).findings.find((finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET");
+  assert.equal(jsonFinding?.details?.warningThreshold, 6400);
+  assert.equal(jsonFinding?.details?.highThreshold, 8000);
 });
 
 test("oversized Skills without headings retain manual semantic guidance", async () => {
@@ -2456,7 +2588,7 @@ test("oversized Skills without headings retain manual semantic guidance", async 
 name: headingless
 description: Review content. Use when a large linear workflow needs review.
 ---
-${repeatWords("linear", 2100)}`,
+${repeatWords("linear", 6500)}`,
   );
   const result = await scan(root);
   const finding = result.findings.find(

@@ -16,7 +16,92 @@ import {
   evaluateStrictScan,
   STRICT_SCAN_MATCH_IDS,
 } from "../src/strict-scan.js";
+import { estimateTokens } from "../src/token-estimator.js";
 import { RepositoryFixture } from "./repository-fixture.js";
+
+test("Skill token budgets use normal fail-on behavior without a strict-only gate", async (t) => {
+  const cases = [
+    { tokens: 6401, severity: "medium", expectedCode: 0 },
+    { tokens: 8001, severity: "high", expectedCode: 1 },
+  ] as const;
+
+  for (const config of cases) {
+    await t.test(String(config.tokens), async (caseContext) => {
+      const fixture = await RepositoryFixture.create({
+        testContext: caseContext,
+      });
+      await fixture.write(
+        "skills/token-budget/SKILL.md",
+        `---\nname: token-budget\ndescription: Review repositories. Use when token-budget governance needs review.\n---\n${skillBodyWithTokens(config.tokens)}`,
+      );
+
+      const result = await scan(fixture.root, {
+        failOn: "high",
+        format: "json",
+      });
+      const finding = result.findings.find(
+        (candidate) => candidate.id === "QUAL-SKILL-TOKEN-BUDGET",
+      );
+      const normal = await captureStdout(() =>
+        runScanCommand(fixture.root, { failOn: "high", format: "json" }),
+      );
+      const strict = await captureStdout(() =>
+        runScanCommand(
+          fixture.root,
+          { failOn: "high", format: "json" },
+          { strict: true },
+        ),
+      );
+
+      assert.equal(finding?.details?.measured, config.tokens);
+      assert.equal(finding?.severity, config.severity);
+      assert.equal(normal.code, config.expectedCode);
+      assert.equal(strict.code, config.expectedCode);
+    });
+  }
+});
+
+test("content token budgets use normal fail-on behavior without a strict-only gate", async (t) => {
+  const cases = [
+    { tokens: 6401, severity: "medium", expectedCode: 0 },
+    { tokens: 8001, severity: "high", expectedCode: 1 },
+  ] as const;
+
+  for (const config of cases) {
+    await t.test(String(config.tokens), async (caseContext) => {
+      const fixture = await RepositoryFixture.create({
+        testContext: caseContext,
+      });
+      await fixture.write(
+        "contexts/token-budget.md",
+        contextWithTokens(config.tokens),
+      );
+
+      const result = await scan(fixture.root, {
+        failOn: "high",
+        format: "json",
+      });
+      const finding = result.findings.find(
+        (candidate) => candidate.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+      );
+      const normal = await captureStdout(() =>
+        runScanCommand(fixture.root, { failOn: "high", format: "json" }),
+      );
+      const strict = await captureStdout(() =>
+        runScanCommand(
+          fixture.root,
+          { failOn: "high", format: "json" },
+          { strict: true },
+        ),
+      );
+
+      assert.equal(finding?.details?.measured, config.tokens);
+      assert.equal(finding?.severity, config.severity);
+      assert.equal(normal.code, config.expectedCode);
+      assert.equal(strict.code, config.expectedCode);
+    });
+  }
+});
 
 test("strict scan rejects a specification-invalid canonical Agent Skill", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
@@ -521,6 +606,68 @@ test("strict evaluator keeps below-threshold active findings non-blocking", asyn
   );
   assert.equal(command.code, 0);
 });
+
+function skillBodyWithTokens(count: number): string {
+  const core = `# Token Budget
+
+## Use When
+Use when repository token-budget policy needs review.
+
+## Do Not Use For
+Do not use for runtime context selection.
+
+## Required Inputs
+Provide the target repository.
+
+## Preflight
+Confirm the target is available.
+
+## Workflow
+1. Review the repository evidence.
+2. Report the result without rewriting content automatically.
+
+## Examples
+For example, report a measured threshold crossing.
+
+## Completion Criteria
+The review is complete when the finding and effective thresholds are reported.
+
+## Verification
+Verify the reported evidence.`;
+  const coreTokens = estimateTokens(core);
+  assert.ok(coreTokens < count);
+  const filler = Array.from(
+    { length: count - coreTokens },
+    (_, index) => `filler${index}`,
+  ).join(" ");
+  const body = `${core}\n\n${filler}`;
+  assert.equal(estimateTokens(body), count);
+  return body;
+}
+
+function contextWithTokens(count: number): string {
+  const core = `---
+id: context.token-budget
+owner: platform
+status: stable
+when_to_use:
+  - Reviewing token budgets
+when_not_to_use:
+  - Runtime selection
+---
+# Token Budget
+
+Review repository token-budget policy without rewriting content automatically.`;
+  const coreTokens = estimateTokens(core);
+  assert.ok(coreTokens < count);
+  const filler = Array.from(
+    { length: count - coreTokens },
+    (_, index) => `filler${index}`,
+  ).join(" ");
+  const content = `${core}\n\n${filler}`;
+  assert.equal(estimateTokens(content), count);
+  return content;
+}
 
 async function captureStdout(
   callback: () => Promise<number>,

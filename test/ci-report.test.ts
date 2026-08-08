@@ -40,12 +40,17 @@ import {
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";
 import { scan } from "../src/scanner.js";
+import { estimateTokens, markdownBody } from "../src/token-estimator.js";
 import {
   summarizeSecurityPosture,
   zeroSecurityPostureSummary,
 } from "../src/security-posture.js";
 import { buildSecurityDiffSummary } from "../src/security-diff.js";
 import { visibleMarkdownInlineValue } from "../src/renderers/markdown-inline-code.js";
+import {
+  QUALITY_POLICY_CI_MATCH_IDS,
+  evaluateQualityPolicyCiPolicy,
+} from "../src/quality-policy-ci-policy.js";
 import type {
   ReviewableEffectiveSecurityPolicy,
   SecurityPolicyAssetChange,
@@ -2632,6 +2637,10 @@ function sampleReport(): CiReport {
       ),
       { from: "off", to: "off" },
     ),
+    qualityPolicy: evaluateQualityPolicyCiPolicy(
+      { changes: [] },
+      { from: "fail", to: "fail" },
+    ),
     securityPosture: {
       added: zeroSecurityPostureSummary(),
       resolved: zeroSecurityPostureSummary(),
@@ -3260,6 +3269,324 @@ test("ci-report rejects conflicting aliases in either archived endpoint", async 
     assert.match(command.stderr, /security\.profiles\.restricted/);
     assert.match(command.stderr, /conflicting aliases for networkAllowed/);
     assert.doesNotMatch(command.stderr, /SEC-|QUAL-|strict_scan\./);
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("ci-report evaluates Skill token budgets with revision-local quality configuration", async () => {
+  const repo = await createQualityThresholdCiRepo();
+  try {
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const added = report.diff.findings.added.find(
+      (finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET",
+    );
+
+    assert.equal(added?.severity, "high");
+    assert.equal(added?.evidence?.path, "skills/token-budget/SKILL.md");
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("ci-report evaluates content token budgets with revision-local quality configuration", async () => {
+  const repo = await createContentQualityThresholdCiRepo();
+  try {
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const added = report.diff.findings.added.find(
+      (finding) => finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+
+    assert.equal(added?.severity, "high");
+    assert.equal(added?.evidence?.path, "contexts/token-budget.md");
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("quality threshold relaxation fails CI and does not praise a vanished High finding", async () => {
+  const repo = await createQualityRelaxationCiRepo();
+  try {
+    const first = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const second = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const json = formatCiReport(first, "json");
+    const markdown = formatCiReport(first, "markdown");
+    const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+    assert.equal(first.status, "fail");
+    assert.deepEqual(first.qualityPolicy.configured, {
+      from: "fail",
+      to: "off",
+      effective: "fail",
+    });
+    assert.equal(first.qualityPolicy.outcome, "fail");
+    assert.equal(first.qualityPolicy.matchCount, 3);
+    assert.deepEqual(first.qualityPolicy.numericThresholdChanges, {
+      weakenings: 2,
+      tightenings: 0,
+    });
+    assert.deepEqual(
+      first.qualityPolicy.matches.map((match) => match.id),
+      [
+        QUALITY_POLICY_CI_MATCH_IDS.CI_POLICY_RELAXED,
+        QUALITY_POLICY_CI_MATCH_IDS.THRESHOLD_INCREASED,
+        QUALITY_POLICY_CI_MATCH_IDS.THRESHOLD_INCREASED,
+      ],
+    );
+    assert.deepEqual(
+      first.diff.qualityPolicy.changes.map((change) => [
+        change.thresholdType,
+        change.direction,
+        change.from.value,
+        change.to.value,
+        change.from.source,
+        change.to.source,
+      ]),
+      [
+        [
+          "warning",
+          "weakening",
+          4000,
+          6500,
+          "repository_configuration",
+          "repository_configuration",
+        ],
+        [
+          "high",
+          "weakening",
+          5500,
+          7500,
+          "repository_configuration",
+          "repository_configuration",
+        ],
+      ],
+    );
+    assert.ok(
+      first.diff.findings.removed.some(
+        (finding) =>
+          finding.id === "QUAL-SKILL-TOKEN-BUDGET" &&
+          finding.severity === "high",
+      ),
+    );
+    assert.ok(!first.notes.includes("Scan findings decreased."));
+    assert.ok(
+      first.notes.some((note) =>
+        note.includes("not treated as verified remediation"),
+      ),
+    );
+    assert.match(visible, /^## Quality Policy$/m);
+    assert.match(visible, /Mode-transition direction: weakening/);
+    assert.match(visible, /Numeric threshold weakenings: 2/);
+    assert.match(visible, /skill warning 4000 .* -> 6500 /);
+    assert.match(visible, /skill high 5500 .* -> 7500 /);
+    assert.doesNotMatch(visible, /No CI report regressions detected/);
+    assert.equal(json, formatCiReport(second, "json"));
+    assert.equal(markdown, formatCiReport(second, "markdown"));
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("quality threshold relaxation honors warn and visible gate-off modes", async (t) => {
+  for (const [mode, expectedStatus] of [
+    ["warn", "warn"],
+    ["off", "pass"],
+  ] as const) {
+    await t.test(mode, async () => {
+      const repo = await createQualityRelaxationCiRepo({
+        from: mode,
+        to: mode,
+      });
+      try {
+        const report = await ciReport(repo, {
+          fromRef: "base",
+          toRef: "HEAD",
+        });
+        const markdown = formatCiReport(report, "markdown");
+        const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+        assert.equal(report.status, expectedStatus);
+        assert.equal(report.qualityPolicy.matchCount, 2);
+        assert.equal(
+          report.qualityPolicy.outcome,
+          mode === "warn" ? "warn" : "pass",
+        );
+        if (mode === "off") {
+          assert.match(visible, /Quality policy: GATE OFF/);
+          assert.match(visible, /CI status effect: none — gate disabled/);
+        }
+      } finally {
+        await rm(repo, { force: true, recursive: true });
+      }
+    });
+  }
+});
+
+test("mode-only Quality Policy transitions are visible and use the stricter endpoint", async (t) => {
+  const cases = [
+    {
+      from: "fail",
+      to: "off",
+      direction: "weakening",
+      effective: "fail",
+      status: "fail",
+      outcome: "fail",
+      matchCount: 1,
+    },
+    {
+      from: "fail",
+      to: "warn",
+      direction: "weakening",
+      effective: "fail",
+      status: "fail",
+      outcome: "fail",
+      matchCount: 1,
+    },
+    {
+      from: "warn",
+      to: "off",
+      direction: "weakening",
+      effective: "warn",
+      status: "warn",
+      outcome: "warn",
+      matchCount: 1,
+    },
+    {
+      from: "off",
+      to: "warn",
+      direction: "tightening",
+      effective: "warn",
+      status: "pass",
+      outcome: "pass",
+      matchCount: 0,
+    },
+    {
+      from: "warn",
+      to: "fail",
+      direction: "tightening",
+      effective: "fail",
+      status: "pass",
+      outcome: "pass",
+      matchCount: 0,
+    },
+  ] as const;
+
+  for (const fixtureCase of cases) {
+    await t.test(`${fixtureCase.from} -> ${fixtureCase.to}`, async () => {
+      const repo = await createQualityModeTransitionCiRepo({
+        from: fixtureCase.from,
+        to: fixtureCase.to,
+      });
+      try {
+        const first = await ciReport(repo, {
+          fromRef: "base",
+          toRef: "HEAD",
+        });
+        const second = await ciReport(repo, {
+          fromRef: "base",
+          toRef: "HEAD",
+        });
+        const json = formatCiReport(first, "json");
+        const markdown = formatCiReport(first, "markdown");
+        const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+        assert.equal(first.status, fixtureCase.status);
+        assert.equal(first.qualityPolicy.outcome, fixtureCase.outcome);
+        assert.equal(
+          first.qualityPolicy.configured.effective,
+          fixtureCase.effective,
+        );
+        assert.deepEqual(first.qualityPolicy.modeTransition, {
+          from: fixtureCase.from,
+          to: fixtureCase.to,
+          direction: fixtureCase.direction,
+        });
+        assert.deepEqual(first.qualityPolicy.numericThresholdChanges, {
+          weakenings: 0,
+          tightenings: 0,
+        });
+        assert.equal(first.diff.qualityPolicy.changes.length, 0);
+        assert.equal(first.qualityPolicy.matchCount, fixtureCase.matchCount);
+        assert.deepEqual(
+          first.qualityPolicy.matches.map((match) => match.id),
+          fixtureCase.direction === "weakening"
+            ? [QUALITY_POLICY_CI_MATCH_IDS.CI_POLICY_RELAXED]
+            : [],
+        );
+        assert.match(visible, /^## Quality Policy$/m);
+        assert.match(
+          visible,
+          new RegExp(
+            `Configured CI review policy: ${fixtureCase.from} -> ${fixtureCase.to}`,
+          ),
+        );
+        assert.match(
+          visible,
+          new RegExp(`Effective CI review policy: ${fixtureCase.effective}`),
+        );
+        assert.match(
+          visible,
+          new RegExp(`Policy outcome: ${fixtureCase.outcome.toUpperCase()}`),
+        );
+        assert.match(
+          visible,
+          new RegExp(`Mode-transition direction: ${fixtureCase.direction}`),
+        );
+        assert.match(visible, /Numeric threshold weakenings: 0/);
+        assert.match(visible, /Numeric threshold tightenings: 0/);
+        assert.match(visible, /No numeric threshold changes\./);
+        assert.doesNotMatch(visible, /No CI report regressions detected/);
+        assert.equal(json, formatCiReport(second, "json"));
+        assert.equal(markdown, formatCiReport(second, "markdown"));
+      } finally {
+        await rm(repo, { force: true, recursive: true });
+      }
+    });
+  }
+});
+
+test("the first PR in a staged Quality Policy bypass is blocked", async () => {
+  const repo = await createStagedQualityBypassCiRepo();
+  try {
+    const firstPr = await ciReport(repo, {
+      fromRef: "base",
+      toRef: "mode-off",
+    });
+    const secondPr = await ciReport(repo, {
+      fromRef: "mode-off",
+      toRef: "HEAD",
+    });
+    const firstMarkdown = formatCiReport(firstPr, "markdown");
+    const firstVisible = firstMarkdown.slice(
+      0,
+      firstMarkdown.indexOf("<details>"),
+    );
+    const secondMarkdown = formatCiReport(secondPr, "markdown");
+    const secondVisible = secondMarkdown.slice(
+      0,
+      secondMarkdown.indexOf("<details>"),
+    );
+
+    assert.equal(firstPr.status, "fail");
+    assert.equal(firstPr.qualityPolicy.outcome, "fail");
+    assert.deepEqual(
+      firstPr.qualityPolicy.matches.map((match) => match.id),
+      [QUALITY_POLICY_CI_MATCH_IDS.CI_POLICY_RELAXED],
+    );
+    assert.match(firstVisible, /Quality policy: FAIL — mode weakening/);
+    assert.doesNotMatch(firstVisible, /No CI report regressions detected/);
+
+    assert.equal(secondPr.status, "pass");
+    assert.equal(secondPr.qualityPolicy.configured.effective, "off");
+    assert.equal(secondPr.qualityPolicy.outcome, "pass");
+    assert.equal(secondPr.qualityPolicy.modeTransition.direction, "unchanged");
+    assert.deepEqual(secondPr.qualityPolicy.numericThresholdChanges, {
+      weakenings: 2,
+      tightenings: 0,
+    });
+    assert.match(secondVisible, /Quality policy: GATE OFF/);
   } finally {
     await rm(repo, { force: true, recursive: true });
   }
@@ -4061,6 +4388,200 @@ async function writeContext(repo: string): Promise<void> {
       "",
     ].join("\n"),
   );
+}
+
+async function createQualityThresholdCiRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-ci-repo-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "token-budget");
+  await mkdir(skillDirectory, { recursive: true });
+  const skill = `---\nname: token-budget\ndescription: Review repositories. Use when token-budget governance needs review.\n---\n${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.equal(estimateTokens(markdownBody(skill)), 6000);
+  await writeFile(join(skillDirectory, "SKILL.md"), skill);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        skill_token_warning: 6500,
+        skill_token_high: 7500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        skill_token_warning: 4000,
+        skill_token_high: 5500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "tighten quality policy"]);
+  return repo;
+}
+
+async function createContentQualityThresholdCiRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-content-quality-ci-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await mkdir(join(repo, "contexts"), { recursive: true });
+  const context = `---
+id: context.token-budget
+owner: platform
+status: stable
+when_to_use:
+  - Reviewing token budgets
+when_not_to_use:
+  - Runtime selection
+---
+${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.ok(estimateTokens(context) > 6000);
+  assert.ok(estimateTokens(context) < 6100);
+  await writeFile(join(repo, "contexts", "token-budget.md"), context);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        context_token_warning: 7000,
+        context_token_high: 9000,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base content quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        context_token_warning: 4000,
+        context_token_high: 5500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "tighten content quality policy"]);
+  return repo;
+}
+
+async function createQualityRelaxationCiRepo(
+  modes: { from: "off" | "warn" | "fail"; to: "off" | "warn" | "fail" } = {
+    from: "fail",
+    to: "off",
+  },
+): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-relaxation-ci-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "token-budget");
+  await mkdir(skillDirectory, { recursive: true });
+  const skill = `---\nname: token-budget\ndescription: Review repositories. Use when token-budget governance needs review.\n---\n${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.equal(estimateTokens(markdownBody(skill)), 6000);
+  await writeFile(join(skillDirectory, "SKILL.md"), skill);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        ci_policy: modes.from,
+        skill_token_warning: 4000,
+        skill_token_high: 5500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base strict quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        ci_policy: modes.to,
+        skill_token_warning: 6500,
+        skill_token_high: 7500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "relax quality policy"]);
+  return repo;
+}
+
+async function createQualityModeTransitionCiRepo(modes: {
+  from: "off" | "warn" | "fail";
+  to: "off" | "warn" | "fail";
+}): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-mode-ci-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "quality-mode");
+  await mkdir(skillDirectory, { recursive: true });
+  await writeFile(
+    join(skillDirectory, "SKILL.md"),
+    "---\nname: quality-mode\ndescription: Review repositories. Use when Quality Policy mode governance needs review.\n---\n# Quality Mode\n",
+  );
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({ quality: { ci_policy: modes.from } })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base quality mode"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({ quality: { ci_policy: modes.to } })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "change quality mode"]);
+  return repo;
+}
+
+async function createStagedQualityBypassCiRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-staged-ci-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "quality-mode");
+  await mkdir(skillDirectory, { recursive: true });
+  await writeFile(
+    join(skillDirectory, "SKILL.md"),
+    "---\nname: quality-mode\ndescription: Review repositories. Use when staged Quality Policy governance needs review.\n---\n# Quality Mode\n",
+  );
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({ quality: { ci_policy: "fail" } })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base strict quality mode"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({ quality: { ci_policy: "off" } })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "disable quality gate"]);
+  await git(repo, ["tag", "mode-off"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        ci_policy: "off",
+        skill_token_warning: 6500,
+        skill_token_high: 8100,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "relax token thresholds"]);
+  return repo;
 }
 
 async function writeInvalidContextLens(repo: string): Promise<void> {

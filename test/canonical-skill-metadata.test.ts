@@ -554,11 +554,11 @@ test("catalog normalizes only a valid active token-budget decision", () => {
       "skills/demo/references/valid.md",
       "reference",
       `---
-token_budget_override: 5200
+token_budget_override: 7400
 token_budget_rationale: "This is a single ordered workflow."
 token_budget_reviewed_at: "2026-07-12"
 ---
-${"context ".repeat(5050)}`,
+${"context ".repeat(7250)}`,
     ),
   );
   const invalid = parseDocument(
@@ -566,11 +566,11 @@ ${"context ".repeat(5050)}`,
       "skills/demo/references/invalid.md",
       "reference",
       `---
-token_budget_override: 5200
-token_budget_override: 5300
+token_budget_override: 7400
+token_budget_override: 7500
 token_budget_rationale: "This is ambiguous."
 ---
-${"context ".repeat(5050)}`,
+${"context ".repeat(7250)}`,
     ),
   );
   const maxSafe = parseDocument(
@@ -581,7 +581,7 @@ ${"context ".repeat(5050)}`,
 token_budget_override: ${Number.MAX_SAFE_INTEGER}
 token_budget_rationale: "This is exactly representable."
 ---
-${"context ".repeat(5050)}`,
+${"context ".repeat(7250)}`,
     ),
   );
   const unsafe = parseDocument(
@@ -592,7 +592,7 @@ ${"context ".repeat(5050)}`,
 token_budget_override: 9007199254740993
 token_budget_rationale: "This would be rounded."
 ---
-${"context ".repeat(5050)}`,
+${"context ".repeat(7250)}`,
     ),
   );
 
@@ -610,7 +610,7 @@ ${"context ".repeat(5050)}`,
     (entry) => entry.sourcePath === "skills/demo/references/unsafe.md",
   )?.metadata;
 
-  assert.equal(validMetadata?.tokenBudgetOverride, 5200);
+  assert.equal(validMetadata?.tokenBudgetOverride, 7400);
   assert.equal(
     validMetadata?.tokenBudgetRationale,
     "This is a single ordered workflow.",

@@ -253,6 +253,37 @@ policy is temporarily relaxed without introducing executable configuration.
 Existing `renma.config.json` and `.renma.json` files remain supported; Renma
 does not support or execute `.mjs` configuration.
 
+Repositories may set effective warning and High token-budget thresholds for
+Skills and each governed Markdown content kind:
+
+```jsonc
+{
+  "quality": {
+    "ci_policy": "fail",
+    "skill_token_warning": 6400,
+    "skill_token_high": 8000,
+    "context_token_warning": 6400,
+    "context_token_high": 8000,
+    "reference_token_warning": 7200,
+    "reference_token_high": 9000,
+    "profile_token_warning": 3200,
+    "profile_token_high": 4000,
+    "example_token_warning": 4800,
+    "example_token_high": 6000
+  }
+}
+```
+
+These are Renma repository-governance thresholds, not portable Agent Skills
+requirements. The portable Agent Skills recommendation remains 5,000 Skill
+body tokens; Renma's default warning begins at 6,400. Increasing any threshold
+or weakening `quality.ci_policy` (`fail` to `warn`/`off`, or `warn` to `off`)
+is an explicit governance relaxation. The stricter mode from both compared
+revisions determines whether that relaxation fails or warns; mode tightening
+is visible and non-blocking. See the User Manual's
+[authoritative configuration contract](docs/user-manual.md#configuration) for
+defaults, validation, and independent fallback behavior.
+
 `contexts/**` is the canonical independently governed Context Asset root;
 `context/**` remains accepted for compatibility. Canonical Skill-local support
 directories are `references/`, `profiles/`, `examples/`, `scripts/`, and

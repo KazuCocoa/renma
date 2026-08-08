@@ -52,6 +52,32 @@ export interface SkillDiscoveryConfig {
   ciPolicy: SkillDiscoveryCiPolicyMode;
 }
 
+export type QualityThresholdSource =
+  "renma_default" | "repository_configuration";
+
+export type QualityCiPolicyMode = "off" | "warn" | "fail";
+
+export type ContentTokenBudgetKind =
+  "context" | "reference" | "profile" | "example";
+
+export interface ContentTokenBudgetConfig {
+  warning: number;
+  high: number;
+  warningSource: QualityThresholdSource;
+  highSource: QualityThresholdSource;
+}
+
+/** Effective repository policy for governed Markdown token-budget diagnostics. */
+export interface QualityConfig {
+  /** CI review mode for token-budget threshold weakening. Defaults to fail. */
+  ciPolicy: QualityCiPolicyMode;
+  skillTokenWarning: number;
+  skillTokenHigh: number;
+  skillTokenWarningSource: QualityThresholdSource;
+  skillTokenHighSource: QualityThresholdSource;
+  contentTokenBudgets: Record<ContentTokenBudgetKind, ContentTokenBudgetConfig>;
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -64,6 +90,7 @@ export interface ScanConfig {
   suppressions: SuppressionConfig[];
   scanBoundary: ScanBoundaryConfig;
   executableSurface: ExecutableSurfaceConfig;
+  quality: QualityConfig;
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;

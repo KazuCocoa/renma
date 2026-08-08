@@ -19,9 +19,10 @@ They describe implementation rationale and are not normative user guidance.
   Context Repository exists, the primary product boundary, installation, first
   use, and a short command overview.
 - [User Manual](user-manual.md) is authoritative for the complete operational
-  metadata reference and for current CLI workflows, command purposes, options,
-  formats, examples, expected outputs, and next steps. Emitted `renma --help`
-  and `renma <command> --help` remain the command-line authority.
+  metadata and [repository configuration](user-manual.md#configuration)
+  references and for current CLI workflows, command purposes, options, formats,
+  examples, expected outputs, and next steps. Emitted `renma --help` and
+  `renma <command> --help` remain the command-line authority.
 - [Authoring Guide](authoring-guide.md) is authoritative for new-Skill and
   existing-Skill authoring workflows, clarification, the creation gate, and the
   boundary between Renma and the consuming LLM.

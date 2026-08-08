@@ -6,7 +6,11 @@ import {
   printParseErrorCode,
   type ParseError,
 } from "jsonc-parser";
-import type { LoadedConfig, ScanConfig } from "./types/configuration.js";
+import type {
+  ContentTokenBudgetKind,
+  LoadedConfig,
+  ScanConfig,
+} from "./types/configuration.js";
 import type {
   Severity,
   SuppressionConfig,
@@ -24,6 +28,22 @@ const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const EXECUTABLE_SURFACE_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const QUALITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const CONTENT_TOKEN_BUDGET_KINDS = [
+  "context",
+  "reference",
+  "profile",
+  "example",
+] as const satisfies readonly ContentTokenBudgetKind[];
+const QUALITY_CONFIG_KEYS = [
+  "ci_policy",
+  "skill_token_warning",
+  "skill_token_high",
+  ...CONTENT_TOKEN_BUDGET_KINDS.flatMap((kind) => [
+    `${kind}_token_warning`,
+    `${kind}_token_high`,
+  ]),
+] as const;
 const SECURITY_PROFILE_ALIAS_GROUPS = {
   allowedDataClass: ["allowedDataClass", "allowed_data_class"],
   networkAllowed: ["networkAllowed", "network_allowed"],
@@ -73,6 +93,19 @@ export const DEFAULT_CONFIG: ScanConfig = {
   executableSurface: {
     ciPolicy: "off",
   },
+  quality: {
+    ciPolicy: "fail",
+    skillTokenWarning: DEFAULT_QUALITY_PROFILE.skillTokenWarning,
+    skillTokenHigh: DEFAULT_QUALITY_PROFILE.skillTokenHigh,
+    skillTokenWarningSource: "renma_default",
+    skillTokenHighSource: "renma_default",
+    contentTokenBudgets: {
+      context: defaultContentTokenBudget("context"),
+      reference: defaultContentTokenBudget("reference"),
+      profile: defaultContentTokenBudget("profile"),
+      example: defaultContentTokenBudget("example"),
+    },
+  },
   layout: {
     workflowAliases: {},
   },
@@ -113,6 +146,7 @@ export async function loadConfig(
     config: {
       ...DEFAULT_CONFIG,
       ...config,
+      quality: config.quality ?? cloneDefaultQualityConfig(),
       failOn: overrides.failOn ?? config.failOn ?? DEFAULT_CONFIG.failOn,
       format: overrides.format ?? config.format ?? DEFAULT_CONFIG.format,
     },
@@ -221,6 +255,7 @@ function normalizeConfig(
     "suppressions",
     "scan_boundary",
     "executable_surface",
+    "quality",
     "layout",
     "security",
     "skill_discovery",
@@ -260,6 +295,8 @@ function normalizeConfig(
     config.executableSurface = executableSurfacePolicy(
       value.executable_surface,
     );
+  if (value.quality !== undefined)
+    config.quality = qualityPolicy(value.quality);
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
@@ -267,6 +304,112 @@ function normalizeConfig(
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function qualityPolicy(value: unknown): ScanConfig["quality"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("quality must be an object.");
+  }
+  const allowed = new Set<string>(QUALITY_CONFIG_KEYS);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown quality config key "${key}". Allowed keys: ${QUALITY_CONFIG_KEYS.join(", ")}.`,
+      );
+    }
+  }
+
+  const hasWarning = value.skill_token_warning !== undefined;
+  const hasHigh = value.skill_token_high !== undefined;
+  const skillTokenWarning = hasWarning
+    ? positiveSafeInteger(
+        "quality.skill_token_warning",
+        value.skill_token_warning,
+      )
+    : DEFAULT_QUALITY_PROFILE.skillTokenWarning;
+  const skillTokenHigh = hasHigh
+    ? positiveSafeInteger("quality.skill_token_high", value.skill_token_high)
+    : DEFAULT_QUALITY_PROFILE.skillTokenHigh;
+  if (skillTokenWarning >= skillTokenHigh) {
+    throw new ConfigError(
+      `quality.skill_token_warning (${skillTokenWarning}) must be strictly lower than quality.skill_token_high (${skillTokenHigh}).`,
+    );
+  }
+
+  return {
+    ciPolicy:
+      value.ci_policy === undefined
+        ? "fail"
+        : enumValue(
+            "quality.ci_policy",
+            value.ci_policy,
+            QUALITY_CI_POLICY_MODES,
+          ),
+    skillTokenWarning,
+    skillTokenHigh,
+    skillTokenWarningSource: hasWarning
+      ? "repository_configuration"
+      : "renma_default",
+    skillTokenHighSource: hasHigh
+      ? "repository_configuration"
+      : "renma_default",
+    contentTokenBudgets: {
+      context: configuredContentTokenBudget(value, "context"),
+      reference: configuredContentTokenBudget(value, "reference"),
+      profile: configuredContentTokenBudget(value, "profile"),
+      example: configuredContentTokenBudget(value, "example"),
+    },
+  };
+}
+
+function configuredContentTokenBudget(
+  value: Record<string, unknown>,
+  kind: ContentTokenBudgetKind,
+): ScanConfig["quality"]["contentTokenBudgets"][ContentTokenBudgetKind] {
+  const warningKey = `${kind}_token_warning`;
+  const highKey = `${kind}_token_high`;
+  const hasWarning = value[warningKey] !== undefined;
+  const hasHigh = value[highKey] !== undefined;
+  const warning = hasWarning
+    ? positiveSafeInteger(`quality.${warningKey}`, value[warningKey])
+    : DEFAULT_QUALITY_PROFILE.contentTokenWarning[kind];
+  const high = hasHigh
+    ? positiveSafeInteger(`quality.${highKey}`, value[highKey])
+    : DEFAULT_QUALITY_PROFILE.contentTokenHigh[kind];
+  if (warning >= high) {
+    throw new ConfigError(
+      `quality.${warningKey} (${warning}) must be strictly lower than quality.${highKey} (${high}).`,
+    );
+  }
+  return {
+    warning,
+    high,
+    warningSource: hasWarning ? "repository_configuration" : "renma_default",
+    highSource: hasHigh ? "repository_configuration" : "renma_default",
+  };
+}
+
+function defaultContentTokenBudget(
+  kind: ContentTokenBudgetKind,
+): ScanConfig["quality"]["contentTokenBudgets"][ContentTokenBudgetKind] {
+  return {
+    warning: DEFAULT_QUALITY_PROFILE.contentTokenWarning[kind],
+    high: DEFAULT_QUALITY_PROFILE.contentTokenHigh[kind],
+    warningSource: "renma_default",
+    highSource: "renma_default",
+  };
+}
+
+function cloneDefaultQualityConfig(): ScanConfig["quality"] {
+  return {
+    ...DEFAULT_CONFIG.quality,
+    contentTokenBudgets: {
+      context: { ...DEFAULT_CONFIG.quality.contentTokenBudgets.context },
+      reference: { ...DEFAULT_CONFIG.quality.contentTokenBudgets.reference },
+      profile: { ...DEFAULT_CONFIG.quality.contentTokenBudgets.profile },
+      example: { ...DEFAULT_CONFIG.quality.contentTokenBudgets.example },
+    },
+  };
 }
 
 function executableSurfacePolicy(
@@ -375,6 +518,13 @@ function positiveInteger(field: string, value: unknown): number {
   if (Number.isInteger(value) && typeof value === "number" && value > 0)
     return value;
   throw new ConfigError(`${field} must be a positive integer.`);
+}
+
+function positiveSafeInteger(field: string, value: unknown): number {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+    return value;
+  }
+  throw new ConfigError(`${field} must be a positive safe integer.`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -377,6 +377,19 @@ native Set or Map object does not disable its mutator methods. Their mutable
 backing collections are never exposed. No derived projection may rediscover
 files or reread repository content.
 
+Effective rule configuration is snapshot-scoped. `loadConfig` normalizes the
+repository's optional snake-case Skill, Context, Reference, Profile, and Example
+`quality.*_token_warning` / `quality.*_token_high` fields into complete
+camel-case token policies, including independent default/configuration
+provenance for every value. The shape rule consumes that snapshot value without
+mutating `DEFAULT_QUALITY_PROFILE` or consulting process-global state. These
+values do not enter `scan-boundary` identity because they change finding
+evaluation, not the repository paths or bytes Renma can inspect. A valid
+support-asset metadata override composes as an effective warning floor, while
+the effective High threshold remains at least that floor. Override declaration
+validity uses a stable compatibility baseline independent from current warning
+defaults, so raising a default cannot invalidate an established decision.
+
 An explicit projection store derives and memoizes these facts from that stable
 input:
 
@@ -594,12 +607,22 @@ top level, evaluates the two snapshot policy modes as
 `skillDiscoveryPolicy`, evaluates both snapshot `security.ci_policy` modes as
 `securityPolicy`, evaluates both `scan_boundary.ci_policy` modes as
 `scanBoundaryPolicy`, evaluates both `executable_surface.ci_policy` modes as
-`executableSurfacePolicy`, and retains a compatibility-shaped nested diff. Endpoint
+`executableSurfacePolicy`, evaluates both `quality.ci_policy` modes as
+`qualityPolicy`, and retains a compatibility-shaped nested diff. The quality
+diff compares all ten numeric warning/High thresholds. The evaluator separately
+classifies the archived CI-mode transition and gates both threshold increases
+and mode weakening using the stricter endpoint mode. Its additive
+`modeTransition` and `numericThresholdChanges` evidence prevents a mode-only
+relaxation from becoming a silent first stage; mode tightening remains visible
+and non-blocking. Endpoint
 snapshots remain revision-local for semantic configuration. For CI only, target
 paths are collected once more through the independent union of both endpoint
 coverage predicates; the target's semantic configuration is still used for
 parsing, projections, and rules. This is an enforcement projection, not a
-second semantic comparison.
+second semantic comparison. In particular, each direct diff endpoint evaluates
+Skill and governed content-asset token-budget findings with its own archived
+`quality` thresholds; the CI enforcement-view target uses the target revision's
+quality thresholds while only its inspection boundary is widened.
 
 `determineCiReportStatus()` still receives only the compatible diff. The pure
 `skill-discovery-ci-policy` module selects the stricter `off < warn` mode,

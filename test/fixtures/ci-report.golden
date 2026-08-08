@@ -216,6 +216,26 @@
     "matchCount": 0,
     "matches": []
   },
+  "qualityPolicy": {
+    "schemaVersion": "renma.quality-policy-ci-policy.v1",
+    "configured": {
+      "from": "fail",
+      "to": "fail",
+      "effective": "fail"
+    },
+    "modeTransition": {
+      "from": "fail",
+      "to": "fail",
+      "direction": "unchanged"
+    },
+    "numericThresholdChanges": {
+      "weakenings": 0,
+      "tightenings": 0
+    },
+    "outcome": "pass",
+    "matchCount": 0,
+    "matches": []
+  },
   "securityPosture": {
     "added": {
       "totalSecurityFindings": 0,

@@ -36,7 +36,11 @@ import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
 import type { SecurityCiPolicyMode } from "../types/configuration.js";
 import type { ScanBoundaryCiPolicyMode } from "../types/configuration.js";
 import type { ExecutableSurfaceCiPolicyMode } from "../types/configuration.js";
-import type { SecurityConfig } from "../types/configuration.js";
+import type {
+  QualityCiPolicyMode,
+  QualityConfig,
+  SecurityConfig,
+} from "../types/configuration.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
   collectRepositorySnapshot,
@@ -76,6 +80,11 @@ import {
   type ScanBoundaryDiff,
 } from "../scan-boundary-diff.js";
 import { scanFromRepositorySnapshot } from "../scanner.js";
+import {
+  buildQualityPolicyDiff,
+  type QualityPolicyDiff,
+  type QualityPolicyThresholdChange,
+} from "../quality-policy-diff.js";
 import type {
   SuppressedFindingEvidence,
   SuppressionConfig,
@@ -134,6 +143,7 @@ export interface DiffReport {
   executableSurface: ExecutableSurfaceDiff;
   security: SecurityDiffSummary;
   scanBoundary: ScanBoundaryDiff;
+  qualityPolicy: QualityPolicyDiff;
   inspectionCoverage: InspectionCoverageDiff;
   findings: {
     added: FindingDelta[];
@@ -249,6 +259,7 @@ export interface DiffSnapshot {
   executableSurfaceInventory?: ExecutableSurfaceInventory;
   securityPolicies?: SecurityPolicyAssetEvidence[];
   securityConfig?: SecurityConfig;
+  qualityConfig?: QualityConfig;
   scanBoundary?: ScanBoundaryEvidence;
   inspectionCoverage?: InspectionCoverage;
   configPath?: string;
@@ -277,6 +288,10 @@ export interface DiffExecutionContext {
   executableSurfaceCiPolicy: {
     from: ExecutableSurfaceCiPolicyMode;
     to: ExecutableSurfaceCiPolicyMode;
+  };
+  qualityCiPolicy: {
+    from: QualityCiPolicyMode;
+    to: QualityCiPolicyMode;
   };
   effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence;
 }
@@ -450,6 +465,10 @@ async function executeDiffWithProjection(
         executableSurfaceCiPolicy: {
           from: fromCollected.executableSurfaceCiPolicy,
           to: toCollected.executableSurfaceCiPolicy,
+        },
+        qualityCiPolicy: {
+          from: fromCollected.qualityCiPolicy,
+          to: toCollected.qualityCiPolicy,
         },
         ...(effectiveCiBoundary
           ? { effectiveCiScanBoundary: effectiveCiBoundary }
@@ -648,6 +667,10 @@ function buildDiffReportProjection(
       toAssetIdsByPath: assetIdsByPath(toSnapshot.graph),
     }),
     scanBoundary: buildScanBoundaryDiff(fromScanBoundary, toScanBoundary),
+    qualityPolicy: buildQualityPolicyDiff(
+      fromSnapshot.qualityConfig ?? DEFAULT_CONFIG.quality,
+      toSnapshot.qualityConfig ?? DEFAULT_CONFIG.quality,
+    ),
     inspectionCoverage: buildInspectionCoverageDiff(
       fromSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
       toSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
@@ -702,6 +725,10 @@ export function formatDiff(
 
 function formatDiffMarkdown(report: DiffReportFormatInput): string {
   const discovery = "discovery" in report ? report.discovery : undefined;
+  const qualityPolicy = report.qualityPolicy ?? {
+    schemaVersion: "renma.quality-policy-diff.v1" as const,
+    changes: [],
+  };
   const discoveryLines = discovery
     ? ["", ...formatSkillDiscoveryChanges(discovery)]
     : [];
@@ -738,6 +765,14 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Target active suppressions: ${report.scanBoundary.to.activeSuppressions.length}`,
     `- Boundary changes: ${report.scanBoundary.changes.length}`,
     ...report.scanBoundary.changes.map(formatScanBoundaryChange),
+    "",
+    "## Quality Policy",
+    "",
+    `- Token threshold changes: ${qualityPolicy.changes.length}`,
+    ...qualityPolicy.changes
+      .slice(0, DIFF_DETAIL_LIMIT)
+      .map(formatQualityPolicyChange),
+    ...formatPolicyOverflow(qualityPolicy.changes.length, 0),
     "",
     "## Inspection Coverage",
     "",
@@ -868,6 +903,14 @@ function formatScanBoundaryChange(
         ? `expires ${change.suppression.fromExpires}`
         : `expires ${change.suppression.fromExpires} -> ${change.suppression.toExpires}`;
   return `- ${direction}: suppression ${change.change} ${formatMarkdownInlineCode(change.suppression.id)} at ${formatMarkdownInlineCode(change.suppression.path)}; ${expires}`;
+}
+
+function formatQualityPolicyChange(
+  change: QualityPolicyThresholdChange,
+): string {
+  const direction =
+    change.direction === "weakening" ? "WEAKENING" : "tightening";
+  return `- ${direction}: ${change.assetKind} ${change.thresholdType} ${change.from.value} (${change.from.source}) -> ${change.to.value} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
 }
 
 function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
@@ -1484,6 +1527,7 @@ async function snapshot(
   securityPolicyCiPolicy: SecurityCiPolicyMode;
   scanBoundaryCiPolicy: ScanBoundaryCiPolicyMode;
   executableSurfaceCiPolicy: ExecutableSurfaceCiPolicyMode;
+  qualityCiPolicy: QualityCiPolicyMode;
 }> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
@@ -1520,6 +1564,7 @@ async function snapshot(
     scanBoundaryCiPolicy: repositorySnapshot.config.scanBoundary.ciPolicy,
     executableSurfaceCiPolicy:
       repositorySnapshot.config.executableSurface.ciPolicy,
+    qualityCiPolicy: repositorySnapshot.config.quality.ciPolicy,
   };
 }
 
@@ -1561,6 +1606,7 @@ function projectDiffSnapshot(
       executableSurfaceInventory: repositorySnapshot.executableSurfaceInventory,
       securityPolicies: repositorySnapshot.securityPolicies,
       securityConfig: repositorySnapshot.config.security,
+      qualityConfig: repositorySnapshot.config.quality,
       scanBoundary: canonicalScanBoundary(
         scanBoundarySource(
           repositorySnapshot.config,

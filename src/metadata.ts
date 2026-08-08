@@ -12,7 +12,10 @@ import type {
   ParsedDocument,
 } from "./types/metadata.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
-import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import {
+  DEFAULT_QUALITY_PROFILE,
+  TOKEN_BUDGET_OVERRIDE_VALIDATION_BASELINE,
+} from "./quality-profile.js";
 import { estimateTokens } from "./token-estimator.js";
 import {
   CANONICAL_SKILL_METADATA_KEYS,
@@ -104,7 +107,10 @@ export interface SupportAssetTokenBudgetDecision {
   status: "absent" | "invalid" | "active";
   estimatedTokens?: number;
   defaultLimit?: number;
+  overrideValidationBaseline?: number;
   overrideLimit?: number;
+  declaredOverrideLimit?: number;
+  overrideAffectsDefaultWarning?: boolean;
   effectiveLimit?: number;
   tokenBudgetRationale?: string;
   tokenBudgetReviewedAt?: string;
@@ -142,7 +148,9 @@ export function parseSupportAssetTokenBudgetDecision(
   }
 
   const defaultLimit =
-    DEFAULT_QUALITY_PROFILE.contentTokenWarn[document.artifact.kind];
+    DEFAULT_QUALITY_PROFILE.contentTokenWarning[document.artifact.kind];
+  const overrideValidationBaseline =
+    TOKEN_BUDGET_OVERRIDE_VALIDATION_BASELINE[document.artifact.kind];
   const estimatedTokens = estimateTokens(document.artifact.content);
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
   const parsedFields = frontmatter.fields.filter(isTokenBudgetField);
@@ -152,6 +160,7 @@ export function parseSupportAssetTokenBudgetDecision(
       status: "absent",
       estimatedTokens,
       defaultLimit,
+      overrideValidationBaseline,
       effectiveLimit: defaultLimit,
       invalidReasons: [],
     };
@@ -241,9 +250,9 @@ export function parseSupportAssetTokenBudgetDecision(
           reason: "token_budget_override must be positive",
           evidence: fieldEvidence(document, overrideField),
         });
-      } else if (overrideLimit <= defaultLimit) {
+      } else if (overrideLimit <= overrideValidationBaseline) {
         issues.push({
-          reason: `token_budget_override must be greater than the default limit of ${defaultLimit}`,
+          reason: `token_budget_override must be greater than the compatibility validation baseline of ${overrideValidationBaseline}`,
           evidence: fieldEvidence(document, overrideField),
         });
       }
@@ -282,9 +291,13 @@ export function parseSupportAssetTokenBudgetDecision(
     }
   }
 
-  if (issues.length === 0 && overrideField && estimatedTokens <= defaultLimit) {
+  if (
+    issues.length === 0 &&
+    overrideField &&
+    estimatedTokens <= overrideValidationBaseline
+  ) {
     issues.push({
-      reason: `token_budget_override is unnecessary because the asset is within the default limit of ${defaultLimit}`,
+      reason: `token_budget_override is unnecessary because the asset is within the compatibility validation baseline of ${overrideValidationBaseline}`,
       evidence: fieldEvidence(document, overrideField),
     });
   }
@@ -294,7 +307,11 @@ export function parseSupportAssetTokenBudgetDecision(
       status: "invalid",
       estimatedTokens,
       defaultLimit,
+      overrideValidationBaseline,
       ...(overrideLimit !== undefined ? { overrideLimit } : {}),
+      ...(overrideLimit !== undefined
+        ? { declaredOverrideLimit: overrideLimit }
+        : {}),
       effectiveLimit: defaultLimit,
       ...(rationale ? { tokenBudgetRationale: rationale } : {}),
       ...(reviewedAt ? { tokenBudgetReviewedAt: reviewedAt } : {}),
@@ -308,6 +325,7 @@ export function parseSupportAssetTokenBudgetDecision(
       status: "invalid",
       estimatedTokens,
       defaultLimit,
+      overrideValidationBaseline,
       effectiveLimit: defaultLimit,
       invalidReasons: ["token-budget decision metadata is incomplete"],
       evidence: firstDecisionEvidence,
@@ -318,8 +336,11 @@ export function parseSupportAssetTokenBudgetDecision(
     status: "active",
     estimatedTokens,
     defaultLimit,
+    overrideValidationBaseline,
     overrideLimit,
-    effectiveLimit: overrideLimit,
+    declaredOverrideLimit: overrideLimit,
+    overrideAffectsDefaultWarning: overrideLimit > defaultLimit,
+    effectiveLimit: Math.max(defaultLimit, overrideLimit),
     tokenBudgetRationale: rationale,
     ...(reviewedAt ? { tokenBudgetReviewedAt: reviewedAt } : {}),
     invalidReasons: [],

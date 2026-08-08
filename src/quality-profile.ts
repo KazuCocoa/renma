@@ -4,22 +4,46 @@ import packageJson from "../package.json" with { type: "json" };
  * Renma's deterministic quality policy.
  *
  * These values are Renma advisories unless a field is explicitly grouped
- * under `agentSkills`. They are deliberately internal: repositories
- * cannot override them through repository configuration.
+ * under `agentSkills`. Repository configuration may override only fields with
+ * an explicit configuration contract; all other values remain internal.
  */
 export const RENMA_QUALITY_PROFILE_VERSION =
   `renma-quality@${packageJson.version}` as const;
 
+/**
+ * Stable floor used only to validate support-asset override declarations.
+ *
+ * This is intentionally independent from current repository warning defaults:
+ * raising an advisory must not retroactively invalidate an accepted decision.
+ */
+export const TOKEN_BUDGET_OVERRIDE_VALIDATION_BASELINE = {
+  context: 4_000,
+  reference: 5_000,
+  profile: 2_000,
+  example: 2_500,
+} as const;
+
 export const DEFAULT_QUALITY_PROFILE = {
   profile: RENMA_QUALITY_PROFILE_VERSION,
   descriptionMinChars: 0,
-  skillTokenWarn: 2_000,
-  skillTokenStrongWarn: 5_000,
-  contentTokenWarn: {
-    context: 4_000,
-    reference: 5_000,
-    profile: 2_000,
-    example: 2_500,
+  // Warning thresholds are 80% of High thresholds, leaving a review band
+  // before a large asset becomes a High-severity maintainability concern.
+  skillTokenWarning: 6_400,
+  skillTokenHigh: 8_000,
+  contentTokenWarning: {
+    context: 6_400,
+    reference: 7_200,
+    profile: 3_200,
+    example: 4_800,
+  },
+  // Asset kinds have distinct coherence and completeness needs. These upper
+  // bounds keep long-form material reviewable without treating size alone as
+  // evidence that an asset should be split.
+  contentTokenHigh: {
+    context: 8_000,
+    reference: 9_000,
+    profile: 4_000,
+    example: 6_000,
   },
   frontmatterMaxLines: 48,
   frontmatterMaxChars: 4_096,
