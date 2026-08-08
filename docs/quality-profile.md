@@ -11,8 +11,11 @@ the active profile as `renma-quality@<Renma package version>`, derived from
 defaults remain fixed except for the explicitly documented Skill body and
 content-asset thresholds. Repositories may override those values through the
 corresponding `quality.*_token_warning` and `quality.*_token_high` keys. Numeric
-increases are governed by `quality.ci_policy` (`off`, `warn`, or `fail`, default
-`fail`) using the stricter mode from the compared revisions; the
+increases and weakening `quality.ci_policy` (`fail` to `warn`/`off`, or `warn`
+to `off`) are governed using the stricter mode from the compared revisions.
+Mode tightening remains visible but does not block solely because of that
+transition. `quality.ci_policy` supports `off`, `warn`, and `fail`, and defaults
+to `fail`. The
 [User Manual configuration section](user-manual.md#configuration) is the
 authoritative configuration contract. The internal shape is versioned so
 effective policy remains centralized rather than scattering constants across

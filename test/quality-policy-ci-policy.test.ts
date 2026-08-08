@@ -7,8 +7,10 @@ import {
   type QualityPolicyThresholdChange,
 } from "../src/quality-policy-diff.js";
 import {
+  QUALITY_POLICY_CI_MATCH_IDS,
   effectiveQualityPolicyCiPolicy,
   evaluateQualityPolicyCiPolicy,
+  qualityPolicyCiModeTransition,
 } from "../src/quality-policy-ci-policy.js";
 import type { QualityConfig } from "../src/types/configuration.js";
 
@@ -139,6 +141,118 @@ test("quality CI policy applies fail warn off and stricter fail-to-off resolutio
     evaluateQualityPolicyCiPolicy(diff, { from: "fail", to: "off" }).outcome,
     "fail",
   );
+  const combined = evaluateQualityPolicyCiPolicy(diff, {
+    from: "fail",
+    to: "off",
+  });
+  assert.equal(combined.matchCount, 2);
+  assert.deepEqual(
+    combined.matches.map((match) => match.id),
+    [
+      QUALITY_POLICY_CI_MATCH_IDS.CI_POLICY_RELAXED,
+      QUALITY_POLICY_CI_MATCH_IDS.THRESHOLD_INCREASED,
+    ],
+  );
+  assert.deepEqual(combined.numericThresholdChanges, {
+    weakenings: 1,
+    tightenings: 0,
+  });
+});
+
+test("quality CI mode transitions are independently classified and governed", () => {
+  const cases = [
+    {
+      from: "fail",
+      to: "off",
+      direction: "weakening",
+      effective: "fail",
+      outcome: "fail",
+      matchCount: 1,
+    },
+    {
+      from: "fail",
+      to: "warn",
+      direction: "weakening",
+      effective: "fail",
+      outcome: "fail",
+      matchCount: 1,
+    },
+    {
+      from: "warn",
+      to: "off",
+      direction: "weakening",
+      effective: "warn",
+      outcome: "warn",
+      matchCount: 1,
+    },
+    {
+      from: "off",
+      to: "warn",
+      direction: "tightening",
+      effective: "warn",
+      outcome: "pass",
+      matchCount: 0,
+    },
+    {
+      from: "warn",
+      to: "fail",
+      direction: "tightening",
+      effective: "fail",
+      outcome: "pass",
+      matchCount: 0,
+    },
+    {
+      from: "off",
+      to: "off",
+      direction: "unchanged",
+      effective: "off",
+      outcome: "pass",
+      matchCount: 0,
+    },
+    {
+      from: "fail",
+      to: "fail",
+      direction: "unchanged",
+      effective: "fail",
+      outcome: "pass",
+      matchCount: 0,
+    },
+  ] as const;
+
+  for (const fixtureCase of cases) {
+    const configured = { from: fixtureCase.from, to: fixtureCase.to };
+    const first = evaluateQualityPolicyCiPolicy({ changes: [] }, configured);
+    const second = evaluateQualityPolicyCiPolicy({ changes: [] }, configured);
+
+    assert.deepEqual(first, second);
+    assert.deepEqual(qualityPolicyCiModeTransition(configured), {
+      ...configured,
+      direction: fixtureCase.direction,
+    });
+    assert.equal(first.configured.effective, fixtureCase.effective);
+    assert.equal(first.modeTransition.direction, fixtureCase.direction);
+    assert.equal(first.outcome, fixtureCase.outcome);
+    assert.equal(first.matchCount, fixtureCase.matchCount);
+    assert.deepEqual(first.numericThresholdChanges, {
+      weakenings: 0,
+      tightenings: 0,
+    });
+    assert.deepEqual(
+      first.matches,
+      fixtureCase.direction === "weakening"
+        ? [
+            {
+              id: QUALITY_POLICY_CI_MATCH_IDS.CI_POLICY_RELAXED,
+              summary: "The Quality Policy CI review mode was weakened.",
+              transition: {
+                ...configured,
+                direction: "weakening",
+              },
+            },
+          ]
+        : [],
+    );
+  }
 });
 
 test("quality tightening remains visible without failing the gate", () => {
@@ -156,6 +270,10 @@ test("quality tightening remains visible without failing the gate", () => {
   assert.ok(diff.changes.every((change) => change.direction === "tightening"));
   assert.equal(evaluation.matchCount, 0);
   assert.equal(evaluation.outcome, "pass");
+  assert.deepEqual(evaluation.numericThresholdChanges, {
+    weakenings: 0,
+    tightenings: 2,
+  });
 });
 
 function qualityConfig(): QualityConfig {

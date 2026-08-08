@@ -1134,9 +1134,11 @@ The configuration supports the same names used by the implementation, including:
   `QUAL-SKILL-TOKEN-BUDGET` finding and the Context, Reference, Profile, and
   Example `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` finding. Supported keys and Renma
   defaults are. `ci_policy` supports `off`, `warn`, and `fail`, defaults to
-  `fail`, and governs numeric threshold increases in `ci-report`. CI uses the
-  stricter base/target mode, so changing `fail` to `off` in the same revision
-  cannot bypass review.
+  `fail`, and governs numeric threshold increases and CI-mode weakening in
+  `ci-report`. `fail -> warn`, `fail -> off`, and `warn -> off` are weakenings.
+  CI uses the stricter base/target mode, so those transitions fail under an
+  effective `fail` mode and warn under an effective `warn` mode. `off -> warn`
+  and `warn -> fail` are visible, non-blocking tightenings.
 
   | Asset measurement | Warning key and default | High key and default |
   | --- | ---: | ---: |
@@ -2281,12 +2283,20 @@ Token-threshold changes appear in nested `diff.qualityPolicy` as
 old/new values, default/configured provenance, and weakening/tightening
 direction. Top-level `qualityPolicy` is
 `renma.quality-policy-ci-policy.v1`; it records archived `from`, `to`, and
-stricter effective modes plus outcome and complete weakening matches. Increasing
-either threshold is weakening; decreasing one is tightening, and simultaneous
-changes retain both directions. In `fail` mode any weakening makes the report
-`FAIL`; `warn` makes it at least `WARN`; `off` remains visible without changing
-status. A finding that disappears alongside threshold weakening is not treated
-as verified remediation. This evaluator is separate from scan-boundary policy.
+stricter effective modes plus outcome and complete weakening matches.
+`modeTransition` records configured endpoints and `unchanged`, `weakening`, or
+`tightening` direction; `numericThresholdChanges` independently counts numeric
+weakenings and tightenings. Increasing either threshold is weakening;
+decreasing one is tightening, and simultaneous changes retain both directions.
+A CI-mode weakening emits the stable
+`quality_policy_ci.ci_policy_relaxed` match. In effective `fail` mode any
+weakening makes the report `FAIL`; effective `warn` makes it at least `WARN`;
+unchanged `off` remains visible without changing status. Mode tightening is
+visible but non-blocking. Markdown renders the Quality Policy section whenever
+the modes differ, numeric thresholds differ, or the evaluator has a match, so
+a mode-only relaxation never receives a no-regression review note. A finding
+that disappears alongside threshold weakening is not treated as verified
+remediation. This evaluator is separate from scan-boundary policy.
 
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero

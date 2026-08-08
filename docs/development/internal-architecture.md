@@ -609,8 +609,12 @@ top level, evaluates the two snapshot policy modes as
 `scanBoundaryPolicy`, evaluates both `executable_surface.ci_policy` modes as
 `executableSurfacePolicy`, evaluates both `quality.ci_policy` modes as
 `qualityPolicy`, and retains a compatibility-shaped nested diff. The quality
-diff compares all ten numeric warning/High thresholds and the evaluator gates
-only increases using the stricter endpoint mode. Endpoint
+diff compares all ten numeric warning/High thresholds. The evaluator separately
+classifies the archived CI-mode transition and gates both threshold increases
+and mode weakening using the stricter endpoint mode. Its additive
+`modeTransition` and `numericThresholdChanges` evidence prevents a mode-only
+relaxation from becoming a silent first stage; mode tightening remains visible
+and non-blocking. Endpoint
 snapshots remain revision-local for semantic configuration. For CI only, target
 paths are collected once more through the independent union of both endpoint
 coverage predicates; the target's semantic configuration is still used for

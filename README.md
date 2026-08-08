@@ -277,8 +277,10 @@ Skills and each governed Markdown content kind:
 These are Renma repository-governance thresholds, not portable Agent Skills
 requirements. The portable Agent Skills recommendation remains 5,000 Skill
 body tokens; Renma's default warning begins at 6,400. Increasing any threshold
-is a policy weakening governed by `quality.ci_policy`; the default `fail` mode
-uses the stricter mode from both compared revisions. See the User Manual's
+or weakening `quality.ci_policy` (`fail` to `warn`/`off`, or `warn` to `off`)
+is an explicit governance relaxation. The stricter mode from both compared
+revisions determines whether that relaxation fails or warns; mode tightening
+is visible and non-blocking. See the User Manual's
 [authoritative configuration contract](docs/user-manual.md#configuration) for
 defaults, validation, and independent fallback behavior.
 

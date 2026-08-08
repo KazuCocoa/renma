@@ -496,21 +496,40 @@ function reviewNotes(
     }
   }
   if (qualityPolicy.matchCount > 0) {
-    const suffix = qualityPolicy.matchCount === 1 ? "increase" : "increases";
-    if (qualityPolicy.configured.effective === "off") {
-      notes.push(
-        `Quality-policy CI review is off; ${qualityPolicy.matchCount} threshold ${suffix} remain informational.`,
-      );
-    } else {
-      notes.push(
-        `Quality policy matched ${qualityPolicy.matchCount} token-threshold ${suffix}.`,
-      );
+    const thresholdWeakeningCount =
+      qualityPolicy.numericThresholdChanges.weakenings;
+    const suffix = thresholdWeakeningCount === 1 ? "increase" : "increases";
+    if (thresholdWeakeningCount > 0) {
+      if (qualityPolicy.configured.effective === "off") {
+        notes.push(
+          `Quality-policy CI review is off; ${thresholdWeakeningCount} numeric threshold ${suffix} remain informational.`,
+        );
+      } else {
+        notes.push(
+          `Quality policy matched ${thresholdWeakeningCount} numeric token-threshold ${suffix}.`,
+        );
+      }
     }
-    if (report.summary.findingsDelta < 0) {
+    if (report.summary.findingsDelta < 0 && thresholdWeakeningCount > 0) {
       notes.push(
         "Scan findings decreased alongside a token-threshold weakening; this is not treated as verified remediation.",
       );
     }
+  }
+  if (qualityPolicy.modeTransition.direction === "weakening") {
+    if (qualityPolicy.configured.effective === "off") {
+      notes.push(
+        `Quality CI mode was relaxed from ${qualityPolicy.modeTransition.from} to ${qualityPolicy.modeTransition.to}; the gate is disabled.`,
+      );
+    } else {
+      notes.push(
+        `Quality CI mode was relaxed from ${qualityPolicy.modeTransition.from} to ${qualityPolicy.modeTransition.to}; the stricter ${qualityPolicy.configured.effective} endpoint mode governs this comparison.`,
+      );
+    }
+  } else if (qualityPolicy.modeTransition.direction === "tightening") {
+    notes.push(
+      `Quality CI mode was tightened from ${qualityPolicy.modeTransition.from} to ${qualityPolicy.modeTransition.to}; the transition is non-blocking.`,
+    );
   }
   if (executableSurfacePolicy.matchCount > 0) {
     if (executableSurfacePolicy.configured.effective === "off") {
@@ -657,18 +676,23 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     : [];
   const qualityPolicy =
     "qualityPolicy" in report ? report.qualityPolicy : undefined;
-  if (qualityPolicy && qualityDiff.changes.length > 0) {
+  const hasQualityPolicyEvidence =
+    qualityPolicy !== undefined &&
+    (qualityPolicy.configured.from !== qualityPolicy.configured.to ||
+      qualityDiff.changes.length > 0 ||
+      qualityPolicy.matchCount > 0);
+  if (qualityPolicy && hasQualityPolicyEvidence) {
     const effect =
       qualityPolicy.matchCount > 0 &&
       qualityPolicy.configured.effective === "off"
         ? "GATE OFF"
         : qualityPolicy.outcome.toUpperCase();
     summaryLines.push(
-      `- Quality token thresholds: ${effect} — ${qualityPolicy.matchCount} weakening / ${qualityDiff.changes.length - qualityPolicy.matchCount} tightening`,
+      `- Quality policy: ${effect} — mode ${qualityPolicy.modeTransition.direction}; ${qualityPolicy.numericThresholdChanges.weakenings} numeric weakenings / ${qualityPolicy.numericThresholdChanges.tightenings} numeric tightenings`,
     );
   }
   const qualityPolicyLines =
-    qualityPolicy && qualityDiff.changes.length > 0
+    qualityPolicy && hasQualityPolicyEvidence
       ? ["", ...formatQualityPolicySection(qualityPolicy, qualityDiff.changes)]
       : [];
 
@@ -1036,27 +1060,28 @@ function formatQualityPolicySection(
   changes: readonly QualityPolicyThresholdChange[],
 ): string[] {
   const { from, to, effective } = policy.configured;
-  const configured =
-    from === to
-      ? [`- CI review policy: ${from}`]
-      : [
-          `- CI review policy: ${from} -> ${to}`,
-          `- Effective CI review policy: ${effective}`,
-        ];
   return [
-    "## Quality Token-Threshold Policy",
+    "## Quality Policy",
     "",
-    ...configured,
+    `- Configured CI review policy: ${from} -> ${to}`,
+    `- Effective CI review policy: ${effective}`,
+    `- Policy outcome: ${policy.outcome.toUpperCase()}`,
+    `- Mode-transition direction: ${policy.modeTransition.direction}`,
+    `- Numeric threshold weakenings: ${policy.numericThresholdChanges.weakenings}`,
+    `- Numeric threshold tightenings: ${policy.numericThresholdChanges.tightenings}`,
+    `- Evaluator matches: ${policy.matchCount}`,
     ...(effective === "off" && policy.matchCount > 0
       ? ["- CI status effect: none — gate disabled"]
-      : [`- Policy outcome: ${policy.outcome.toUpperCase()}`]),
-    `- Weakenings: ${policy.matchCount}`,
-    `- Tightenings: ${changes.length - policy.matchCount}`,
+      : []),
     "",
-    ...changes
-      .slice(0, MAX_LIST_ITEMS)
-      .map((change) => `- ${formatQualityPolicyChange(change)}`),
-    ...formatOverflow(changes.length),
+    ...(changes.length === 0
+      ? ["- No numeric threshold changes."]
+      : [
+          ...changes
+            .slice(0, MAX_LIST_ITEMS)
+            .map((change) => `- ${formatQualityPolicyChange(change)}`),
+          ...formatOverflow(changes.length),
+        ]),
   ];
 }
 

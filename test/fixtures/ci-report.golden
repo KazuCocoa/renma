@@ -223,6 +223,15 @@
       "to": "fail",
       "effective": "fail"
     },
+    "modeTransition": {
+      "from": "fail",
+      "to": "fail",
+      "direction": "unchanged"
+    },
+    "numericThresholdChanges": {
+      "weakenings": 0,
+      "tightenings": 0
+    },
     "outcome": "pass",
     "matchCount": 0,
     "matches": []

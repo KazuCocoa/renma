@@ -15,8 +15,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   provenance, and revision-local `diff` / `ci-report` evaluation.
 - Added deterministic `renma.quality-policy-diff.v1` threshold-transition
   evidence and `quality.ci_policy` (`off`, `warn`, or `fail`, default `fail`).
-  CI uses the stricter endpoint mode, gates numeric threshold increases, keeps
-  tightening visible, and emits `renma.quality-policy-ci-policy.v1` outcomes.
+  CI uses the stricter endpoint mode and gates both numeric threshold increases
+  and CI-mode weakening. Mode and numeric transitions remain independently
+  visible in `renma.quality-policy-ci-policy.v1` outcomes; tightening is
+  non-blocking.
 
 ### Changed
 
@@ -46,10 +48,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Metadata-size, Script, and Asset policies are unchanged. Quality thresholds
   do not participate in scan-boundary weakening policy.
 - Semantic diff JSON adds `qualityPolicy`, and CI-report JSON adds top-level
-  `qualityPolicy`. A finding decrease alongside a threshold weakening is not
-  described as verified remediation. Existing fields remain compatible and
-  support-asset finding details add declaration, validation-baseline, and
-  effective-warning-impact evidence.
+  `qualityPolicy`. The CI evaluation additively records `modeTransition` and
+  independent `numericThresholdChanges`; a mode weakening emits
+  `quality_policy_ci.ci_policy_relaxed`. A finding decrease alongside a
+  threshold weakening is not described as verified remediation. Existing
+  fields remain compatible and support-asset finding details add declaration,
+  validation-baseline, and effective-warning-impact evidence.
 - Semantic diff and nested CI-report JSON add optional `contentHash` values to
   asset endpoints and `contentChanged` to newly built changed-asset rows when
   both endpoints provide comparable content identity.
