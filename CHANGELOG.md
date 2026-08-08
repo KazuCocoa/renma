@@ -6,6 +6,31 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added `SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` as a dedicated
+  high-severity security-review finding for positive high-risk directives in
+  HTML comments and blockquotes. Structured finding details identify
+  `sourceRegionKind`, preserve that the content is non-operational, and report
+  deterministic risk signals without promoting quoted content into ordinary
+  instruction semantics.
+
+### Changed
+
+- Changed semantic asset comparison to use canonical catalog content hashes.
+  Content-only edits now appear as changed assets in `diff` and `ci-report`,
+  with a visible bounded content-change count, while remaining neutral unless
+  an independent finding or governance rule changes CI status.
+
+### Compatibility
+
+- Semantic diff and nested CI-report JSON add optional `contentHash` values to
+  asset endpoints, `contentChanged` to newly built changed-asset rows, and
+  `summary.contentChangedAssets` when endpoint snapshots provide comparable
+  content identity. `changedFields` remains the governance-metadata field list;
+  formatters continue to accept legacy rows and snapshots without the new
+  fields.
+
 ## [0.31.0] - 2026-08-08
 
 ### Added

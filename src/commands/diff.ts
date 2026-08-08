@@ -114,6 +114,7 @@ export interface DiffReport {
     graphResolutionDelta: number;
     findingsDelta: number;
     highOrCriticalFindingsDelta: number;
+    contentChangedAssets?: number;
   };
   catalog: {
     addedAssets: AssetDelta[];
@@ -177,6 +178,7 @@ export interface AssetDelta {
   id: string;
   path?: string | undefined;
   kind?: string | undefined;
+  contentHash?: string | undefined;
   declaredOwner: string | null;
   effectiveOwner: string | null;
   status?: string | undefined;
@@ -200,6 +202,7 @@ export interface AssetChange {
   id: string;
   path?: string | undefined;
   changedFields: ComparableAssetField[];
+  contentChanged?: boolean;
   from: AssetDelta;
   to: AssetDelta;
 }
@@ -545,6 +548,13 @@ function buildDiffReportProjection(
   const removedFindings = [...fromFindings]
     .filter(([key]) => !toFindings.has(key))
     .map(([, finding]) => finding);
+  const catalogChanges = changedAssets(fromAssets, toAssets);
+  const contentIdentityComparable = [...toAssets].some(([key, toAsset]) => {
+    const fromAsset = fromAssets.get(key);
+    return (
+      fromAsset !== undefined && hasComparableContentHash(fromAsset, toAsset)
+    );
+  });
 
   const shared = {
     root,
@@ -570,6 +580,13 @@ function buildDiffReportProjection(
         highOrCriticalCount([...toFindings.values()]),
         highOrCriticalCount([...fromFindings.values()]),
       ),
+      ...(contentIdentityComparable
+        ? {
+            contentChangedAssets: catalogChanges.filter(
+              (change) => change.contentChanged === true,
+            ).length,
+          }
+        : {}),
     },
     catalog: {
       addedAssets: [...toAssets]
@@ -578,7 +595,7 @@ function buildDiffReportProjection(
       removedAssets: [...fromAssets]
         .filter(([key]) => !toAssets.has(key))
         .map(([, asset]) => asset),
-      changedAssets: changedAssets(fromAssets, toAssets),
+      changedAssets: catalogChanges,
     },
     graph: {
       addedEdges: [...toEdges]
@@ -705,6 +722,7 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Graph resolution: ${signed(report.summary.graphResolutionDelta)}`,
     `- Findings: ${signed(report.summary.findingsDelta)}`,
     `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
+    `- Content changes: ${report.summary.contentChangedAssets ?? contentChangedAssetCount(report.catalog.changedAssets)}`,
     ...discoveryLines,
     "",
     "## Scan Boundary",
@@ -737,13 +755,22 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Added assets: ${report.catalog.addedAssets.length}`,
     `- Removed assets: ${report.catalog.removedAssets.length}`,
     `- Changed assets: ${report.catalog.changedAssets.length}`,
+    `- Content-changed assets: ${contentChangedAssetCount(report.catalog.changedAssets)}`,
     ...(report.catalog.changedAssets.length > 0
       ? [
           "",
-          "### Changed asset fields",
+          "### Changed asset evidence",
           "",
           ...report.catalog.changedAssets.flatMap((change) => [
             `- \`${change.id}\` (${change.path ? `\`${change.path}\`` : "path unavailable"})`,
+            ...(change.contentChanged === true
+              ? [
+                  `  - content changed: yes`,
+                  `  - content hash: ${markdownValue(change.from.contentHash)} -> ${markdownValue(change.to.contentHash)}`,
+                ]
+              : change.contentChanged === false
+                ? [`  - content changed: no`]
+                : []),
             ...change.changedFields.map(
               (field) =>
                 `  - ${field}: ${markdownValue(change.from[field])} -> ${markdownValue(change.to[field])}`,
@@ -1598,13 +1625,17 @@ function changedAssets(
       const changedFields = COMPARABLE_ASSET_FIELDS.filter(
         (field) => fromAsset[field] !== toAsset[field],
       );
-      return changedFields.length === 0
+      const contentChanged = hasComparableContentHash(fromAsset, toAsset)
+        ? fromAsset.contentHash !== toAsset.contentHash
+        : false;
+      return changedFields.length === 0 && !contentChanged
         ? []
         : [
             {
               id: toAsset.id,
               path: toAsset.path,
               changedFields,
+              contentChanged,
               from: fromAsset,
               to: toAsset,
             },
@@ -1664,6 +1695,9 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
         id: firstString(node, ["id", "path", "sourcePath"]),
         path: firstOptionalString(node, ["sourcePath", "path"]),
         kind: firstOptionalString(node, ["kind"]),
+        ...(firstOptionalString(node, ["contentHash"])
+          ? { contentHash: firstOptionalString(node, ["contentHash"]) }
+          : {}),
         declaredOwner:
           optionalNullableStringField(ownership, "declaredOwner") ?? null,
         effectiveOwner:
@@ -1681,6 +1715,14 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
       return [asset.id, asset] as const;
     }),
   );
+}
+
+function hasComparableContentHash(from: AssetDelta, to: AssetDelta): boolean {
+  return from.contentHash !== undefined && to.contentHash !== undefined;
+}
+
+function contentChangedAssetCount(changes: readonly AssetChange[]): number {
+  return changes.filter((change) => change.contentChanged === true).length;
 }
 
 function markdownValue(value: unknown): string {

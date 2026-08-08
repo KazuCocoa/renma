@@ -146,6 +146,7 @@ artifact eligibility
   -> policy prelude
   -> physical-line detections
   -> semantic-unit detections
+  -> structurally excluded-region security review
   -> policy contradictions
   -> deduplication and Finding projection
 ```
@@ -170,6 +171,16 @@ cache identity. Guard evidence and Finding evidence remain line-specific. The
 projection never crosses paragraph, list-item, blockquote, heading,
 thematic-break, hidden comment, or code boundaries, and it does not replace
 physical-line or logical-command evidence or analysis input.
+
+`MarkdownSecurityView.excludedSecurityReviewRegions` separately retains exact
+positioned HTML-comment and top-level blockquote evidence. The security
+orchestrator evaluates that collection only through the dedicated, bounded
+high-risk review classifier. It requires positive directive evidence and emits
+`SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` with the source-region kind;
+excluded text never enters visible lines, semantic units, guard history,
+logical commands, or body-policy projection. This keeps negative examples and
+quoted prose non-operational while preventing high-confidence dangerous source
+content from disappearing from review.
 
 The private `src/security-body-policy/` classifier consumes prepared clause
 ranges through an explicitly layered, bounded pipeline:
@@ -579,6 +590,13 @@ review conditions select bounded relevant rows. This projection never changes
 scan JSON or BOM rendering. Diff separately records newly introduced
 multi-fingerprint invocations, while CI renders their total delta and a bounded
 neutral detail list without adding them to path-problem evidence.
+
+Asset delta construction reads the canonical `contentHash` already present on
+graph/catalog evidence. Hash comparison is symmetric and independent of node
+discovery order. `contentChanged` is separate from governance
+`changedFields`, and `summary.contentChangedAssets` is a neutral count; neither
+field participates in CI status selection. Legacy formatter inputs without
+content identity remain accepted and do not fabricate a content transition.
 
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as

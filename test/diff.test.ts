@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
-import { buildCiReportFromDiff } from "../src/commands/ci-report.js";
+import {
+  buildCiReportFromDiff,
+  formatCiReport,
+} from "../src/commands/ci-report.js";
 import { buildDiffReport, diff, formatDiff } from "../src/commands/diff.js";
 import { ConfigError } from "../src/config.js";
 import {
@@ -223,6 +226,142 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
   assert.equal(report.security.policyInventory.networkAllowed.true, 1);
   assert.equal(report.security.policyInventory.securityProfiles.missing, 1);
   assert.equal(report.security.policyInventory.securityProfiles.cyclic, -1);
+});
+
+test("content identity changes are neutral, deterministic, reversible, and legacy-compatible", () => {
+  const unchanged = {
+    ...node("context", "contexts/context.md", "context", "docs", "stable"),
+    contentHash: `sha256:${"a".repeat(64)}`,
+  };
+  const before = {
+    ...node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
+    contentHash: `sha256:${"b".repeat(64)}`,
+  };
+  const after = {
+    ...before,
+    contentHash: `sha256:${"c".repeat(64)}`,
+  };
+  const from = snapshot("base", {
+    score: 100,
+    level: "ready",
+    totalAssets: 2,
+    ownedAssets: 2,
+    ownershipCoveragePercent: 100,
+    graphResolutionPercent: 100,
+    nodes: [before, unchanged],
+  });
+  const to = snapshot("head", {
+    score: 100,
+    level: "ready",
+    totalAssets: 2,
+    ownedAssets: 2,
+    ownershipCoveragePercent: 100,
+    graphResolutionPercent: 100,
+    nodes: [unchanged, after],
+  });
+
+  const forward = buildDiffReport("/repo", from, to);
+  const reordered = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      score: 100,
+      level: "ready",
+      totalAssets: 2,
+      ownedAssets: 2,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 100,
+      nodes: [unchanged, before],
+    }),
+    snapshot("head", {
+      score: 100,
+      level: "ready",
+      totalAssets: 2,
+      ownedAssets: 2,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 100,
+      nodes: [after, unchanged],
+    }),
+  );
+  const reverse = buildDiffReport("/repo", to, from);
+
+  assert.equal(forward.summary.contentChangedAssets, 1);
+  assert.deepEqual(
+    forward.catalog.changedAssets,
+    reordered.catalog.changedAssets,
+  );
+  assert.deepEqual(forward.catalog.changedAssets[0], {
+    id: "skill",
+    path: "skills/demo/SKILL.md",
+    changedFields: [],
+    contentChanged: true,
+    from: {
+      id: "skill",
+      path: "skills/demo/SKILL.md",
+      kind: "skill",
+      contentHash: before.contentHash,
+      declaredOwner: "platform",
+      effectiveOwner: "platform",
+      status: "stable",
+    },
+    to: {
+      id: "skill",
+      path: "skills/demo/SKILL.md",
+      kind: "skill",
+      contentHash: after.contentHash,
+      declaredOwner: "platform",
+      effectiveOwner: "platform",
+      status: "stable",
+    },
+  });
+  assert.equal(reverse.catalog.changedAssets[0]?.contentChanged, true);
+  assert.equal(
+    reverse.catalog.changedAssets[0]?.from.contentHash,
+    after.contentHash,
+  );
+  assert.equal(
+    reverse.catalog.changedAssets[0]?.to.contentHash,
+    before.contentHash,
+  );
+
+  const ci = buildCiReportFromDiff(forward);
+  const ciJson = JSON.parse(formatCiReport(ci, "json")) as typeof ci;
+  const diffJson = JSON.parse(formatDiff(forward, "json")) as typeof forward;
+  const ciMarkdown = formatCiReport(ci, "markdown");
+  const diffMarkdown = formatDiff(forward, "markdown");
+  assert.equal(ci.status, "pass");
+  assert.equal(ciJson.diff.summary.contentChangedAssets, 1);
+  assert.equal(ciJson.diff.catalog.changedAssets[0]?.contentChanged, true);
+  assert.equal(
+    ciJson.diff.catalog.changedAssets[0]?.from.contentHash,
+    before.contentHash,
+  );
+  assert.equal(diffJson.summary.contentChangedAssets, 1);
+  assert.equal(diffJson.catalog.changedAssets[0]?.contentChanged, true);
+  assert.equal(
+    diffJson.catalog.changedAssets[0]?.to.contentHash,
+    after.contentHash,
+  );
+  assert.match(ciMarkdown, /- Content changes: 1/u);
+  assert.match(ciMarkdown, /- Changed assets: 1/u);
+  assert.match(ciMarkdown, /- Content changed: yes/u);
+  assert.match(diffMarkdown, /- Content changes: 1/u);
+  assert.match(diffMarkdown, /- Content-changed assets: 1/u);
+
+  const legacy = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      nodes: [
+        node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
+      ],
+    }),
+    snapshot("head", {
+      nodes: [
+        node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
+      ],
+    }),
+  );
+  assert.equal(legacy.catalog.changedAssets.length, 0);
+  assert.equal(legacy.summary.contentChangedAssets, undefined);
 });
 
 test("buildDiffReport exposes canonical declared and effective owner changes", () => {

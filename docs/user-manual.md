@@ -1385,6 +1385,17 @@ coverage, and summary data that other tools can consume.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 
+Blockquotes and HTML comments remain excluded from ordinary operational
+instruction, authorization, and guard semantics. A separate deterministic
+source-integrity review can still emit the high-severity
+`SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` when one of those regions contains
+a positive directive for secret disclosure, policy-denied network/upload
+behavior, safeguard bypass, or remote pipe-to-shell execution. Structured
+details identify `html_comment` or `blockquote` and explicitly keep
+`operationalInstruction: false`. Direct prohibitions, clearly bounded safe or
+negative examples, harmless comments, and ordinary quoted prose remain
+neutral.
+
 `executableSurfaceInventory` uses schema
 `renma.executable-surface-inventory.v1`. An executable surface is an
 already-discovered repository-local Skill script or `tools/**` helper that
@@ -2116,6 +2127,15 @@ adoption and coverage transitions, count deltas, published entrypoint changes,
 newly reachable/not-reached and newly/resolved unrouted Skill identities,
 route additions/removals/state changes, and added/resolved cyclic components.
 
+Asset comparison also uses the canonical catalog content hash. Newly generated
+JSON includes endpoint `contentHash`, a `contentChanged` boolean on changed
+asset rows, and `summary.contentChangedAssets`; `changedFields` remains limited
+to governance metadata such as path, kind, ownership, and lifecycle. A
+content-only edit is therefore a changed asset even when `changedFields` is
+empty. Markdown reports the content-change count and, for bounded changed-asset
+details, the before/after hashes. This remains semantic identity evidence, not
+a generic source-hunk renderer.
+
 Skills are identified by repository-relative path and ID. Routes are grouped
 by normalized source Skill path and normalized declared target, so declaration
 reordering, YAML array position, and source-line movement do not create false
@@ -2214,7 +2234,8 @@ percentage while retaining the existing `summary.ownershipCoverageDelta` field.
 
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero
-summary deltas, and review notes so `WARN` and `FAIL` reasons remain immediately
+summary deltas, the content-changed asset count, and review notes so `WARN` and
+`FAIL` reasons remain immediately
 visible in a pull request. When detailed evidence changes without affecting
 those net deltas, compact non-zero change groups also call out affected assets,
 graph edges, checks, Skill Discovery, executable surfaces and governance,
@@ -2232,6 +2253,11 @@ status/severity and summary changes, and concrete security policy inventory
 deltas. Each detail collection uses the shared presentation limit and directs
 reviewers to JSON when more items exist. JSON remains the complete, unbounded
 machine-readable report and is unaffected by Markdown disclosure.
+
+A content-only asset edit is neutral by itself: it does not change CI status or
+the command exit code. It remains visibly reviewable as a changed asset, while
+an independently added high/critical finding or governed policy regression can
+make the same edit `FAIL`.
 
 When an asset's normalized effective security boundary changes, the `Security
 Changes` section under `Full report details` adds only the non-empty policy

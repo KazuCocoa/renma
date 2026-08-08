@@ -819,6 +819,20 @@ padding, tab, ordered-marker, and lazy-continuation boundaries. Frontmatter is
 excluded from parser state while the parser's source positions are offset back
 to original artifact line numbers.
 
+`SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` is a separate source-integrity
+review path, not an expansion of the operational prose rule above. HTML
+comments and blockquotes remain excluded from ordinary authorization,
+instruction execution, guard association, and policy-body semantics. Renma
+retains their exact positioned source ranges and reports a high-severity
+finding only when deterministic evidence contains a positive high-risk
+directive: secret-bearing file disclosure, an action denied by effective
+network/upload policy, an approval or safeguard bypass, or direct remote
+pipe-to-shell execution. `details.sourceRegionKind` is `html_comment` or
+`blockquote`, `details.operationalInstruction` is `false`, and
+`details.highRiskSignals` records the matched review reasons. Direct
+prohibitions, clearly bounded safe/negative examples, harmless implementation
+notes, and ordinary quoted prose remain neutral.
+
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
 Markdown authoritative or executes its embedded commands without review. Safe
@@ -1139,6 +1153,7 @@ section size or heading text—determines whether content belongs in `SKILL.md`,
 | `SEC-POLICY-PROFILE-NOT-FOUND`                   | Referenced policy profile is missing.                | Metadata names a profile renma cannot resolve.                                                     | Add the profile or correct the reference.                                                              |
 | `SEC-PREDICTABLE-TEMP-PATH`                      | Command uses a predictable temp path.                | Examples write to fixed `/tmp` paths or similar locations.                                         | Use a unique temporary directory or safe temp-file helper.                                             |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`           | Privileged command lacks guardrails.                 | Content runs `sudo` or equivalent privileged actions without checks.                               | Add prerequisites, confirmation, and rollback guidance.                                                |
+| `SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION`      | Non-operational Markdown contains a high-risk directive. | An HTML comment or blockquote positively requests secret exposure, denied network/upload behavior, safeguard bypass, or remote pipe-to-shell execution. | Remove the directive or make the source clearly bounded, safe, and non-directive without weakening policy. |
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`               | Instructions explicitly bypass a security safeguard. | Content disables checks, weakens policy, skips approval, suppresses warnings, or uses a riskier fallback. | Preserve the safeguard, stop and report missing authority, and verify again without policy relaxation. |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`                | Instructions expose or request secret material.      | Content includes or asks for private keys, tokens, or credentials.                                 | Remove secret material and describe secure handling instead.                                           |
 | `SEC-SENSITIVE-FILE-REFERENCE`                   | Instructions reference sensitive files.              | Content points at credentials, keys, or local secret paths.                                        | Replace with safe examples or redacted placeholders.                                                   |

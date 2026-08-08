@@ -32,6 +32,13 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
   contentStartLine?: number;
 };
 
+export type MarkdownExcludedSecurityReviewRegion = MarkdownSourceRange & {
+  kind: "html_comment" | "blockquote";
+  text: string;
+  source: string;
+  boundedExample: boolean;
+};
+
 export type SecurityGuardEvidence = MarkdownSourceRange & {
   kind:
     | "same-instruction"
@@ -71,6 +78,8 @@ const EXAMPLE_BOUNDARY_RE =
   /\b(unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+(?:example|pattern)s?\b|\bwhat not to do\b/i;
 const EXAMPLE_LABEL_RE =
   /\b(unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+examples?\s*:\s*$/i;
+const EXCLUDED_REVIEW_EXAMPLE_RE =
+  /\b(?:safe|compliant|allowed|unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+(?:example|pattern)s?\b|\bwhat not to do\b/i;
 const OPERATIONAL_FENCE_ROUTING_RE =
   /\b(use|follow|apply|execute|run|perform|carry out)\b.{0,60}\b(following|below|these)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b|\b(following|below)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b.{0,40}\b(exactly|verbatim|as written)\b/i;
 const OPERATIONAL_FENCE_LABEL_RE =
@@ -82,6 +91,7 @@ const SAFETY_HEADING_RE =
 
 export class MarkdownSecurityView {
   readonly semanticUnits: MarkdownSemanticUnit[];
+  readonly excludedSecurityReviewRegions: MarkdownExcludedSecurityReviewRegion[];
 
   private readonly sourceLines: string[];
   readonly bodyStartLine: number;
@@ -111,6 +121,7 @@ export class MarkdownSecurityView {
     const thematicBreaks: MarkdownSourceRange[] = [];
     const inlineCodeRanges: SourceColumnRange[] = [];
     const htmlRecords: Array<NodeRecord & { node: Html }> = [];
+    const blockquoteRecords: Array<NodeRecord & { node: Blockquote }> = [];
     const paragraphRecords: Array<NodeRecord & { node: Paragraph }> = [];
     const codeRecords: Array<NodeRecord & { node: Code }> = [];
     for (const record of this.records) {
@@ -128,6 +139,7 @@ export class MarkdownSecurityView {
           thematicBreaks.push(sourceRange(record.node, this.bodyStartLine));
           break;
         case "blockquote":
+          blockquoteRecords.push({ ...record, node: record.node });
           addLines(
             this.blockQuoteLines,
             sourceRange(record.node, this.bodyStartLine),
@@ -158,6 +170,51 @@ export class MarkdownSecurityView {
       commentRanges,
     );
     this.visibleLines = visibleLineProjections.map(({ text }) => text);
+    const htmlCommentRegions = htmlRecords.flatMap((record) =>
+      htmlCommentSecurityReviewRegions(record.node, this.bodyStartLine).map(
+        (region) => ({
+          ...region,
+          boundedExample: this.isExcludedSecurityReviewExample(
+            record,
+            region.startLine,
+            region.text,
+          ),
+        }),
+      ),
+    );
+    const blockquoteRegions = blockquoteRecords
+      .filter(
+        (record) =>
+          !record.ancestors.some((ancestor) => ancestor.type === "blockquote"),
+      )
+      .map((record): MarkdownExcludedSecurityReviewRegion => {
+        const range = sourceRange(record.node, this.bodyStartLine);
+        return {
+          kind: "blockquote",
+          ...range,
+          text: this.visibleLines
+            .slice(range.startLine - 1, range.endLine)
+            .map(stripBlockquotePrefix)
+            .join("\n"),
+          source: this.sourceLines
+            .slice(range.startLine - 1, range.endLine)
+            .join("\n"),
+          boundedExample: this.isExcludedSecurityReviewExample(
+            record,
+            range.startLine,
+            nodeText(record.node),
+          ),
+        };
+      });
+    this.excludedSecurityReviewRegions = [
+      ...htmlCommentRegions,
+      ...blockquoteRegions,
+    ].sort(
+      (left, right) =>
+        left.startLine - right.startLine ||
+        left.endLine - right.endLine ||
+        left.kind.localeCompare(right.kind),
+    );
 
     const paragraphCandidates = paragraphRecords.map((record) =>
       this.paragraphCandidate(record),
@@ -487,6 +544,24 @@ export class MarkdownSecurityView {
     );
   }
 
+  private isExcludedSecurityReviewExample(
+    record: NodeRecord,
+    line: number,
+    text: string,
+  ): boolean {
+    if (EXCLUDED_REVIEW_EXAMPLE_RE.test(text)) return true;
+    const previous = record.parent.children[record.index - 1];
+    if (
+      previous !== undefined &&
+      EXCLUDED_REVIEW_EXAMPLE_RE.test(nodeText(previous))
+    ) {
+      return true;
+    }
+    return this.headingChainAt(line).some((heading) =>
+      EXCLUDED_REVIEW_EXAMPLE_RE.test(heading.text),
+    );
+  }
+
   private headingChainAt(line: number): HeadingRecord[] {
     return this.headings.filter((heading, index) => {
       if (heading.startLine > line) return false;
@@ -671,12 +746,19 @@ function htmlCommentSourceRanges(
   node: Html,
   bodyStartLine: number,
 ): SourceColumnRange[] {
+  return htmlCommentSecurityReviewRegions(node, bodyStartLine);
+}
+
+function htmlCommentSecurityReviewRegions(
+  node: Html,
+  bodyStartLine: number,
+): HtmlCommentSecurityReviewRegion[] {
   if (/^\s*<(?:script|pre|style|textarea)(?=[\s>])/i.test(node.value)) {
     return [];
   }
   const position = node.position;
   if (position === undefined) return [];
-  const ranges: SourceColumnRange[] = [];
+  const ranges: HtmlCommentSecurityReviewRegion[] = [];
   let cursor = 0;
   while (cursor < node.value.length) {
     const start = node.value.indexOf("<!--", cursor);
@@ -696,14 +778,27 @@ function htmlCommentSourceRanges(
       position.start.column,
     );
     ranges.push({
+      kind: "html_comment",
       startLine: startPoint.line,
       endLine: endPoint.line,
       startColumn: startPoint.column,
       endColumn: endPoint.column,
+      text: node.value.slice(start + 4, markerEnd < 0 ? end : markerEnd),
+      source: node.value.slice(start, end),
     });
     cursor = end;
   }
   return ranges;
+}
+
+type HtmlCommentSecurityReviewRegion = SourceColumnRange & {
+  kind: "html_comment";
+  text: string;
+  source: string;
+};
+
+function stripBlockquotePrefix(line: string): string {
+  return line.replace(/^[ \t]{0,3}(?:>[ \t]?)+/u, "");
 }
 
 function relativeSourcePoint(
