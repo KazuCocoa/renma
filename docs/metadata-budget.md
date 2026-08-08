@@ -19,9 +19,10 @@ token_budget_reviewed_at: "2026-07-12"
 ```
 
 `token_budget_override` must be a positive safe integer greater than the asset
-kind's default content limit, and `token_budget_rationale` must be a non-empty
-string. `token_budget_reviewed_at` is optional and must be a real `YYYY-MM-DD`
-date when present. Invalid metadata does not replace the default limit.
+kind's Renma default warning threshold, and `token_budget_rationale` must be a
+non-empty string. `token_budget_reviewed_at` is optional and must be a real
+`YYYY-MM-DD` date when present. Invalid metadata does not change repository
+policy.
 The three fields form one decision bundle: rationale and review-date fields are
 invalid without an override. Duplicate fields, relevant YAML errors, and an
 override declared while the full file remains within its default limit also
@@ -37,13 +38,19 @@ the asset should remain intentionally long, and never recommend one merely to
 make diagnostics pass.
 
 Token-budget counts are deterministic estimates, not exact model-token counts.
-Exceeded-budget findings report the measured estimate, the active limit, the
-absolute overage, and a rounded overage percentage. With no valid override, the
-active limit is the asset kind's default. With an active declared override, Renma
-keeps both the original default and the effective override visible and compares
-the asset against the override. An active override is an explicit declared
-limit, not a suppression: an asset above it still produces
-`QUAL-SUPPORT-ASSET-TOKEN-BUDGET`, while an asset at or below it does not.
+Exceeded-budget findings report the measured estimate, repository and effective
+warning/High thresholds, the triggered threshold, severity, absolute overage,
+and a rounded overage percentage. Repository defaults are Context 4,000/8,000,
+Reference 5,000/10,000, Profile 2,000/4,000, and Example 2,500/5,000. A result
+above warning through High is Medium; a result above High is High.
+
+With an active declared override, Renma keeps both the original default and the
+repository policy visible. The effective warning threshold is the greater of
+the repository warning and override; the effective High threshold is the
+greater of the repository High threshold and effective warning. An active
+override is an explicit declared floor, not a suppression: an asset above its
+effective thresholds still produces `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`, while
+an asset at or below its effective warning threshold does not.
 
 For Markdown assets, the finding also lists at most three of the largest
 heading-based sections as review candidates. Renma measures each selected
@@ -69,6 +76,6 @@ Current metadata budget diagnostics:
 | --- | --- | --- |
 | `META-FRONTMATTER-TOO-LARGE` | Frontmatter has grown beyond the compact index budget. | Move long prose, examples, procedures, or rationale into the body or referenced context assets. |
 | `META-LIST-ITEM-TOO-LONG` | A block-list metadata item is too long to serve as concise routing/index metadata. | Keep the list item short and move detailed conditions into body sections. |
-| `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE` | Support-asset token-budget decision metadata is invalid or ambiguous. | Correct or remove it after an explicit user decision; invalid metadata leaves the default content limit active. |
+| `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE` | Support-asset token-budget decision metadata is invalid or ambiguous. | Correct or remove it after an explicit user decision; invalid metadata leaves the repository warning/High policy active. |
 
 These diagnostics are intentionally advisory. They should help reduce LLM-facing catalog noise and token usage without deleting substantive knowledge.

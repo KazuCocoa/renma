@@ -3282,6 +3282,22 @@ test("ci-report evaluates Skill token budgets with revision-local quality config
   }
 });
 
+test("ci-report evaluates content token budgets with revision-local quality configuration", async () => {
+  const repo = await createContentQualityThresholdCiRepo();
+  try {
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const added = report.diff.findings.added.find(
+      (finding) => finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+
+    assert.equal(added?.severity, "high");
+    assert.equal(added?.evidence?.path, "contexts/token-budget.md");
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("Skill directory symlink is a subtree coverage regression from an exact path", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
   await fixture.initializeGit();
@@ -4113,6 +4129,51 @@ async function createQualityThresholdCiRepo(): Promise<string> {
   );
   await git(repo, ["add", "renma.config.json"]);
   await git(repo, ["commit", "-m", "tighten quality policy"]);
+  return repo;
+}
+
+async function createContentQualityThresholdCiRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-content-quality-ci-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await mkdir(join(repo, "contexts"), { recursive: true });
+  const context = `---
+id: context.token-budget
+owner: platform
+status: stable
+when_to_use:
+  - Reviewing token budgets
+when_not_to_use:
+  - Runtime selection
+---
+${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.ok(estimateTokens(context) > 6000);
+  assert.ok(estimateTokens(context) < 6100);
+  await writeFile(join(repo, "contexts", "token-budget.md"), context);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        context_token_warning: 7000,
+        context_token_high: 9000,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base content quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        context_token_warning: 4000,
+        context_token_high: 5500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "tighten content quality policy"]);
   return repo;
 }
 

@@ -183,7 +183,6 @@ const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
   "candidate",
   "candidates",
 ]);
-const CONTEXT_TOKEN_LIMITS = QUALITY.contentTokenWarn;
 
 /** Run all deterministic rules and return findings in stable source order. */
 export function runRules(
@@ -243,7 +242,7 @@ function rulesForEvaluationDate(
       run: ({ documents, config }) =>
         documents.flatMap((document) => [
           ...shapeFindings(document, config),
-          ...contextBudgetFindings(document),
+          ...contextBudgetFindings(document, config),
           ...profileFindings(document),
         ]),
     },
@@ -1927,7 +1926,10 @@ function uniqueStrings(values: Array<string | undefined>): string[] {
   );
 }
 
-function contextBudgetFindings(document: ParsedDocument): Finding[] {
+function contextBudgetFindings(
+  document: ParsedDocument,
+  config: ScanConfig,
+): Finding[] {
   if (
     document.artifact.kind !== "context" &&
     document.artifact.kind !== "profile" &&
@@ -1938,12 +1940,23 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
   }
 
   const tokenBudget = parseAssetMetadata(document).tokenBudgetDecision;
+  const policy = config.quality.contentTokenBudgets[document.artifact.kind];
   const defaultLimit =
-    tokenBudget.defaultLimit ?? CONTEXT_TOKEN_LIMITS[document.artifact.kind];
+    tokenBudget.defaultLimit ??
+    QUALITY.contentTokenWarning[document.artifact.kind];
   const estimatedTokens =
     tokenBudget.estimatedTokens ?? estimateTokens(document.artifact.content);
-  const effectiveLimit = tokenBudget.effectiveLimit ?? defaultLimit;
   const overrideActive = tokenBudget.status === "active";
+  const overrideLimit = overrideActive ? tokenBudget.overrideLimit : undefined;
+  const effectiveWarningThreshold = Math.max(
+    policy.warning,
+    overrideLimit ?? policy.warning,
+  );
+  const effectiveHighThreshold = Math.max(
+    policy.high,
+    effectiveWarningThreshold,
+  );
+  const effectiveLimit = effectiveWarningThreshold;
   const sectionCandidates = tokenBudgetSectionCandidates(document);
   const findings: Finding[] = [];
 
@@ -1962,7 +1975,7 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
       `${invalidReasonSummary} Correct or remove the malformed token-budget decision metadata without inferring the intended values. An override is valid only after a human decides the asset should remain intentionally coherent or ordered; do not add or increase an override merely to make diagnostics pass.`,
       {
         whyItMatters:
-          "Token-budget overrides record a declared human decision. Malformed, ambiguous, incomplete, orphaned, or unnecessary metadata cannot safely replace the default advisory limit.",
+          "Token-budget overrides record a declared human decision. Malformed, ambiguous, incomplete, orphaned, or unnecessary metadata cannot safely raise the effective repository warning floor.",
         constraints: [
           "Do not automatically insert token-budget override metadata.",
           "Do not treat the override as a general ignore mechanism.",
@@ -1988,6 +2001,15 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
           invalidReasons: tokenBudget.invalidReasons,
           profile: QUALITY.profile,
           measurement: "full_file",
+          repositoryWarningThreshold: policy.warning,
+          repositoryHighThreshold: policy.high,
+          effectiveWarningThreshold,
+          effectiveHighThreshold,
+          policySource: contentTokenPolicySource(policy),
+          thresholdSources: {
+            warning: policy.warningSource,
+            high: policy.highSource,
+          },
         },
       },
     );
@@ -1997,12 +2019,16 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
     });
   }
 
-  if (estimatedTokens <= effectiveLimit) return findings;
+  if (estimatedTokens <= effectiveWarningThreshold) return findings;
 
-  const overage = tokenBudgetOverage(estimatedTokens, effectiveLimit);
+  const severity: Severity =
+    estimatedTokens > effectiveHighThreshold ? "high" : "medium";
+  const triggeredThreshold =
+    severity === "high" ? effectiveHighThreshold : effectiveWarningThreshold;
+  const overage = tokenBudgetOverage(estimatedTokens, triggeredThreshold);
   const measurementSummary = overrideActive
-    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The default advisory limit is ${defaultLimit} tokens, and the active declared override is ${effectiveLimit} tokens. It is ${overage.overBy} tokens (~${overage.overPercent}%) over the active limit.`
-    : `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens against the default ${defaultLimit}-token advisory limit, ${overage.overBy} tokens (~${overage.overPercent}%) over the limit.`;
+    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The Renma default warning threshold is ${defaultLimit} tokens, the repository warning and high thresholds are ${policy.warning} and ${policy.high} tokens, and the active declared override is ${overrideLimit} tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%).`
+    : `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%). The effective warning and high thresholds are ${effectiveWarningThreshold} and ${effectiveHighThreshold} estimated tokens.`;
   const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
   const candidateGuidance =
     sectionCandidates.length > 0 ? "Inspect these large sections. " : "";
@@ -2014,13 +2040,13 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
     documentFinding(
       document,
       DIAGNOSTIC_IDS.QUAL_SUPPORT_ASSET_TOKEN_BUDGET,
-      "Support asset exceeds token guidance",
+      "Support asset exceeds its effective token-budget threshold",
       "quality",
-      "low",
+      severity,
       `${measurementSummary} ${sectionReview} ${decisionGuidance}`,
       {
         whyItMatters:
-          "Large content assets deserve a low-advisory coherence review. A meaningful split is preferred when it preserves semantic boundaries, while an explicit override can record the user's declared decision for an intentionally coherent or ordered long-form asset.",
+          "Large content assets deserve a coherence and maintainability review. Token size is evidence only: a meaningful split may help when it preserves semantic boundaries, while an explicit override can record the user's declared decision for an intentionally coherent or ordered long-form asset.",
         constraints: [
           "Do not introduce runtime context resolution.",
           "Do not create prompt packages.",
@@ -2048,11 +2074,22 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
             ? { tokenBudgetRationale: tokenBudget.tokenBudgetRationale }
             : {}),
           measured: estimatedTokens,
-          limit: effectiveLimit,
+          repositoryWarningThreshold: policy.warning,
+          repositoryHighThreshold: policy.high,
+          effectiveWarningThreshold,
+          effectiveHighThreshold,
+          triggeredThreshold,
+          effectiveSeverity: severity,
+          limit: triggeredThreshold,
           ...overage,
           unit: "estimated_tokens",
           profile: QUALITY.profile,
           measurement: "full_file",
+          policySource: contentTokenPolicySource(policy),
+          thresholdSources: {
+            warning: policy.warningSource,
+            high: policy.highSource,
+          },
           ...(document.artifact.markdownParserEligible === true
             ? { sectionMeasurement: "markdown_body_sections" }
             : {}),
@@ -2062,6 +2099,21 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
     ),
   );
   return findings;
+}
+
+function contentTokenPolicySource(
+  policy: ScanConfig["quality"]["contentTokenBudgets"][keyof ScanConfig["quality"]["contentTokenBudgets"]],
+): "renma_defaults" | "repository_configuration" | "mixed" {
+  if (
+    policy.warningSource === "repository_configuration" &&
+    policy.highSource === "repository_configuration"
+  ) {
+    return "repository_configuration";
+  }
+  return policy.warningSource === "renma_default" &&
+    policy.highSource === "renma_default"
+    ? "renma_defaults"
+    : "mixed";
 }
 
 function profileFindings(document: ParsedDocument): Finding[] {

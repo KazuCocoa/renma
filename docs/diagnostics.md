@@ -1005,10 +1005,12 @@ examples by asset kind.
 
 Token-budget findings use deterministic `estimated_tokens`, not exact token
 counts for a particular model. `QUAL-SKILL-TOKEN-BUDGET` measures the Markdown
-body after frontmatter; `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` continues to measure
-the full file. The Renma Skill defaults produce no finding through 5,000,
-Medium above 5,000 through 8,000, and High above 8,000 estimated tokens.
-Repositories may set the two effective Skill thresholds through the
+body after frontmatter; `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` measures the full
+Context, Reference, Profile, or Example file. The Renma defaults are Skill
+5,000/8,000, Context 4,000/8,000, Reference 5,000/10,000, Profile 2,000/4,000,
+and Example 2,500/5,000. Each pair produces no finding through warning, Medium
+above warning through High, and High above High. Repositories may set every
+effective pair through the
 [authoritative configuration contract](user-manual.md#configuration).
 
 The Skill finding details retain `measured`, `warningThreshold`,
@@ -1024,14 +1026,20 @@ split or infer a destination from a heading. `scan --fail-on high` gates the
 High result through Renma's normal severity model; no token-specific strict
 mode exists.
 
-For support assets, the active limit is the default unless an active declared
-override is in force. An active override remains visible alongside the default
-and is not a suppression: exceeding it still produces the advisory. Invalid
-override metadata exposes its parser-provided reasons in human-facing guidance
-and leaves the default limit active. Splitting an asset, recording an override,
-or changing one requires an explicit human decision. Semantic ownership—not
-section size or heading text—determines whether content belongs in `SKILL.md`,
-`references/`, `scripts/`, `assets/`, or `contexts/`.
+Support-asset findings likewise expose repository and effective warning/High
+thresholds, the triggered threshold and severity, policy provenance, and
+overage. A valid per-file override raises the effective warning floor; the
+effective High threshold cannot fall below it.
+
+For support assets, repository configuration supplies the warning/High pair. An
+active override remains visible alongside the Renma default and repository
+policy and is not a suppression: exceeding the resulting effective thresholds
+still produces the finding. Invalid override metadata exposes its parser-
+provided reasons in human-facing guidance and leaves repository policy active.
+Splitting an asset, recording an override, or changing one requires an explicit
+human decision. Semantic ownership—not section size or heading text—determines
+whether content belongs in `SKILL.md`, `references/`, `scripts/`, `assets/`, or
+`contexts/`.
 
 | Identifier                                       | Meaning                                              | Typical cause                                                                                      | How to fix                                                                                             |
 | ------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -1102,7 +1110,7 @@ section size or heading text—determines whether content belongs in `SKILL.md`,
 | `QUAL-SKILL-PROGRESSIVE-DISCLOSURE`              | Progressive disclosure needs review.                 | Reserved 0.18 focused-workflow contract identifier.                                                | Keep read conditions and core workflow in `SKILL.md`; place details by semantic responsibility.        |
 | `QUAL-SKILL-TOKEN-BUDGET`                        | Skill body exceeds its effective repository token-budget threshold. | Markdown body is above the effective warning threshold or above the effective High threshold. | Review progressive disclosure while retaining core workflow, constraints, and completion criteria; never split or move content by size alone. |
 | `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE`             | Support-asset decision metadata is invalid.           | The decision is malformed, unsafe to represent exactly, ambiguous, incomplete, orphaned, duplicated, or unnecessary while the asset remains within its default. | Correct or remove the declaration. Ask about a meaningful split first; use an override only after the user confirms the asset should remain intentionally long. |
-| `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`                | Support asset exceeds its effective advisory estimate. | A context, reference, profile, or example exceeds its default or active declared override.         | Ask whether a semantic split preserves coherence and execution order. Split only with user agreement; otherwise record an explicit rationale, never an override added merely to pass diagnostics. |
+| `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`                | Support asset exceeds its effective token-budget threshold. | A Context, Reference, Profile, or Example exceeds its effective warning threshold (Medium) or High threshold (High). | Ask whether a semantic split preserves coherence and execution order. Split only with user agreement; otherwise record an explicit rationale, never an override added merely to pass diagnostics. |
 | `QUAL-USER-LOCAL-PATHS`                          | User-local path appears in content.                  | Guidance includes machine-specific paths such as home directories.                                 | Replace local paths with repository-relative or configurable paths.                                    |
 | `SEC-DESTRUCTIVE-COMMAND`                        | Destructive command appears.                         | Content includes risky commands such as forced deletion or reset.                                  | Remove it, gate it with explicit safety guidance, or use a safer command.                              |
 | `SEC-ENV-COPY`                                   | Environment copying is suggested.                    | Content copies broad environment or secret-bearing files.                                          | Narrow the copied data and document secret handling.                                                   |

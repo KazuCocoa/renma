@@ -8,8 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Added repository-configurable Skill body token-budget policy through
-  `quality.skill_token_warning` and `quality.skill_token_high`, with independent
+- Added repository-configurable warning and High token-budget policy for Skill,
+  Context, Reference, Profile, and Example Markdown through the corresponding
+  `quality.*_token_warning` and `quality.*_token_high` keys, with independent
   defaulting, positive-safe-integer and ordering validation, structured policy
   provenance, and revision-local `diff` / `ci-report` evaluation.
 
@@ -19,6 +20,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   tokens, Medium above 5,000 through 8,000, and High above 8,000. The High result
   uses the ordinary `--fail-on high` severity gate; token size remains review
   evidence and never triggers automatic splitting or rewriting.
+- Extended that two-tier severity model to full-file Context (4,000/8,000),
+  Reference (5,000/10,000), Profile (2,000/4,000), and Example (2,500/5,000)
+  budgets. Valid per-file overrides raise the effective warning floor while the
+  effective High threshold remains at least that floor.
 - Changed semantic asset comparison to use canonical catalog content hashes.
   Content-only edits now appear as changed assets in `diff` and `ci-report`,
   with a visible bounded content-change count, while remaining neutral unless
@@ -27,9 +32,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Compatibility
 
 - Repositories without `quality` configuration continue to load without
-  migration and receive the quieter 5,000 / 8,000 defaults. Context, reference,
-  profile, example, metadata, and support-asset budget defaults and override
-  semantics are unchanged. Quality thresholds do not participate in
+  migration and receive the documented Renma defaults for every governed asset
+  kind. Existing valid support-asset override declarations remain valid and now
+  compose with the repository warning/High pair. Metadata-size, Script, and
+  Asset policies are unchanged. Quality thresholds do not participate in
   scan-boundary weakening policy.
 - Semantic diff and nested CI-report JSON add optional `contentHash` values to
   asset endpoints and `contentChanged` to newly built changed-asset rows when

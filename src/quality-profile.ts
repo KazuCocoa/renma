@@ -15,11 +15,17 @@ export const DEFAULT_QUALITY_PROFILE = {
   descriptionMinChars: 0,
   skillTokenWarning: 5_000,
   skillTokenHigh: 8_000,
-  contentTokenWarn: {
+  contentTokenWarning: {
     context: 4_000,
     reference: 5_000,
     profile: 2_000,
     example: 2_500,
+  },
+  contentTokenHigh: {
+    context: 8_000,
+    reference: 10_000,
+    profile: 4_000,
+    example: 5_000,
   },
   frontmatterMaxLines: 48,
   frontmatterMaxChars: 4_096,

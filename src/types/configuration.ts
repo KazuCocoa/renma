@@ -55,12 +55,23 @@ export interface SkillDiscoveryConfig {
 export type QualityThresholdSource =
   "renma_default" | "repository_configuration";
 
-/** Effective repository policy for the Skill body token-budget diagnostic. */
+export type ContentTokenBudgetKind =
+  "context" | "reference" | "profile" | "example";
+
+export interface ContentTokenBudgetConfig {
+  warning: number;
+  high: number;
+  warningSource: QualityThresholdSource;
+  highSource: QualityThresholdSource;
+}
+
+/** Effective repository policy for governed Markdown token-budget diagnostics. */
 export interface QualityConfig {
   skillTokenWarning: number;
   skillTokenHigh: number;
   skillTokenWarningSource: QualityThresholdSource;
   skillTokenHighSource: QualityThresholdSource;
+  contentTokenBudgets: Record<ContentTokenBudgetKind, ContentTokenBudgetConfig>;
 }
 
 /** Effective scan configuration after defaults, config files, and CLI overrides. */

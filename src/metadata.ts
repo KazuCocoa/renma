@@ -142,7 +142,7 @@ export function parseSupportAssetTokenBudgetDecision(
   }
 
   const defaultLimit =
-    DEFAULT_QUALITY_PROFILE.contentTokenWarn[document.artifact.kind];
+    DEFAULT_QUALITY_PROFILE.contentTokenWarning[document.artifact.kind];
   const estimatedTokens = estimateTokens(document.artifact.content);
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
   const parsedFields = frontmatter.fields.filter(isTokenBudgetField);

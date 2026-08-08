@@ -26,11 +26,17 @@ test("quality profile pins every package-version default", () => {
     descriptionMinChars: 0,
     skillTokenWarning: 5000,
     skillTokenHigh: 8000,
-    contentTokenWarn: {
+    contentTokenWarning: {
       context: 4000,
       reference: 5000,
       profile: 2000,
       example: 2500,
+    },
+    contentTokenHigh: {
+      context: 8000,
+      reference: 10000,
+      profile: 4000,
+      example: 5000,
     },
     frontmatterMaxLines: 48,
     frontmatterMaxChars: 4096,
@@ -232,6 +238,7 @@ test("Skill budget details identify independently defaulted threshold policy", (
   const config: ScanConfig = {
     ...DEFAULT_CONFIG,
     quality: {
+      ...DEFAULT_CONFIG.quality,
       skillTokenWarning: 4000,
       skillTokenHigh: 8000,
       skillTokenWarningSource: "repository_configuration",
@@ -253,40 +260,58 @@ test("Skill budget details identify independently defaulted threshold policy", (
 });
 
 test("content budgets use the shared estimator at each exact boundary", () => {
-  for (const [kind, limit] of Object.entries(
-    DEFAULT_QUALITY_PROFILE.contentTokenWarn,
+  for (const [kind, warning] of Object.entries(
+    DEFAULT_QUALITY_PROFILE.contentTokenWarning,
   ) as Array<["context" | "reference" | "profile" | "example", number]>) {
+    const high = DEFAULT_QUALITY_PROFILE.contentTokenHigh[kind];
     assert.equal(
       findBudget(
-        findingsFor(kind, fillerTokens(limit)),
+        findingsFor(kind, fillerTokens(warning)),
         "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
       ),
       undefined,
     );
-    const finding = findBudget(
-      findingsFor(kind, fillerTokens(limit + 1)),
+    const aboveWarning = findBudget(
+      findingsFor(kind, fillerTokens(warning + 1)),
       "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
     );
-    assert.equal(finding?.severity, "low");
-    assert.equal(finding?.details?.measured, limit + 1);
-    assert.equal(finding?.details?.limit, limit);
-    assert.equal(finding?.details?.overBy, 1);
-    assert.equal(finding?.details?.overPercent, 0);
-    assert.equal(finding?.details?.unit, "estimated_tokens");
-    assert.equal(finding?.details?.profile, RENMA_QUALITY_PROFILE_VERSION);
-    assert.equal(finding?.details?.measurement, "full_file");
+    assert.equal(aboveWarning?.severity, "medium");
+    assert.equal(aboveWarning?.details?.measured, warning + 1);
+    assert.equal(aboveWarning?.details?.effectiveWarningThreshold, warning);
+    assert.equal(aboveWarning?.details?.effectiveHighThreshold, high);
+    assert.equal(aboveWarning?.details?.triggeredThreshold, warning);
+    assert.equal(aboveWarning?.details?.effectiveSeverity, "medium");
+    assert.equal(aboveWarning?.details?.limit, warning);
+    assert.equal(aboveWarning?.details?.overBy, 1);
+    assert.equal(aboveWarning?.details?.overPercent, 0);
+    assert.equal(aboveWarning?.details?.unit, "estimated_tokens");
+    assert.equal(aboveWarning?.details?.profile, RENMA_QUALITY_PROFILE_VERSION);
+    assert.equal(aboveWarning?.details?.measurement, "full_file");
     assert.equal(
-      finding?.details?.sectionMeasurement,
+      aboveWarning?.details?.sectionMeasurement,
       "markdown_body_sections",
     );
-    assert.deepEqual(finding?.details?.sectionCandidates, []);
+    assert.deepEqual(aboveWarning?.details?.sectionCandidates, []);
+    const atHigh = findBudget(
+      findingsFor(kind, fillerTokens(high)),
+      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+    const aboveHigh = findBudget(
+      findingsFor(kind, fillerTokens(high + 1)),
+      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+    assert.equal(atHigh?.severity, "medium");
+    assert.equal(aboveHigh?.severity, "high");
+    assert.equal(aboveHigh?.details?.triggeredThreshold, high);
+    assert.equal(aboveHigh?.details?.limit, high);
+    assert.equal(aboveHigh?.details?.overBy, 1);
   }
 });
 
 test("custom Skill thresholds do not change Context or support-asset budgets", () => {
   const config = qualityConfig(1000, 2000);
   for (const [kind, limit] of Object.entries(
-    DEFAULT_QUALITY_PROFILE.contentTokenWarn,
+    DEFAULT_QUALITY_PROFILE.contentTokenWarning,
   ) as Array<["context" | "reference" | "profile" | "example", number]>) {
     const finding = findBudget(
       findingsFor(kind, fillerTokens(limit + 1), config),
@@ -295,6 +320,32 @@ test("custom Skill thresholds do not change Context or support-asset budgets", (
     assert.equal(finding?.details?.defaultLimit, limit, kind);
     assert.equal(finding?.details?.effectiveLimit, limit, kind);
     assert.equal(finding?.details?.limit, limit, kind);
+  }
+});
+
+test("content budgets use custom Medium and High thresholds independently", () => {
+  for (const kind of ["context", "reference", "profile", "example"] as const) {
+    const config = contentQualityConfig(kind, 100, 200);
+    assert.equal(
+      findBudget(
+        findingsFor(kind, fillerTokens(100), config),
+        "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+      ),
+      undefined,
+    );
+    const medium = findBudget(
+      findingsFor(kind, fillerTokens(101), config),
+      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+    const high = findBudget(
+      findingsFor(kind, fillerTokens(201), config),
+      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+    assert.equal(medium?.severity, "medium", kind);
+    assert.equal(high?.severity, "high", kind);
+    assert.equal(high?.details?.repositoryWarningThreshold, 100, kind);
+    assert.equal(high?.details?.repositoryHighThreshold, 200, kind);
+    assert.equal(high?.details?.policySource, "repository_configuration", kind);
   }
 });
 
@@ -328,10 +379,33 @@ function qualityConfig(warning: number, high: number): ScanConfig {
   return {
     ...DEFAULT_CONFIG,
     quality: {
+      ...DEFAULT_CONFIG.quality,
       skillTokenWarning: warning,
       skillTokenHigh: high,
       skillTokenWarningSource: "repository_configuration",
       skillTokenHighSource: "repository_configuration",
+    },
+  };
+}
+
+function contentQualityConfig(
+  kind: "context" | "reference" | "profile" | "example",
+  warning: number,
+  high: number,
+): ScanConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    quality: {
+      ...DEFAULT_CONFIG.quality,
+      contentTokenBudgets: {
+        ...DEFAULT_CONFIG.quality.contentTokenBudgets,
+        [kind]: {
+          warning,
+          high,
+          warningSource: "repository_configuration",
+          highSource: "repository_configuration",
+        },
+      },
     },
   };
 }

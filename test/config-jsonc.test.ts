@@ -8,6 +8,33 @@ import { main } from "../src/cli.js";
 import { ConfigError, DEFAULT_CONFIG, loadConfig } from "../src/config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../src/quality-profile.js";
 
+const DEFAULT_CONTENT_TOKEN_BUDGETS = {
+  context: {
+    warning: 4000,
+    high: 8000,
+    warningSource: "renma_default",
+    highSource: "renma_default",
+  },
+  reference: {
+    warning: 5000,
+    high: 10000,
+    warningSource: "renma_default",
+    highSource: "renma_default",
+  },
+  profile: {
+    warning: 2000,
+    high: 4000,
+    warningSource: "renma_default",
+    highSource: "renma_default",
+  },
+  example: {
+    warning: 2500,
+    high: 5000,
+    warningSource: "renma_default",
+    highSource: "renma_default",
+  },
+} as const;
+
 test("quality token thresholds use Renma defaults when configuration is absent", async (t) => {
   const root = await fixture(t);
 
@@ -18,6 +45,7 @@ test("quality token thresholds use Renma defaults when configuration is absent",
     skillTokenHigh: 8000,
     skillTokenWarningSource: "renma_default",
     skillTokenHighSource: "renma_default",
+    contentTokenBudgets: DEFAULT_CONTENT_TOKEN_BUDGETS,
   });
 });
 
@@ -26,12 +54,23 @@ test("loaded default quality policy is request-local", async (t) => {
   const loaded = await loadConfig(root, {});
 
   loaded.config.quality.skillTokenWarning = 1;
+  loaded.config.quality.contentTokenBudgets.context.warning = 1;
 
   assert.equal(DEFAULT_CONFIG.quality.skillTokenWarning, 5000);
+  assert.equal(
+    DEFAULT_CONFIG.quality.contentTokenBudgets.context.warning,
+    4000,
+  );
   assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 5000);
+  assert.equal(DEFAULT_QUALITY_PROFILE.contentTokenWarning.context, 4000);
   assert.equal(
     (await loadConfig(root, {})).config.quality.skillTokenWarning,
     5000,
+  );
+  assert.equal(
+    (await loadConfig(root, {})).config.quality.contentTokenBudgets.context
+      .warning,
+    4000,
   );
 });
 
@@ -44,6 +83,7 @@ test("quality token thresholds fall back independently and retain their sources"
         skillTokenHigh: 8000,
         skillTokenWarningSource: "repository_configuration",
         skillTokenHighSource: "renma_default",
+        contentTokenBudgets: DEFAULT_CONTENT_TOKEN_BUDGETS,
       },
     },
     {
@@ -53,6 +93,7 @@ test("quality token thresholds fall back independently and retain their sources"
         skillTokenHigh: 9000,
         skillTokenWarningSource: "renma_default",
         skillTokenHighSource: "repository_configuration",
+        contentTokenBudgets: DEFAULT_CONTENT_TOKEN_BUDGETS,
       },
     },
   ] as const;
@@ -65,6 +106,109 @@ test("quality token thresholds fall back independently and retain their sources"
       const loaded = await loadConfig(root, {});
 
       assert.deepEqual(loaded.config.quality, config.expected);
+    });
+  }
+});
+
+test("content token thresholds configure independently by asset kind", async (t) => {
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.jsonc"),
+    `{
+  "quality": {
+    "context_token_warning": 4500,
+    "reference_token_high": 12000
+  }
+}`,
+  );
+
+  const loaded = await loadConfig(root, {});
+
+  assert.deepEqual(loaded.config.quality.contentTokenBudgets.context, {
+    warning: 4500,
+    high: 8000,
+    warningSource: "repository_configuration",
+    highSource: "renma_default",
+  });
+  assert.deepEqual(loaded.config.quality.contentTokenBudgets.reference, {
+    warning: 5000,
+    high: 12000,
+    warningSource: "renma_default",
+    highSource: "repository_configuration",
+  });
+  assert.deepEqual(
+    loaded.config.quality.contentTokenBudgets.profile,
+    DEFAULT_CONTENT_TOKEN_BUDGETS.profile,
+  );
+  assert.deepEqual(
+    loaded.config.quality.contentTokenBudgets.example,
+    DEFAULT_CONTENT_TOKEN_BUDGETS.example,
+  );
+});
+
+test("content token thresholds reject invalid values and relationships", async (t) => {
+  const fields = [
+    "context_token_warning",
+    "context_token_high",
+    "reference_token_warning",
+    "reference_token_high",
+    "profile_token_warning",
+    "profile_token_high",
+    "example_token_warning",
+    "example_token_high",
+  ] as const;
+  const invalidValues: Array<[string, unknown]> = [
+    ["zero", 0],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["unsafe", Number.MAX_SAFE_INTEGER + 1],
+    ["string", "5000"],
+    ["null", null],
+    ["array", [5000]],
+    ["object", { value: 5000 }],
+  ];
+  for (const field of fields) {
+    for (const [label, value] of invalidValues) {
+      await t.test(`${field} ${label}`, async (caseContext) => {
+        const root = await fixture(caseContext);
+        await writeFile(
+          path.join(root, "renma.config.json"),
+          JSON.stringify({ quality: { [field]: value } }),
+        );
+        await assert.rejects(
+          loadConfig(root, {}),
+          (error: unknown) =>
+            error instanceof ConfigError &&
+            error.message ===
+              `quality.${field} must be a positive safe integer.`,
+        );
+      });
+    }
+  }
+
+  for (const config of [
+    {
+      value: { context_token_warning: 8000 },
+      message:
+        "quality.context_token_warning (8000) must be strictly lower than quality.context_token_high (8000).",
+    },
+    {
+      value: { reference_token_high: 5000 },
+      message:
+        "quality.reference_token_warning (5000) must be strictly lower than quality.reference_token_high (5000).",
+    },
+  ]) {
+    await t.test(JSON.stringify(config.value), async (caseContext) => {
+      const root = await fixture(caseContext);
+      await writeFile(
+        path.join(root, "renma.config.jsonc"),
+        JSON.stringify({ quality: config.value }),
+      );
+      await assert.rejects(
+        loadConfig(root, {}),
+        (error: unknown) =>
+          error instanceof ConfigError && error.message === config.message,
+      );
     });
   }
 });
@@ -133,6 +277,7 @@ test("equivalent JSON and JSONC normalize to the same configuration", async (t) 
     skillTokenHigh: 9000,
     skillTokenWarningSource: "repository_configuration",
     skillTokenHighSource: "repository_configuration",
+    contentTokenBudgets: DEFAULT_CONTENT_TOKEN_BUDGETS,
   });
 });
 
@@ -217,7 +362,7 @@ test("quality configuration rejects unknown keys", async (t) => {
     (error: unknown) =>
       error instanceof ConfigError &&
       error.message ===
-        'Unknown quality config key "unknown". Allowed keys: skill_token_warning, skill_token_high.',
+        'Unknown quality config key "unknown". Allowed keys: skill_token_warning, skill_token_high, context_token_warning, context_token_high, reference_token_warning, reference_token_high, profile_token_warning, profile_token_high, example_token_warning, example_token_high.',
   );
 });
 

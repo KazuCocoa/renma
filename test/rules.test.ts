@@ -1774,7 +1774,10 @@ ${repeatWords("example", 1000)}
     "skills/demo/references/large.md",
   );
   assert.match(contextBudgetFinding?.title ?? "", /Support asset exceeds/);
-  assert.match(contextBudgetFinding?.whyItMatters ?? "", /coherence review/);
+  assert.match(
+    contextBudgetFinding?.whyItMatters ?? "",
+    /coherence and maintainability review/,
+  );
   assert.ok(
     contextBudgetFinding?.constraints?.includes(
       "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
@@ -1802,6 +1805,12 @@ ${repeatWords("example", 1000)}
   );
   assert.equal(contextBudgetFinding?.details?.defaultLimit, 5000);
   assert.equal(contextBudgetFinding?.details?.effectiveLimit, 5000);
+  assert.equal(contextBudgetFinding?.severity, "medium");
+  assert.equal(contextBudgetFinding?.details?.repositoryWarningThreshold, 5000);
+  assert.equal(contextBudgetFinding?.details?.repositoryHighThreshold, 10000);
+  assert.equal(contextBudgetFinding?.details?.effectiveWarningThreshold, 5000);
+  assert.equal(contextBudgetFinding?.details?.effectiveHighThreshold, 10000);
+  assert.equal(contextBudgetFinding?.details?.effectiveSeverity, "medium");
   assert.equal(contextBudgetFinding?.details?.overrideActive, false);
   assert.equal(contextBudgetFinding?.details?.measurement, "full_file");
   assert.equal(contextBudgetFinding?.details?.limit, 5000);
@@ -1849,7 +1858,7 @@ ${repeatWords("example", 1000)}
   }
   assert.match(
     contextBudgetFinding?.remediation ?? "",
-    /default 5000-token advisory limit/,
+    /effective 5000-token medium threshold/,
   );
 
   const diagnosticV2 = result.diagnosticsV2.find(
@@ -2036,7 +2045,7 @@ token_budget_rationale: Intentionally coherent.`,
   );
   assert.match(
     overOverride?.remediation ?? "",
-    /default advisory limit is 5000 tokens/,
+    /Renma default warning threshold is 5000 tokens/,
   );
   assert.match(
     overOverride?.remediation ?? "",
@@ -2066,6 +2075,61 @@ token_budget_rationale: Intentionally coherent.`,
     assert.equal(unsafe?.details?.effectiveLimit, 5000, file);
     assert.equal(unsafe?.details?.overrideActive, false, file);
   }
+});
+
+test("support-asset overrides compose with repository warning and High thresholds", async () => {
+  const root = await fixture();
+  const referenceDir = path.join(root, "skills", "demo", "references");
+  await mkdir(referenceDir, { recursive: true });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      quality: {
+        reference_token_warning: 5100,
+        reference_token_high: 5150,
+      },
+    }),
+  );
+  await writeFile(
+    path.join(referenceDir, "over.md"),
+    `---
+token_budget_override: 5200
+token_budget_rationale: Intentionally coherent.
+---
+${repeatWords("reference", 5250)}`,
+  );
+  await writeFile(
+    path.join(referenceDir, "within.md"),
+    `---
+token_budget_override: 5200
+token_budget_rationale: Intentionally coherent.
+---
+${repeatWords("reference", 5050)}`,
+  );
+
+  const result = await scan(root);
+  const over = result.findings.find(
+    (finding) =>
+      finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+      finding.evidence.path.endsWith("over.md"),
+  );
+
+  assert.equal(over?.severity, "high");
+  assert.equal(over?.details?.repositoryWarningThreshold, 5100);
+  assert.equal(over?.details?.repositoryHighThreshold, 5150);
+  assert.equal(over?.details?.effectiveWarningThreshold, 5200);
+  assert.equal(over?.details?.effectiveHighThreshold, 5200);
+  assert.equal(over?.details?.triggeredThreshold, 5200);
+  assert.equal(over?.details?.overrideActive, true);
+  assert.equal(over?.details?.policySource, "repository_configuration");
+  assert.equal(
+    result.findings.some(
+      (finding) =>
+        finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+        finding.evidence.path.endsWith("within.md"),
+    ),
+    false,
+  );
 });
 
 test("token-budget override metadata does not affect unsupported asset kinds", async () => {

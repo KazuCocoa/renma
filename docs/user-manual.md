@@ -1080,9 +1080,17 @@ For example:
     "ci_policy": "warn"
   },
   "quality": {
-    // Repository-specific effective Skill body policy.
+    // Repository-specific effective Markdown token-budget policy.
     "skill_token_warning": 5000,
-    "skill_token_high": 8000
+    "skill_token_high": 8000,
+    "context_token_warning": 4000,
+    "context_token_high": 8000,
+    "reference_token_warning": 5000,
+    "reference_token_high": 10000,
+    "profile_token_warning": 2000,
+    "profile_token_high": 4000,
+    "example_token_warning": 2500,
+    "example_token_high": 5000
   },
   "skill_discovery": {
     "adopted": true,
@@ -1120,17 +1128,27 @@ The configuration supports the same names used by the implementation, including:
   `off`, `warn`, and `fail` and defaults to `off`. `renma init` does not enable
   it.
 - `quality`: repository-specific effective policy for the Skill body
-  `QUAL-SKILL-TOKEN-BUDGET` finding. The only supported keys are
-  `skill_token_warning` and `skill_token_high`. Renma defaults them to `5000`
-  and `8000`; an omitted key falls back independently to its Renma default.
-  Each value must be a positive safe integer, and `skill_token_warning` must
-  be strictly lower than `skill_token_high`. Unknown keys, invalid values, and
+  `QUAL-SKILL-TOKEN-BUDGET` finding and the Context, Reference, Profile, and
+  Example `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` finding. Supported keys and Renma
+  defaults are:
+
+  | Asset measurement | Warning key and default | High key and default |
+  | --- | ---: | ---: |
+  | Skill Markdown body after frontmatter | `skill_token_warning`: 5,000 | `skill_token_high`: 8,000 |
+  | Context full file | `context_token_warning`: 4,000 | `context_token_high`: 8,000 |
+  | Reference full file | `reference_token_warning`: 5,000 | `reference_token_high`: 10,000 |
+  | Profile full file | `profile_token_warning`: 2,000 | `profile_token_high`: 4,000 |
+  | Example full file | `example_token_warning`: 2,500 | `example_token_high`: 5,000 |
+
+  Each omitted key falls back independently to its Renma default. Every value
+  must be a positive safe integer, and each asset kind's warning must be
+  strictly lower than its High threshold. Unknown keys, invalid values, and
   invalid relationships are caller-correctable configuration errors with exit
-  code `2`. At exactly the warning threshold there is no finding; above it
-  through the high threshold the finding is Medium; above the high threshold
-  it is High. The values affect only the Markdown body after frontmatter for
-  canonical Skills. They do not change Context, reference, profile, example,
-  metadata, or support-asset budgets, and they are not scan-boundary settings.
+  code `2`. At exactly the effective warning threshold there is no finding;
+  above it through the effective High threshold the finding is Medium; above
+  the effective High threshold it is High. These values are not scan-boundary
+  settings. Scripts, assets, metadata-size checks, and other quality rules keep
+  their existing policies.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1143,12 +1161,12 @@ repository configuration. Likewise, `ci-report --fail-on-status` is a
 CI-integrator exit threshold, not repository policy. Other commands use their
 documented command-specific format defaults and flags.
 
-The High Skill token-budget result uses that ordinary severity model. For
-example, `renma scan . --fail-on high` gates a Skill above its effective High
-threshold without `--strict`; Medium results remain below that exit threshold.
-`diff` loads each archived endpoint's effective `quality` policy independently,
-and `ci-report` retains those revision-local semantic findings while separately
-applying its established CI status model.
+High token-budget results use the ordinary severity model. For example,
+`renma scan . --fail-on high` gates a Skill or governed content asset above its
+effective High threshold without `--strict`; Medium results remain below that
+exit threshold. `diff` loads each archived endpoint's effective `quality`
+policy independently, and `ci-report` retains those revision-local semantic
+findings while separately applying its established CI status model.
 
 Within a canonical Skill entrypoint or one of its classified support documents,
 helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma

@@ -253,14 +253,22 @@ policy is temporarily relaxed without introducing executable configuration.
 Existing `renma.config.json` and `.renma.json` files remain supported; Renma
 does not support or execute `.mjs` configuration.
 
-Repositories may set an effective Skill body token-budget policy without
-changing other asset budgets:
+Repositories may set effective warning and High token-budget thresholds for
+Skills and each governed Markdown content kind:
 
 ```jsonc
 {
   "quality": {
     "skill_token_warning": 5000,
-    "skill_token_high": 8000
+    "skill_token_high": 8000,
+    "context_token_warning": 4000,
+    "context_token_high": 8000,
+    "reference_token_warning": 5000,
+    "reference_token_high": 10000,
+    "profile_token_warning": 2000,
+    "profile_token_high": 4000,
+    "example_token_warning": 2500,
+    "example_token_high": 5000
   }
 }
 ```

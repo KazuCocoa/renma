@@ -378,15 +378,15 @@ backing collections are never exposed. No derived projection may rediscover
 files or reread repository content.
 
 Effective rule configuration is snapshot-scoped. `loadConfig` normalizes the
-repository's optional snake-case `quality.skill_token_warning` and
-`quality.skill_token_high` fields into a complete camel-case Skill token policy,
-including independent default/configuration provenance for each value. The
-shape rule consumes that snapshot value without mutating
-`DEFAULT_QUALITY_PROFILE` or consulting process-global state. These values do
-not enter `scan-boundary` identity because they change finding evaluation, not
-the repository paths or bytes Renma can inspect. Context and support-asset
-budgets continue to consume their separate internal defaults and metadata
-override contract.
+repository's optional snake-case Skill, Context, Reference, Profile, and Example
+`quality.*_token_warning` / `quality.*_token_high` fields into complete
+camel-case token policies, including independent default/configuration
+provenance for every value. The shape rule consumes that snapshot value without
+mutating `DEFAULT_QUALITY_PROFILE` or consulting process-global state. These
+values do not enter `scan-boundary` identity because they change finding
+evaluation, not the repository paths or bytes Renma can inspect. A valid
+support-asset metadata override composes as an effective warning floor, while
+the effective High threshold remains at least that floor.
 
 An explicit projection store derives and memoizes these facts from that stable
 input:
@@ -611,9 +611,9 @@ paths are collected once more through the independent union of both endpoint
 coverage predicates; the target's semantic configuration is still used for
 parsing, projections, and rules. This is an enforcement projection, not a
 second semantic comparison. In particular, each direct diff endpoint evaluates
-Skill token-budget findings with its own archived `quality` thresholds; the CI
-enforcement-view target uses the target revision's quality thresholds while
-only its inspection boundary is widened.
+Skill and governed content-asset token-budget findings with its own archived
+`quality` thresholds; the CI enforcement-view target uses the target revision's
+quality thresholds while only its inspection boundary is widened.
 
 `determineCiReportStatus()` still receives only the compatible diff. The pure
 `skill-discovery-ci-policy` module selects the stricter `off < warn` mode,

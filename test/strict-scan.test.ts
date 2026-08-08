@@ -61,6 +61,48 @@ test("Skill token budgets use normal fail-on behavior without a strict-only gate
   }
 });
 
+test("content token budgets use normal fail-on behavior without a strict-only gate", async (t) => {
+  const cases = [
+    { tokens: 4001, severity: "medium", expectedCode: 0 },
+    { tokens: 8001, severity: "high", expectedCode: 1 },
+  ] as const;
+
+  for (const config of cases) {
+    await t.test(String(config.tokens), async (caseContext) => {
+      const fixture = await RepositoryFixture.create({
+        testContext: caseContext,
+      });
+      await fixture.write(
+        "contexts/token-budget.md",
+        contextWithTokens(config.tokens),
+      );
+
+      const result = await scan(fixture.root, {
+        failOn: "high",
+        format: "json",
+      });
+      const finding = result.findings.find(
+        (candidate) => candidate.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+      );
+      const normal = await captureStdout(() =>
+        runScanCommand(fixture.root, { failOn: "high", format: "json" }),
+      );
+      const strict = await captureStdout(() =>
+        runScanCommand(
+          fixture.root,
+          { failOn: "high", format: "json" },
+          { strict: true },
+        ),
+      );
+
+      assert.equal(finding?.details?.measured, config.tokens);
+      assert.equal(finding?.severity, config.severity);
+      assert.equal(normal.code, config.expectedCode);
+      assert.equal(strict.code, config.expectedCode);
+    });
+  }
+});
+
 test("strict scan rejects a specification-invalid canonical Agent Skill", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
   await fixture.write(
@@ -601,6 +643,30 @@ Verify the reported evidence.`;
   const body = `${core}\n\n${filler}`;
   assert.equal(estimateTokens(body), count);
   return body;
+}
+
+function contextWithTokens(count: number): string {
+  const core = `---
+id: context.token-budget
+owner: platform
+status: stable
+when_to_use:
+  - Reviewing token budgets
+when_not_to_use:
+  - Runtime selection
+---
+# Token Budget
+
+Review repository token-budget policy without rewriting content automatically.`;
+  const coreTokens = estimateTokens(core);
+  assert.ok(coreTokens < count);
+  const filler = Array.from(
+    { length: count - coreTokens },
+    (_, index) => `filler${index}`,
+  ).join(" ");
+  const content = `${core}\n\n${filler}`;
+  assert.equal(estimateTokens(content), count);
+  return content;
 }
 
 async function captureStdout(
