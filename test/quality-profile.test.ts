@@ -16,6 +16,7 @@ import {
   markdownBody,
 } from "../src/token-estimator.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { ScanConfig } from "../src/types/configuration.js";
 
 test("quality profile pins every package-version default", () => {
   const expectedProfileVersion = `renma-quality@${packageJson.version}`;
@@ -23,8 +24,8 @@ test("quality profile pins every package-version default", () => {
   assert.deepEqual(DEFAULT_QUALITY_PROFILE, {
     profile: expectedProfileVersion,
     descriptionMinChars: 0,
-    skillTokenWarn: 2000,
-    skillTokenStrongWarn: 5000,
+    skillTokenWarning: 5000,
+    skillTokenHigh: 8000,
     contentTokenWarn: {
       context: 4000,
       reference: 5000,
@@ -150,17 +151,20 @@ test("token estimator is deterministic and Unicode-aware across repository text"
 });
 
 test("Skill budgets measure body after frontmatter at exact boundaries", () => {
-  const atLow = findingsFor("skill", skillWithBodyTokens(2000));
-  assert.equal(findBudget(atLow, "QUAL-SKILL-TOKEN-BUDGET"), undefined);
+  const atWarning = findingsFor("skill", skillWithBodyTokens(5000));
+  assert.equal(findBudget(atWarning, "QUAL-SKILL-TOKEN-BUDGET"), undefined);
 
-  const aboveLow = findBudget(
-    findingsFor("skill", skillWithBodyTokens(2001)),
+  const aboveWarning = findBudget(
+    findingsFor("skill", skillWithBodyTokens(5001)),
     "QUAL-SKILL-TOKEN-BUDGET",
   );
-  assert.equal(aboveLow?.severity, "low");
-  assert.deepEqual(aboveLow?.details, {
-    measured: 2001,
-    limit: 2000,
+  assert.equal(aboveWarning?.severity, "medium");
+  assert.deepEqual(aboveWarning?.details, {
+    measured: 5001,
+    warningThreshold: 5000,
+    highThreshold: 8000,
+    triggeredThreshold: 5000,
+    effectiveSeverity: "medium",
     overBy: 1,
     overPercent: 0,
     unit: "estimated_tokens",
@@ -168,18 +172,84 @@ test("Skill budgets measure body after frontmatter at exact boundaries", () => {
     measurement: "markdown_body_after_frontmatter",
     sectionMeasurement: "markdown_body_sections",
     sectionCandidates: [],
-    source: "renma_quality_policy",
+    policySource: "renma_defaults",
+    thresholdSources: {
+      warning: "renma_default",
+      high: "renma_default",
+    },
   });
 
-  const aboveStrong = findBudget(
-    findingsFor("skill", skillWithBodyTokens(5001)),
+  const atHigh = findBudget(
+    findingsFor("skill", skillWithBodyTokens(8000)),
     "QUAL-SKILL-TOKEN-BUDGET",
   );
-  assert.equal(aboveStrong?.severity, "medium");
-  assert.equal(aboveStrong?.details?.limit, 5000);
-  assert.equal(aboveStrong?.details?.overBy, 1);
-  assert.equal(aboveStrong?.details?.overPercent, 0);
-  assert.equal(estimateTokens(markdownBody(skillWithBodyTokens(5001))), 5001);
+  assert.equal(atHigh?.severity, "medium");
+  assert.equal(atHigh?.details?.triggeredThreshold, 5000);
+  assert.equal(atHigh?.details?.measured, 8000);
+
+  const aboveHigh = findBudget(
+    findingsFor("skill", skillWithBodyTokens(8001)),
+    "QUAL-SKILL-TOKEN-BUDGET",
+  );
+  assert.equal(aboveHigh?.severity, "high");
+  assert.equal(aboveHigh?.details?.triggeredThreshold, 8000);
+  assert.equal(aboveHigh?.details?.overBy, 1);
+  assert.equal(aboveHigh?.details?.overPercent, 0);
+  assert.equal("limit" in (aboveHigh?.details ?? {}), false);
+  assert.equal(estimateTokens(markdownBody(skillWithBodyTokens(8001))), 8001);
+});
+
+test("Skill budgets use custom effective thresholds without changing defaults", () => {
+  const config = qualityConfig(3000, 6000);
+  const atWarning = findingsFor("skill", skillWithBodyTokens(3000), config);
+  const aboveWarning = findBudget(
+    findingsFor("skill", skillWithBodyTokens(3001), config),
+    "QUAL-SKILL-TOKEN-BUDGET",
+  );
+  const atHigh = findBudget(
+    findingsFor("skill", skillWithBodyTokens(6000), config),
+    "QUAL-SKILL-TOKEN-BUDGET",
+  );
+  const aboveHigh = findBudget(
+    findingsFor("skill", skillWithBodyTokens(6001), config),
+    "QUAL-SKILL-TOKEN-BUDGET",
+  );
+
+  assert.equal(findBudget(atWarning, "QUAL-SKILL-TOKEN-BUDGET"), undefined);
+  assert.equal(aboveWarning?.severity, "medium");
+  assert.equal(atHigh?.severity, "medium");
+  assert.equal(aboveHigh?.severity, "high");
+  assert.deepEqual(aboveHigh?.details?.thresholdSources, {
+    warning: "repository_configuration",
+    high: "repository_configuration",
+  });
+  assert.equal(aboveHigh?.details?.policySource, "repository_configuration");
+  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 5000);
+  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenHigh, 8000);
+});
+
+test("Skill budget details identify independently defaulted threshold policy", () => {
+  const config: ScanConfig = {
+    ...DEFAULT_CONFIG,
+    quality: {
+      skillTokenWarning: 4000,
+      skillTokenHigh: 8000,
+      skillTokenWarningSource: "repository_configuration",
+      skillTokenHighSource: "renma_default",
+    },
+  };
+  const finding = findBudget(
+    findingsFor("skill", skillWithBodyTokens(4001), config),
+    "QUAL-SKILL-TOKEN-BUDGET",
+  );
+
+  assert.equal(finding?.details?.warningThreshold, 4000);
+  assert.equal(finding?.details?.highThreshold, 8000);
+  assert.equal(finding?.details?.policySource, "mixed");
+  assert.deepEqual(finding?.details?.thresholdSources, {
+    warning: "repository_configuration",
+    high: "renma_default",
+  });
 });
 
 test("content budgets use the shared estimator at each exact boundary", () => {
@@ -213,6 +283,21 @@ test("content budgets use the shared estimator at each exact boundary", () => {
   }
 });
 
+test("custom Skill thresholds do not change Context or support-asset budgets", () => {
+  const config = qualityConfig(1000, 2000);
+  for (const [kind, limit] of Object.entries(
+    DEFAULT_QUALITY_PROFILE.contentTokenWarn,
+  ) as Array<["context" | "reference" | "profile" | "example", number]>) {
+    const finding = findBudget(
+      findingsFor(kind, fillerTokens(limit + 1), config),
+      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+    );
+    assert.equal(finding?.details?.defaultLimit, limit, kind);
+    assert.equal(finding?.details?.effectiveLimit, limit, kind);
+    assert.equal(finding?.details?.limit, limit, kind);
+  }
+});
+
 function skillWithBodyTokens(count: number): string {
   return `---\nname: demo\ndescription: Review files. Use when a repository needs review.\n---\n${fillerTokens(count)}`;
 }
@@ -221,7 +306,11 @@ function fillerTokens(count: number): string {
   return Array.from({ length: count }, (_, index) => `word${index}`).join(" ");
 }
 
-function findingsFor(kind: ArtifactKind, content: string) {
+function findingsFor(
+  kind: ArtifactKind,
+  content: string,
+  config: ScanConfig = DEFAULT_CONFIG,
+) {
   const path = kind === "skill" ? "skills/demo/SKILL.md" : artifactPath(kind);
   const artifact: Artifact = {
     path,
@@ -232,7 +321,19 @@ function findingsFor(kind: ArtifactKind, content: string) {
     markdownParserEligible: true,
     content,
   };
-  return runRules([parseDocument(artifact)], DEFAULT_CONFIG);
+  return runRules([parseDocument(artifact)], config);
+}
+
+function qualityConfig(warning: number, high: number): ScanConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    quality: {
+      skillTokenWarning: warning,
+      skillTokenHigh: high,
+      skillTokenWarningSource: "repository_configuration",
+      skillTokenHighSource: "repository_configuration",
+    },
+  };
 }
 
 function artifactPath(kind: ArtifactKind): string {

@@ -20,6 +20,7 @@ import {
   type SecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
 import type { SkillDiscoveryIndex } from "../src/skill-discovery.js";
+import { estimateTokens, markdownBody } from "../src/token-estimator.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -1416,6 +1417,29 @@ test("diff rejects conflicting aliases in either archived endpoint", async () =>
   }
 });
 
+test("diff evaluates Skill token-budget findings with each revision's quality configuration", async () => {
+  const repo = await createQualityThresholdRepo({
+    warning: 4000,
+    high: 7000,
+  });
+  try {
+    const report = await diff(repo, { fromRef: "base", toRef: "HEAD" });
+    const added = report.findings.added.find(
+      (finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET",
+    );
+
+    assert.equal(added?.severity, "medium");
+    assert.equal(added?.evidence?.path, "skills/token-budget/SKILL.md");
+    assert.ok(
+      !report.findings.removed.some(
+        (finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET",
+      ),
+    );
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("formatDiff tolerates legacy reports without security diff", () => {
   const report = buildDiffReport(
     "/repo",
@@ -1833,6 +1857,45 @@ async function createGitRepo(): Promise<string> {
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-m", "head"]);
   return repo;
+}
+
+async function createQualityThresholdRepo(target: {
+  warning: number;
+  high: number;
+}): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-diff-repo-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "token-budget");
+  await mkdir(skillDirectory, { recursive: true });
+  const skill = `---\nname: token-budget\ndescription: Review repositories. Use when token-budget governance needs review.\n---\n${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.equal(estimateTokens(markdownBody(skill)), 6000);
+  await writeFile(join(skillDirectory, "SKILL.md"), skill);
+  await writeQualityConfig(repo, 6500, 7500);
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeQualityConfig(repo, target.warning, target.high);
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "change quality policy"]);
+  return repo;
+}
+
+async function writeQualityConfig(
+  repo: string,
+  warning: number,
+  high: number,
+): Promise<void> {
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        skill_token_warning: warning,
+        skill_token_high: high,
+      },
+    })}\n`,
+  );
 }
 
 async function createArchivedAliasConflictRepo(): Promise<string> {

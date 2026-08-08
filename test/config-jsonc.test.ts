@@ -4,7 +4,70 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ConfigError, loadConfig } from "../src/config.js";
+import { main } from "../src/cli.js";
+import { ConfigError, DEFAULT_CONFIG, loadConfig } from "../src/config.js";
+import { DEFAULT_QUALITY_PROFILE } from "../src/quality-profile.js";
+
+test("quality token thresholds use Renma defaults when configuration is absent", async (t) => {
+  const root = await fixture(t);
+
+  const loaded = await loadConfig(root, {});
+
+  assert.deepEqual(loaded.config.quality, {
+    skillTokenWarning: 5000,
+    skillTokenHigh: 8000,
+    skillTokenWarningSource: "renma_default",
+    skillTokenHighSource: "renma_default",
+  });
+});
+
+test("loaded default quality policy is request-local", async (t) => {
+  const root = await fixture(t);
+  const loaded = await loadConfig(root, {});
+
+  loaded.config.quality.skillTokenWarning = 1;
+
+  assert.equal(DEFAULT_CONFIG.quality.skillTokenWarning, 5000);
+  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 5000);
+  assert.equal(
+    (await loadConfig(root, {})).config.quality.skillTokenWarning,
+    5000,
+  );
+});
+
+test("quality token thresholds fall back independently and retain their sources", async (t) => {
+  const cases = [
+    {
+      source: '{"quality":{"skill_token_warning":4000}}',
+      expected: {
+        skillTokenWarning: 4000,
+        skillTokenHigh: 8000,
+        skillTokenWarningSource: "repository_configuration",
+        skillTokenHighSource: "renma_default",
+      },
+    },
+    {
+      source: '{"quality":{"skill_token_high":9000}}',
+      expected: {
+        skillTokenWarning: 5000,
+        skillTokenHigh: 9000,
+        skillTokenWarningSource: "renma_default",
+        skillTokenHighSource: "repository_configuration",
+      },
+    },
+  ] as const;
+
+  for (const [index, config] of cases.entries()) {
+    await t.test(String(index), async (caseContext) => {
+      const root = await fixture(caseContext);
+      await writeFile(path.join(root, "renma.config.jsonc"), config.source);
+
+      const loaded = await loadConfig(root, {});
+
+      assert.deepEqual(loaded.config.quality, config.expected);
+    });
+  }
+});
 
 test("automatically discovers and parses canonical JSONC comments", async (t) => {
   const root = await fixture(t);
@@ -47,6 +110,7 @@ test("equivalent JSON and JSONC normalize to the same configuration", async (t) 
     fail_on: "critical",
     format: "json",
     max_depth: 8,
+    quality: { skill_token_warning: 6000, skill_token_high: 9000 },
     skill_discovery: { adopted: true, ci_policy: "warn" },
   };
   await writeFile(
@@ -64,6 +128,120 @@ test("equivalent JSON and JSONC normalize to the same configuration", async (t) 
   assert.deepEqual(json.config, jsonc.config);
   assert.equal(json.configPath, "renma.config.json");
   assert.equal(jsonc.configPath, "renma.config.jsonc");
+  assert.deepEqual(json.config.quality, {
+    skillTokenWarning: 6000,
+    skillTokenHigh: 9000,
+    skillTokenWarningSource: "repository_configuration",
+    skillTokenHighSource: "repository_configuration",
+  });
+});
+
+test("quality token thresholds reject non-positive or non-safe-integer values", async (t) => {
+  const invalidValues: Array<[string, unknown]> = [
+    ["zero", 0],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["unsafe", Number.MAX_SAFE_INTEGER + 1],
+    ["string", "5000"],
+    ["null", null],
+    ["array", [5000]],
+    ["object", { value: 5000 }],
+  ];
+
+  for (const field of ["skill_token_warning", "skill_token_high"] as const) {
+    for (const [label, value] of invalidValues) {
+      await t.test(`${field} ${label}`, async (caseContext) => {
+        const root = await fixture(caseContext);
+        await writeFile(
+          path.join(root, "renma.config.json"),
+          JSON.stringify({ quality: { [field]: value } }),
+        );
+
+        await assert.rejects(
+          loadConfig(root, {}),
+          (error: unknown) =>
+            error instanceof ConfigError &&
+            error.message ===
+              `quality.${field} must be a positive safe integer.`,
+        );
+      });
+    }
+  }
+});
+
+test("quality token thresholds require warning to be strictly lower than high", async (t) => {
+  const cases = [
+    {
+      source: { skill_token_warning: 6000, skill_token_high: 6000 },
+      message:
+        "quality.skill_token_warning (6000) must be strictly lower than quality.skill_token_high (6000).",
+    },
+    {
+      source: { skill_token_warning: 9000 },
+      message:
+        "quality.skill_token_warning (9000) must be strictly lower than quality.skill_token_high (8000).",
+    },
+    {
+      source: { skill_token_high: 4000 },
+      message:
+        "quality.skill_token_warning (5000) must be strictly lower than quality.skill_token_high (4000).",
+    },
+  ] as const;
+
+  for (const config of cases) {
+    await t.test(JSON.stringify(config.source), async (caseContext) => {
+      const root = await fixture(caseContext);
+      await writeFile(
+        path.join(root, "renma.config.jsonc"),
+        JSON.stringify({ quality: config.source }),
+      );
+
+      await assert.rejects(
+        loadConfig(root, {}),
+        (error: unknown) =>
+          error instanceof ConfigError && error.message === config.message,
+      );
+    });
+  }
+});
+
+test("quality configuration rejects unknown keys", async (t) => {
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.jsonc"),
+    '{"quality":{"skill_token_warning":5000,"unknown":true}}',
+  );
+
+  await assert.rejects(
+    loadConfig(root, {}),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      error.message ===
+        'Unknown quality config key "unknown". Allowed keys: skill_token_warning, skill_token_high.',
+  );
+});
+
+test("invalid quality configuration is a caller-correctable CLI error", async (t) => {
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.jsonc"),
+    '{"quality":{"skill_token_warning":8000,"skill_token_high":8000}}',
+  );
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (...values: unknown[]) => {
+    errors.push(values.join(" "));
+  };
+  t.after(() => {
+    console.error = originalError;
+  });
+
+  const exitCode = await main(["scan", root]);
+
+  assert.equal(exitCode, 2);
+  assert.deepEqual(errors, [
+    "quality.skill_token_warning (8000) must be strictly lower than quality.skill_token_high (8000).",
+  ]);
 });
 
 test("continues discovering legacy JSON configuration filenames", async (t) => {

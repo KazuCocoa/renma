@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { catalog } from "../src/commands/catalog.js";
 import { todayIsoDate } from "../src/freshness.js";
-import { formatText } from "../src/report.js";
+import { formatJson, formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { ScanResult } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -2362,13 +2362,13 @@ Do not use for runtime context selection.
 ## Preflight
 Collect the target repository path.
 ## Core Workflow
-${repeatWords("workflow", 500)}
+${repeatWords("workflow", 1500)}
 ## Troubleshooting
-${repeatWords("troubleshooting", 1300)}
+${repeatWords("troubleshooting", 2800)}
 ### Platform Details
-${repeatWords("platform", 200)}
+${repeatWords("platform", 400)}
 ## Examples
-${repeatWords("example", 400)}
+${repeatWords("example", 1000)}
 ## Completion Criteria
 The review is complete when the findings are reported.
 ## Verification
@@ -2387,15 +2387,24 @@ Run npm test.
   assert.equal(skillBudgetFinding?.evidence.snippet, "# Large Skill");
   assert.notEqual(skillBudgetFinding?.evidence.snippet, "---");
   assert.equal(typeof skillBudgetFinding?.details?.measured, "number");
-  assert.ok(Number(skillBudgetFinding?.details?.measured) > 2000);
-  assert.equal(skillBudgetFinding?.details?.limit, 2000);
+  assert.ok(Number(skillBudgetFinding?.details?.measured) > 5000);
+  assert.equal(skillBudgetFinding?.severity, "medium");
+  assert.equal(skillBudgetFinding?.details?.warningThreshold, 5000);
+  assert.equal(skillBudgetFinding?.details?.highThreshold, 8000);
+  assert.equal(skillBudgetFinding?.details?.triggeredThreshold, 5000);
+  assert.equal(skillBudgetFinding?.details?.effectiveSeverity, "medium");
+  assert.equal(skillBudgetFinding?.details?.policySource, "renma_defaults");
+  assert.deepEqual(skillBudgetFinding?.details?.thresholdSources, {
+    warning: "renma_default",
+    high: "renma_default",
+  });
   assert.equal(
     skillBudgetFinding?.details?.overBy,
-    Number(skillBudgetFinding?.details?.measured) - 2000,
+    Number(skillBudgetFinding?.details?.measured) - 5000,
   );
   assert.equal(
     skillBudgetFinding?.details?.overPercent,
-    Math.round((Number(skillBudgetFinding?.details?.overBy) / 2000) * 100),
+    Math.round((Number(skillBudgetFinding?.details?.overBy) / 5000) * 100),
   );
   assert.equal(skillBudgetFinding?.details?.unit, "estimated_tokens");
   assert.match(skillBudgetFinding?.whyItMatters ?? "", /Long Skill bodies/);
@@ -2436,14 +2445,25 @@ Run npm test.
     textReport,
     new RegExp(`${skillBudgetFinding?.details?.measured} estimated tokens`),
   );
-  assert.match(textReport, /2000-token advisory limit/);
+  assert.match(textReport, /effective 5000-token medium threshold/);
+  assert.match(textReport, /warning and high thresholds are 5000 and 8000/);
   assert.match(
     textReport,
     new RegExp(
-      `${skillBudgetFinding?.details?.overBy} tokens \\(~${skillBudgetFinding?.details?.overPercent}%\\) over`,
+      `by ${skillBudgetFinding?.details?.overBy} tokens \\(~${skillBudgetFinding?.details?.overPercent}%\\)`,
     ),
   );
   assert.match(textReport, /Troubleshooting/);
+  const repeated = await scan(root);
+  assert.equal(formatText(repeated), textReport);
+  assert.equal(formatJson(repeated), formatJson(result));
+  const jsonFinding = (
+    JSON.parse(formatJson(result)) as {
+      findings: Array<{ id: string; details?: Record<string, unknown> }>;
+    }
+  ).findings.find((finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET");
+  assert.equal(jsonFinding?.details?.warningThreshold, 5000);
+  assert.equal(jsonFinding?.details?.highThreshold, 8000);
 });
 
 test("oversized Skills without headings retain manual semantic guidance", async () => {
@@ -2456,7 +2476,7 @@ test("oversized Skills without headings retain manual semantic guidance", async 
 name: headingless
 description: Review content. Use when a large linear workflow needs review.
 ---
-${repeatWords("linear", 2100)}`,
+${repeatWords("linear", 5100)}`,
   );
   const result = await scan(root);
   const finding = result.findings.find(

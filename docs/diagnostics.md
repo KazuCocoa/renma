@@ -1006,12 +1006,23 @@ examples by asset kind.
 Token-budget findings use deterministic `estimated_tokens`, not exact token
 counts for a particular model. `QUAL-SKILL-TOKEN-BUDGET` measures the Markdown
 body after frontmatter; `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` continues to measure
-the full file. Each exceeded-budget finding reports measured and active limits,
-absolute and rounded-percent overage, and up to three largest heading-based
-review candidates when useful structure exists. The candidates are ranked by
-estimated section size with source-line tie-breaking, and nested headings stay
-within the selected parent section. They locate material for semantic review;
-they do not direct an automatic split or infer a destination from a heading.
+the full file. The Renma Skill defaults produce no finding through 5,000,
+Medium above 5,000 through 8,000, and High above 8,000 estimated tokens.
+Repositories may set the two effective Skill thresholds through the
+[authoritative configuration contract](user-manual.md#configuration).
+
+The Skill finding details retain `measured`, `warningThreshold`,
+`highThreshold`, `triggeredThreshold`, `effectiveSeverity`, `unit`, Markdown
+body measurement scope, quality-profile identity, overall `policySource`, and
+per-threshold sources. Overage evidence is calculated against the threshold
+that selected the result. Each exceeded-budget finding also retains up to
+three largest heading-based review candidates when useful structure exists.
+The candidates are ranked by estimated section size with source-line
+tie-breaking, and nested headings stay within the selected parent section.
+They locate material for semantic review; they do not direct an automatic
+split or infer a destination from a heading. `scan --fail-on high` gates the
+High result through Renma's normal severity model; no token-specific strict
+mode exists.
 
 For support assets, the active limit is the default unless an active declared
 override is in force. An active override remains visible alongside the default
@@ -1089,7 +1100,7 @@ section size or heading text—determines whether content belongs in `SKILL.md`,
 | `QUAL-SHORT-DESCRIPTION`                         | Disabled compatibility identifier.                   | 0.17 applied an independent 150-character minimum.                                                  | Use Agent Skills validity and selection-boundary diagnostics; short clear descriptions are accepted.  |
 | `QUAL-SKILL-MIXED-RESPONSIBILITY`                | Skill may mix workflow and reusable knowledge.       | A sufficiently large Skill has multiple distinct reusable-knowledge signals.                       | Promote only independently owned shared knowledge; keep Skill-local workflow and detail local.         |
 | `QUAL-SKILL-PROGRESSIVE-DISCLOSURE`              | Progressive disclosure needs review.                 | Reserved 0.18 focused-workflow contract identifier.                                                | Keep read conditions and core workflow in `SKILL.md`; place details by semantic responsibility.        |
-| `QUAL-SKILL-TOKEN-BUDGET`                        | Skill body exceeds an advisory estimate.             | Markdown body exceeds 2,000 or 5,000 estimated tokens.                                             | Review progressive disclosure without splitting or moving content by size alone.                       |
+| `QUAL-SKILL-TOKEN-BUDGET`                        | Skill body exceeds its effective repository token-budget threshold. | Markdown body is above the effective warning threshold or above the effective High threshold. | Review progressive disclosure while retaining core workflow, constraints, and completion criteria; never split or move content by size alone. |
 | `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE`             | Support-asset decision metadata is invalid.           | The decision is malformed, unsafe to represent exactly, ambiguous, incomplete, orphaned, duplicated, or unnecessary while the asset remains within its default. | Correct or remove the declaration. Ask about a meaningful split first; use an override only after the user confirms the asset should remain intentionally long. |
 | `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`                | Support asset exceeds its effective advisory estimate. | A context, reference, profile, or example exceeds its default or active declared override.         | Ask whether a semantic split preserves coherence and execution order. Split only with user agreement; otherwise record an explicit rationale, never an override added merely to pass diagnostics. |
 | `QUAL-USER-LOCAL-PATHS`                          | User-local path appears in content.                  | Guidance includes machine-specific paths such as home directories.                                 | Replace local paths with repository-relative or configurable paths.                                    |

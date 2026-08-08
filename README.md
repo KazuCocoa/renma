@@ -253,6 +253,23 @@ policy is temporarily relaxed without introducing executable configuration.
 Existing `renma.config.json` and `.renma.json` files remain supported; Renma
 does not support or execute `.mjs` configuration.
 
+Repositories may set an effective Skill body token-budget policy without
+changing other asset budgets:
+
+```jsonc
+{
+  "quality": {
+    "skill_token_warning": 5000,
+    "skill_token_high": 8000
+  }
+}
+```
+
+These are Renma repository-governance thresholds, not portable Agent Skills
+requirements. See the User Manual's
+[authoritative configuration contract](docs/user-manual.md#configuration) for
+defaults, validation, and independent fallback behavior.
+
 `contexts/**` is the canonical independently governed Context Asset root;
 `context/**` remains accepted for compatibility. Canonical Skill-local support
 directories are `references/`, `profiles/`, `examples/`, `scripts/`, and

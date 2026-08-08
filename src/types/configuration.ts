@@ -52,6 +52,17 @@ export interface SkillDiscoveryConfig {
   ciPolicy: SkillDiscoveryCiPolicyMode;
 }
 
+export type QualityThresholdSource =
+  "renma_default" | "repository_configuration";
+
+/** Effective repository policy for the Skill body token-budget diagnostic. */
+export interface QualityConfig {
+  skillTokenWarning: number;
+  skillTokenHigh: number;
+  skillTokenWarningSource: QualityThresholdSource;
+  skillTokenHighSource: QualityThresholdSource;
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -64,6 +75,7 @@ export interface ScanConfig {
   suppressions: SuppressionConfig[];
   scanBoundary: ScanBoundaryConfig;
   executableSurface: ExecutableSurfaceConfig;
+  quality: QualityConfig;
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;

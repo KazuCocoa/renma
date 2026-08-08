@@ -40,6 +40,7 @@ import {
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";
 import { scan } from "../src/scanner.js";
+import { estimateTokens, markdownBody } from "../src/token-estimator.js";
 import {
   summarizeSecurityPosture,
   zeroSecurityPostureSummary,
@@ -3265,6 +3266,22 @@ test("ci-report rejects conflicting aliases in either archived endpoint", async 
   }
 });
 
+test("ci-report evaluates Skill token budgets with revision-local quality configuration", async () => {
+  const repo = await createQualityThresholdCiRepo();
+  try {
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const added = report.diff.findings.added.find(
+      (finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET",
+    );
+
+    assert.equal(added?.severity, "high");
+    assert.equal(added?.evidence?.path, "skills/token-budget/SKILL.md");
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("Skill directory symlink is a subtree coverage regression from an exact path", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
   await fixture.initializeGit();
@@ -4061,6 +4078,42 @@ async function writeContext(repo: string): Promise<void> {
       "",
     ].join("\n"),
   );
+}
+
+async function createQualityThresholdCiRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-quality-ci-repo-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  const skillDirectory = join(repo, "skills", "token-budget");
+  await mkdir(skillDirectory, { recursive: true });
+  const skill = `---\nname: token-budget\ndescription: Review repositories. Use when token-budget governance needs review.\n---\n${Array.from({ length: 6000 }, (_, index) => `word${index}`).join(" ")}`;
+  assert.equal(estimateTokens(markdownBody(skill)), 6000);
+  await writeFile(join(skillDirectory, "SKILL.md"), skill);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        skill_token_warning: 6500,
+        skill_token_high: 7500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base quality policy"]);
+  await git(repo, ["tag", "base"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    `${JSON.stringify({
+      quality: {
+        skill_token_warning: 4000,
+        skill_token_high: 5500,
+      },
+    })}\n`,
+  );
+  await git(repo, ["add", "renma.config.json"]);
+  await git(repo, ["commit", "-m", "tighten quality policy"]);
+  return repo;
 }
 
 async function writeInvalidContextLens(repo: string): Promise<void> {

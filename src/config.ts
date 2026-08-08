@@ -73,6 +73,12 @@ export const DEFAULT_CONFIG: ScanConfig = {
   executableSurface: {
     ciPolicy: "off",
   },
+  quality: {
+    skillTokenWarning: DEFAULT_QUALITY_PROFILE.skillTokenWarning,
+    skillTokenHigh: DEFAULT_QUALITY_PROFILE.skillTokenHigh,
+    skillTokenWarningSource: "renma_default",
+    skillTokenHighSource: "renma_default",
+  },
   layout: {
     workflowAliases: {},
   },
@@ -113,6 +119,7 @@ export async function loadConfig(
     config: {
       ...DEFAULT_CONFIG,
       ...config,
+      quality: config.quality ?? { ...DEFAULT_CONFIG.quality },
       failOn: overrides.failOn ?? config.failOn ?? DEFAULT_CONFIG.failOn,
       format: overrides.format ?? config.format ?? DEFAULT_CONFIG.format,
     },
@@ -221,6 +228,7 @@ function normalizeConfig(
     "suppressions",
     "scan_boundary",
     "executable_surface",
+    "quality",
     "layout",
     "security",
     "skill_discovery",
@@ -260,6 +268,8 @@ function normalizeConfig(
     config.executableSurface = executableSurfacePolicy(
       value.executable_surface,
     );
+  if (value.quality !== undefined)
+    config.quality = qualityPolicy(value.quality);
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
@@ -267,6 +277,48 @@ function normalizeConfig(
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function qualityPolicy(value: unknown): ScanConfig["quality"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("quality must be an object.");
+  }
+  const allowed = new Set(["skill_token_warning", "skill_token_high"]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown quality config key "${key}". Allowed keys: skill_token_warning, skill_token_high.`,
+      );
+    }
+  }
+
+  const hasWarning = value.skill_token_warning !== undefined;
+  const hasHigh = value.skill_token_high !== undefined;
+  const skillTokenWarning = hasWarning
+    ? positiveSafeInteger(
+        "quality.skill_token_warning",
+        value.skill_token_warning,
+      )
+    : DEFAULT_QUALITY_PROFILE.skillTokenWarning;
+  const skillTokenHigh = hasHigh
+    ? positiveSafeInteger("quality.skill_token_high", value.skill_token_high)
+    : DEFAULT_QUALITY_PROFILE.skillTokenHigh;
+  if (skillTokenWarning >= skillTokenHigh) {
+    throw new ConfigError(
+      `quality.skill_token_warning (${skillTokenWarning}) must be strictly lower than quality.skill_token_high (${skillTokenHigh}).`,
+    );
+  }
+
+  return {
+    skillTokenWarning,
+    skillTokenHigh,
+    skillTokenWarningSource: hasWarning
+      ? "repository_configuration"
+      : "renma_default",
+    skillTokenHighSource: hasHigh
+      ? "repository_configuration"
+      : "renma_default",
+  };
 }
 
 function executableSurfacePolicy(
@@ -375,6 +427,13 @@ function positiveInteger(field: string, value: unknown): number {
   if (Number.isInteger(value) && typeof value === "number" && value > 0)
     return value;
   throw new ConfigError(`${field} must be a positive integer.`);
+}
+
+function positiveSafeInteger(field: string, value: unknown): number {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+    return value;
+  }
+  throw new ConfigError(`${field} must be a positive safe integer.`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

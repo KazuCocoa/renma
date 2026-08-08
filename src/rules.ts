@@ -240,9 +240,9 @@ function rulesForEvaluationDate(
     },
     {
       id: "shape",
-      run: ({ documents }) =>
+      run: ({ documents, config }) =>
         documents.flatMap((document) => [
-          ...shapeFindings(document),
+          ...shapeFindings(document, config),
           ...contextBudgetFindings(document),
           ...profileFindings(document),
         ]),
@@ -920,7 +920,10 @@ function commandFindings(document: ParsedDocument): Finding[] {
   });
 }
 
-function shapeFindings(document: ParsedDocument): Finding[] {
+function shapeFindings(
+  document: ParsedDocument,
+  config: ScanConfig,
+): Finding[] {
   if (document.artifact.kind !== "skill" && document.artifact.kind !== "agent")
     return [];
 
@@ -978,17 +981,17 @@ function shapeFindings(document: ParsedDocument): Finding[] {
 
   if (
     document.artifact.kind === "skill" &&
-    bodyTokenCount > QUALITY.skillTokenWarn
+    bodyTokenCount > config.quality.skillTokenWarning
   ) {
-    const limit =
-      bodyTokenCount > QUALITY.skillTokenStrongWarn
-        ? QUALITY.skillTokenStrongWarn
-        : QUALITY.skillTokenWarn;
-    const severity =
-      bodyTokenCount > QUALITY.skillTokenStrongWarn ? "medium" : "low";
-    const overage = tokenBudgetOverage(bodyTokenCount, limit);
+    const triggeredThreshold =
+      bodyTokenCount > config.quality.skillTokenHigh
+        ? config.quality.skillTokenHigh
+        : config.quality.skillTokenWarning;
+    const severity: Severity =
+      bodyTokenCount > config.quality.skillTokenHigh ? "high" : "medium";
+    const overage = tokenBudgetOverage(bodyTokenCount, triggeredThreshold);
     const sectionCandidates = tokenBudgetSectionCandidates(document);
-    const measurementSummary = `The Skill is approximately ${bodyTokenCount} estimated tokens against the ${limit}-token advisory limit, ${overage.overBy} tokens (~${overage.overPercent}%) over the limit.`;
+    const measurementSummary = `The Skill body is approximately ${bodyTokenCount} estimated tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%). The effective warning and high thresholds are ${config.quality.skillTokenWarning} and ${config.quality.skillTokenHigh} estimated tokens.`;
     const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
     const progressiveDisclosureGuidance =
       sectionCandidates.length > 0
@@ -998,13 +1001,13 @@ function shapeFindings(document: ParsedDocument): Finding[] {
       documentFinding(
         document,
         DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET,
-        "Skill body exceeds advisory token budget",
+        "Skill body exceeds its effective token-budget threshold",
         "quality",
         severity,
         `${measurementSummary} ${sectionReview} ${progressiveDisclosureGuidance} Keep selection boundaries, read conditions, ordered workflow, constraints, and completion criteria in SKILL.md. Move Skill-specific conditional detail to references/, deterministic repeated implementation to scripts/, output material to assets/, and independently owned cross-Skill knowledge to contexts/. Do not split automatically or choose a destination from heading text alone.`,
         {
           whyItMatters:
-            "Long Skill bodies can make activated workflows harder to navigate. Size is advisory evidence only; Agent Skills recommends staying under 5,000 tokens and Renma adds an earlier low review point at 2,000 estimated tokens.",
+            "Long Skill bodies can make activated workflows harder to navigate and maintain. Token size is evidence for progressive-disclosure review, not proof that the Skill has the wrong structure or must be split.",
           constraints: [
             "Do not introduce runtime context resolution.",
             "Do not create prompt packages.",
@@ -1020,17 +1023,29 @@ function shapeFindings(document: ParsedDocument): Finding[] {
           llmHint: `${measurementSummary} ${sectionReview} Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge. Treat the listed sections only as review candidates.`,
           details: {
             measured: bodyTokenCount,
-            limit,
+            warningThreshold: config.quality.skillTokenWarning,
+            highThreshold: config.quality.skillTokenHigh,
+            triggeredThreshold,
+            effectiveSeverity: severity,
             ...overage,
             unit: "estimated_tokens",
             profile: QUALITY.profile,
             measurement: "markdown_body_after_frontmatter",
             sectionMeasurement: "markdown_body_sections",
             sectionCandidates,
-            source:
-              limit === QUALITY.skillTokenStrongWarn
-                ? "agent_skills_recommendation_and_renma_severity"
-                : "renma_quality_policy",
+            policySource:
+              config.quality.skillTokenWarningSource ===
+                "repository_configuration" &&
+              config.quality.skillTokenHighSource === "repository_configuration"
+                ? "repository_configuration"
+                : config.quality.skillTokenWarningSource === "renma_default" &&
+                    config.quality.skillTokenHighSource === "renma_default"
+                  ? "renma_defaults"
+                  : "mixed",
+            thresholdSources: {
+              warning: config.quality.skillTokenWarningSource,
+              high: config.quality.skillTokenHighSource,
+            },
           },
         },
       ),

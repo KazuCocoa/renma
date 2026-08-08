@@ -377,6 +377,17 @@ native Set or Map object does not disable its mutator methods. Their mutable
 backing collections are never exposed. No derived projection may rediscover
 files or reread repository content.
 
+Effective rule configuration is snapshot-scoped. `loadConfig` normalizes the
+repository's optional snake-case `quality.skill_token_warning` and
+`quality.skill_token_high` fields into a complete camel-case Skill token policy,
+including independent default/configuration provenance for each value. The
+shape rule consumes that snapshot value without mutating
+`DEFAULT_QUALITY_PROFILE` or consulting process-global state. These values do
+not enter `scan-boundary` identity because they change finding evaluation, not
+the repository paths or bytes Renma can inspect. Context and support-asset
+budgets continue to consume their separate internal defaults and metadata
+override contract.
+
 An explicit projection store derives and memoizes these facts from that stable
 input:
 
@@ -599,7 +610,10 @@ snapshots remain revision-local for semantic configuration. For CI only, target
 paths are collected once more through the independent union of both endpoint
 coverage predicates; the target's semantic configuration is still used for
 parsing, projections, and rules. This is an enforcement projection, not a
-second semantic comparison.
+second semantic comparison. In particular, each direct diff endpoint evaluates
+Skill token-budget findings with its own archived `quality` thresholds; the CI
+enforcement-view target uses the target revision's quality thresholds while
+only its inspection boundary is widened.
 
 `determineCiReportStatus()` still receives only the compatible diff. The pure
 `skill-discovery-ci-policy` module selects the stricter `off < warn` mode,
