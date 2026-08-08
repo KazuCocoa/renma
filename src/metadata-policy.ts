@@ -1,6 +1,7 @@
-import { inspectAgentSkill } from "./agent-skills.js";
+import { LEGACY_RENMA_SKILL_FIELDS } from "./agent-skills.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
 import { DIAGNOSTIC_IDS, withDiagnosticId } from "./diagnostic-ids.js";
+import { parseCanonicalCatalogListValue } from "./metadata.js";
 import type { AssetMetadata, CatalogEntry } from "./model.js";
 import {
   RENMA_REQUIRED_METADATA_DEFINITIONS,
@@ -15,6 +16,8 @@ import {
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
+
+const LEGACY_SKILL_FIELDS = new Set<string>(LEGACY_RENMA_SKILL_FIELDS);
 
 export type RequiredMetadataPresenceState =
   "absent" | "empty" | "invalid" | "ambiguous";
@@ -107,16 +110,18 @@ function requiredMetadataPresence(
   definition: RequiredMetadataPolicyDefinition,
 ): RequiredMetadataPresence {
   return document.artifact.kind === "skill"
-    ? canonicalSkillPresence(document, metadata, definition)
+    ? canonicalSkillPresence(document, definition)
     : nonSkillPresence(document, metadata, definition);
 }
 
 function canonicalSkillPresence(
   document: ParsedDocument,
-  metadata: AssetMetadata,
   definition: RequiredMetadataPolicyDefinition,
 ): RequiredMetadataPresence {
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const metadataMappings = frontmatter.fields.filter(
+    (field) => field.key === "metadata",
+  );
   const fields = frontmatter.metadataFields.filter(
     (field) => field.key === definition.skillKey,
   );
@@ -128,18 +133,63 @@ function canonicalSkillPresence(
   ) {
     return { state: "ambiguous", ...(evidence ? { evidence } : {}) };
   }
-  if (fields.length === 0) {
-    return malformedEnvelope(frontmatter)
-      ? { state: "invalid", evidence: firstLineEvidence(document) }
-      : { state: "absent" };
+  if (malformedEnvelope(frontmatter)) {
+    return {
+      state: "invalid",
+      evidence: evidence ?? firstLineEvidence(document),
+    };
   }
-  if (
-    malformedEnvelope(frontmatter) ||
-    !inspectAgentSkill(document).validation.valid
-  ) {
+  if (metadataMappings.length === 1 && !isRecord(metadataMappings[0]!.value)) {
+    return {
+      state: "invalid",
+      evidence: evidence ?? yamlFieldEvidence(document, metadataMappings[0]!),
+    };
+  }
+  if (fields.length === 0) {
+    return { state: "absent" };
+  }
+  if (frontmatter.fields.some((field) => LEGACY_SKILL_FIELDS.has(field.key))) {
     return { state: "invalid", ...(evidence ? { evidence } : {}) };
   }
-  return normalizedPresence(metadata, definition, first!.value, evidence);
+  return canonicalSkillNormalizedPresence(definition, first!.value, evidence);
+}
+
+function canonicalSkillNormalizedPresence(
+  definition: RequiredMetadataPolicyDefinition,
+  rawValue: unknown,
+  evidence: Evidence | undefined,
+): RequiredMetadataPresence {
+  if (definition.policyValueKind === "list") {
+    if (typeof rawValue === "string" && rawValue.trim().length === 0) {
+      return { state: "empty", ...(evidence ? { evidence } : {}) };
+    }
+    const parsed = parseCanonicalCatalogListValue(rawValue);
+    if (!parsed.valid) {
+      return { state: "invalid", ...(evidence ? { evidence } : {}) };
+    }
+    return {
+      state: parsed.values.length > 0 ? "valid" : "empty",
+      ...(evidence ? { evidence } : {}),
+    };
+  }
+
+  if (
+    rawValue === null ||
+    rawValue === undefined ||
+    (typeof rawValue === "string" && rawValue.trim().length === 0)
+  ) {
+    return { state: "empty", ...(evidence ? { evidence } : {}) };
+  }
+  if (typeof rawValue !== "string") {
+    return { state: "invalid", ...(evidence ? { evidence } : {}) };
+  }
+  const normalized = rawValue.trim();
+  return {
+    state: validTextSemantics(definition.policyKey, normalized)
+      ? "valid"
+      : "invalid",
+    ...(evidence ? { evidence } : {}),
+  };
 }
 
 function nonSkillPresence(
@@ -273,6 +323,10 @@ function rawJsonArrayIsEmpty(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function yamlFieldEvidence(

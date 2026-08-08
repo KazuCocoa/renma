@@ -83,10 +83,14 @@ serializer output.
 configuration. It evaluates declared source evidence before ownership
 inheritance and emits at most one
 `META-POLICY-REQUIRED-FIELD-MISSING` diagnostic per applicable asset/field.
-Canonical Skills fail closed through Agent Skills validity and exact
-`metadata.renma.*` evidence. Non-Skills use the registered top-level key.
-Binary, non-Markdown, config, unknown, and non-catalog runtime surfaces never
-receive a requirement.
+Canonical Skill requirements use field-local `metadata.renma.*` evidence:
+their envelope, mapping, exact required key, encoding, normalized value, and
+field semantics must be valid and unambiguous. Independent Agent Skills errors
+remain separately diagnosed but do not invalidate a correct required field.
+Operational Skill metadata retains its existing whole-Skill validity gate, so
+this policy-only check cannot populate catalog, ownership, or security state.
+Non-Skills use the registered top-level key. Binary, non-Markdown, config,
+unknown, and non-catalog runtime surfaces never receive a requirement.
 
 `src/metadata-policy-diff.ts` compares archived required-field sets in registry
 order and retains endpoint configuration provenance. The separate
@@ -95,8 +99,11 @@ independently, matches removals and CI-mode weakening with stable IDs, and uses
 the stricter archived endpoint mode. `diff` and `ci-report` only add the new
 policy projection when there is transition evidence, preserving unconfigured
 public output. Finding details are retained in semantic diff only for this
-policy diagnostic so a vanished finding remains attributable to its exact
-field, asset, serialization key, and source configuration.
+policy diagnostic, and its active and suppressed semantic identities include
+the registry-ordered required field plus expected serialization key. Separate
+fields on one asset therefore remain distinct while unrelated finding identity
+is unchanged; vanished findings remain attributable to their exact field,
+asset, serialization key, and source configuration.
 
 ## Typed Catalog Diagnostic Identity
 

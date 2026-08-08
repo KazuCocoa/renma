@@ -256,6 +256,126 @@ test("ci-report shows required-field addition as tightening", async (t) => {
   );
 });
 
+test("adding a second missing field preserves the unchanged field and fails CI", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  await fixture.writeConfig({ metadata: { required: ["owner"] } });
+  await fixture.skill("demo");
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base missing owner"]);
+  await fixture.git(["tag", "base"]);
+
+  await fixture.writeConfig({
+    metadata: { required: ["owner", "tags"] },
+  });
+  await fixture.git(["add", "renma.config.json"]);
+  await fixture.git(["commit", "-m", "require missing tags"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const addedPolicyFindings = report.diff.findings.added.filter(
+    (finding) => finding.id === "META-POLICY-REQUIRED-FIELD-MISSING",
+  );
+
+  assert.equal(report.status, "fail");
+  assert.equal(report.summary.findingsDelta, 1);
+  assert.equal(report.summary.highOrCriticalFindingsDelta, 1);
+  assert.deepEqual(
+    addedPolicyFindings.map((finding) => finding.details?.requiredField),
+    ["tags"],
+  );
+  assert.ok(
+    !report.diff.findings.removed.some(
+      (finding) => finding.details?.requiredField === "owner",
+    ),
+  );
+  assert.match(
+    formatCiReport(report, "markdown"),
+    /required `tags` as `metadata\.renma\.tags`/,
+  );
+});
+
+test("all simultaneous missing fields survive semantic diff identity in registry order", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  await fixture.writeConfig({ metadata: { required: [] } });
+  await fixture.skill("demo");
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await fixture.writeConfig({
+    metadata: { required: ["tags", "purpose", "owner"] },
+  });
+  await fixture.git(["add", "renma.config.json"]);
+  await fixture.git(["commit", "-m", "require three missing fields"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const addedPolicyFindings = report.diff.findings.added.filter(
+    (finding) => finding.id === "META-POLICY-REQUIRED-FIELD-MISSING",
+  );
+  const markdown = formatCiReport(report, "markdown");
+  const json = formatCiReport(report, "json");
+
+  assert.equal(report.status, "fail");
+  assert.equal(report.summary.findingsDelta, 3);
+  assert.equal(report.summary.highOrCriticalFindingsDelta, 3);
+  assert.deepEqual(
+    addedPolicyFindings.map((finding) => finding.details?.requiredField),
+    ["owner", "purpose", "tags"],
+  );
+  for (const field of ["owner", "purpose", "tags"]) {
+    assert.ok(markdown.includes("required `" + field + "`"));
+    assert.match(json, new RegExp(`"requiredField": "${field}"`));
+  }
+});
+
+test("suppressed deltas retain separate required fields on one asset", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  const suppressions = [
+    {
+      id: "META-POLICY-REQUIRED-FIELD-MISSING",
+      paths: ["skills/demo/**"],
+      reason: "Exercise field-specific suppressed finding identity.",
+      expires: "never",
+    },
+  ];
+  await fixture.writeConfig({
+    suppressions,
+    metadata: { required: [] },
+  });
+  await fixture.skill("demo");
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await fixture.writeConfig({
+    suppressions,
+    metadata: { required: ["tags", "purpose", "owner"] },
+  });
+  await fixture.git(["add", "renma.config.json"]);
+  await fixture.git(["commit", "-m", "suppress three missing fields"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  assert.deepEqual(
+    report.diff.findings.suppressed.added.map(
+      (item) => item.finding.details?.requiredField,
+    ),
+    ["owner", "purpose", "tags"],
+  );
+  assert.equal(report.diff.findings.added.length, 0);
+  assert.equal(report.summary.findingsDelta, 0);
+});
+
 function policy(
   ciPolicy: MetadataCiPolicyMode,
   required: MetadataConfig["required"],

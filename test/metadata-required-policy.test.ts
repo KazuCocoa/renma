@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { validateAgentSkill } from "../src/agent-skills.js";
 import { buildCatalog } from "../src/catalog.js";
+import { catalogDiagnosticFindings } from "../src/catalog-findings.js";
 import { ConfigError, DEFAULT_CONFIG, loadConfig } from "../src/config.js";
 import { parseDocument } from "../src/markdown.js";
 import { scan } from "../src/scanner.js";
@@ -56,6 +58,75 @@ test("canonical Skill owner satisfies policy and missing owner reports exact spe
     ["owner"],
   );
   assert.equal(policyDiagnostics(present.diagnostics).length, 0);
+});
+
+test("unrelated Skill identity errors do not invalidate a correct required owner", () => {
+  const skill = document(
+    "skills/different-directory/SKILL.md",
+    "skill",
+    canonicalSkill("  renma.owner: platform\n", "# Present\n"),
+  );
+  const validation = validateAgentSkill(skill);
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "AS-SKILL-NAME-DIRECTORY-MISMATCH",
+    ),
+  );
+
+  const built = buildCatalogWithPolicy([skill], ["owner"]);
+  assert.equal(policyDiagnostics(built.diagnostics).length, 0);
+});
+
+test("unrelated invalid Skill metadata does not become operational or invalidate a correct required owner", () => {
+  const skill = document(
+    "skills/demo/SKILL.md",
+    "skill",
+    canonicalSkill(
+      "  renma.owner: platform\n  renma.tags:\n    - invalid-native-list\n",
+      "# Present\n",
+    ),
+  );
+  const validation = validateAgentSkill(skill);
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "AS-SKILL-INVALID-METADATA",
+    ),
+  );
+
+  const built = buildCatalogWithPolicy([skill], ["owner"]);
+  assert.equal(policyDiagnostics(built.diagnostics).length, 0);
+  assert.equal(built.catalog.entries[0]?.metadata.owner, undefined);
+  assert.equal(built.catalog.entries[0]?.ownership.effectiveOwner, null);
+});
+
+test("invalid and duplicate required Skill fields still fail closed as High findings", () => {
+  const invalid = document(
+    "skills/invalid/SKILL.md",
+    "skill",
+    canonicalSkill("  renma.owner: 42\n", "# Invalid\n"),
+  );
+  const duplicate = document(
+    "skills/duplicate/SKILL.md",
+    "skill",
+    canonicalSkill(
+      "  renma.owner: first\n  renma.owner: second\n",
+      "# Duplicate\n",
+    ),
+  );
+  const built = buildCatalogWithPolicy([invalid, duplicate], ["owner"]);
+
+  assert.deepEqual(
+    policyDiagnostics(built.diagnostics).map(
+      (diagnostic) => diagnostic.details?.presenceState,
+    ),
+    ["invalid", "ambiguous"],
+  );
+  assert.deepEqual(
+    catalogDiagnosticFindings(built.diagnostics)
+      .filter((finding) => finding.id === REQUIRED_ID)
+      .map((finding) => finding.severity),
+    ["high", "high"],
+  );
 });
 
 test("legacy and ignored hybrid Skill owner declarations do not satisfy policy", () => {

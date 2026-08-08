@@ -92,12 +92,17 @@ import {
   type MetadataPolicyDiff,
   type MetadataPolicyRequiredFieldChange,
 } from "../metadata-policy-diff.js";
+import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
+import { REQUIRED_METADATA_POLICY_FIELDS } from "../metadata-definitions.js";
 import type {
   SuppressedFindingEvidence,
   SuppressionConfig,
 } from "../types/diagnostics.js";
 
 const execFile = promisify(execFileCallback);
+const REQUIRED_METADATA_FIELD_ORDER = new Map<string, number>(
+  REQUIRED_METADATA_POLICY_FIELDS.map((field, index) => [field, index]),
+);
 
 export class DiffInputError extends CliUserError {
   constructor(message: string, options?: ErrorOptions) {
@@ -1723,6 +1728,7 @@ function suppressedFindingMap(
         evidence.finding.severity,
         evidence.finding.riskClass ?? "",
         evidence.finding.evidence.path,
+        ...findingDetailIdentity(evidence.finding.id, evidence.finding.details),
         evidence.finding.evidence.startLine,
         evidence.finding.evidence.endLine,
         evidence.suppression.id,
@@ -1919,6 +1925,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
         [
           deltaFinding.id,
           evidence?.path ?? "",
+          ...findingDetailIdentity(deltaFinding.id, details),
           evidence?.startLine ?? "",
           evidence?.endLine ?? "",
           evidence?.snippet ?? "",
@@ -1927,6 +1934,22 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
       ] as const;
     }),
   );
+}
+
+/** Keep ordinary identities unchanged while separating required fields at one location. */
+function findingDetailIdentity(findingId: string, details: unknown): string[] {
+  if (findingId !== DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING) {
+    return [];
+  }
+  const requiredField = optionalStringField(details, "requiredField") ?? "";
+  const expectedSerializedKey =
+    optionalStringField(details, "expectedSerializedKey") ?? "";
+  const fieldOrder = REQUIRED_METADATA_FIELD_ORDER.get(requiredField);
+  return [
+    fieldOrder === undefined ? "~~~~" : String(fieldOrder).padStart(4, "0"),
+    requiredField,
+    expectedSerializedKey,
+  ];
 }
 
 function countById(fromFindings: unknown[], toFindings: unknown[]) {

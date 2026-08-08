@@ -349,9 +349,14 @@ not receive impossible frontmatter requirements.
 A declaration satisfies policy only when it is unambiguous, structurally and
 semantically valid, and non-empty after Renma normalization. Empty text, empty
 lists, malformed YAML, duplicate declarations, and invalid status/date/cycle
-values fail closed. Skills must be specification-valid and use the exact
-canonical field under the portable `metadata` mapping. Pre-0.16 top-level Skill
-fields and ignored hybrid metadata never satisfy the policy.
+values fail closed. For Skills, this check is field-local: the required field
+must use the exact canonical string encoding under a structurally valid
+portable `metadata` mapping. An unrelated name/directory, description,
+`allowed-tools`, or different metadata-field error remains an independent Agent
+Skills diagnostic and does not invalidate a correct required field. Pre-0.16
+top-level Skill fields and ignored hybrid metadata never satisfy the policy.
+This exception is limited to required-field validation; invalid Skills still
+contribute no operational catalog, ownership, security, or other metadata.
 
 The policy is specifically about declared metadata. For example, a uniquely
 resolved Skill-local support file may retain an inherited effective owner for
