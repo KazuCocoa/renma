@@ -66,6 +66,7 @@ import {
   type BodyPolicyClauseFacts,
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
+import { quotePairEnclosesOffset } from "./security-body-policy/statement-components.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -846,6 +847,16 @@ const EXCLUDED_REGION_NETWORK_ACTION_RE =
   /\b(fetch|download|curl|wget|connect|request|call|access|open|visit|clone|install|upload|send|share|attach|submit|publish|post|put)\b/i;
 const EXCLUDED_REGION_SECRET_ACTION_RE =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|provide|reveal|show|disclose|expose|exfiltrate|publish|post|put)\b/i;
+const EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE =
+  /\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|lower|loosen|override|change|continue|proceed|execute|run|apply|upload|delete|publish)\b/i;
+const EXCLUDED_REGION_EXECUTION_ACTION_RE = /\b(run|execute|pipe)\b/i;
+const EXCLUDED_REGION_COMMAND_ACTION_RE = /\b(scp|curl|wget)\b/i;
+const EXCLUDED_REGION_DIRECT_IMPERATIVE_PREFIX_RE =
+  /(?:^\s*(?:(?:(?:first|next|then|after that|to continue)\s*,?\s*)|(?:(?:please|immediately|always)\s+))?|[;!?]\s*(?:(?:first|next|then|after that|to continue)\s*,?\s*)?|,\s*(?:first|next|then|after that|to continue)\s*,?\s*)$/i;
+const EXCLUDED_REGION_ACTOR_MODAL_PREFIX_RE =
+  /(?:^\s*|[;!?]\s*|,\s*(?:first|next|then|after that)\s*,?\s*)(?:you|the agent|agents?|the workflow|the tool)\s+(?:must|should|shall|needs? to|has to)\s+(?:(?:first|next|then|immediately|always)\s+)?$/i;
+const EXCLUDED_REGION_EXECUTABLE_COMMAND_RE =
+  /^\s*(?:\$\s+)?(?:(?:env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*)(?:sudo\s+)?(?:scp|curl|wget)\b/i;
 const PASSIVE_SAFE_ACTION_RE =
   /\b(?:upload|network access|remote execution|external sharing|secret disclosure)\s+(?:is|are|remains?|must remain)\s+(?:disabled|blocked|forbidden|prohibited|denied|disallowed)\b/i;
 const SAFE_ENV_TEMPLATE_COPY_RE =
@@ -1795,40 +1806,92 @@ function collectExcludedRegionSecurityReviewDetections(
         },
         destinationAnalysis: analysis,
       });
+      const directiveDisclosureActions = disclosureActions.filter(({ start }) =>
+        excludedRegionActionIsPositiveDirective(candidate, start),
+      );
+      const directiveNetworkAction = excludedRegionHasPositiveDirectiveMatch(
+        candidate,
+        EXCLUDED_REGION_NETWORK_ACTION_RE,
+      );
+      const directiveSecretAction = excludedRegionHasPositiveDirectiveMatch(
+        candidate,
+        EXCLUDED_REGION_SECRET_ACTION_RE,
+      );
+      const executableCommand =
+        excludedRegionIsExecutableCommand(candidate) ||
+        excludedRegionHasPositiveDirectiveMatch(
+          candidate,
+          EXCLUDED_REGION_COMMAND_ACTION_RE,
+        );
+      const safeguardBypassDirective =
+        safeguardBypass &&
+        excludedRegionHasPositiveDirectiveMatch(
+          candidate,
+          EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE,
+        );
+      const remoteExecutionDirective =
+        remoteExecution &&
+        (executableCommand ||
+          excludedRegionHasPositiveDirectiveMatch(
+            candidate,
+            EXCLUDED_REGION_EXECUTION_ACTION_RE,
+          ) ||
+          excludedRegionHasPositiveDirectiveMatch(
+            candidate,
+            /\b(?:curl|wget)\b/i,
+          ));
+      const positiveDirective =
+        directiveDisclosureActions.length > 0 ||
+        directiveNetworkAction ||
+        directiveSecretAction ||
+        executableCommand ||
+        safeguardBypassDirective ||
+        remoteExecutionDirective;
+      if (!positiveDirective) continue;
+
       const uploadAction =
-        analysis.operationalDestinations.some(
+        (analysis.operationalDestinations.some(
           ({ intent }) => intent === "upload",
+        ) &&
+          (directiveNetworkAction ||
+            directiveSecretAction ||
+            executableCommand)) ||
+        (executableCommand &&
+          commandAnalysis.sinks.some(
+            ({ kind }) => kind === "external-upload",
+          )) ||
+        directiveDisclosureActions.some(
+          ({ kind }) => kind === "external-upload",
         ) ||
-        commandAnalysis.sinks.some(({ kind }) => kind === "external-upload") ||
-        disclosureActions.some(({ kind }) => kind === "external-upload") ||
-        (isUploadInstruction(analysis) &&
-          EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate));
+        (isUploadInstruction(analysis) && directiveNetworkAction);
       const networkAction =
         (analysis.operationalDestinations.some(
           ({ intent }) => intent === "network",
         ) &&
           (uploadAction ||
-            disclosureActions.some(({ kind }) =>
+            directiveDisclosureActions.some(({ kind }) =>
               ["network", "external-upload"].includes(kind),
             ) ||
-            EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate))) ||
-        (isNetworkInstruction(analysis) &&
-          EXCLUDED_REGION_NETWORK_ACTION_RE.test(candidate));
+            directiveNetworkAction ||
+            executableCommand)) ||
+        (isNetworkInstruction(analysis) && directiveNetworkAction);
       const sensitiveMaterial =
         commandAnalysis.sensitiveSources.length > 0 ||
         SECRET_WORD_RE.test(candidate) ||
         referencesHighRiskSensitiveFile(candidate);
       const secretExposure =
         sensitiveMaterial &&
-        (EXCLUDED_REGION_SECRET_ACTION_RE.test(candidate) ||
-          commandAnalysis.sinks.some(({ kind }) =>
-            [
-              "stdout-or-log",
-              "prompt-or-context",
-              "network",
-              "external-upload",
-            ].includes(kind),
-          ));
+        (directiveSecretAction ||
+          directiveDisclosureActions.length > 0 ||
+          (executableCommand &&
+            commandAnalysis.sinks.some(({ kind }) =>
+              [
+                "stdout-or-log",
+                "prompt-or-context",
+                "network",
+                "external-upload",
+              ].includes(kind),
+            )));
 
       if (secretExposure) signals.add("secret_exposure");
       if (
@@ -1840,8 +1903,8 @@ function collectExcludedRegionSecurityReviewDetections(
       if (networkAction && prepared.effectivePolicy.networkAllowed === false) {
         signals.add("policy_denied_network");
       }
-      if (safeguardBypass) signals.add("safeguard_bypass");
-      if (remoteExecution) signals.add("remote_pipe_to_shell");
+      if (safeguardBypassDirective) signals.add("safeguard_bypass");
+      if (remoteExecutionDirective) signals.add("remote_pipe_to_shell");
     }
 
     if (signals.size === 0) continue;
@@ -1864,6 +1927,44 @@ function collectExcludedRegionSecurityReviewDetections(
     });
   }
   return detections;
+}
+
+function excludedRegionHasPositiveDirectiveMatch(
+  candidate: string,
+  pattern: RegExp,
+): boolean {
+  const flags = pattern.flags.includes("g")
+    ? pattern.flags
+    : `${pattern.flags}g`;
+  for (const match of candidate.matchAll(new RegExp(pattern.source, flags))) {
+    if (
+      match.index !== undefined &&
+      excludedRegionActionIsPositiveDirective(candidate, match.index)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function excludedRegionActionIsPositiveDirective(
+  candidate: string,
+  actionOffset: number,
+): boolean {
+  if (quotePairEnclosesOffset(candidate, actionOffset)) return false;
+  const prefix = candidate.slice(0, actionOffset);
+  return (
+    EXCLUDED_REGION_DIRECT_IMPERATIVE_PREFIX_RE.test(prefix) ||
+    EXCLUDED_REGION_ACTOR_MODAL_PREFIX_RE.test(prefix)
+  );
+}
+
+function excludedRegionIsExecutableCommand(candidate: string): boolean {
+  const match = EXCLUDED_REGION_EXECUTABLE_COMMAND_RE.exec(candidate);
+  return (
+    match?.index !== undefined &&
+    !quotePairEnclosesOffset(candidate, match.index)
+  );
 }
 
 function excludedRegionCandidateIsClearlySafe(candidate: string): boolean {
