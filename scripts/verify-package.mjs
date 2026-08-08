@@ -1,10 +1,18 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const PACKAGE_NAME = "renma";
 const PACKAGE_JSON_SPECIFIER = "renma/package.json";
+const REPOSITORY_ONLY_README_PREFIXES = ["docs/development/"];
 const PUBLIC_DEEP_IMPORTS = [
   ["renma/dist/types.js", "dist/types.js", "dist/types.d.ts"],
   [
@@ -172,7 +180,6 @@ try {
       modulePath,
       declarationPath,
     ]),
-    "docs/development/internal-architecture.md",
     "docs/trust-graph.md",
     "docs/schemas/repository-context-bom-v2.schema.json",
     "docs/schemas/trust-graph-v2.schema.json",
@@ -184,6 +191,10 @@ try {
   for (const rawTarget of markdownLinkTargets(readme)) {
     const target = repositoryRelativeTarget(rawTarget);
     if (!target) continue;
+    if (isRepositoryOnlyReadmeTarget(target)) {
+      await requireRepositoryPath(target);
+      continue;
+    }
     requirePackagedPath(files, target);
   }
 
@@ -194,6 +205,7 @@ try {
     "src/",
     "examples/",
     "coverage/",
+    "docs/development/",
     ".git/",
   ]) {
     if ([...files].some((file) => file.startsWith(forbiddenPrefix))) {
@@ -642,6 +654,22 @@ function requirePackagedPath(files, target) {
     [...files].some((file) => file.startsWith(`${normalized}/`));
   if (!present) {
     throw new Error(`Packaged README target is missing: ${target}`);
+  }
+}
+
+function isRepositoryOnlyReadmeTarget(target) {
+  const normalized = path.posix.normalize(target).replace(/^\.\//, "");
+  return REPOSITORY_ONLY_README_PREFIXES.some((prefix) =>
+    normalized.startsWith(prefix),
+  );
+}
+
+async function requireRepositoryPath(target) {
+  const normalized = path.posix.normalize(target).replace(/^\.\//, "");
+  try {
+    await lstat(normalized);
+  } catch {
+    throw new Error(`Repository-only README target is missing: ${target}`);
   }
 }
 
