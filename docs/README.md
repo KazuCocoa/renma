@@ -1,8 +1,17 @@
 # Renma Documentation
 
-Each document below has one primary responsibility. Follow the link whose
-authority matches the question instead of copying its contract into another
-document.
+For an initial overview, read `user-manual.md`.
+
+For authoring Skills and Context Assets, read `authoring-guide.md`.
+
+For diagnostics and remediation, read `diagnostics.md`.
+
+For security-related metadata and policy, read `security-policy.md`.
+
+For machine-readable contracts, use the schemas under `schemas/`.
+
+Development and internal design documents are under `development/`.
+They describe implementation rationale and are not normative user guidance.
 
 ## Start Here
 
@@ -67,6 +76,9 @@ document.
 - [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas)
   contains the machine-readable BOM v2, Trust Graph v2, and Skill Authoring
   Handoff v1 contracts shipped in the npm package.
+
+The development architecture, design, and roadmap documents below are
+source-repository-only and intentionally excluded from the npm package.
 
 ## Development
 

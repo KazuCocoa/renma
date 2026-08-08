@@ -286,12 +286,16 @@ a trust score.
 - [Experimental Execution Contract](docs/execution-contract.md)
 - [Trust Graph v2](docs/trust-graph.md)
 - [Skill Authoring Handoff v1 Schema](docs/schemas/skill-authoring-handoff-v1.schema.json)
+- [Changelog](CHANGELOG.md)
+- [Examples](https://github.com/KazuCocoa/renma/tree/main/examples)
+
+Development architecture, design, and roadmap documents are
+source-repository-only and intentionally excluded from the npm package:
+
 - [Public Architecture](docs/development/architecture.md)
 - [Internal Architecture](docs/development/internal-architecture.md)
 - [Product Design](docs/development/design.md)
-- [Changelog](CHANGELOG.md)
 - [Current Roadmap](docs/development/plan.md)
-- [Examples](https://github.com/KazuCocoa/renma/tree/main/examples)
 
 ```text
 LLM investigates and proposes. Renma validates deterministic structure and repository evidence. Human reviews and approves.

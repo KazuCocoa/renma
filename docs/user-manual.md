@@ -2116,6 +2116,21 @@ adoption and coverage transitions, count deltas, published entrypoint changes,
 newly reachable/not-reached and newly/resolved unrouted Skill identities,
 route additions/removals/state changes, and added/resolved cyclic components.
 
+Asset comparison also uses the canonical catalog content hash. Newly generated
+JSON includes endpoint `contentHash`, a `contentChanged` boolean on changed
+asset rows, and `summary.contentChangedAssets`; `changedFields` remains limited
+to governance metadata such as path, kind, ownership, and lifecycle. A
+content-only edit is therefore a changed asset even when `changedFields` is
+empty. Markdown reports the content-change count and, for bounded changed-asset
+details, the before/after hashes. This remains semantic identity evidence, not
+a generic source-hunk renderer.
+
+Legacy or partially comparable snapshots do not assert that content stayed
+unchanged. `contentChanged` is omitted for an asset unless both endpoint hashes
+are present, and the aggregate content-change count is omitted unless every
+shared asset is comparable. Comparable changed rows may still retain their
+individual hash evidence in a partially comparable report.
+
 Skills are identified by repository-relative path and ID. Routes are grouped
 by normalized source Skill path and normalized declared target, so declaration
 reordering, YAML array position, and source-line movement do not create false
@@ -2214,7 +2229,8 @@ percentage while retaining the existing `summary.ownershipCoverageDelta` field.
 
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero
-summary deltas, and review notes so `WARN` and `FAIL` reasons remain immediately
+summary deltas, the content-changed asset count when available, and review notes
+so `WARN` and `FAIL` reasons remain immediately
 visible in a pull request. When detailed evidence changes without affecting
 those net deltas, compact non-zero change groups also call out affected assets,
 graph edges, checks, Skill Discovery, executable surfaces and governance,
@@ -2232,6 +2248,11 @@ status/severity and summary changes, and concrete security policy inventory
 deltas. Each detail collection uses the shared presentation limit and directs
 reviewers to JSON when more items exist. JSON remains the complete, unbounded
 machine-readable report and is unaffected by Markdown disclosure.
+
+A content-only asset edit is neutral by itself: it does not change CI status or
+the command exit code. It remains visibly reviewable as a changed asset, while
+an independently added high/critical finding or governed policy regression can
+make the same edit `FAIL`.
 
 When an asset's normalized effective security boundary changes, the `Security
 Changes` section under `Full report details` adds only the non-empty policy

@@ -580,6 +580,15 @@ scan JSON or BOM rendering. Diff separately records newly introduced
 multi-fingerprint invocations, while CI renders their total delta and a bounded
 neutral detail list without adding them to path-problem evidence.
 
+Asset delta construction reads the canonical `contentHash` already present on
+graph/catalog evidence. Hash comparison is symmetric and independent of node
+discovery order. `contentChanged` is separate from governance
+`changedFields`, and `summary.contentChangedAssets` is a neutral count; neither
+field participates in CI status selection. Legacy formatter inputs without
+content identity remain accepted and do not fabricate a content transition.
+Per-asset `contentChanged` is omitted unless both endpoint hashes are present,
+and the aggregate count is omitted unless every shared asset is comparable.
+
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as
 `skillDiscoveryPolicy`, evaluates both snapshot `security.ci_policy` modes as

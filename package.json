@@ -117,6 +117,7 @@
     "scripts",
     "docs",
     "!docs/public/branding",
+    "!docs/development/",
     "!docs/.vitepress/",
     "CHANGELOG.md",
     "LICENSE",

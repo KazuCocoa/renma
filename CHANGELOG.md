@@ -6,6 +6,23 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Changed semantic asset comparison to use canonical catalog content hashes.
+  Content-only edits now appear as changed assets in `diff` and `ci-report`,
+  with a visible bounded content-change count, while remaining neutral unless
+  an independent finding or governance rule changes CI status.
+
+### Compatibility
+
+- Semantic diff and nested CI-report JSON add optional `contentHash` values to
+  asset endpoints and `contentChanged` to newly built changed-asset rows when
+  both endpoints provide comparable content identity.
+  `summary.contentChangedAssets` appears only when every shared asset is
+  comparable. `changedFields` remains the governance-metadata field list;
+  formatters continue to accept legacy and partially comparable rows and
+  snapshots without fabricating a negative content-transition result.
+
 ## [0.31.0] - 2026-08-08
 
 ### Added

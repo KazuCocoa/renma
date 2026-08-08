@@ -863,6 +863,14 @@ for network allowance and approved network destinations, external-upload
 allowance and approved upload destinations, allowed data, forbidden inputs,
 secret handling, human approval, and disallowed commands.
 
+Canonical catalog content hashes are compared independently from governance
+metadata. A content-only edit therefore appears as a changed asset with
+`contentChanged: true`, endpoint hashes, and no governance `changedFields`.
+This is neutral review evidence by itself: it changes neither direct `diff`
+exit behavior nor CI status. CI becomes `WARN` or `FAIL` only when an
+independent readiness, finding, security-policy, scan-boundary, Discovery, or
+executable-surface rule requires that outcome.
+
 Each asset change retains its canonical ID/path, normalized before/after policy,
 concrete added and removed list values, and field-level provenance. Provenance
 distinguishes a direct asset-local declaration change from policy inherited
