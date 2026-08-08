@@ -66,8 +66,6 @@ import {
   type BodyPolicyClauseFacts,
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
-import { quotePairEnclosesOffset } from "./security-body-policy/statement-components.js";
-import { directiveIntentAt } from "./security-directive-intent.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -546,29 +544,6 @@ const RULES = {
     confidence: "high",
     riskClass: "violation",
   },
-  excludedRegionHighRiskInstruction: {
-    id: DIAGNOSTIC_IDS.SEC_EXCLUDED_REGION_HIGH_RISK_INSTRUCTION,
-    category: "safety",
-    title: "Structurally excluded Markdown contains a high-risk instruction",
-    whyItMatters:
-      "HTML comments and blockquotes are non-operational Markdown, but a high-confidence directive hidden there can evade ordinary instruction review while still influencing humans, tools, or later edits.",
-    remediation:
-      "Remove the dangerous directive from the excluded region, or replace it with an explicitly bounded safe or negative example that preserves the effective security policy.",
-    constraints: [
-      "Do not treat the excluded region as authorization or as an operational instruction.",
-      "Do not weaken network, upload, secret-handling, approval, or verification policy to silence the finding.",
-      "Keep quoted examples and documentation clearly bounded and non-directive.",
-    ],
-    verificationSteps: [
-      "Run renma scan.",
-      "Confirm the high-risk directive is removed or clearly bounded as a safe or negative example.",
-      "Confirm the effective security policy remains at least as restrictive.",
-    ],
-    llmHint:
-      "Review the exact excluded-region evidence as non-operational source content, remove the dangerous directive, and preserve all existing policy and approval safeguards.",
-    confidence: "high",
-    riskClass: "violation",
-  },
   untrustedContentAsInstruction: {
     id: DIAGNOSTIC_IDS.SEC_UNTRUSTED_CONTENT_AS_INSTRUCTION,
     category: "safety",
@@ -844,20 +819,6 @@ const SAFEGUARD_BYPASS_PATTERNS = [
 ] as const;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
-const EXCLUDED_REGION_NETWORK_ACTION_RE =
-  /\b(fetch|download|curl|wget|connect|request|call|access|open|visit|clone|install|upload|send|share|attach|submit|publish|post|put)\b/i;
-const EXCLUDED_REGION_SECRET_ACTION_RE =
-  /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|provide|reveal|show|disclose|expose|exfiltrate|publish|post|put)\b/i;
-const EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE =
-  /\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|lower|loosen|override|change|continue|proceed|execute|run|apply|upload|delete|publish)\b/i;
-const EXCLUDED_REGION_EXECUTION_ACTION_RE = /\b(run|execute|pipe)\b/i;
-const EXCLUDED_REGION_COMMAND_ACTION_RE = /\b(scp|curl|wget)\b/i;
-const EXCLUDED_REGION_EXECUTABLE_COMMAND_RE =
-  /^\s*(?:\$\s+)?(?:(?:env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*)(?:sudo\s+)?(?:scp|curl|wget)\b/i;
-const PASSIVE_SAFE_ACTION_RE =
-  /\b(?:upload|network access|remote execution|external sharing|secret disclosure)\s+(?:is|are|remains?|must remain)\s+(?:disabled|blocked|forbidden|prohibited|denied|disallowed)\b/i;
-const SAFE_ENV_TEMPLATE_COPY_RE =
-  /^\s*(?:please\s+)?copy\s+\.env\.(?:example|sample|template)\s+(?:to\s+)?\.env(?:\.[a-z0-9_-]+)?(?:\s+for\s+local\s+setup)?\s*\.?\s*$/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
@@ -1041,7 +1002,6 @@ function securityFindingsForDocument(
     ...collectPolicyPreludeDetections(prepared),
     ...collectSecurityLineDetections(prepared),
     ...collectSemanticInstructionDetections(prepared),
-    ...collectExcludedRegionSecurityReviewDetections(prepared),
     ...policyContradictions(prepared.effectivePolicy),
   ];
 
@@ -1771,306 +1731,6 @@ function collectSemanticInstructionDetections(
     );
   }
   return detections;
-}
-
-function collectExcludedRegionSecurityReviewDetections(
-  prepared: PreparedSecurityDocumentAnalysis,
-): Detection[] {
-  const detections: Detection[] = [];
-  for (const region of prepared.markdownView.excludedSecurityReviewRegions) {
-    if (region.boundedExample) continue;
-
-    const signals = new Set<string>();
-    const text = region.text.replace(/\r?\n/gu, " ");
-    for (const sentence of semanticSentenceSpans(text)) {
-      const candidate = sentence.text.trim();
-      if (!candidate || excludedRegionCandidateIsClearlySafe(candidate)) {
-        continue;
-      }
-
-      const safeguardBypass = SAFEGUARD_BYPASS_PATTERNS.some((pattern) =>
-        pattern.test(candidate),
-      );
-      const remoteExecution = REMOTE_SCRIPT_RE.test(candidate);
-      const analysis = analyzeDestinations(candidate);
-      const disclosureActions = positiveDisclosureActions(candidate);
-      const commandAnalysis = analyzeSecurityCommand({
-        source: {
-          text: candidate,
-          startLine: region.startLine,
-          endLine: region.startLine,
-          lines: [candidate],
-        },
-        destinationAnalysis: analysis,
-      });
-      const networkActionRanges = excludedRegionActionRanges(
-        candidate,
-        EXCLUDED_REGION_NETWORK_ACTION_RE,
-      );
-      const secretActionRanges = excludedRegionActionRanges(
-        candidate,
-        EXCLUDED_REGION_SECRET_ACTION_RE,
-      );
-      const safeguardBypassActionRanges = excludedRegionActionRanges(
-        candidate,
-        EXCLUDED_REGION_SAFEGUARD_BYPASS_ACTION_RE,
-      );
-      const executionActionRanges = excludedRegionActionRanges(
-        candidate,
-        EXCLUDED_REGION_EXECUTION_ACTION_RE,
-      );
-      const commandActionRanges = excludedRegionActionRanges(
-        candidate,
-        EXCLUDED_REGION_COMMAND_ACTION_RE,
-      );
-      const predicateOffsets = [
-        ...new Set(
-          [
-            ...networkActionRanges,
-            ...secretActionRanges,
-            ...safeguardBypassActionRanges,
-            ...executionActionRanges,
-            ...commandActionRanges,
-            ...disclosureActions,
-          ].map(({ start }) => start),
-        ),
-      ].sort((left, right) => left - right);
-      const directiveActionOffsets = new Set(
-        predicateOffsets.filter(
-          (offset) =>
-            directiveIntentAt(candidate, offset, predicateOffsets) !==
-            undefined,
-        ),
-      );
-      const directiveDisclosureActions = disclosureActions.filter(({ start }) =>
-        directiveActionOffsets.has(start),
-      );
-      const directiveNetworkAction = excludedRegionRangesHaveDirective(
-        networkActionRanges,
-        directiveActionOffsets,
-      );
-      const directiveSecretAction = excludedRegionRangesHaveDirective(
-        secretActionRanges,
-        directiveActionOffsets,
-      );
-      const nestedCommand = excludedRegionNestedCommandDirective(
-        candidate,
-        executionActionRanges,
-        commandActionRanges,
-        directiveActionOffsets,
-      );
-      const executableCommand =
-        excludedRegionIsExecutableCommand(candidate) ||
-        excludedRegionRangesHaveDirective(
-          commandActionRanges,
-          directiveActionOffsets,
-        ) ||
-        nestedCommand !== undefined;
-      const nestedDestinationAnalysis =
-        nestedCommand === undefined
-          ? undefined
-          : analyzeDestinations(nestedCommand);
-      const nestedCommandAnalysis =
-        nestedCommand === undefined || nestedDestinationAnalysis === undefined
-          ? undefined
-          : analyzeSecurityCommand({
-              source: {
-                text: nestedCommand,
-                startLine: region.startLine,
-                endLine: region.startLine,
-                lines: [nestedCommand],
-              },
-              destinationAnalysis: nestedDestinationAnalysis,
-            });
-      const operationalDestinations = [
-        ...analysis.operationalDestinations,
-        ...(nestedDestinationAnalysis?.operationalDestinations ?? []),
-      ];
-      const commandSinks = [
-        ...commandAnalysis.sinks,
-        ...(nestedCommandAnalysis?.sinks ?? []),
-      ];
-      const sensitiveSources = [
-        ...commandAnalysis.sensitiveSources,
-        ...(nestedCommandAnalysis?.sensitiveSources ?? []),
-      ];
-      const safeguardBypassDirective =
-        safeguardBypass &&
-        excludedRegionRangesHaveDirective(
-          safeguardBypassActionRanges,
-          directiveActionOffsets,
-        );
-      const executionDirective = excludedRegionRangesHaveDirective(
-        executionActionRanges,
-        directiveActionOffsets,
-      );
-      const remoteExecutionDirective =
-        remoteExecution && (executableCommand || executionDirective);
-      const positiveDirective =
-        directiveDisclosureActions.length > 0 ||
-        directiveNetworkAction ||
-        directiveSecretAction ||
-        executableCommand ||
-        safeguardBypassDirective ||
-        executionDirective ||
-        remoteExecutionDirective;
-      if (!positiveDirective) continue;
-
-      const uploadAction =
-        (operationalDestinations.some(({ intent }) => intent === "upload") &&
-          (directiveNetworkAction ||
-            directiveSecretAction ||
-            executableCommand)) ||
-        (executableCommand &&
-          commandSinks.some(({ kind }) => kind === "external-upload")) ||
-        directiveDisclosureActions.some(
-          ({ kind }) => kind === "external-upload",
-        ) ||
-        (isUploadInstruction(analysis) && directiveNetworkAction);
-      const networkAction =
-        (operationalDestinations.some(({ intent }) => intent === "network") &&
-          (uploadAction ||
-            directiveDisclosureActions.some(({ kind }) =>
-              ["network", "external-upload"].includes(kind),
-            ) ||
-            directiveNetworkAction ||
-            executableCommand)) ||
-        (isNetworkInstruction(analysis) && directiveNetworkAction);
-      const sensitiveMaterial =
-        sensitiveSources.length > 0 ||
-        SECRET_WORD_RE.test(candidate) ||
-        referencesHighRiskSensitiveFile(candidate);
-      const secretExposure =
-        sensitiveMaterial &&
-        (directiveSecretAction ||
-          directiveDisclosureActions.length > 0 ||
-          (executableCommand &&
-            commandSinks.some(({ kind }) =>
-              [
-                "stdout-or-log",
-                "prompt-or-context",
-                "network",
-                "external-upload",
-              ].includes(kind),
-            )));
-
-      if (secretExposure) signals.add("secret_exposure");
-      if (
-        uploadAction &&
-        prepared.effectivePolicy.externalUploadAllowed === false
-      ) {
-        signals.add("policy_denied_external_upload");
-      }
-      if (networkAction && prepared.effectivePolicy.networkAllowed === false) {
-        signals.add("policy_denied_network");
-      }
-      if (safeguardBypassDirective) signals.add("safeguard_bypass");
-      if (remoteExecutionDirective) signals.add("remote_pipe_to_shell");
-    }
-
-    if (signals.size === 0) continue;
-    const highRiskSignals = [...signals].sort();
-    detections.push({
-      metadata: RULES.excludedRegionHighRiskInstruction,
-      severity: "high",
-      startLine: region.startLine,
-      ...(region.endLine === region.startLine
-        ? {}
-        : { endLine: region.endLine }),
-      snippet: region.source,
-      dedupeKey: `${RULES.excludedRegionHighRiskInstruction.id}:${region.kind}:${region.startLine}:${region.endLine}`,
-      details: {
-        sourceRegionKind: region.kind,
-        operationalInstruction: false,
-        reviewPath: "structurally_excluded_markdown",
-        highRiskSignals,
-      },
-    });
-  }
-  return detections;
-}
-
-type ExcludedRegionActionRange = {
-  readonly start: number;
-  readonly end: number;
-};
-
-function excludedRegionActionRanges(
-  candidate: string,
-  pattern: RegExp,
-): ExcludedRegionActionRange[] {
-  const ranges: ExcludedRegionActionRange[] = [];
-  const flags = pattern.flags.includes("g")
-    ? pattern.flags
-    : `${pattern.flags}g`;
-  for (const match of candidate.matchAll(new RegExp(pattern.source, flags))) {
-    if (match.index === undefined || match[0].length === 0) continue;
-    ranges.push({
-      start: match.index,
-      end: match.index + match[0].length,
-    });
-  }
-  return ranges;
-}
-
-function excludedRegionRangesHaveDirective(
-  ranges: readonly ExcludedRegionActionRange[],
-  directiveActionOffsets: ReadonlySet<number>,
-): boolean {
-  return ranges.some(({ start }) => directiveActionOffsets.has(start));
-}
-
-function excludedRegionNestedCommandDirective(
-  candidate: string,
-  executionRanges: readonly ExcludedRegionActionRange[],
-  commandRanges: readonly ExcludedRegionActionRange[],
-  directiveActionOffsets: ReadonlySet<number>,
-): string | undefined {
-  for (const execution of executionRanges) {
-    if (!directiveActionOffsets.has(execution.start)) continue;
-    for (const command of commandRanges) {
-      if (
-        command.start < execution.end ||
-        quotePairEnclosesOffset(candidate, command.start)
-      ) {
-        continue;
-      }
-      const bridge = candidate.slice(execution.end, command.start);
-      if (
-        /^[ \t]*(?:\$[ \t]*)?(?:(?:the[ \t]+)?command[ \t]+)?$/iu.test(bridge)
-      ) {
-        return candidate.slice(command.start);
-      }
-    }
-  }
-  return undefined;
-}
-
-function excludedRegionIsExecutableCommand(candidate: string): boolean {
-  const match = EXCLUDED_REGION_EXECUTABLE_COMMAND_RE.exec(candidate);
-  return (
-    match?.index !== undefined &&
-    !quotePairEnclosesOffset(candidate, match.index)
-  );
-}
-
-function excludedRegionCandidateIsClearlySafe(candidate: string): boolean {
-  return (
-    PASSIVE_SAFE_ACTION_RE.test(candidate) ||
-    SAFE_ENV_TEMPLATE_COPY_RE.test(candidate) ||
-    isDefensiveActionInstruction(candidate) ||
-    SAFE_FORBIDDEN_INPUT_PATTERN.test(candidate) ||
-    SAFE_NEGATION_RE.test(candidate) ||
-    DIRECT_DEFENSIVE_SEMANTIC_RE.test(candidate)
-  );
-}
-
-function referencesHighRiskSensitiveFile(candidate: string): boolean {
-  const withoutTemplateEnvironmentFiles = candidate.replace(
-    /\.env\.(?:example|sample|template)\b/giu,
-    "",
-  );
-  return referencesSensitiveFile(withoutTemplateEnvironmentFiles);
 }
 
 function requireLogicalDestinationAnalysis(
@@ -3291,7 +2951,6 @@ function forbiddenInputDetection(
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
   let lineLocalDetection: Detection | undefined;
   for (let index = scanStart; index < lines.length; index += 1) {
-    if (markdownView?.isBlockQuotedLine(index)) continue;
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
     if (SAFE_FORBIDDEN_INPUT_PATTERN.test(line)) continue;

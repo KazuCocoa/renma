@@ -181,7 +181,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "scan-boundary-ci-policy.ts",
       "scan-boundary-diff.ts",
       "scanner.ts",
-      "security-directive-intent.ts",
       "security-diagnostics.ts",
       "security-diff.ts",
       "security-policy-ci-policy.ts",

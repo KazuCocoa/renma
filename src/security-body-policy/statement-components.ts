@@ -705,8 +705,7 @@ function quoteEnclosureProvenanceAtOffset(
   );
 }
 
-/** @internal Return whether an offset is enclosed by a recognized quote pair. */
-export function quotePairEnclosesOffset(text: string, offset: number): boolean {
+function quotePairEnclosesOffset(text: string, offset: number): boolean {
   return (
     quoteEnclosureProvenanceAtOffset(quoteEnclosureRanges(text), offset) !==
     "unenclosed"

@@ -451,18 +451,6 @@ come from an unrelated code block, or become operational from a block quote.
 Generic wording such as “handle this carefully” is not an approval or
 no-disclosure guard.
 
-Blockquotes and HTML comments remain non-operational: they cannot authorize an
-action, satisfy a guard, contradict body policy, or become ordinary execution
-instructions. Renma nevertheless retains their positioned source content for a
-separate integrity review. A positive high-risk directive in either region can
-emit `SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` at `high` severity when it
-requests secret disclosure, violates effective denied network/upload policy,
-bypasses approval or another safeguard, or directly pipes remote content to a
-shell. The finding details identify `html_comment` or `blockquote` and state
-that the evidence is not operational. Direct prohibitions, clearly bounded
-safe or negative examples, harmless comments, and ordinary quoted prose remain
-neutral.
-
 `SEC-UNPINNED-DEPENDENCY-INSTALL` combines structured command and selector
 analysis with established bounded compatibility fallback:
 
@@ -705,10 +693,7 @@ Keep the security policy and verification enabled; do not add a suppression mere
 Renma reports the unsafe form as
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION`. Direct prohibitions, quoted examples,
 HTML-comment content, and fenced prose clearly marked as an unsafe or negative
-example do not become semantic bypass findings. The separate excluded-region
-integrity review described above may still report a dedicated finding when a
-comment or quote contains a positive high-risk directive; it never reclassifies
-that content as an operational bypass instruction. Visible text outside an HTML
+example do not become semantic bypass findings. Visible text outside an HTML
 comment span is still scanned. Fenced `text` or `markdown` payloads become
 operational when surrounding prose, an instruction label, or an operational
 instruction heading explicitly routes them as instructions. Approval guards
@@ -1015,7 +1000,6 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`         | The asset asks for data listed in its forbidden-input policy.                                                                        | Remove the request or replace it with redaction and placeholder guidance.                                                                                                                                                                                                                                                                                                   | Body text and metadata                     |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body text                                  |
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text                                  |
-| `SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` | A non-operational HTML comment or blockquote contains a positive high-risk directive.                                                | Remove the dangerous directive or bound it clearly as safe/negative review material without weakening effective policy.                                                                                                                                                                                                                                                      | HTML comment or blockquote                 |
 | `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body text                                  |
 | `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary.                                                      | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section.                                                                                                                                                                                                                                                                  | Body text                                  |
 | `SEC-DESTRUCTIVE-COMMAND`                 | A destructive command appears without enough local safety context.                                                                   | Remove it, scope it tightly, or add explicit approval and recovery guidance.                                                                                                                                                                                                                                                                                                | Body text                                  |

@@ -146,7 +146,6 @@ artifact eligibility
   -> policy prelude
   -> physical-line detections
   -> semantic-unit detections
-  -> structurally excluded-region security review
   -> policy contradictions
   -> deduplication and Finding projection
 ```
@@ -171,16 +170,6 @@ cache identity. Guard evidence and Finding evidence remain line-specific. The
 projection never crosses paragraph, list-item, blockquote, heading,
 thematic-break, hidden comment, or code boundaries, and it does not replace
 physical-line or logical-command evidence or analysis input.
-
-`MarkdownSecurityView.excludedSecurityReviewRegions` separately retains exact
-positioned HTML-comment and top-level blockquote evidence. The security
-orchestrator evaluates that collection only through the dedicated, bounded
-high-risk review classifier. It requires positive directive evidence and emits
-`SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` with the source-region kind;
-excluded text never enters visible lines, semantic units, guard history,
-logical commands, or body-policy projection. This keeps negative examples and
-quoted prose non-operational while preventing high-confidence dangerous source
-content from disappearing from review.
 
 The private `src/security-body-policy/` classifier consumes prepared clause
 ranges through an explicitly layered, bounded pipeline:

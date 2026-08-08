@@ -56,9 +56,8 @@ export function classifyDestinationCandidates(
     const start = match.index ?? 0;
     const end = start + raw.length;
     if (overlapsDestinationCandidate(candidates, start, end)) continue;
-    const scpRemoteHost = isScpRemoteHostCandidate(line, start, end);
 
-    if (isCommandFileArgument(line, start) && !scpRemoteHost) {
+    if (isCommandFileArgument(line, start)) {
       candidates.push({ raw, start, end, kind: "command-file-argument" });
       continue;
     }
@@ -84,17 +83,6 @@ export function classifyDestinationCandidates(
     const destination = normalizeNetworkDestination(raw);
     if (destination === undefined) {
       candidates.push({ raw, start, end, kind: "unsupported-host" });
-      continue;
-    }
-
-    if (scpRemoteHost) {
-      candidates.push({
-        raw,
-        start,
-        end,
-        kind: "bare-host",
-        destination,
-      });
       continue;
     }
 
@@ -168,26 +156,6 @@ function isCommandFileArgument(line: string, start: number): boolean {
     before.lastIndexOf("'"),
   );
   return /^--?[a-z0-9][a-z0-9-]*=$/i.test(before.slice(tokenStart + 1));
-}
-
-function isScpRemoteHostCandidate(
-  line: string,
-  start: number,
-  end: number,
-): boolean {
-  if (line[end] !== ":") return false;
-  const tokenStart = Math.max(
-    line.lastIndexOf(" ", start - 1),
-    line.lastIndexOf("\t", start - 1),
-  );
-  const userPrefix = line.slice(tokenStart + 1, start);
-  if (
-    userPrefix.length > 0 &&
-    !/^[A-Za-z_][A-Za-z0-9._-]*@$/u.test(userPrefix)
-  ) {
-    return false;
-  }
-  return /^\s*(?:sudo\s+)?scp(?:\s|$)/iu.test(line);
 }
 
 function isLocalPathCandidate(line: string, start: number): boolean {

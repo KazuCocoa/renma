@@ -1385,17 +1385,6 @@ coverage, and summary data that other tools can consume.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 
-Blockquotes and HTML comments remain excluded from ordinary operational
-instruction, authorization, and guard semantics. A separate deterministic
-source-integrity review can still emit the high-severity
-`SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` when one of those regions contains
-a positive directive for secret disclosure, policy-denied network/upload
-behavior, safeguard bypass, or remote pipe-to-shell execution. Structured
-details identify `html_comment` or `blockquote` and explicitly keep
-`operationalInstruction: false`. Direct prohibitions, clearly bounded safe or
-negative examples, harmless comments, and ordinary quoted prose remain
-neutral.
-
 `executableSurfaceInventory` uses schema
 `renma.executable-surface-inventory.v1`. An executable surface is an
 already-discovered repository-local Skill script or `tools/**` helper that

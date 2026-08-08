@@ -33,10 +33,10 @@ const DIRECT_AMBIGUOUS_NETWORK_TARGET_PREFIX_RE =
 const DIRECT_BARE_NETWORK_TARGET_PREFIX_RE =
   /\b(?:get|post|put|curl|wget|fetch|download)\b[^.;,!?]{0,160}$/i;
 const PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE =
-  /\b(?:fetch|download)\s+from\s*$|\b(?:upload|send|attach|submit|push|publish|copy)\b[^;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^;,!?]{0,100}\bwith\s*$/i;
+  /\b(?:fetch|download)\s+from\s*$|\b(?:upload|send|attach|submit|push|publish|copy)\b[^.;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^.;,!?]{0,100}\bwith\s*$/i;
 const DIRECT_UPLOAD_TARGET_PREFIX_RE = /\b(?:post|put)\b[^.;,!?]{0,160}$/i;
 const PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE =
-  /\b(?:upload|send|attach|submit|push|publish|copy)\b[^;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^;,!?]{0,100}\bwith\s*$/i;
+  /\b(?:upload|send|attach|submit|push|publish|copy)\b[^.;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^.;,!?]{0,100}\bwith\s*$/i;
 const CURL_UPLOAD_DATA_OPTION_RE =
   /(?:^|\s)(?:-(?:d|F|T)|--(?:data(?:-ascii|-binary|-raw|-urlencode)?|form(?:-string)?|upload-file)(?=\s|=|$))/;
 const CURL_UPLOAD_METHOD_RE =
@@ -192,13 +192,6 @@ function networkDestinationAssociation(
   candidate: DestinationCandidate,
   clause: OffsetSpan,
 ): Association | undefined {
-  const scpAssociation = scpDestinationAssociation(
-    context,
-    candidate,
-    clause,
-    "network",
-  );
-  if (scpAssociation !== undefined) return scpAssociation;
   if (
     candidate.explicitTransport !== undefined ||
     candidate.kind === "network-share"
@@ -231,13 +224,6 @@ function uploadDestinationAssociation(
   candidate: DestinationCandidate,
   clause: OffsetSpan,
 ): Association | undefined {
-  const scpAssociation = scpDestinationAssociation(
-    context,
-    candidate,
-    clause,
-    "upload",
-  );
-  if (scpAssociation !== undefined) return scpAssociation;
   const curlAssociation = curlUploadAssociation(context, candidate, clause);
   if (curlAssociation !== undefined) {
     return curlAssociation.associated ? curlAssociation.association : undefined;
@@ -250,35 +236,6 @@ function uploadDestinationAssociation(
     return { actionKind: "prepositional-action", tool: "prose" };
   }
   return undefined;
-}
-
-function scpDestinationAssociation(
-  context: AssociationContext,
-  candidate: DestinationCandidate,
-  clause: OffsetSpan,
-  intent: "network" | "upload",
-): Association | undefined {
-  if (candidate.destination === undefined) return undefined;
-  const command = containingShellCommandSpan(
-    context.shellProjection.projection,
-    candidate.start,
-    clause,
-  );
-  const projection = context.shellProjection.projection;
-  const commandText = projection.slice(command.start, command.end);
-  if (!/^\s*(?:sudo\s+)?scp(?:\s|$)/iu.test(commandText)) return undefined;
-
-  const remoteSuffix = projection.slice(candidate.end, command.end);
-  if (!/^:[^\s]*/u.test(remoteSuffix)) return undefined;
-  if (intent === "upload" && !/^:[^\s]*\s*$/u.test(remoteSuffix)) {
-    return undefined;
-  }
-  return {
-    actionKind: "scp-transfer",
-    tool: "scp",
-    commandSpan: sourceSpan(command, context),
-    transferSpan: sourceSpan(command, context),
-  };
 }
 
 function curlUploadAssociation(

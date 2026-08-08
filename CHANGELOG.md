@@ -6,15 +6,6 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-### Added
-
-- Added `SEC-EXCLUDED-REGION-HIGH-RISK-INSTRUCTION` as a dedicated
-  high-severity security-review finding for positive high-risk directives in
-  HTML comments and blockquotes. Structured finding details identify
-  `sourceRegionKind`, preserve that the content is non-operational, and report
-  deterministic risk signals without promoting quoted content into ordinary
-  instruction semantics.
-
 ### Changed
 
 - Changed semantic asset comparison to use canonical catalog content hashes.
