@@ -1043,6 +1043,16 @@ human decision. Semantic ownership—not section size or heading text—determin
 whether content belongs in `SKILL.md`, `references/`, `scripts/`, `assets/`, or
 `contexts/`.
 
+`META-POLICY-REQUIRED-FIELD-MISSING` is a High finding backed by an `error`
+catalog diagnostic. Its structured details include `requiredField`,
+`assetPath`, `assetKind`, `expectedSerializedKey`, `presenceState` (`absent`,
+`empty`, `invalid`, or `ambiguous`), `policySource`, `configurationKey`,
+`configurationPath`, and the explicit declaration requirement. The source is
+always repository configuration and the responsible key is
+`metadata.required`. Skills receive the exact `metadata.renma.*` guidance;
+non-Skills receive the registered top-level spelling. No value is inferred or
+written during scanning.
+
 | Identifier                                       | Meaning                                              | Typical cause                                                                                      | How to fix                                                                                             |
 | ------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `COMPOSITION-DECLARED-CONFLICT`                  | Required declared composition contains conflicting assets. | Two assets connected to the same focused composition through required routes have an explicit `conflicts` declaration. | Review both inclusion routes and the conflict declaration; change relationships only from reviewed intent and never select a winner from order. |
@@ -1140,6 +1150,7 @@ whether content belongs in `SKILL.md`, `references/`, `scripts/`, `assets/`, or
 | `META-SUSPENDED-STATUS-METADATA-INCOMPLETE`      | Suspended lifecycle evidence is incomplete.          | A suspended asset lacks a non-blank transition reason, a changed date, or both. | Add human-reviewed reason and real transition-date evidence without restoring, archiving, deleting, or cloning the asset. |
 | `META-LIST-ITEM-TOO-LONG`                        | Metadata list item is too long.                      | A block-list metadata item contains routing prose or detailed conditions.                          | Keep the item short and move detailed guidance into body sections or referenced context assets.        |
 | `META-MISSING-ID`                                | Metadata is missing an asset ID.                     | A cataloged asset has no stable `id`.                                                              | Add an `id` metadata field.                                                                            |
+| `META-POLICY-REQUIRED-FIELD-MISSING`             | Repository-required metadata is absent, empty, invalid, or ambiguous. | An applicable catalog asset does not explicitly declare a valid non-empty field named by `metadata.required`. | Add the reviewed value using the finding's exact canonical Skill or top-level non-Skill spelling; do not infer or fabricate it. |
 | `META-UNKNOWN-DEPENDENCY`                        | Metadata dependency is unresolved.                   | A dependency points at an asset renma did not discover.                                            | Correct the dependency, add the missing asset, or update discovery config.                             |
 | `SEC-BODY-POLICY-CONTRADICTION`                  | Body text contradicts a security policy.             | Asset instructions override or weaken policy expectations.                                         | Align the asset content with the active policy profile.                                                |
 | `SEC-BULK-DATA-SHARING-INSTRUCTION`              | Instructions allow broad data sharing.               | Content tells an agent to share large or sensitive data without bounds.                            | Narrow the sharing scope and add approval or redaction guidance.                                       |
