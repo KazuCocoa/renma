@@ -21,6 +21,10 @@ import {
   DEFAULT_SKILL_ENTRYPOINT_GLOBS,
   DEFAULT_SKILL_SUPPORT_GLOBS,
 } from "./skill-path-contract.js";
+import {
+  REQUIRED_METADATA_POLICY_FIELDS,
+  type RequiredMetadataPolicyField,
+} from "./metadata-definitions.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
@@ -29,6 +33,7 @@ const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const EXECUTABLE_SURFACE_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const QUALITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const METADATA_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const CONTENT_TOKEN_BUDGET_KINDS = [
   "context",
   "reference",
@@ -106,6 +111,11 @@ export const DEFAULT_CONFIG: ScanConfig = {
       example: defaultContentTokenBudget("example"),
     },
   },
+  metadata: {
+    ciPolicy: "fail",
+    required: [],
+    requiredSource: "renma_default",
+  },
   layout: {
     workflowAliases: {},
   },
@@ -147,6 +157,7 @@ export async function loadConfig(
       ...DEFAULT_CONFIG,
       ...config,
       quality: config.quality ?? cloneDefaultQualityConfig(),
+      metadata: config.metadata ?? cloneDefaultMetadataConfig(),
       failOn: overrides.failOn ?? config.failOn ?? DEFAULT_CONFIG.failOn,
       format: overrides.format ?? config.format ?? DEFAULT_CONFIG.format,
     },
@@ -256,6 +267,7 @@ function normalizeConfig(
     "scan_boundary",
     "executable_surface",
     "quality",
+    "metadata",
     "layout",
     "security",
     "skill_discovery",
@@ -297,6 +309,8 @@ function normalizeConfig(
     );
   if (value.quality !== undefined)
     config.quality = qualityPolicy(value.quality);
+  if (value.metadata !== undefined)
+    config.metadata = metadataPolicy(value.metadata);
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
@@ -304,6 +318,65 @@ function normalizeConfig(
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function metadataPolicy(value: unknown): ScanConfig["metadata"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("metadata must be an object.");
+  }
+  const allowed = new Set(["ci_policy", "required"]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown metadata config key "${key}". Allowed keys: ci_policy, required.`,
+      );
+    }
+  }
+
+  const required =
+    value.required === undefined ? [] : requiredMetadataFields(value.required);
+  return {
+    ciPolicy:
+      value.ci_policy === undefined
+        ? "fail"
+        : enumValue(
+            "metadata.ci_policy",
+            value.ci_policy,
+            METADATA_CI_POLICY_MODES,
+          ),
+    required,
+    requiredSource:
+      value.required === undefined
+        ? "renma_default"
+        : "repository_configuration",
+  };
+}
+
+function requiredMetadataFields(value: unknown): RequiredMetadataPolicyField[] {
+  if (!Array.isArray(value)) {
+    throw new ConfigError("metadata.required must be an array of strings.");
+  }
+  const supported = new Set<string>(REQUIRED_METADATA_POLICY_FIELDS);
+  const seen = new Set<string>();
+  for (const [index, field] of value.entries()) {
+    if (typeof field !== "string") {
+      throw new ConfigError(
+        `metadata.required[${index}] must be a supported field name string.`,
+      );
+    }
+    if (!supported.has(field)) {
+      throw new ConfigError(
+        `Unsupported metadata.required field "${field}". Supported fields: ${REQUIRED_METADATA_POLICY_FIELDS.join(", ")}.`,
+      );
+    }
+    if (seen.has(field)) {
+      throw new ConfigError(
+        `metadata.required contains duplicate field "${field}".`,
+      );
+    }
+    seen.add(field);
+  }
+  return REQUIRED_METADATA_POLICY_FIELDS.filter((field) => seen.has(field));
 }
 
 function qualityPolicy(value: unknown): ScanConfig["quality"] {
@@ -409,6 +482,13 @@ function cloneDefaultQualityConfig(): ScanConfig["quality"] {
       profile: { ...DEFAULT_CONFIG.quality.contentTokenBudgets.profile },
       example: { ...DEFAULT_CONFIG.quality.contentTokenBudgets.example },
     },
+  };
+}
+
+function cloneDefaultMetadataConfig(): ScanConfig["metadata"] {
+  return {
+    ...DEFAULT_CONFIG.metadata,
+    required: [...DEFAULT_CONFIG.metadata.required],
   };
 }
 

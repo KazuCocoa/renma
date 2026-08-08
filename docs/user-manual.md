@@ -308,6 +308,67 @@ implementation-owned registries.
 | —                                     | `canonical_context`             | Comma-separated scalar of Context paths                                                               | Skill-local Reference only                                                                   | Recognized compatibility-only; do not add for new assets                                                       | Maintenance diagnosis for a deprecated local reference promoted to shared Context; not catalog metadata or a general dependency                                                                                                                   |
 <!-- renma-operational-metadata:end -->
 
+### Repository-required metadata policy
+
+Repository configuration may promote the following otherwise-optional catalog
+fields to explicit per-asset requirements. This policy does not alter portable
+Agent Skills validity, and an absent `metadata.required` list preserves current
+Renma behavior. The table is generated conceptually from the same metadata
+definition registry used by parsing and is checked against that registry in
+tests.
+
+<!-- required-metadata-policy-fields:start -->
+| Policy field | Skill serialization | Non-Skill serialization | Value kind |
+| --- | --- | --- | --- |
+| `version` | `metadata.renma.version` | `version` | Text |
+| `owner` | `metadata.renma.owner` | `owner` | Text |
+| `status` | `metadata.renma.status` | `status` | Text |
+| `status_reason` | `metadata.renma.status-reason` | `status_reason` | Text |
+| `status_changed_at` | `metadata.renma.status-changed-at` | `status_changed_at` | Text |
+| `purpose` | `metadata.renma.purpose` | `purpose` | Text |
+| `last_reviewed_at` | `metadata.renma.last-reviewed-at` | `last_reviewed_at` | Text |
+| `review_cycle` | `metadata.renma.review-cycle` | `review_cycle` | Text |
+| `expires_at` | `metadata.renma.expires-at` | `expires_at` | Text |
+| `tags` | `metadata.renma.tags` | `tags` | List |
+| `when_to_use` | `metadata.renma.when-to-use` | `when_to_use` | List |
+| `when_not_to_use` | `metadata.renma.when-not-to-use` | `when_not_to_use` | List |
+| `requires_context` | `metadata.renma.requires-context` | `requires_context` | List |
+| `optional_context` | `metadata.renma.optional-context` | `optional_context` | List |
+| `requires_lens` | `metadata.renma.requires-lens` | `requires_lens` | List |
+| `optional_lens` | `metadata.renma.optional-lens` | `optional_lens` | List |
+| `conflicts` | `metadata.renma.conflicts` | `conflicts` | List |
+| `superseded_by` | `metadata.renma.superseded-by` | `superseded_by` | List |
+<!-- required-metadata-policy-fields:end -->
+
+Only cataloged, Markdown-parser-eligible Skill, Context, Context Lens, Profile,
+Reference, Example, Script, and Asset documents are eligible, and only when the
+selected field has the mapping shown above. Binary files, raw non-Markdown
+support, configuration files, unknown artifacts, and runtime-only surfaces do
+not receive impossible frontmatter requirements.
+
+A declaration satisfies policy only when it is unambiguous, structurally and
+semantically valid, and non-empty after Renma normalization. Empty text, empty
+lists, malformed YAML, duplicate declarations, and invalid status/date/cycle
+values fail closed. For Skills, this check is field-local: the required field
+must use the exact canonical string encoding under a structurally valid
+portable `metadata` mapping. An unrelated name/directory, description,
+`allowed-tools`, or different metadata-field error remains an independent Agent
+Skills diagnostic and does not invalidate a correct required field. Pre-0.16
+top-level Skill fields and ignored hybrid metadata never satisfy the policy.
+This exception is limited to required-field validation; invalid Skills still
+contribute no operational catalog, ownership, security, or other metadata.
+
+The policy is specifically about declared metadata. For example, a uniquely
+resolved Skill-local support file may retain an inherited effective owner for
+catalog, ownership coverage, Readiness, and graph calculations. That inherited
+value does not satisfy `metadata.required: ["owner"]`; the support file must
+declare its own valid top-level `owner`.
+
+Intentionally unsupported policy names include arbitrary custom metadata,
+security-policy fields, token-budget decision metadata, Context Lens aliases,
+deprecated aliases, `id`, Skill-only `title`/`continues_with`, and unrelated
+non-Skill-only fields. Unknown or unsupported names are configuration errors.
+
 The table intentionally has no top-level non-Skill equivalent for
 `renma.title`, continuation, or publication. A scaffolded non-Skill `title`
 may remain useful to authors, and `suggest-metadata` may inspect it, but
@@ -1095,6 +1156,11 @@ For example:
     "example_token_warning": 4800,
     "example_token_high": 6000
   },
+  "metadata": {
+    // Promote supported catalog fields to explicit repository requirements.
+    "ci_policy": "fail",
+    "required": ["owner"]
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1159,6 +1225,17 @@ The configuration supports the same names used by the implementation, including:
   settings. Scripts, assets, metadata-size checks, and other quality rules keep
   their existing policies. The portable Agent Skills recommendation remains
   5,000 Skill body tokens; Renma's repository warning default is 6,400.
+- `metadata`: repository-required declared catalog metadata. Supported keys are
+  `required` and `ci_policy`; unknown keys are errors. `required` defaults to
+  `[]`, must be an array of unique supported string names, and is normalized in
+  registry order. The exact vocabulary and Skill/non-Skill spellings are in
+  [Repository-required metadata policy](#repository-required-metadata-policy).
+  `ci_policy` supports `off`, `warn`, and `fail` and defaults to `fail`.
+  Required-field removal and mode weakening (`fail -> warn`, `fail -> off`, or
+  `warn -> off`) are explicit CI matches. The stricter base/target mode governs
+  the comparison. Requirement additions and mode tightening remain visible but
+  are non-blocking solely as policy transitions. A decrease in findings caused
+  by requirement removal is policy weakening, not verified remediation.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -2614,7 +2691,9 @@ Output includes total asset count, owned asset count, ownership coverage, owner 
 
 Renma treats `owner` as governance metadata. Declaring an owner is recommended because it makes context assets easier to review, maintain, and share across teams.
 
-However, owner metadata is not globally required yet. Assets without an owner are accepted and reported as unowned in the ownership coverage report.
+Owner metadata is not globally required. Assets without an owner are accepted
+and reported as unowned unless the repository explicitly configures
+`metadata.required: ["owner"]`.
 
 Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
 

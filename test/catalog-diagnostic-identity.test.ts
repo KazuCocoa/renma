@@ -222,7 +222,14 @@ when_not_to_use: current guidance
     ),
   ];
 
-  const { diagnostics } = buildCatalog(documents);
+  const { diagnostics } = buildCatalog(documents, undefined, undefined, {
+    policy: {
+      ciPolicy: "fail",
+      required: ["purpose"],
+      requiredSource: "repository_configuration",
+    },
+    configPath: "renma.config.jsonc",
+  });
   const producedCodes = new Set(
     diagnostics
       .map((diagnostic) => diagnostic.code)

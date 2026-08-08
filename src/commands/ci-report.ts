@@ -72,6 +72,12 @@ import {
   type QualityPolicyCiEvaluation,
 } from "../quality-policy-ci-policy.js";
 import { CLI_EXIT } from "../cli-errors.js";
+import type { MetadataPolicyRequiredFieldChange } from "../metadata-policy-diff.js";
+import {
+  evaluateMetadataPolicyCiPolicy,
+  type MetadataPolicyCiConfiguration,
+  type MetadataPolicyCiEvaluation,
+} from "../metadata-policy-ci-policy.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -120,6 +126,7 @@ export interface CiReport {
   scanBoundaryPolicy: ScanBoundaryCiEvaluation;
   executableSurfacePolicy: ExecutableSurfaceCiEvaluation;
   qualityPolicy: QualityPolicyCiEvaluation;
+  metadataPolicy?: MetadataPolicyCiEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -138,6 +145,7 @@ export type CiReportFormatInput =
       | "scanBoundaryPolicy"
       | "executableSurfacePolicy"
       | "qualityPolicy"
+      | "metadataPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     })
@@ -150,6 +158,7 @@ export type CiReportFormatInput =
       | "scanBoundaryPolicy"
       | "executableSurfacePolicy"
       | "qualityPolicy"
+      | "metadataPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     });
@@ -174,6 +183,7 @@ interface ReportFinding {
         startLine?: number | undefined;
       }
     | undefined;
+  details?: Record<string, unknown> | undefined;
 }
 
 export async function runCiReportCommand(
@@ -214,6 +224,7 @@ export async function ciReport(
     execution.effectiveCiScanBoundary,
     execution.executableSurfaceCiPolicy,
     execution.qualityCiPolicy,
+    execution.metadataCiPolicy,
   );
 }
 
@@ -237,6 +248,10 @@ export function buildCiReportFromDiff(
     to: "off",
   },
   configuredQualityPolicy: QualityPolicyCiConfiguration = {
+    from: "fail",
+    to: "fail",
+  },
+  configuredMetadataPolicy: MetadataPolicyCiConfiguration = {
     from: "fail",
     to: "fail",
   },
@@ -271,6 +286,12 @@ export function buildCiReportFromDiff(
     },
     configuredQualityPolicy,
   );
+  const metadataPolicy = evaluateMetadataPolicyCiPolicy(
+    ciCompatibleDiff.metadataPolicy ?? {
+      changes: [],
+    },
+    configuredMetadataPolicy,
+  );
   const status = composeCiReportStatus(
     existingStatus,
     skillDiscoveryPolicy.outcome,
@@ -278,12 +299,17 @@ export function buildCiReportFromDiff(
     scanBoundaryPolicy.outcome,
     executableSurfacePolicy.outcome,
     qualityPolicy.outcome,
+    metadataPolicy.outcome,
   );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
     resolved: summarizeSecurityPosture(ciCompatibleDiff.findings.removed),
   };
 
+  const hasMetadataPolicyEvidence =
+    metadataPolicy.configured.from !== metadataPolicy.configured.to ||
+    (ciCompatibleDiff.metadataPolicy?.changes.length ?? 0) > 0 ||
+    metadataPolicy.matchCount > 0;
   return {
     root: ciCompatibleDiff.root,
     from: ciCompatibleDiff.from,
@@ -296,6 +322,7 @@ export function buildCiReportFromDiff(
     scanBoundaryPolicy,
     executableSurfacePolicy,
     qualityPolicy,
+    ...(hasMetadataPolicyEvidence ? { metadataPolicy } : {}),
     securityPosture,
     notes: reviewNotes(
       ciCompatibleDiff,
@@ -306,6 +333,7 @@ export function buildCiReportFromDiff(
       scanBoundaryPolicy,
       executableSurfacePolicy,
       qualityPolicy,
+      metadataPolicy,
     ),
     diff: ciCompatibleDiff,
   };
@@ -375,13 +403,15 @@ export function composeCiReportStatus(
   scanBoundaryPolicyOutcome: ScanBoundaryCiEvaluation["outcome"] = "pass",
   executableSurfacePolicyOutcome: ExecutableSurfaceCiEvaluation["outcome"] = "pass",
   qualityPolicyOutcome: QualityPolicyCiEvaluation["outcome"] = "pass",
+  metadataPolicyOutcome: MetadataPolicyCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
   if (
     existingStatus === "fail" ||
     securityPolicyOutcome === "fail" ||
     scanBoundaryPolicyOutcome === "fail" ||
     executableSurfacePolicyOutcome === "fail" ||
-    qualityPolicyOutcome === "fail"
+    qualityPolicyOutcome === "fail" ||
+    metadataPolicyOutcome === "fail"
   )
     return "fail";
   if (
@@ -390,7 +420,8 @@ export function composeCiReportStatus(
     securityPolicyOutcome === "warn" ||
     scanBoundaryPolicyOutcome === "warn" ||
     executableSurfacePolicyOutcome === "warn" ||
-    qualityPolicyOutcome === "warn"
+    qualityPolicyOutcome === "warn" ||
+    metadataPolicyOutcome === "warn"
   )
     return "warn";
   return "pass";
@@ -431,6 +462,7 @@ function reviewNotes(
   scanBoundaryPolicy: ScanBoundaryCiEvaluation,
   executableSurfacePolicy: ExecutableSurfaceCiEvaluation,
   qualityPolicy: QualityPolicyCiEvaluation,
+  metadataPolicy: MetadataPolicyCiEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -467,7 +499,8 @@ function reviewNotes(
     report.summary.findingsDelta < 0 &&
     securityPolicy.matchCount === 0 &&
     scanBoundaryPolicy.matchCount === 0 &&
-    qualityPolicy.matchCount === 0
+    qualityPolicy.matchCount === 0 &&
+    metadataPolicy.matchCount === 0
   ) {
     notes.push("Scan findings decreased.");
   }
@@ -531,6 +564,28 @@ function reviewNotes(
       `Quality CI mode was tightened from ${qualityPolicy.modeTransition.from} to ${qualityPolicy.modeTransition.to}; the transition is non-blocking.`,
     );
   }
+  const removedRequiredFields = metadataPolicy.matches.flatMap((match) =>
+    "change" in match ? [match.change.field] : [],
+  );
+  if (removedRequiredFields.length > 0) {
+    notes.push(
+      `Metadata policy removed ${removedRequiredFields.length} required ${removedRequiredFields.length === 1 ? "field" : "fields"}: ${removedRequiredFields.join(", ")}.`,
+    );
+    if (report.summary.findingsDelta < 0) {
+      notes.push(
+        "Scan findings decreased alongside required-metadata policy weakening; this is not treated as verified remediation.",
+      );
+    }
+  }
+  if (metadataPolicy.modeTransition.direction === "weakening") {
+    notes.push(
+      `Metadata CI mode was relaxed from ${metadataPolicy.modeTransition.from} to ${metadataPolicy.modeTransition.to}; the stricter ${metadataPolicy.configured.effective} endpoint mode governs this comparison.`,
+    );
+  } else if (metadataPolicy.modeTransition.direction === "tightening") {
+    notes.push(
+      `Metadata CI mode was tightened from ${metadataPolicy.modeTransition.from} to ${metadataPolicy.modeTransition.to}; the transition is non-blocking.`,
+    );
+  }
   if (executableSurfacePolicy.matchCount > 0) {
     if (executableSurfacePolicy.configured.effective === "off") {
       const suffix =
@@ -574,6 +629,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     schemaVersion: "renma.quality-policy-diff.v1" as const,
     changes: [],
   };
+  const metadataDiff = report.diff.metadataPolicy;
   const skillDiscoveryLines =
     "skillDiscovery" in report
       ? [
@@ -695,6 +751,27 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     qualityPolicy && hasQualityPolicyEvidence
       ? ["", ...formatQualityPolicySection(qualityPolicy, qualityDiff.changes)]
       : [];
+  const metadataPolicy =
+    "metadataPolicy" in report ? report.metadataPolicy : undefined;
+  if (metadataPolicy) {
+    const effect =
+      metadataPolicy.matchCount > 0 &&
+      metadataPolicy.configured.effective === "off"
+        ? "GATE OFF"
+        : metadataPolicy.outcome.toUpperCase();
+    summaryLines.push(
+      `- Required metadata policy: ${effect} — mode ${metadataPolicy.modeTransition.direction}; ${metadataPolicy.requiredFieldChanges.weakenings} removals / ${metadataPolicy.requiredFieldChanges.tightenings} additions`,
+    );
+  }
+  const metadataPolicyLines = metadataPolicy
+    ? [
+        "",
+        ...formatMetadataPolicySection(
+          metadataPolicy,
+          metadataDiff?.changes ?? [],
+        ),
+      ]
+    : [];
 
   const detailLines = [
     "## Readiness",
@@ -716,6 +793,9 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     `- Added findings: ${report.diff.findings.added.length}`,
     `- Resolved findings: ${report.diff.findings.removed.length}`,
     `- Quality token-threshold changes: ${qualityDiff.changes.length}`,
+    ...(metadataPolicy || metadataDiff
+      ? [`- Required metadata changes: ${metadataDiff?.changes.length ?? 0}`]
+      : []),
     "",
     "## Asset Changes",
     "",
@@ -806,6 +886,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...scanBoundaryPolicyLines,
     ...executableSurfacePolicyLines,
     ...qualityPolicyLines,
+    ...metadataPolicyLines,
     "",
     "## Review Notes",
     "",
@@ -945,6 +1026,11 @@ function formatChangeOverview(
       0,
       0,
       report.diff.qualityPolicy?.changes.length ?? 0,
+    ],
+    [
+      "required metadata",
+      report.diff.metadataPolicy?.addedRequiredFields.length ?? 0,
+      report.diff.metadataPolicy?.removedRequiredFields.length ?? 0,
     ],
     [
       "security policy relaxations",
@@ -1091,6 +1177,49 @@ function formatQualityPolicyChange(
   const direction =
     change.direction === "weakening" ? "WEAKENING" : "tightening";
   return `${direction}: ${change.assetKind} ${change.thresholdType} ${change.from.value} (${change.from.source}) -> ${change.to.value} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatMetadataPolicySection(
+  policy: MetadataPolicyCiEvaluation,
+  changes: readonly MetadataPolicyRequiredFieldChange[],
+): string[] {
+  const { from, to, effective } = policy.configured;
+  return [
+    "## Required Metadata Policy",
+    "",
+    `- Configured CI review policy: ${from} -> ${to}`,
+    `- Effective CI review policy: ${effective}`,
+    `- Policy outcome: ${policy.outcome.toUpperCase()}`,
+    `- Mode-transition direction: ${policy.modeTransition.direction}`,
+    `- Required-field removals: ${policy.requiredFieldChanges.weakenings}`,
+    `- Required-field additions: ${policy.requiredFieldChanges.tightenings}`,
+    `- Evaluator matches: ${policy.matchCount}`,
+    ...(effective === "off" && policy.matchCount > 0
+      ? ["- CI status effect: none — gate disabled"]
+      : []),
+    "",
+    ...changes
+      .slice(0, MAX_LIST_ITEMS)
+      .map((change) => `- ${formatMetadataPolicyChange(change)}`),
+    ...formatOverflow(changes.length),
+  ];
+}
+
+function formatMetadataPolicyChange(
+  change: MetadataPolicyRequiredFieldChange,
+): string {
+  const direction =
+    change.direction === "weakening" ? "WEAKENING" : "tightening";
+  return `${direction}: required ${formatMarkdownInlineCode(change.field)} ${formatMetadataPolicyEndpoint(change.from)} -> ${formatMetadataPolicyEndpoint(change.to)}; ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatMetadataPolicyEndpoint(
+  endpoint: MetadataPolicyRequiredFieldChange["from"],
+): string {
+  if (endpoint.provenance.source === "renma_default") {
+    return `${endpoint.required ? "required" : "not required"} (renma default)`;
+  }
+  return `${endpoint.required ? "required" : "not required"} (repository configuration ${formatMarkdownInlineCode(endpoint.provenance.configPath ?? "(explicit config path)")})`;
 }
 
 function formatExecutableSurfaceCiPolicySection(
@@ -1915,7 +2044,25 @@ function formatFindingSection(
 function formatFinding(finding: ReportFinding): string {
   const location = formatFindingLocation(finding);
   const risk = finding.riskClass ? ` [${finding.riskClass}]` : "";
-  return `- ${finding.severity.toUpperCase()}${risk} \`${finding.id}\` \`${location}\` — ${finding.title}`;
+  const requiredField = reportDetailString(finding.details, "requiredField");
+  const expectedKey = reportDetailString(
+    finding.details,
+    "expectedSerializedKey",
+  );
+  const presence = reportDetailString(finding.details, "presenceState");
+  const policyEvidence =
+    requiredField && expectedKey
+      ? `; required ${formatMarkdownInlineCode(requiredField)} as ${formatMarkdownInlineCode(expectedKey)} by ${formatMarkdownInlineCode("metadata.required")}${presence ? ` (${presence})` : ""}`
+      : "";
+  return `- ${finding.severity.toUpperCase()}${risk} \`${finding.id}\` \`${location}\` — ${finding.title}${policyEvidence}`;
+}
+
+function reportDetailString(
+  details: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = details?.[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 function formatFindingLocation(finding: ReportFinding): string {

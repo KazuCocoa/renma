@@ -253,6 +253,26 @@ policy is temporarily relaxed without introducing executable configuration.
 Existing `renma.config.json` and `.renma.json` files remain supported; Renma
 does not support or execute `.mjs` configuration.
 
+Repositories can promote supported optional catalog metadata to an explicit
+repository requirement without changing portable Agent Skills validity or
+Renma's defaults:
+
+```jsonc
+{
+  "metadata": {
+    "ci_policy": "fail",
+    "required": ["owner"]
+  }
+}
+```
+
+Skills satisfy this policy only with valid canonical `metadata.renma.*`
+declarations; non-Skills use the registered top-level key. An inherited
+effective owner still supports ownership calculations, but does not satisfy a
+policy requiring an explicit `owner` declaration. Removing a requirement or
+weakening `metadata.ci_policy` is governed by the stricter archived endpoint
+mode in `ci-report`. See the User Manual for the exact supported vocabulary.
+
 Repositories may set effective warning and High token-budget thresholds for
 Skills and each governed Markdown content kind:
 

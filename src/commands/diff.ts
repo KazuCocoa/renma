@@ -37,6 +37,8 @@ import type { SecurityCiPolicyMode } from "../types/configuration.js";
 import type { ScanBoundaryCiPolicyMode } from "../types/configuration.js";
 import type { ExecutableSurfaceCiPolicyMode } from "../types/configuration.js";
 import type {
+  MetadataCiPolicyMode,
+  MetadataConfig,
   QualityCiPolicyMode,
   QualityConfig,
   SecurityConfig,
@@ -85,12 +87,22 @@ import {
   type QualityPolicyDiff,
   type QualityPolicyThresholdChange,
 } from "../quality-policy-diff.js";
+import {
+  buildMetadataPolicyDiff,
+  type MetadataPolicyDiff,
+  type MetadataPolicyRequiredFieldChange,
+} from "../metadata-policy-diff.js";
+import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
+import { REQUIRED_METADATA_POLICY_FIELDS } from "../metadata-definitions.js";
 import type {
   SuppressedFindingEvidence,
   SuppressionConfig,
 } from "../types/diagnostics.js";
 
 const execFile = promisify(execFileCallback);
+const REQUIRED_METADATA_FIELD_ORDER = new Map<string, number>(
+  REQUIRED_METADATA_POLICY_FIELDS.map((field, index) => [field, index]),
+);
 
 export class DiffInputError extends CliUserError {
   constructor(message: string, options?: ErrorOptions) {
@@ -144,6 +156,7 @@ export interface DiffReport {
   security: SecurityDiffSummary;
   scanBoundary: ScanBoundaryDiff;
   qualityPolicy: QualityPolicyDiff;
+  metadataPolicy?: MetadataPolicyDiff;
   inspectionCoverage: InspectionCoverageDiff;
   findings: {
     added: FindingDelta[];
@@ -241,6 +254,8 @@ interface FindingDelta {
   riskClass?: string | undefined;
   title: string;
   evidence?: EvidenceDelta | undefined;
+  /** Retained only for required-metadata policy findings. */
+  details?: Record<string, unknown> | undefined;
 }
 
 interface EvidenceDelta {
@@ -260,6 +275,7 @@ export interface DiffSnapshot {
   securityPolicies?: SecurityPolicyAssetEvidence[];
   securityConfig?: SecurityConfig;
   qualityConfig?: QualityConfig;
+  metadataConfig?: MetadataConfig;
   scanBoundary?: ScanBoundaryEvidence;
   inspectionCoverage?: InspectionCoverage;
   configPath?: string;
@@ -292,6 +308,10 @@ export interface DiffExecutionContext {
   qualityCiPolicy: {
     from: QualityCiPolicyMode;
     to: QualityCiPolicyMode;
+  };
+  metadataCiPolicy: {
+    from: MetadataCiPolicyMode;
+    to: MetadataCiPolicyMode;
   };
   effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence;
 }
@@ -470,6 +490,10 @@ async function executeDiffWithProjection(
           from: fromCollected.qualityCiPolicy,
           to: toCollected.qualityCiPolicy,
         },
+        metadataCiPolicy: {
+          from: fromCollected.metadataCiPolicy,
+          to: toCollected.metadataCiPolicy,
+        },
         ...(effectiveCiBoundary
           ? { effectiveCiScanBoundary: effectiveCiBoundary }
           : {}),
@@ -568,6 +592,12 @@ function buildDiffReportProjection(
     .filter(([key]) => !toFindings.has(key))
     .map(([, finding]) => finding);
   const catalogChanges = changedAssets(fromAssets, toAssets);
+  const metadataPolicy = buildMetadataPolicyDiff(
+    fromSnapshot.metadataConfig ?? DEFAULT_CONFIG.metadata,
+    toSnapshot.metadataConfig ?? DEFAULT_CONFIG.metadata,
+    fromSnapshot.configPath,
+    toSnapshot.configPath,
+  );
   const sharedAssetPairs = [...toAssets].flatMap(([key, toAsset]) => {
     const fromAsset = fromAssets.get(key);
     return fromAsset === undefined ? [] : [[fromAsset, toAsset] as const];
@@ -671,6 +701,7 @@ function buildDiffReportProjection(
       fromSnapshot.qualityConfig ?? DEFAULT_CONFIG.quality,
       toSnapshot.qualityConfig ?? DEFAULT_CONFIG.quality,
     ),
+    ...(metadataPolicy.changes.length > 0 ? { metadataPolicy } : {}),
     inspectionCoverage: buildInspectionCoverageDiff(
       fromSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
       toSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
@@ -729,6 +760,7 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     schemaVersion: "renma.quality-policy-diff.v1" as const,
     changes: [],
   };
+  const metadataPolicy = report.metadataPolicy;
   const discoveryLines = discovery
     ? ["", ...formatSkillDiscoveryChanges(discovery)]
     : [];
@@ -773,6 +805,20 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
       .slice(0, DIFF_DETAIL_LIMIT)
       .map(formatQualityPolicyChange),
     ...formatPolicyOverflow(qualityPolicy.changes.length, 0),
+    ...(metadataPolicy
+      ? [
+          "",
+          "## Required Metadata Policy",
+          "",
+          `- Required-field changes: ${metadataPolicy.changes.length}`,
+          `- Added requirements: ${metadataPolicy.addedRequiredFields.length}`,
+          `- Removed requirements: ${metadataPolicy.removedRequiredFields.length}`,
+          ...metadataPolicy.changes
+            .slice(0, DIFF_DETAIL_LIMIT)
+            .map(formatMetadataPolicyChange),
+          ...formatPolicyOverflow(metadataPolicy.changes.length, 0),
+        ]
+      : []),
     "",
     "## Inspection Coverage",
     "",
@@ -911,6 +957,23 @@ function formatQualityPolicyChange(
   const direction =
     change.direction === "weakening" ? "WEAKENING" : "tightening";
   return `- ${direction}: ${change.assetKind} ${change.thresholdType} ${change.from.value} (${change.from.source}) -> ${change.to.value} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatMetadataPolicyChange(
+  change: MetadataPolicyRequiredFieldChange,
+): string {
+  const direction =
+    change.direction === "weakening" ? "WEAKENING" : "tightening";
+  return `- ${direction}: required ${formatMarkdownInlineCode(change.field)} ${formatMetadataRequirementEndpoint(change.from)} -> ${formatMetadataRequirementEndpoint(change.to)}; ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatMetadataRequirementEndpoint(
+  endpoint: MetadataPolicyRequiredFieldChange["from"],
+): string {
+  if (endpoint.provenance.source === "renma_default") {
+    return `${endpoint.required ? "required" : "not required"} (renma default)`;
+  }
+  return `${endpoint.required ? "required" : "not required"} (repository configuration ${formatMarkdownInlineCode(endpoint.provenance.configPath ?? "(explicit config path)")})`;
 }
 
 function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
@@ -1501,12 +1564,21 @@ function formatPolicyOverflow(total: number, indent: number): string[] {
 
 function formatFindingDelta(finding: FindingDelta): string {
   const location = finding.evidence?.path ? ` at ${finding.evidence.path}` : "";
+  const requiredField = optionalStringField(finding.details, "requiredField");
+  const expectedKey = optionalStringField(
+    finding.details,
+    "expectedSerializedKey",
+  );
+  const policyEvidence =
+    requiredField && expectedKey
+      ? `; required ${requiredField} as ${expectedKey} by metadata.required`
+      : "";
 
   if (!finding.riskClass) {
-    return `${finding.id} (${finding.severity})${location}`;
+    return `${finding.id} (${finding.severity})${location}${policyEvidence}`;
   }
 
-  return `${finding.severity.toUpperCase()} [${finding.riskClass}] ${finding.id}${location}`;
+  return `${finding.severity.toUpperCase()} [${finding.riskClass}] ${finding.id}${location}${policyEvidence}`;
 }
 
 async function snapshot(
@@ -1528,6 +1600,7 @@ async function snapshot(
   scanBoundaryCiPolicy: ScanBoundaryCiPolicyMode;
   executableSurfaceCiPolicy: ExecutableSurfaceCiPolicyMode;
   qualityCiPolicy: QualityCiPolicyMode;
+  metadataCiPolicy: MetadataCiPolicyMode;
 }> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
@@ -1565,6 +1638,7 @@ async function snapshot(
     executableSurfaceCiPolicy:
       repositorySnapshot.config.executableSurface.ciPolicy,
     qualityCiPolicy: repositorySnapshot.config.quality.ciPolicy,
+    metadataCiPolicy: repositorySnapshot.config.metadata.ciPolicy,
   };
 }
 
@@ -1607,6 +1681,7 @@ function projectDiffSnapshot(
       securityPolicies: repositorySnapshot.securityPolicies,
       securityConfig: repositorySnapshot.config.security,
       qualityConfig: repositorySnapshot.config.quality,
+      metadataConfig: repositorySnapshot.config.metadata,
       scanBoundary: canonicalScanBoundary(
         scanBoundarySource(
           repositorySnapshot.config,
@@ -1653,6 +1728,7 @@ function suppressedFindingMap(
         evidence.finding.severity,
         evidence.finding.riskClass ?? "",
         evidence.finding.evidence.path,
+        ...findingDetailIdentity(evidence.finding.id, evidence.finding.details),
         evidence.finding.evidence.startLine,
         evidence.finding.evidence.endLine,
         evidence.suppression.id,
@@ -1833,18 +1909,47 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
         title: stringField(finding, "title"),
         evidence,
       };
+      const rawDetails = objectField(finding, "details");
+      const details =
+        deltaFinding.id === "META-POLICY-REQUIRED-FIELD-MISSING" &&
+        rawDetails !== null &&
+        typeof rawDetails === "object" &&
+        !Array.isArray(rawDetails)
+          ? (rawDetails as Record<string, unknown>)
+          : undefined;
+      const projectedFinding = {
+        ...deltaFinding,
+        ...(details ? { details } : {}),
+      };
       return [
         [
           deltaFinding.id,
           evidence?.path ?? "",
+          ...findingDetailIdentity(deltaFinding.id, details),
           evidence?.startLine ?? "",
           evidence?.endLine ?? "",
           evidence?.snippet ?? "",
         ].join("\0"),
-        deltaFinding,
+        projectedFinding,
       ] as const;
     }),
   );
+}
+
+/** Keep ordinary identities unchanged while separating required fields at one location. */
+function findingDetailIdentity(findingId: string, details: unknown): string[] {
+  if (findingId !== DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING) {
+    return [];
+  }
+  const requiredField = optionalStringField(details, "requiredField") ?? "";
+  const expectedSerializedKey =
+    optionalStringField(details, "expectedSerializedKey") ?? "";
+  const fieldOrder = REQUIRED_METADATA_FIELD_ORDER.get(requiredField);
+  return [
+    fieldOrder === undefined ? "~~~~" : String(fieldOrder).padStart(4, "0"),
+    requiredField,
+    expectedSerializedKey,
+  ];
 }
 
 function countById(fromFindings: unknown[], toFindings: unknown[]) {

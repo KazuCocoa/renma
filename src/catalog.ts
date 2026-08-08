@@ -29,6 +29,10 @@ import type { ParsedDocument } from "./types/metadata.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
 import { isLifecycleUsable } from "./lifecycle.js";
 import { resolveUniqueDependencyTarget } from "./dependency-resolution.js";
+import {
+  requiredMetadataPolicyDiagnostics,
+  type RequiredMetadataPolicyOptions,
+} from "./metadata-policy.js";
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
@@ -143,6 +147,7 @@ export function buildCatalog(
     documents.map((document) => document.artifact.path),
   ),
   skillParents: SkillParentIndex = buildSkillParentIndex(documents),
+  metadataPolicy?: RequiredMetadataPolicyOptions,
 ): {
   catalog: Catalog;
   diagnostics: Diagnostic[];
@@ -180,6 +185,16 @@ export function buildCatalog(
         diagnostics.push(
           ...assetMetadataDiagnostics(document, result.metadata, kind),
         );
+        if (metadataPolicy) {
+          diagnostics.push(
+            ...requiredMetadataPolicyDiagnostics(
+              document,
+              result.metadata,
+              kind,
+              metadataPolicy,
+            ),
+          );
+        }
       }
 
       if (!kind) return undefined;

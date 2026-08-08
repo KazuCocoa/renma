@@ -418,6 +418,10 @@ function createRepositoryProjections(
       core.documents,
       core.discoveredPaths,
       skillParents,
+      {
+        policy: core.config.metadata,
+        ...(core.configPath ? { configPath: core.configPath } : {}),
+      },
     );
     return {
       catalog: built.catalog,

@@ -212,6 +212,27 @@ const CATALOG_FINDING_DEFINITION_LIST = [
   },
   {
     ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING,
+    title: "Repository-required metadata is missing or invalid",
+    severity: "high",
+    whyItMatters:
+      "The repository explicitly requires this declared metadata field for every applicable catalog asset. Missing, empty, invalid, ambiguous, legacy, or inherited values do not meet that governance contract.",
+    remediation:
+      "Add the reviewed field using the exact Skill metadata.renma.* spelling or registered top-level non-Skill spelling identified in the finding. Do not infer or fabricate a value.",
+    constraints: [
+      "Do not infer metadata from Git history, filesystem ownership, CODEOWNERS, nearby files, or inherited effective values.",
+      "Do not rewrite or add metadata during scan.",
+      "Preserve portable Agent Skills validity and use only canonical metadata.renma.* Skill declarations.",
+    ],
+    verificationSteps: [
+      "Run renma scan . --format json.",
+      "Confirm the required field is valid, non-empty, and explicitly declared on the asset.",
+    ],
+    llmHint:
+      "Use the expectedSerializedKey in finding details and obtain a human-reviewed value. Do not invent metadata or use inherited ownership as a declaration.",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
     code: DIAGNOSTIC_IDS.META_UNKNOWN_DEPENDENCY,
     title: "Metadata dependency target is unknown",
   },

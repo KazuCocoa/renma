@@ -1069,61 +1069,58 @@ function operationalListValue(
 
   const canonicalKey =
     CANONICAL_SKILL_METADATA_KEYS[key as CanonicalSkillOperationalKey];
-  if (typeof value !== "string") {
+  const parsed = parseCanonicalCatalogListValue(value);
+  if (!parsed.valid) {
     diagnostics.push(
       invalidCanonicalListDiagnostic(
         document,
         source,
         key,
         canonicalKey,
-        "must be a string containing a JSON array of strings",
+        parsed.reason,
       ),
     );
     return [];
   }
 
+  return parsed.values;
+}
+
+export type CanonicalCatalogListParseResult =
+  { valid: true; values: string[] } | { valid: false; reason: string };
+
+/** Parse the established canonical Skill JSON-array string encoding. */
+export function parseCanonicalCatalogListValue(
+  value: unknown,
+): CanonicalCatalogListParseResult {
+  if (typeof value !== "string") {
+    return {
+      valid: false,
+      reason: "must be a string containing a JSON array of strings",
+    };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
   } catch {
-    diagnostics.push(
-      invalidCanonicalListDiagnostic(
-        document,
-        source,
-        key,
-        canonicalKey,
-        "must contain valid JSON for an array of strings",
-      ),
-    );
-    return [];
+    return {
+      valid: false,
+      reason: "must contain valid JSON for an array of strings",
+    };
   }
-
   if (!Array.isArray(parsed)) {
-    diagnostics.push(
-      invalidCanonicalListDiagnostic(
-        document,
-        source,
-        key,
-        canonicalKey,
-        "must contain a JSON array",
-      ),
-    );
-    return [];
+    return { valid: false, reason: "must contain a JSON array" };
   }
   if (parsed.some((item) => typeof item !== "string")) {
-    diagnostics.push(
-      invalidCanonicalListDiagnostic(
-        document,
-        source,
-        key,
-        canonicalKey,
-        "must contain only string array members",
-      ),
-    );
-    return [];
+    return {
+      valid: false,
+      reason: "must contain only string array members",
+    };
   }
-
-  return parsed.map((item) => item.trim()).filter(Boolean);
+  return {
+    valid: true,
+    values: parsed.map((item) => item.trim()).filter(Boolean),
+  };
 }
 
 function invalidCanonicalListDiagnostic(
