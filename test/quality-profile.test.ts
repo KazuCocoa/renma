@@ -24,19 +24,19 @@ test("quality profile pins every package-version default", () => {
   assert.deepEqual(DEFAULT_QUALITY_PROFILE, {
     profile: expectedProfileVersion,
     descriptionMinChars: 0,
-    skillTokenWarning: 5000,
+    skillTokenWarning: 6400,
     skillTokenHigh: 8000,
     contentTokenWarning: {
-      context: 4000,
-      reference: 5000,
-      profile: 2000,
-      example: 2500,
+      context: 6400,
+      reference: 7200,
+      profile: 3200,
+      example: 4800,
     },
     contentTokenHigh: {
       context: 8000,
-      reference: 10000,
+      reference: 9000,
       profile: 4000,
-      example: 5000,
+      example: 6000,
     },
     frontmatterMaxLines: 48,
     frontmatterMaxChars: 4096,
@@ -157,19 +157,19 @@ test("token estimator is deterministic and Unicode-aware across repository text"
 });
 
 test("Skill budgets measure body after frontmatter at exact boundaries", () => {
-  const atWarning = findingsFor("skill", skillWithBodyTokens(5000));
+  const atWarning = findingsFor("skill", skillWithBodyTokens(6400));
   assert.equal(findBudget(atWarning, "QUAL-SKILL-TOKEN-BUDGET"), undefined);
 
   const aboveWarning = findBudget(
-    findingsFor("skill", skillWithBodyTokens(5001)),
+    findingsFor("skill", skillWithBodyTokens(6401)),
     "QUAL-SKILL-TOKEN-BUDGET",
   );
   assert.equal(aboveWarning?.severity, "medium");
   assert.deepEqual(aboveWarning?.details, {
-    measured: 5001,
-    warningThreshold: 5000,
+    measured: 6401,
+    warningThreshold: 6400,
     highThreshold: 8000,
-    triggeredThreshold: 5000,
+    triggeredThreshold: 6400,
     effectiveSeverity: "medium",
     overBy: 1,
     overPercent: 0,
@@ -190,7 +190,7 @@ test("Skill budgets measure body after frontmatter at exact boundaries", () => {
     "QUAL-SKILL-TOKEN-BUDGET",
   );
   assert.equal(atHigh?.severity, "medium");
-  assert.equal(atHigh?.details?.triggeredThreshold, 5000);
+  assert.equal(atHigh?.details?.triggeredThreshold, 6400);
   assert.equal(atHigh?.details?.measured, 8000);
 
   const aboveHigh = findBudget(
@@ -230,7 +230,7 @@ test("Skill budgets use custom effective thresholds without changing defaults", 
     high: "repository_configuration",
   });
   assert.equal(aboveHigh?.details?.policySource, "repository_configuration");
-  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 5000);
+  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 6400);
   assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenHigh, 8000);
 });
 

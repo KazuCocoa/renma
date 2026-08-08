@@ -10,26 +10,26 @@ import { DEFAULT_QUALITY_PROFILE } from "../src/quality-profile.js";
 
 const DEFAULT_CONTENT_TOKEN_BUDGETS = {
   context: {
-    warning: 4000,
+    warning: 6400,
     high: 8000,
     warningSource: "renma_default",
     highSource: "renma_default",
   },
   reference: {
-    warning: 5000,
-    high: 10000,
+    warning: 7200,
+    high: 9000,
     warningSource: "renma_default",
     highSource: "renma_default",
   },
   profile: {
-    warning: 2000,
+    warning: 3200,
     high: 4000,
     warningSource: "renma_default",
     highSource: "renma_default",
   },
   example: {
-    warning: 2500,
-    high: 5000,
+    warning: 4800,
+    high: 6000,
     warningSource: "renma_default",
     highSource: "renma_default",
   },
@@ -41,7 +41,7 @@ test("quality token thresholds use Renma defaults when configuration is absent",
   const loaded = await loadConfig(root, {});
 
   assert.deepEqual(loaded.config.quality, {
-    skillTokenWarning: 5000,
+    skillTokenWarning: 6400,
     skillTokenHigh: 8000,
     skillTokenWarningSource: "renma_default",
     skillTokenHighSource: "renma_default",
@@ -56,21 +56,21 @@ test("loaded default quality policy is request-local", async (t) => {
   loaded.config.quality.skillTokenWarning = 1;
   loaded.config.quality.contentTokenBudgets.context.warning = 1;
 
-  assert.equal(DEFAULT_CONFIG.quality.skillTokenWarning, 5000);
+  assert.equal(DEFAULT_CONFIG.quality.skillTokenWarning, 6400);
   assert.equal(
     DEFAULT_CONFIG.quality.contentTokenBudgets.context.warning,
-    4000,
+    6400,
   );
-  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 5000);
-  assert.equal(DEFAULT_QUALITY_PROFILE.contentTokenWarning.context, 4000);
+  assert.equal(DEFAULT_QUALITY_PROFILE.skillTokenWarning, 6400);
+  assert.equal(DEFAULT_QUALITY_PROFILE.contentTokenWarning.context, 6400);
   assert.equal(
     (await loadConfig(root, {})).config.quality.skillTokenWarning,
-    5000,
+    6400,
   );
   assert.equal(
     (await loadConfig(root, {})).config.quality.contentTokenBudgets.context
       .warning,
-    4000,
+    6400,
   );
 });
 
@@ -89,7 +89,7 @@ test("quality token thresholds fall back independently and retain their sources"
     {
       source: '{"quality":{"skill_token_high":9000}}',
       expected: {
-        skillTokenWarning: 5000,
+        skillTokenWarning: 6400,
         skillTokenHigh: 9000,
         skillTokenWarningSource: "renma_default",
         skillTokenHighSource: "repository_configuration",
@@ -131,7 +131,7 @@ test("content token thresholds configure independently by asset kind", async (t)
     highSource: "renma_default",
   });
   assert.deepEqual(loaded.config.quality.contentTokenBudgets.reference, {
-    warning: 5000,
+    warning: 7200,
     high: 12000,
     warningSource: "renma_default",
     highSource: "repository_configuration",
@@ -195,7 +195,7 @@ test("content token thresholds reject invalid values and relationships", async (
     {
       value: { reference_token_high: 5000 },
       message:
-        "quality.reference_token_warning (5000) must be strictly lower than quality.reference_token_high (5000).",
+        "quality.reference_token_warning (7200) must be strictly lower than quality.reference_token_high (5000).",
     },
   ]) {
     await t.test(JSON.stringify(config.value), async (caseContext) => {
@@ -329,7 +329,7 @@ test("quality token thresholds require warning to be strictly lower than high", 
     {
       source: { skill_token_high: 4000 },
       message:
-        "quality.skill_token_warning (5000) must be strictly lower than quality.skill_token_high (4000).",
+        "quality.skill_token_warning (6400) must be strictly lower than quality.skill_token_high (4000).",
     },
   ] as const;
 

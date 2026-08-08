@@ -13,19 +13,24 @@ export const RENMA_QUALITY_PROFILE_VERSION =
 export const DEFAULT_QUALITY_PROFILE = {
   profile: RENMA_QUALITY_PROFILE_VERSION,
   descriptionMinChars: 0,
-  skillTokenWarning: 5_000,
+  skillTokenWarning: 6_400,
   skillTokenHigh: 8_000,
+  // These warning is 80% of high.
   contentTokenWarning: {
-    context: 4_000,
-    reference: 5_000,
-    profile: 2_000,
-    example: 2_500,
+    context: 6_400,
+    reference: 7_200,
+    profile: 3_200,
+    example: 4_800,
   },
+  // Magic numbers.
+  // Codex 5.5 tols me that general token amount in a skill was less than 6_000
+  // based on their experience, so lets set reasonable amount for them.
+  // Anyway, huge token could waist context token for LLM as well.
   contentTokenHigh: {
     context: 8_000,
-    reference: 10_000,
+    reference: 9_000,
     profile: 4_000,
-    example: 5_000,
+    example: 6_000,
   },
   frontmatterMaxLines: 48,
   frontmatterMaxChars: 4_096,

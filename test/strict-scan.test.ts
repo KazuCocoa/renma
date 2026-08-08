@@ -21,7 +21,7 @@ import { RepositoryFixture } from "./repository-fixture.js";
 
 test("Skill token budgets use normal fail-on behavior without a strict-only gate", async (t) => {
   const cases = [
-    { tokens: 5001, severity: "medium", expectedCode: 0 },
+    { tokens: 6401, severity: "medium", expectedCode: 0 },
     { tokens: 8001, severity: "high", expectedCode: 1 },
   ] as const;
 
@@ -63,7 +63,7 @@ test("Skill token budgets use normal fail-on behavior without a strict-only gate
 
 test("content token budgets use normal fail-on behavior without a strict-only gate", async (t) => {
   const cases = [
-    { tokens: 4001, severity: "medium", expectedCode: 0 },
+    { tokens: 6401, severity: "medium", expectedCode: 0 },
     { tokens: 8001, severity: "high", expectedCode: 1 },
   ] as const;
 
