@@ -4,6 +4,10 @@ import type {
   SuppressionExpiration,
 } from "./types/diagnostics.js";
 
+export const SCAN_BOUNDARY_SCHEMA_VERSION = "renma.scan-boundary.v1" as const;
+export const CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION =
+  "renma.ci-evidence-boundary.v1" as const;
+
 export interface CanonicalSuppressionEvidence {
   id: string;
   paths: string[];
@@ -23,7 +27,7 @@ export interface ScanBoundarySource {
 
 /** Canonical, deterministic evidence for one revision-local scan boundary. */
 export interface ScanBoundaryEvidence {
-  schemaVersion: "renma.scan-boundary.v1";
+  schemaVersion: typeof SCAN_BOUNDARY_SCHEMA_VERSION;
   configPath: string | null;
   globs: string[];
   exclude: string[];
@@ -34,7 +38,7 @@ export interface ScanBoundaryEvidence {
 
 /** CI's fail-closed target coverage model and the exact paths it retained. */
 export interface EffectiveCiScanBoundaryEvidence {
-  schemaVersion: "renma.ci-evidence-boundary.v1";
+  schemaVersion: typeof CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION;
   coverageModel: "target_path_endpoint_coverage_union";
   configPath: null;
   globs: string[];
@@ -70,7 +74,7 @@ export function canonicalScanBoundary(
 ): ScanBoundaryEvidence {
   const todayKey = evaluationDateKey(today);
   return {
-    schemaVersion: "renma.scan-boundary.v1",
+    schemaVersion: SCAN_BOUNDARY_SCHEMA_VERSION,
     configPath: source.configPath,
     // Discovery passes both declarations directly to its runtime predicates.
     // Preserve their exact identity here so evidence cannot collapse syntax
@@ -93,7 +97,7 @@ export function effectiveCiScanBoundary(
     canonicalScanBoundary(source, today),
   );
   return {
-    schemaVersion: "renma.ci-evidence-boundary.v1",
+    schemaVersion: CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION,
     coverageModel: "target_path_endpoint_coverage_union",
     configPath: null,
     globs: sortedExactStrings(canonicalSources.flatMap((item) => item.globs)),

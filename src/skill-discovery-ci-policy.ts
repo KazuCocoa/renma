@@ -1,6 +1,9 @@
 import type { SkillDiscoveryDiff } from "./skill-discovery-diff.js";
 import type { SkillDiscoveryCiPolicyMode } from "./types/configuration.js";
 
+export const SKILL_DISCOVERY_CI_POLICY_SCHEMA_VERSION =
+  "renma.skill-discovery-ci-policy.v1" as const;
+
 export const SKILL_DISCOVERY_CI_POLICY_MATCH_IDS = {
   ADOPTION_WEAKENED: "skill_discovery_ci.adoption_weakened",
   ADOPTION_INCOMPLETE: "skill_discovery_ci.adoption_incomplete",
@@ -33,7 +36,7 @@ export interface SkillDiscoveryCiPolicyConfiguration {
 }
 
 export interface SkillDiscoveryCiPolicyEvaluation {
-  schemaVersion: "renma.skill-discovery-ci-policy.v1";
+  schemaVersion: typeof SKILL_DISCOVERY_CI_POLICY_SCHEMA_VERSION;
   configured: SkillDiscoveryCiPolicyConfiguration & {
     effective: SkillDiscoveryCiPolicyMode;
   };
@@ -71,7 +74,7 @@ export function evaluateSkillDiscoveryCiPolicy(
   };
   if (effective === "off") {
     return {
-      schemaVersion: "renma.skill-discovery-ci-policy.v1",
+      schemaVersion: SKILL_DISCOVERY_CI_POLICY_SCHEMA_VERSION,
       configured: configuredResult,
       outcome: "pass",
       matchCount: 0,
@@ -81,7 +84,7 @@ export function evaluateSkillDiscoveryCiPolicy(
 
   const matches = policyMatches(discovery).sort(comparePolicyMatches);
   return {
-    schemaVersion: "renma.skill-discovery-ci-policy.v1",
+    schemaVersion: SKILL_DISCOVERY_CI_POLICY_SCHEMA_VERSION,
     configured: configuredResult,
     outcome: matches.length > 0 ? "warn" : "pass",
     matchCount: matches.length,

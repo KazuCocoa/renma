@@ -29,6 +29,7 @@ import type { ParsedDocument } from "./types/metadata.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
 import { isLifecycleUsable } from "./lifecycle.js";
 import { resolveUniqueDependencyTarget } from "./dependency-resolution.js";
+import { RENMA_METADATA_NAMESPACE_PREFIX } from "./metadata-definitions.js";
 import {
   requiredMetadataPolicyDiagnostics,
   type RequiredMetadataPolicyOptions,
@@ -405,7 +406,7 @@ function metadataBudgetDiagnostics(
 
   for (const [key, values] of operationalMetadataLists(metadata)) {
     const field = metadataFields[key];
-    if (!field?.key.startsWith("renma.")) continue;
+    if (!field?.key.startsWith(RENMA_METADATA_NAMESPACE_PREFIX)) continue;
     for (const value of values) {
       if (!shouldBudgetMetadataItem(key, value)) continue;
       if (value.length <= QUALITY.metadataListItemMaxChars) continue;

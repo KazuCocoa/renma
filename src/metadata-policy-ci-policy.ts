@@ -4,6 +4,9 @@ import type {
 } from "./metadata-policy-diff.js";
 import type { MetadataCiPolicyMode } from "./types/configuration.js";
 
+export const METADATA_POLICY_CI_POLICY_SCHEMA_VERSION =
+  "renma.metadata-policy-ci-policy.v1" as const;
+
 export const METADATA_POLICY_CI_MATCH_IDS = {
   CI_POLICY_RELAXED: "metadata_policy_ci.ci_policy_relaxed",
   REQUIRED_FIELD_REMOVED: "metadata_policy_ci.required_field_removed",
@@ -36,7 +39,7 @@ export type MetadataPolicyCiMatch =
     };
 
 export interface MetadataPolicyCiEvaluation {
-  schemaVersion: "renma.metadata-policy-ci-policy.v1";
+  schemaVersion: typeof METADATA_POLICY_CI_POLICY_SCHEMA_VERSION;
   configured: MetadataPolicyCiConfiguration & {
     effective: MetadataCiPolicyMode;
   };
@@ -113,7 +116,7 @@ export function evaluateMetadataPolicyCiPolicy(
   const weakenings = fieldMatches.length;
 
   return {
-    schemaVersion: "renma.metadata-policy-ci-policy.v1",
+    schemaVersion: METADATA_POLICY_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },
     modeTransition,
     requiredFieldChanges: {

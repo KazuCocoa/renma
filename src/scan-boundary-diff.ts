@@ -3,6 +3,9 @@ import type {
   ScanBoundaryEvidence,
 } from "./scan-boundary.js";
 
+export const SCAN_BOUNDARY_DIFF_SCHEMA_VERSION =
+  "renma.scan-boundary-diff.v1" as const;
+
 export type ScanBoundaryChangeDirection = "weakening" | "tightening";
 
 export type ScanBoundaryChange =
@@ -39,7 +42,7 @@ export type ScanBoundaryChange =
     };
 
 export interface ScanBoundaryDiff {
-  schemaVersion: "renma.scan-boundary-diff.v1";
+  schemaVersion: typeof SCAN_BOUNDARY_DIFF_SCHEMA_VERSION;
   from: ScanBoundaryEvidence;
   to: ScanBoundaryEvidence;
   changes: ScanBoundaryChange[];
@@ -56,7 +59,7 @@ export function buildScanBoundaryDiff(
     ...suppressionChanges(from.activeSuppressions, to.activeSuppressions),
   ].sort(compareChanges);
   return {
-    schemaVersion: "renma.scan-boundary-diff.v1",
+    schemaVersion: SCAN_BOUNDARY_DIFF_SCHEMA_VERSION,
     from,
     to,
     changes,

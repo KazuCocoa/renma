@@ -51,6 +51,7 @@ import {
 } from "../repository-evidence.js";
 import {
   buildSkillDiscoveryDiff,
+  SKILL_DISCOVERY_DIFF_SCHEMA_VERSION,
   type SkillDiscoveryCycleDiff,
   type SkillDiscoveryDiff,
   type SkillDiscoveryDiffSkill,
@@ -71,6 +72,7 @@ import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 import { securityPolicyRelaxations } from "../security-policy-ci-policy.js";
 import {
   canonicalScanBoundary,
+  CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION,
   scanBoundarySource,
   type ScanBoundaryEvidence,
   type ScanBoundarySource,
@@ -84,6 +86,7 @@ import {
 import { scanFromRepositorySnapshot } from "../scanner.js";
 import {
   buildQualityPolicyDiff,
+  QUALITY_POLICY_DIFF_SCHEMA_VERSION,
   type QualityPolicyDiff,
   type QualityPolicyThresholdChange,
 } from "../quality-policy-diff.js";
@@ -93,7 +96,10 @@ import {
   type MetadataPolicyRequiredFieldChange,
 } from "../metadata-policy-diff.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
-import { REQUIRED_METADATA_POLICY_FIELDS } from "../metadata-definitions.js";
+import {
+  REQUIRED_METADATA_CONFIGURATION_KEY,
+  REQUIRED_METADATA_POLICY_FIELDS,
+} from "../metadata-definitions.js";
 import type {
   SuppressedFindingEvidence,
   SuppressionConfig,
@@ -757,7 +763,7 @@ export function formatDiff(
 function formatDiffMarkdown(report: DiffReportFormatInput): string {
   const discovery = "discovery" in report ? report.discovery : undefined;
   const qualityPolicy = report.qualityPolicy ?? {
-    schemaVersion: "renma.quality-policy-diff.v1" as const,
+    schemaVersion: QUALITY_POLICY_DIFF_SCHEMA_VERSION,
     changes: [],
   };
   const metadataPolicy = report.metadataPolicy;
@@ -978,7 +984,7 @@ function formatMetadataRequirementEndpoint(
 
 function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
   return {
-    schemaVersion: "renma.skill-discovery-diff.v1",
+    schemaVersion: SKILL_DISCOVERY_DIFF_SCHEMA_VERSION,
     adoption: {
       from: "not-adopted",
       to: "not-adopted",
@@ -1571,7 +1577,7 @@ function formatFindingDelta(finding: FindingDelta): string {
   );
   const policyEvidence =
     requiredField && expectedKey
-      ? `; required ${requiredField} as ${expectedKey} by metadata.required`
+      ? `; required ${requiredField} as ${expectedKey} by ${REQUIRED_METADATA_CONFIGURATION_KEY}`
       : "";
 
   if (!finding.riskClass) {
@@ -1695,7 +1701,7 @@ function projectDiffSnapshot(
         : {}),
     },
     ...(scanResult.scanBoundary.schemaVersion ===
-    "renma.ci-evidence-boundary.v1"
+    CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION
       ? { effectiveBoundary: scanResult.scanBoundary }
       : {}),
   };
@@ -1911,7 +1917,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
       };
       const rawDetails = objectField(finding, "details");
       const details =
-        deltaFinding.id === "META-POLICY-REQUIRED-FIELD-MISSING" &&
+        deltaFinding.id === DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING &&
         rawDetails !== null &&
         typeof rawDetails === "object" &&
         !Array.isArray(rawDetails)

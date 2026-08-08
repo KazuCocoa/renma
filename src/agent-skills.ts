@@ -16,6 +16,11 @@ import {
 } from "./yaml-frontmatter.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
+  AGENT_SKILLS_TOP_LEVEL_FIELDS,
+  AGENT_SKILL_TOP_LEVEL_KEYS,
+  RENMA_METADATA_NAMESPACE_PREFIX,
+} from "./metadata-definitions.js";
+import {
   ensureMarkdownSyntaxForDocument,
   markdownCodeLineNumbers,
 } from "./markdown-syntax.js";
@@ -26,14 +31,7 @@ export const AGENT_SKILLS_SPECIFICATION =
 export const AGENT_SKILLS_VALIDATION_PROFILE =
   "agentskills.io/specification@2026-07-12";
 
-export const AGENT_SKILLS_TOP_LEVEL_FIELDS = [
-  "name",
-  "description",
-  "license",
-  "compatibility",
-  "metadata",
-  "allowed-tools",
-] as const;
+export { AGENT_SKILLS_TOP_LEVEL_FIELDS } from "./metadata-definitions.js";
 
 export const LEGACY_RENMA_SKILL_FIELDS = [
   "id",
@@ -188,7 +186,9 @@ export function resolvedAgentSkillDescription(
 ): string | undefined {
   if (document.artifact.kind !== "skill") return undefined;
   return nonEmptyString(
-    parseAgentSkillFrontmatter(document.artifact.content).values.description,
+    parseAgentSkillFrontmatter(document.artifact.content).values[
+      AGENT_SKILL_TOP_LEVEL_KEYS.description
+    ],
   );
 }
 
@@ -197,8 +197,12 @@ function validateAgentSkillFrontmatter(
   frontmatter: ParsedYamlFrontmatter,
 ): AgentSkillValidationResult {
   const issues: AgentSkillValidationIssue[] = [];
-  const name = nonEmptyString(frontmatter.values.name);
-  const description = nonEmptyString(frontmatter.values.description);
+  const name = nonEmptyString(
+    frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.name],
+  );
+  const description = nonEmptyString(
+    frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.description],
+  );
   const legacyFields = uniqueSorted(
     frontmatter.fields
       .map((field) => field.key)
@@ -207,7 +211,7 @@ function validateAgentSkillFrontmatter(
   const canonicalRenmaFields = uniqueSorted(
     frontmatter.metadataFields
       .map((field) => field.key)
-      .filter((field) => field.startsWith("renma.")),
+      .filter((field) => field.startsWith(RENMA_METADATA_NAMESPACE_PREFIX)),
   );
   const hasAgentSkillsIdentity = Boolean(name && description);
   const format = classifyAgentSkillFormat(
@@ -428,8 +432,8 @@ function validateName(
   frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const rawName = frontmatter.values.name;
-  const field = firstField(frontmatter, "name");
+  const rawName = frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.name];
+  const field = firstField(frontmatter, AGENT_SKILL_TOP_LEVEL_KEYS.name);
   if (
     rawName === undefined ||
     (typeof rawName === "string" && !rawName.trim())
@@ -442,7 +446,7 @@ function validateName(
         "specification",
         "Agent Skills requires a non-empty string name.",
         field?.startLine ?? 1,
-        "name",
+        AGENT_SKILL_TOP_LEVEL_KEYS.name,
       ),
     );
     return;
@@ -456,7 +460,7 @@ function validateName(
         "specification",
         "Agent Skills name must be a non-empty string.",
         field?.startLine ?? 1,
-        "name",
+        AGENT_SKILL_TOP_LEVEL_KEYS.name,
       ),
     );
     return;
@@ -472,7 +476,7 @@ function validateName(
         "specification",
         `Invalid Agent Skills name "${rawName}": ${nameValidation.problems.join("; ")}.`,
         field?.startLine ?? 1,
-        "name",
+        AGENT_SKILL_TOP_LEVEL_KEYS.name,
       ),
     );
   }
@@ -497,7 +501,7 @@ function validateName(
         "specification",
         `Agent Skills name "${rawName}" must match parent directory "${parent}".`,
         field?.startLine ?? 1,
-        "name",
+        AGENT_SKILL_TOP_LEVEL_KEYS.name,
       ),
       details: { name: rawName, parentDirectory: parent },
     });
@@ -509,8 +513,8 @@ function validateDescription(
   frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const raw = frontmatter.values.description;
-  const field = firstField(frontmatter, "description");
+  const raw = frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.description];
+  const field = firstField(frontmatter, AGENT_SKILL_TOP_LEVEL_KEYS.description);
   if (raw === undefined || (typeof raw === "string" && !raw.trim())) {
     issues.push(
       createIssue(
@@ -520,7 +524,7 @@ function validateDescription(
         "specification",
         "Agent Skills requires a non-empty description describing what the skill does and when to use it.",
         field?.startLine ?? 1,
-        "description",
+        AGENT_SKILL_TOP_LEVEL_KEYS.description,
       ),
     );
     return;
@@ -534,7 +538,7 @@ function validateDescription(
         "specification",
         "Agent Skills description must be a non-empty string.",
         field?.startLine ?? 1,
-        "description",
+        AGENT_SKILL_TOP_LEVEL_KEYS.description,
       ),
     );
     return;
@@ -548,7 +552,7 @@ function validateDescription(
         "specification",
         `Agent Skills description exceeds ${MAX_DESCRIPTION_LENGTH} characters.`,
         field?.startLine ?? 1,
-        "description",
+        AGENT_SKILL_TOP_LEVEL_KEYS.description,
       ),
     );
   }
@@ -559,12 +563,26 @@ function validateOptionalFields(
   frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  validateOptionalString(document, frontmatter, issues, "license");
-  validateOptionalString(document, frontmatter, issues, "allowed-tools");
+  validateOptionalString(
+    document,
+    frontmatter,
+    issues,
+    AGENT_SKILL_TOP_LEVEL_KEYS.license,
+  );
+  validateOptionalString(
+    document,
+    frontmatter,
+    issues,
+    AGENT_SKILL_TOP_LEVEL_KEYS.allowedTools,
+  );
 
-  const compatibility = frontmatter.values.compatibility;
+  const compatibility =
+    frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.compatibility];
   if (compatibility === undefined) return;
-  const field = firstField(frontmatter, "compatibility");
+  const field = firstField(
+    frontmatter,
+    AGENT_SKILL_TOP_LEVEL_KEYS.compatibility,
+  );
   if (typeof compatibility !== "string" || !compatibility.trim()) {
     issues.push(
       createIssue(
@@ -574,7 +592,7 @@ function validateOptionalFields(
         "specification",
         "Agent Skills compatibility must be a non-empty string when provided.",
         field?.startLine ?? 1,
-        "compatibility",
+        AGENT_SKILL_TOP_LEVEL_KEYS.compatibility,
       ),
     );
   } else if (characterLength(compatibility) > MAX_COMPATIBILITY_LENGTH) {
@@ -586,7 +604,7 @@ function validateOptionalFields(
         "specification",
         `Agent Skills compatibility exceeds ${MAX_COMPATIBILITY_LENGTH} characters.`,
         field?.startLine ?? 1,
-        "compatibility",
+        AGENT_SKILL_TOP_LEVEL_KEYS.compatibility,
       ),
     );
   }
@@ -596,12 +614,14 @@ function validateOptionalString(
   document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
-  fieldName: "license" | "allowed-tools",
+  fieldName:
+    | typeof AGENT_SKILL_TOP_LEVEL_KEYS.license
+    | typeof AGENT_SKILL_TOP_LEVEL_KEYS.allowedTools,
 ): void {
   const value = frontmatter.values[fieldName];
   if (value === undefined || typeof value === "string") return;
   const code =
-    fieldName === "license"
+    fieldName === AGENT_SKILL_TOP_LEVEL_KEYS.license
       ? IDS.AS_INVALID_LICENSE
       : IDS.AS_INVALID_ALLOWED_TOOLS;
   issues.push(
@@ -622,7 +642,7 @@ function validateMetadata(
   frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const metadata = frontmatter.values.metadata;
+  const metadata = frontmatter.values[AGENT_SKILL_TOP_LEVEL_KEYS.metadata];
   if (metadata === undefined) return;
   if (
     !isRecord(metadata) ||
@@ -637,8 +657,9 @@ function validateMetadata(
         "error",
         "specification",
         "Agent Skills metadata must be a mapping from string keys to string values.",
-        firstField(frontmatter, "metadata")?.startLine ?? 1,
-        "metadata",
+        firstField(frontmatter, AGENT_SKILL_TOP_LEVEL_KEYS.metadata)
+          ?.startLine ?? 1,
+        AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
       ),
     );
   }
@@ -659,7 +680,8 @@ function authoringIssues(
   const issues: AgentSkillValidationIssue[] = [];
   const bodyLines = collectBodyLines(document, frontmatter);
   const descriptionLine =
-    firstField(frontmatter, "description")?.startLine ?? 1;
+    firstField(frontmatter, AGENT_SKILL_TOP_LEVEL_KEYS.description)
+      ?.startLine ?? 1;
 
   if (!descriptionCapabilityPattern().test(description)) {
     issues.push(

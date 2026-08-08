@@ -5,6 +5,9 @@ import type {
 } from "./scan-boundary-diff.js";
 import type { ScanBoundaryCiPolicyMode } from "./types/configuration.js";
 
+export const SCAN_BOUNDARY_CI_POLICY_SCHEMA_VERSION =
+  "renma.scan-boundary-ci-policy.v1" as const;
+
 export const SCAN_BOUNDARY_CI_MATCH_IDS = {
   GLOB_REMOVED: "scan_boundary_ci.glob_removed",
   EXCLUSION_ADDED: "scan_boundary_ci.exclusion_added",
@@ -30,7 +33,7 @@ export interface ScanBoundaryCiMatch {
 }
 
 export interface ScanBoundaryCiEvaluation {
-  schemaVersion: "renma.scan-boundary-ci-policy.v1";
+  schemaVersion: typeof SCAN_BOUNDARY_CI_POLICY_SCHEMA_VERSION;
   configured: ScanBoundaryCiConfiguration & {
     effective: ScanBoundaryCiPolicyMode;
   };
@@ -65,7 +68,7 @@ export function evaluateScanBoundaryCiPolicy(
     .map((change) => toMatch(change))
     .sort((left, right) => matchKey(left).localeCompare(matchKey(right)));
   return {
-    schemaVersion: "renma.scan-boundary-ci-policy.v1",
+    schemaVersion: SCAN_BOUNDARY_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },
     outcome:
       effective === "off" || matches.length === 0

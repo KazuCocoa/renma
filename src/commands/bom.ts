@@ -29,6 +29,9 @@ import type { SecurityPolicyInventorySummary } from "../security-policy-inventor
 import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
+export const REPOSITORY_CONTEXT_BOM_SCHEMA_VERSION =
+  "renma.repository-context-bom.v2" as const;
+
 export type BomFormat = "json" | "markdown";
 export type BomOutputMode = "default" | "omit_generated_at";
 
@@ -42,7 +45,7 @@ interface BomBuildOptions extends BomOptions {
 }
 
 export interface BomReport {
-  schemaVersion: "renma.repository-context-bom.v2";
+  schemaVersion: typeof REPOSITORY_CONTEXT_BOM_SCHEMA_VERSION;
   generatedAt?: string;
   outputMode: BomOutputMode;
   generator: {
@@ -226,7 +229,7 @@ export function buildBomReport(
   );
 
   return {
-    schemaVersion: "renma.repository-context-bom.v2",
+    schemaVersion: REPOSITORY_CONTEXT_BOM_SCHEMA_VERSION,
     outputMode: omitGeneratedAt ? "omit_generated_at" : "default",
     ...(omitGeneratedAt ? {} : { generatedAt: generatedAtIso(options) }),
     generator: {

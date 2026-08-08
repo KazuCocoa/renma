@@ -7,7 +7,10 @@ import type { AssetClassificationEvidence } from "./types/classification.js";
 import type { Diagnostic } from "./types/diagnostics.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { RepositoryPathState } from "./repository-paths.js";
-import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import {
+  DIAGNOSTIC_IDS,
+  DISCOVERY_LAYOUT_DIAGNOSTIC_IDS,
+} from "./diagnostic-ids.js";
 import {
   safeRepositoryPath,
   walkRepositoryFiles,
@@ -29,10 +32,6 @@ export {
   type SkillRoot,
 } from "./skill-path-contract.js";
 
-const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
-  "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
-const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE =
-  "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR";
 const SKILL_LIKE_FILE_GLOBS = [
   "SKILL.md",
   "skill.md",
@@ -1014,7 +1013,7 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
     const reservedSupportSegment = skillSupportPathSegment(relativePath);
     if (reservedSupportSegment !== undefined) {
       diagnostics.push({
-        code: SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE,
+        code: DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR,
         severity: "info",
         path: relativePath,
         message: `Detected a Skill-looking file inside a reserved Skill-support directory: ${relativePath}. The path segment "${reservedSupportSegment}" is reserved for skill-local support files, so this path is not a Skill entrypoint. Rename the skill directory if this file is intended to define a Renma skill.`,
@@ -1031,7 +1030,7 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
     if (isExplicitSkillsPath(relativePath)) continue;
 
     diagnostics.push({
-      code: SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE,
+      code: DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR,
       severity: "info",
       path: relativePath,
       message: `Detected a skill-like file outside an explicit skills directory: ${relativePath}. Renma only treats files under skills/** or .agents/skills/** as skill assets by default. Move this file under skills/ or .agents/skills/ if it is intended to be a Renma skill.`,

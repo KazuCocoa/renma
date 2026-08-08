@@ -20,7 +20,8 @@ import type {
   RiskClass,
 } from "./types/diagnostics.js";
 
-export type TrustGraphSchemaVersion = "renma.trustGraph.v2";
+export const TRUST_GRAPH_SCHEMA_VERSION = "renma.trustGraph.v2" as const;
+export type TrustGraphSchemaVersion = typeof TRUST_GRAPH_SCHEMA_VERSION;
 
 export type TrustGraphNodeType =
   | "asset"
@@ -285,7 +286,7 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
   const sortedNodes = [...nodes.values()].sort(compareNodes);
   const sortedEdges = [...edges.values()].sort(compareEdges);
   const graph: TrustGraph = {
-    schemaVersion: "renma.trustGraph.v2",
+    schemaVersion: TRUST_GRAPH_SCHEMA_VERSION,
     summary: summarizeTrustGraph(
       assets.length,
       sortedNodes,

@@ -1,5 +1,26 @@
 import type { ArtifactKind } from "./types/artifact.js";
 
+/** Portable top-level Agent Skills keys in canonical specification order. */
+export const AGENT_SKILL_TOP_LEVEL_KEYS = {
+  name: "name",
+  description: "description",
+  license: "license",
+  compatibility: "compatibility",
+  metadata: "metadata",
+  allowedTools: "allowed-tools",
+} as const;
+
+export type AgentSkillTopLevelKey =
+  (typeof AGENT_SKILL_TOP_LEVEL_KEYS)[keyof typeof AGENT_SKILL_TOP_LEVEL_KEYS];
+
+/** Canonical collection derived from the top-level Agent Skills vocabulary. */
+export const AGENT_SKILLS_TOP_LEVEL_FIELDS = Object.values(
+  AGENT_SKILL_TOP_LEVEL_KEYS,
+) as readonly AgentSkillTopLevelKey[];
+
+/** Namespace shared by every canonical Renma extension metadata key. */
+export const RENMA_METADATA_NAMESPACE_PREFIX = "renma." as const;
+
 /** Canonical Agent Skills governance keys understood by the installed Renma version. */
 export const CANONICAL_SKILL_METADATA_KEYS = {
   id: "renma.id",
@@ -258,6 +279,9 @@ export const REQUIRED_METADATA_POLICY_FIELDS =
   RENMA_REQUIRED_METADATA_DEFINITIONS.map(
     (definition) => definition.policyKey,
   ) as readonly RequiredMetadataPolicyField[];
+
+/** Stable dotted configuration path retained in diagnostics and CI evidence. */
+export const REQUIRED_METADATA_CONFIGURATION_KEY = "metadata.required" as const;
 
 /** Ordinary top-level list fields understood by the general non-Skill parser. */
 export const NON_SKILL_LIST_METADATA_KEYS = [

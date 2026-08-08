@@ -7,6 +7,9 @@ import type {
 } from "./executable-surface-diff.js";
 import type { ExecutableSurfaceCiPolicyMode } from "./types/configuration.js";
 
+export const EXECUTABLE_SURFACE_CI_POLICY_SCHEMA_VERSION =
+  "renma.executable-surface-ci-policy.v1" as const;
+
 export const EXECUTABLE_SURFACE_CI_MATCH_IDS = {
   SURFACE_ADDED: "executable_surface_ci.surface_added",
   PROBLEMATIC_INVOCATION_ADDED:
@@ -84,7 +87,7 @@ export type ExecutableSurfaceCiMatch =
   | ExecutableSurfaceCiChangedInvocationGovernanceMatch;
 
 export interface ExecutableSurfaceCiEvaluation {
-  schemaVersion: "renma.executable-surface-ci-policy.v1";
+  schemaVersion: typeof EXECUTABLE_SURFACE_CI_POLICY_SCHEMA_VERSION;
   configured: ExecutableSurfaceCiConfiguration & {
     effective: ExecutableSurfaceCiPolicyMode;
   };
@@ -211,7 +214,7 @@ export function evaluateExecutableSurfaceCiPolicy(
   ].sort(compareMatches);
 
   return {
-    schemaVersion: "renma.executable-surface-ci-policy.v1",
+    schemaVersion: EXECUTABLE_SURFACE_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },
     outcome:
       effective === "off" || matches.length === 0

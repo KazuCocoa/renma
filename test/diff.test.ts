@@ -11,6 +11,7 @@ import {
 } from "../src/commands/ci-report.js";
 import { buildDiffReport, diff, formatDiff } from "../src/commands/diff.js";
 import { ConfigError } from "../src/config.js";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import {
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
@@ -23,6 +24,47 @@ import type { SkillDiscoveryIndex } from "../src/skill-discovery.js";
 import { estimateTokens, markdownBody } from "../src/token-estimator.js";
 
 const execFile = promisify(execFileCallback);
+
+test("required-metadata details retain field identity for active and suppressed findings", () => {
+  const findingId = DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING;
+  const path = "skills/demo/SKILL.md";
+  const owner = finding(findingId, "high", path, 4, undefined, {
+    requiredField: "owner",
+    expectedSerializedKey: "metadata.renma.owner",
+  });
+  const tags = finding(findingId, "high", path, 4, undefined, {
+    requiredField: "tags",
+    expectedSerializedKey: "metadata.renma.tags",
+  });
+  const suppressedFindings = [owner, tags].map((item) => ({
+    suppression: {
+      id: findingId,
+      matchedPath: path,
+      reason: "reviewed fixture",
+      expires: "never" as const,
+    },
+    finding: item,
+  }));
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {}),
+    snapshot("head", {
+      findings: [owner, tags],
+      suppressedFindings,
+    }),
+  );
+
+  assert.deepEqual(
+    report.findings.added.map((item) => item.details?.requiredField),
+    ["owner", "tags"],
+  );
+  assert.deepEqual(
+    report.findings.suppressed.added.map(
+      (item) => item.finding.details?.requiredField,
+    ),
+    ["owner", "tags"],
+  );
+});
 
 test("buildDiffReport compares deterministic readiness snapshots", () => {
   const fromSnapshot = snapshot("base", {
@@ -1533,6 +1575,7 @@ function snapshot(ref: string, overrides: Partial<SnapshotInput>) {
     edges: [],
     checks: [],
     findings: [],
+    suppressedFindings: [],
     ...overrides,
   };
   return {
@@ -1576,6 +1619,7 @@ function snapshot(ref: string, overrides: Partial<SnapshotInput>) {
       edges: input.edges,
     },
     executableSurfaceInventory: input.executableSurfaceInventory,
+    suppressedFindings: input.suppressedFindings,
     discovery: emptySkillDiscoveryIndex(),
   } as unknown as Parameters<typeof buildDiffReport>[1];
 }
@@ -1639,6 +1683,7 @@ interface SnapshotInput {
   edges: Array<ReturnType<typeof edge> | ReturnType<typeof graphEdge>>;
   checks: Array<ReturnType<typeof check>>;
   findings: Array<ReturnType<typeof finding>>;
+  suppressedFindings: unknown[];
   securityPolicyInventory?: SecurityPolicyInventorySummary | undefined;
   executableSurfaceInventory?: ExecutableSurfaceInventory | undefined;
 }
@@ -1852,11 +1897,13 @@ function finding(
   path: string,
   line: number,
   riskClass?: string,
+  details?: Record<string, unknown>,
 ) {
   return {
     id,
     severity,
     ...(riskClass ? { riskClass } : {}),
+    ...(details ? { details } : {}),
     title: id,
     evidence: { path, startLine: line, endLine: line, snippet: id },
   };

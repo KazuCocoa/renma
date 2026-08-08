@@ -18,6 +18,7 @@ import {
 } from "./quality-profile.js";
 import { estimateTokens } from "./token-estimator.js";
 import {
+  AGENT_SKILL_TOP_LEVEL_KEYS,
   CANONICAL_SKILL_METADATA_KEYS,
   CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
   NON_SKILL_CATALOG_METADATA_KEYS,
@@ -671,7 +672,7 @@ export function parseCanonicalSkillContinuationField(
   const first = fields[0]!;
   const fieldEvidence = metadataEvidenceFromYamlField(document, first);
   const duplicateMetadataMapping = inspection.frontmatter.duplicateFields.some(
-    (field) => field.key === "metadata",
+    (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
   if (duplicateMetadataMapping || fields.length !== 1) {
     return {
@@ -744,7 +745,7 @@ export function parseCanonicalSkillPublicationField(
   const first = fields[0]!;
   const fieldEvidence = metadataEvidenceFromYamlField(document, first);
   const duplicateMetadataMapping = inspection.frontmatter.duplicateFields.some(
-    (field) => field.key === "metadata",
+    (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
   if (duplicateMetadataMapping || fields.length !== 1) {
     return {
@@ -1001,7 +1002,7 @@ function canonicalSkillMetadataSource(
   const fields: Record<string, MetadataFieldEvidence> = {};
   const listItems: Record<string, MetadataFieldEvidence[]> = {};
   const duplicateMetadataMapping = frontmatter.duplicateFields.find(
-    (field) => field.key === "metadata",
+    (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
 
   if (duplicateMetadataMapping) {
