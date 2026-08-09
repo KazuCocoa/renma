@@ -1,7 +1,7 @@
 ---
 id: context.release.prep
 title: Release Prep Workflow
-version: 0.2.0
+version: 0.2.1
 owner: maintainers
 status: stable
 tags:
@@ -140,22 +140,24 @@ First inspect local and remote state and resume at the earliest incomplete step.
    - 正確な `origin` URL、ローカルの `main` コミット、リモートの `main` コミット、および `main:main` refspec を解決して提示します。`origin/main` をリモートへ送信する承認を求め、承認後は `main:main` だけを送信し、リモート ref が検証済みのリリースコミットを指していることを確認します。
 4. Create or validate the annotated `v<version>` tag at that same commit. Confirm `.github/workflows/npm-publish.yml` still triggers on `v*.*.*` tag pushes and uses npm trusted publishing.
    - 同じコミットに注釈付きの `v<version>` タグを作成または検証します。`.github/workflows/npm-publish.yml` が引き続き `v*.*.*` タグのリモート送信で起動し、npm trusted publishing を使用することを確認します。
-5. Show the exact `origin` URL, tag, and target commit. Ask separately for approval to push the tag; after approval, push only that tag to trigger the workflow.
+5. Before any release-tag push, confirm the publication gateway prerequisites summarized in [Release Publication Security](../../docs/development/release-security.md): `.github/workflows/npm-publish.yml` binds its publish job to the exact `npm-publish` environment; npm Trusted Publisher is configured for the exact repository, workflow filename `npm-publish.yml`, and environment `npm-publish`; the GitHub Environment has the intended required reviewers and deployment ref rules; and a GitHub ruleset protects creation of `v*` release tags. Repository code cannot verify these external settings. If the release agent cannot independently observe every setting, stop before pushing the tag and ask the maintainer to confirm them. Do not attempt to create or change GitHub or npm security settings unless separately authorized.
+   - リリースタグをリモートへ送信する前に、[Release Publication Security](../../docs/development/release-security.md) に要約された公開ゲートの前提条件を確認します。`.github/workflows/npm-publish.yml` の publish job が正確な `npm-publish` environment に結び付けられていること、npm Trusted Publisher が正確なリポジトリ、workflow filename `npm-publish.yml`、environment `npm-publish` に設定されていること、GitHub Environment に意図した required reviewers と deployment ref rules があること、および GitHub ruleset が `v*` リリースタグの作成を保護していることを確認します。リポジトリコードでは、これらの外部設定を検証できません。リリースエージェントがすべての設定を独立して確認できない場合は、タグをリモートへ送信する前に停止し、メンテナーに確認を求めます。別途承認されない限り、GitHub または npm のセキュリティ設定を作成または変更しません。
+6. Show the exact `origin` URL, tag, and target commit. Ask separately for approval to push the tag; after approval, push only that tag to trigger the workflow.
    - 正確な `origin` URL、タグ、および対象コミットを提示します。タグをリモートへ送信する承認を別途求め、承認後はそのタグだけを送信してワークフローを起動します。
-6. Monitor the triggered workflow through completion. Treat a failed test, build, package check, tag/version check, or publish step as a release blocker.
-   - 起動したワークフローを完了まで監視します。テスト、ビルド、パッケージチェック、タグとバージョンのチェック、または公開手順の失敗をリリースブロッカーとして扱います。
-7. After workflow success, verify the version and integrity metadata from the public npm registry. Use read-only registry queries only.
+7. Monitor the triggered workflow through completion. Treat a failed test, build, package check, tag/version check, or publish step as a release blocker. Approval for the `npm-publish` GitHub Environment may legitimately leave the publish job waiting; report that state as pending and wait for an authorized reviewer rather than bypassing the gate.
+   - 起動したワークフローを完了まで監視します。テスト、ビルド、パッケージチェック、タグとバージョンのチェック、または公開手順の失敗をリリースブロッカーとして扱います。`npm-publish` GitHub Environment の承認待ちにより publish job が待機状態になることがあります。その状態を保留中として報告し、ゲートを回避せず、権限を持つレビュー担当者を待ちます。
+8. After workflow success, verify the version and integrity metadata from the public npm registry. Use read-only registry queries only.
    - ワークフローの成功後、公開 npm レジストリからバージョンと整合性メタデータを検証します。読み取り専用のレジストリクエリだけを使用します。
-8. Generate and present the complete GitHub Release title and body to the user. The title must be exactly `Renma v<version>`, including the `v` prefix used by the Git tag. Wait for explicit content approval and incorporate requested edits before continuing.
+9. Generate and present the complete GitHub Release title and body to the user. The title must be exactly `Renma v<version>`, including the `v` prefix used by the Git tag. Wait for explicit content approval and incorporate requested edits before continuing.
    - GitHub Release の完全なタイトルと本文を生成してユーザーに提示します。タイトルは、Git タグで使用する `v` 接頭辞を含め、正確に `Renma v<version>` とします。明示的な内容承認を待ち、要求された修正を反映してから続行します。
-9. Determine whether the tag's GitHub Release will be created or updated. Show the repository, tag, title, and operation, then ask separately for permission to write the approved content to GitHub. Only after that publication approval, create or update the GitHub Release and verify its URL and published content.
-   - タグの GitHub Release が作成されるか更新されるかを判断します。リポジトリ、タグ、タイトル、および操作を提示し、承認済みの内容を GitHub に書き込む許可を別途求めます。その公開承認を得た後にのみ、GitHub Release を作成または更新し、その URL と公開内容を検証します。
-10. Return the workflow URL, branch and tag commits, registry evidence, GitHub Release URL, and any residual blockers.
+10. Determine whether the tag's GitHub Release will be created or updated. Show the repository, tag, title, and operation, then ask separately for permission to write the approved content to GitHub. Only after that publication approval, create or update the GitHub Release and verify its URL and published content.
+    - タグの GitHub Release が作成されるか更新されるかを判断します。リポジトリ、タグ、タイトル、および操作を提示し、承認済みの内容を GitHub に書き込む許可を別途求めます。その公開承認を得た後にのみ、GitHub Release を作成または更新し、その URL と公開内容を検証します。
+11. Return the workflow URL, branch and tag commits, registry evidence, GitHub Release URL, and any residual blockers.
     - ワークフロー URL、ブランチとタグのコミット、レジストリの証拠、GitHub Release の URL、および残っているブロッカーを返します。
 
-For a GitHub-Release-only request on an existing tag, verify steps 4, 6, and 7 as completed evidence, then perform steps 8 through 10. Do not require the tag to be absent, recreate it, or repeat branch and tag pushes.
+For a GitHub-Release-only request on an existing tag, verify steps 4, 7, and 8 as completed evidence, then perform steps 9 through 11. Do not require the tag to be absent, recreate it, or repeat branch and tag pushes.
 
-既存タグに対する GitHub Release のみの依頼では、ステップ 4、6、7 を完了済みの証拠として確認した後、ステップ 8 から 10 を実行します。タグが存在しないことを要求したり、タグを再作成したり、ブランチやタグの push を繰り返したりしません。
+既存タグに対する GitHub Release のみの依頼では、ステップ 4、7、8 を完了済みの証拠として確認した後、ステップ 9 から 11 を実行します。タグが存在しないことを要求したり、タグを再作成したり、ブランチやタグの push を繰り返したりしません。
 
 ## Constraints
 
@@ -163,6 +165,8 @@ For a GitHub-Release-only request on an existing tag, verify steps 4, 6, and 7 a
 - ドメインの事実、ポリシー、所有者、依存関係、または製品動作を捏造しません。
 - Keep the package release step inside `.github/workflows/npm-publish.yml` through trusted publishing. Use local npm commands only for validation and read-only public registry verification.
 - パッケージのリリース手順は、trusted publishing を使用する `.github/workflows/npm-publish.yml` 内に維持します。ローカルの npm コマンドは、検証および公開レジストリの読み取り専用確認にのみ使用します。
+- Treat the external publication gateway as a mandatory pre-tag-push prerequisite. Do not infer its configuration from repository files, and do not create or change GitHub or npm security settings without separate authorization.
+- 外部公開ゲートを、リリースタグをリモートへ送信する前の必須前提条件として扱います。リポジトリファイルからその設定を推測せず、別途承認なしに GitHub または npm のセキュリティ設定を作成または変更しません。
 - `origin/main` and version-tag pushes require separate, immediate approvals. One approval does not authorize the other or any later GitHub Release write.
 - `origin/main` とバージョンタグのリモート送信には、それぞれ個別かつ直前の承認が必要です。一方の承認は、もう一方の操作や、その後の GitHub Release への書き込みを許可するものではありません。
 - GitHub Release content approval confirms the text only. Obtain an additional, immediate publication approval for the resolved repository, tag, and create-or-update operation before writing to GitHub.
@@ -198,5 +202,9 @@ Run `node tools/release-prep.mjs`; use `--check-only` for metadata and maintaine
 - 必須の Renma レポートが実行されているか、スキップしたレポートについて説明されています。
 - The final handoff names blockers, residual risks, and the local commit and tag state.
 - 最終的な引き継ぎに、ブロッカー、残存リスク、およびローカルのコミットとタグの状態が記載されています。
+- Completion evidence records either independent observation or explicit maintainer confirmation of the exact npm Trusted Publisher repository/workflow/environment binding, the `npm-publish` Environment reviewers and deployment ref rules, and the `v*` tag-creation ruleset before any release-tag push.
+- 完了証拠には、リリースタグをリモートへ送信する前に、npm Trusted Publisher の正確なリポジトリ、workflow、environment の結び付け、`npm-publish` Environment の reviewers と deployment ref rules、および `v*` タグ作成 ruleset について、独立した確認またはメンテナーによる明示的な確認を記録します。
+- A publish job waiting for `npm-publish` Environment approval remains pending completion evidence and names the authorized reviewer approval still required.
+- `npm-publish` Environment の承認を待っている publish job は、完了証拠上も保留中のままとし、引き続き必要な権限を持つレビュー担当者の承認を明記します。
 - Completion evidence for a requested release trigger includes matching remote branch and tag commits, a successful GitHub Actions run, verified npm metadata, and the verified title, URL, and body of the separately approved GitHub Release.
 - 要求されたリリース実行の完了証拠に、一致するリモートブランチとタグのコミット、成功した GitHub Actions の実行、検証済みの npm メタデータ、および別途承認された GitHub Release の検証済みタイトル、URL、本文が含まれています。

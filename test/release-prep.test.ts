@@ -77,6 +77,63 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
   assert.match(workflow, /run: npm publish/);
 });
 
+test("authoritative release Context gates tag pushes on external publication security", () => {
+  const context = readFileSync("contexts/release/prep.md", "utf8");
+  assert.match(context, /^version: 0\.2\.1$/mu);
+  assert.match(
+    context,
+    /\[Release Publication Security\]\(\.\.\/\.\.\/docs\/development\/release-security\.md\)/u,
+  );
+  assert.match(
+    context,
+    /`\.github\/workflows\/npm-publish\.yml` binds its publish job to the exact `npm-publish` environment/u,
+  );
+  assert.match(
+    context,
+    /npm Trusted Publisher is configured for the exact repository, workflow filename `npm-publish\.yml`, and environment `npm-publish`/u,
+  );
+  assert.match(
+    context,
+    /GitHub Environment has the intended required reviewers and deployment ref rules/u,
+  );
+  assert.match(
+    context,
+    /GitHub ruleset protects creation of `v\*` release tags/u,
+  );
+  assert.match(
+    context,
+    /Repository code cannot verify these external settings/u,
+  );
+  assert.match(
+    context,
+    /cannot independently observe every setting, stop before pushing the tag and ask the maintainer to confirm them/u,
+  );
+  assert.match(
+    context,
+    /Do not attempt to create or change GitHub or npm security settings unless separately authorized/u,
+  );
+  assert.match(
+    context,
+    /`npm-publish` GitHub Environment may legitimately leave the publish job waiting[\s\S]+authorized reviewer/u,
+  );
+
+  const prerequisite = context.indexOf("Before any release-tag push");
+  const tagPush = context.indexOf(
+    "Ask separately for approval to push the tag",
+    prerequisite,
+  );
+  assert.ok(prerequisite >= 0 && prerequisite < tagPush);
+
+  assert.match(
+    context,
+    /リリースタグをリモートへ送信する前に[\s\S]+npm Trusted Publisher[\s\S]+required reviewers と deployment ref rules[\s\S]+`v\*` リリースタグの作成を保護/u,
+  );
+  assert.match(
+    context,
+    /リポジトリコードでは、これらの外部設定を検証できません[\s\S]+メンテナーに確認を求めます/u,
+  );
+});
+
 test("release-prep prints GitHub release notes from the target changelog section", () => {
   const result = spawnSync(
     "node",
