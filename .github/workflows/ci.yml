@@ -15,16 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 'lts/*'
 
-      - uses: SocketDev/action@v1
+      - uses: SocketDev/action@937f824ec476dfd164d4a4d9995751427b0be143 # v1
         with:
           mode: firewall-free
 
@@ -106,18 +106,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Read minimum supported Node version
         id: minimum-node
         run: echo "version=$(node scripts/min-supported-node.mjs)" >> "${GITHUB_OUTPUT}"
 
       - name: Setup minimum supported Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: ${{ steps.minimum-node.outputs.version }}
 
-      - uses: SocketDev/action@v1
+      - uses: SocketDev/action@937f824ec476dfd164d4a4d9995751427b0be143 # v1
         with:
           mode: firewall-free
 

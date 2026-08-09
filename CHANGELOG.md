@@ -39,6 +39,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Hardened npm publication so a separate non-OIDC job fetches and verifies the
+  exact remote release tag object and `origin/main`, requires an annotated tag
+  peeled to the exact main commit, and checks the package version before the
+  environment-gated trusted-publishing job can run. Minimum-Node and LTS
+  validation remain required.
+- Pinned every external GitHub Action in repository workflows and the maintained
+  consumer workflow example to a verified full commit SHA while retaining the
+  intended release tag in an inline comment. Dependabot's GitHub Actions updater
+  remains enabled.
 - Release preparation now verifies each maintained consumer installation using
   its narrow file-specific command form: one exact
   `npm install --save-dev --save-exact renma@<version>` command, the GitHub
@@ -83,6 +92,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Removed the release-version literal from the CI consumer-workflow contract
+  test. The expected exact `npm install --save-dev --save-exact
+  renma@<package version>` command is now derived from `package.json`, so a
+  correctly pinned next-version release fixture passes finalization without a
+  release-specific test edit or an expansion of the release-file allowlist.
 - Unedited or partially edited Renma Skill and Context scaffolds now emit the
   High `QUAL-RENMA-SCAFFOLD-PLACEHOLDER` finding for each exact Renma-owned
   marker with line-level evidence. Strict High scans fail, Readiness applies a
@@ -96,6 +110,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
+- npm trusted publishing now requires the `npm-publish` GitHub Environment in
+  its OIDC identity. Maintainers must separately configure npm's Trusted
+  Publisher for the exact `npm-publish.yml` filename and environment, protect
+  the Environment with reviewers and deployment ref rules, and protect `v*`
+  tag creation with a GitHub ruleset. Repository checks cannot verify those
+  external settings or defend against a tagged workflow commit that replaces
+  its own checks.
 - Security diagnostics remain deterministic static checks and bounded,
   best-effort natural-language heuristics; they do not claim complete semantic
   or coreference analysis. Runtime gateway policy, sandboxing, filesystem and
