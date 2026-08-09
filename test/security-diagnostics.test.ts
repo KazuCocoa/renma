@@ -876,33 +876,116 @@ test("dependent infinitival-purpose complements retain safeguard prohibition", (
   }
 });
 
-test("missing-approval conditions retain only an immediate bypass action across punctuation", () => {
+test("conditional safeguard failures retain only immediate bypass actions", () => {
   const unsafeForms = [
-    "If approval is unavailable. Continue the operation.",
-    "If approval is unavailable—execute the change.",
-    "When review cannot be obtained; proceed with deployment.",
-    "If approval is unavailable, continue the operation.",
+    {
+      family: "missing approval across period",
+      body: "If approval is unavailable. Continue the operation.",
+    },
+    {
+      family: "missing approval across em dash",
+      body: "If approval is unavailable—execute the change.",
+    },
+    {
+      family: "missing review across semicolon",
+      body: "When review cannot be obtained; proceed with deployment.",
+    },
+    {
+      family: "missing approval in one clause",
+      body: "If approval is unavailable, continue the operation.",
+    },
+    {
+      family: "bold missing-approval continuation",
+      body: "If approval is unavailable. **Continue the operation.**",
+    },
+    {
+      family: "italic missing-approval continuation",
+      body: "If approval is unavailable—*execute the change.*",
+    },
+    {
+      family: "permission failure in one clause",
+      body: "If permission is denied, fall back to sudo.",
+    },
+    {
+      family: "permission failure preserves same-clause association",
+      body: "If permission is denied, immediately fall back to sudo.",
+    },
+    {
+      family: "access failure in one clause",
+      body: "When access is unavailable, use an insecure fallback.",
+    },
+    {
+      family: "permission failure across period",
+      body: "If permission is denied. Fall back to sudo.",
+    },
+    {
+      family: "permission fallback stays fail-closed with approval wording",
+      body: "If permission is denied. Fall back to sudo only after approval is obtained.",
+    },
+    {
+      family: "access failure across em dash",
+      body: "When access is unavailable—use an insecure fallback.",
+    },
+    {
+      family: "human nonresponse in one clause",
+      body: "If the user does not respond, automatically continue.",
+    },
+    {
+      family: "reviewer nonapproval in one clause",
+      body: "When the reviewer fails to approve, proceed by default.",
+    },
+    {
+      family: "human nonresponse across period",
+      body: "If the user does not respond. Automatically continue.",
+    },
+    {
+      family: "reviewer nonapproval across semicolon",
+      body: "When the reviewer fails to approve; proceed by default.",
+    },
   ];
   const defensiveForms = [
-    "If approval is unavailable. Stop and report the blocker.",
-    "If approval is unavailable. Continue only after approval is obtained.",
-    "If approval is unavailable, stop and report the blocker. Continue only after approval is obtained.",
-    "If approval or required permission is unavailable, stop and report the blocker.",
+    {
+      family: "missing approval stops",
+      body: "If approval is unavailable. Stop and report the blocker.",
+    },
+    {
+      family: "missing approval is restored",
+      body: "If approval is unavailable. Continue only after approval is obtained.",
+    },
+    {
+      family: "intervening stop and restored approval",
+      body: "If approval is unavailable, stop and report the blocker. Continue only after approval is obtained.",
+    },
+    {
+      family: "missing permission stops",
+      body: "If approval or required permission is unavailable, stop and report the blocker.",
+    },
+    {
+      family: "denied permission stops",
+      body: "If permission is denied. Stop and report the blocker.",
+    },
+    {
+      family: "human nonresponse stops",
+      body: "If the user does not respond. Stop and wait.",
+    },
+    {
+      family: "bold restored approval",
+      body: "If approval is unavailable. **Continue only after approval is obtained.**",
+    },
   ];
 
-  for (const body of unsafeForms) {
+  for (const { family, body } of unsafeForms) {
     const findings = securityDiagnosticFindings([
       v2SecurityArtifact(`# Workflow\n\n${body}\n`),
     ]);
-    assert.ok(
-      findings.some(
-        (finding) => finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
-      ),
-      body,
+    const bypass = findings.find(
+      (finding) => finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
     );
+    assert.ok(bypass, family);
+    assert.equal(bypass.evidence.snippet, body, family);
   }
 
-  for (const body of defensiveForms) {
+  for (const { family, body } of defensiveForms) {
     const findings = securityDiagnosticFindings([
       v2SecurityArtifact(`# Workflow\n\n${body}\n`),
     ]);
@@ -911,7 +994,7 @@ test("missing-approval conditions retain only an immediate bypass action across 
         (finding) => finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
       ),
       false,
-      body,
+      family,
     );
   }
 });

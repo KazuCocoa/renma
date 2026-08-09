@@ -836,11 +836,21 @@ const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
 type SafeguardBypassPattern = {
   pattern: RegExp;
+  /** Presence opts this pattern into bounded immediate next-clause association. */
   immediateContinuationCondition?: RegExp;
+  /** Only selected condition families treat restored approval as defensive. */
+  restoredApprovalGuardCanExempt?: boolean;
 };
 
+/** Bounded missing-approval or missing-review condition before an action. */
 const MISSING_APPROVAL_CONDITION_RE =
   /\b(?:if|when)\b[^.;:!?—–\n\r]{0,80}\b(?:approval|confirmation|authorization|review|user response|human response)\b[^.;:!?—–\n\r]{0,80}\b(?:unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b/iu;
+/** Bounded permission or access failure condition before a privileged fallback. */
+const PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE =
+  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:permission|permissions|access)\b[^.;:!?—–\n\r]{0,60}\b(?:denied|unavailable|insufficient|missing)\b/iu;
+/** Bounded human nonresponse or nonapproval condition before a default action. */
+const HUMAN_NONRESPONSE_CONDITION_RE =
+  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:user|human|owner|reviewer)\b[^.;:!?—–\n\r]{0,60}\b(?:does not|doesn't|fails? to|never)\b[^.;:!?—–\n\r]{0,30}\b(?:respond|reply|confirm|approve)\b/iu;
 const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
   {
     pattern:
@@ -858,6 +868,7 @@ const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
     pattern:
       /\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
     immediateContinuationCondition: MISSING_APPROVAL_CONDITION_RE,
+    restoredApprovalGuardCanExempt: true,
   },
   {
     pattern:
@@ -870,10 +881,14 @@ const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
   {
     pattern:
       /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
+    immediateContinuationCondition: PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE,
+    restoredApprovalGuardCanExempt: false,
   },
   {
     pattern:
       /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+    immediateContinuationCondition: HUMAN_NONRESPONSE_CONDITION_RE,
+    restoredApprovalGuardCanExempt: false,
   },
   {
     pattern:
@@ -885,7 +900,7 @@ const SAFEGUARD_ACTION_PREDICATE_RE =
 const SAFEGUARD_PROHIBITION_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
 const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
-const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–]+$/u;
+const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–*_]+$/u;
 const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
   /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu;
 // A subject followed by a finite auxiliary/copula starts a new clause; a
@@ -3788,6 +3803,7 @@ function unsafeSafeguardClause(text: string): string | undefined {
   for (const {
     pattern,
     immediateContinuationCondition,
+    restoredApprovalGuardCanExempt,
   } of SAFEGUARD_BYPASS_PATTERNS) {
     for (const match of overlappingPatternMatches(text, pattern)) {
       const matchEnd = match.start + match.text.length;
@@ -3800,6 +3816,7 @@ function unsafeSafeguardClause(text: string): string | undefined {
             match.start,
             start,
             immediateContinuationCondition,
+            restoredApprovalGuardCanExempt ?? false,
           ),
       );
       if (matchedActions.some(({ prohibited }) => !prohibited)) {
@@ -3815,10 +3832,18 @@ function isSafeguardPatternActionAssociated(
   matchStart: number,
   actionStart: number,
   immediateContinuationCondition: RegExp | undefined,
+  restoredApprovalGuardCanExempt: boolean,
 ): boolean {
   const prefix = text.slice(matchStart, actionStart);
+  const crossesHardBoundary = SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(prefix);
   if (immediateContinuationCondition === undefined) {
-    return !SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(prefix);
+    return !crossesHardBoundary;
+  }
+  if (!crossesHardBoundary) {
+    return (
+      !restoredApprovalGuardCanExempt ||
+      !safeguardActionHasExplicitApprovalGuard(text, actionStart)
+    );
   }
 
   const condition = immediateContinuationCondition.exec(prefix);
@@ -3827,16 +3852,24 @@ function isSafeguardPatternActionAssociated(
   if (!SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE.test(bridge)) {
     return false;
   }
+  // Approval restoration is an explicit per-family policy, not a universal
+  // exemption from conditional safeguard-bypass recognition.
+  if (!restoredApprovalGuardCanExempt) return true;
 
+  return !safeguardActionHasExplicitApprovalGuard(text, actionStart);
+}
+
+function safeguardActionHasExplicitApprovalGuard(
+  text: string,
+  actionStart: number,
+): boolean {
   const actionRemainder = text.slice(actionStart, actionStart + 160);
   const nextBoundary = actionRemainder.search(SAFEGUARD_HARD_SCOPE_BOUNDARY_RE);
   const actionClause =
     nextBoundary === -1
       ? actionRemainder
       : actionRemainder.slice(0, nextBoundary);
-  // This association is independent of prohibition polarity: it accepts only
-  // an immediate conditional continuation and rejects a restored safeguard.
-  return !hasExplicitHumanApprovalGuard(actionClause);
+  return hasExplicitHumanApprovalGuard(actionClause);
 }
 
 function overlappingPatternMatches(
