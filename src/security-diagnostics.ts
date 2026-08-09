@@ -27,6 +27,8 @@ import { inspectAgentSkill } from "./agent-skills.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownSourceRange,
+  parseMarkdownSyntax,
+  requiredMarkdownPosition,
   type MarkdownSyntax,
 } from "./markdown-syntax.js";
 import {
@@ -900,7 +902,7 @@ const SAFEGUARD_ACTION_PREDICATE_RE =
 const SAFEGUARD_PROHIBITION_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
 const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
-const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–*_]+$/u;
+const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–]+$/u;
 const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
   /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu;
 // A subject followed by a finite auxiliary/copula starts a new clause; a
@@ -3799,20 +3801,21 @@ function semanticInstructionDetections(
 }
 
 function unsafeSafeguardClause(text: string): string | undefined {
-  const actions = safeguardActionPolarities(text);
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  const actions = safeguardActionPolarities(analysisText);
   for (const {
     pattern,
     immediateContinuationCondition,
     restoredApprovalGuardCanExempt,
   } of SAFEGUARD_BYPASS_PATTERNS) {
-    for (const match of overlappingPatternMatches(text, pattern)) {
+    for (const match of overlappingPatternMatches(analysisText, pattern)) {
       const matchEnd = match.start + match.text.length;
       const matchedActions = actions.filter(
         ({ start }) =>
           start >= match.start &&
           start < matchEnd &&
           isSafeguardPatternActionAssociated(
-            text,
+            analysisText,
             match.start,
             start,
             immediateContinuationCondition,
@@ -3820,11 +3823,43 @@ function unsafeSafeguardClause(text: string): string | undefined {
           ),
       );
       if (matchedActions.some(({ prohibited }) => !prohibited)) {
-        return match.text;
+        return text.slice(match.start, matchEnd);
       }
     }
   }
   return undefined;
+}
+
+/** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
+function safeguardMarkdownPresentationProjection(text: string): string {
+  if (!/[*_]/u.test(text)) return text;
+  const projected = text.split("");
+  const syntax = parseMarkdownSyntax(text, 1);
+  for (const { node } of syntax.records) {
+    if (node.type !== "emphasis" && node.type !== "strong") continue;
+    const position = requiredMarkdownPosition(node);
+    const start = position.start.offset;
+    const end = position.end.offset;
+    if (start === undefined || end === undefined) continue;
+    const delimiterLength = node.type === "strong" ? 2 : 1;
+    const delimiter = text[start];
+    const closingStart = end - delimiterLength;
+    if (
+      (delimiter !== "*" && delimiter !== "_") ||
+      text.slice(start, start + delimiterLength) !==
+        delimiter.repeat(delimiterLength) ||
+      text.slice(closingStart, end) !== delimiter.repeat(delimiterLength)
+    ) {
+      continue;
+    }
+    for (let index = start; index < start + delimiterLength; index += 1) {
+      projected[index] = " ";
+    }
+    for (let index = closingStart; index < end; index += 1) {
+      projected[index] = " ";
+    }
+  }
+  return projected.join("");
 }
 
 function isSafeguardPatternActionAssociated(
