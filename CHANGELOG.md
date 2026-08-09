@@ -43,9 +43,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   its narrow file-specific command form: one exact
   `npm install --save-dev --save-exact renma@<version>` command, the GitHub
   Actions `npm ci` step, and every maintained
-  `npx --no-install renma` invocation. Separate shell expressions cannot supply
-  pieces of the contract. Both pin-bearing files remain in the local release
-  finalization set.
+  `npx --no-install renma` invocation, including every exact `npx` word in
+  same-line shell compositions. Separate shell expressions cannot supply pieces
+  of the contract. Current-example tests run in an isolated tagged fixture, so
+  shallow or tagless caller checkouts remain supported. Both pin-bearing files
+  remain in the local release finalization set.
 
 - Canonical Agent Skill descriptions are now security-governed semantic units
   with exact frontmatter evidence. Bounded quoted routing-example lists remain

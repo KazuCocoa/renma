@@ -364,21 +364,41 @@ function hasMaintainedActionsNpxInvocations(content) {
   const invocations = actionsRunCommands(content).flatMap((command) =>
     actionsNpxRenmaInvocation(command),
   );
-  if (invocations.some((invocation) => !invocation.noInstall)) return false;
+  if (invocations.some((invocation) => !invocation.valid)) return false;
   const commands = invocations.map((invocation) => invocation.command).sort();
   return sameStrings(commands, [...MAINTAINED_ACTIONS_NPX_COMMANDS].sort());
 }
 
+/**
+ * Accept one leading `npx --no-install renma <command>` invocation per
+ * maintained shell line. Exact shell-word counting also rejects a second npx
+ * or Renma invocation after `&&`, `||`, `;`, parentheses, or quoted shell text.
+ * This intentionally covers the maintained unquoted syntax, not general shell
+ * parsing or variable-expanded command names.
+ */
 function actionsNpxRenmaInvocation(command) {
+  const npxOccurrences = actionsShellWordCount(command, "npx");
+  const renmaOccurrences = actionsShellWordCount(command, "renma");
+  if (npxOccurrences === 0) return [];
+  if (npxOccurrences !== 1 || renmaOccurrences !== 1) {
+    return [{ command: "", valid: false }];
+  }
+
   const tokens = command.split(/\s+/u);
-  if (tokens[0] !== "npx") return [];
-  if (tokens[1] === "renma") {
-    return [{ command: tokens[2] ?? "", noInstall: false }];
+  if (
+    tokens[0] === "npx" &&
+    tokens[1] === "--no-install" &&
+    tokens[2] === "renma"
+  ) {
+    return [{ command: tokens[3] ?? "", valid: true }];
   }
-  if (tokens[1] === "--no-install" && tokens[2] === "renma") {
-    return [{ command: tokens[3] ?? "", noInstall: true }];
-  }
-  return [];
+  return [{ command: "", valid: false }];
+}
+
+/** Count exact command words at the bounded separators used by this example. */
+function actionsShellWordCount(command, word) {
+  return command.split(/[\s;&|()`'"]+/u).filter((token) => token === word)
+    .length;
 }
 
 /**
