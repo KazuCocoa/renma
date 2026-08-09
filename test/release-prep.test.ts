@@ -23,6 +23,11 @@ test("release-prep routes broad and resumable release requests", () => {
     /renma\.requires-context: '\["context\.release\.prep"\]'/,
   );
   assert.match(skill, /Treat that Context as authoritative/);
+  assert.match(skill, /renma\.version: "0\.2\.1"/u);
+  assert.match(
+    skill,
+    /preserve each explicit human-approval guard next to its external action/u,
+  );
   assert.match(context, /resume at the earliest incomplete step/);
   assert.match(context, /GitHub-Release-only request on an existing tag/);
   assert.match(context, /Do not require the tag to be absent/);
@@ -75,6 +80,63 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
   assert.match(workflow, /tags:\n {6}- "v\*\.\*\.\*"/);
   assert.match(workflow, /Uses npm trusted publishing \(OIDC\)/);
   assert.match(workflow, /run: npm publish/);
+});
+
+test("authoritative release Context gates tag pushes on external publication security", () => {
+  const context = readFileSync("contexts/release/prep.md", "utf8");
+  assert.match(context, /^version: 0\.2\.1$/mu);
+  assert.match(
+    context,
+    /\[Release Publication Security\]\(\.\.\/\.\.\/docs\/development\/release-security\.md\)/u,
+  );
+  assert.match(
+    context,
+    /`\.github\/workflows\/npm-publish\.yml` binds its publish job to the exact `npm-publish` environment/u,
+  );
+  assert.match(
+    context,
+    /npm Trusted Publisher is configured for the exact repository, workflow filename `npm-publish\.yml`, and environment `npm-publish`/u,
+  );
+  assert.match(
+    context,
+    /GitHub Environment has the intended required reviewers and deployment ref rules/u,
+  );
+  assert.match(
+    context,
+    /GitHub ruleset protects creation of `v\*` release tags/u,
+  );
+  assert.match(
+    context,
+    /Repository code cannot verify these external settings/u,
+  );
+  assert.match(
+    context,
+    /cannot independently observe every setting, stop before pushing the tag and ask the maintainer to confirm them/u,
+  );
+  assert.match(
+    context,
+    /Do not attempt to create or change GitHub or npm security settings unless separately authorized/u,
+  );
+  assert.match(
+    context,
+    /`npm-publish` GitHub Environment approval gate[\s\S]+Environment approval may legitimately leave the publication job waiting[\s\S]+authorized reviewer/u,
+  );
+
+  const prerequisite = context.indexOf("Before any release-tag push");
+  const tagPush = context.indexOf(
+    "Ask separately for approval to push the tag",
+    prerequisite,
+  );
+  assert.ok(prerequisite >= 0 && prerequisite < tagPush);
+
+  assert.match(
+    context,
+    /リリースタグをリモートへ送信する前に[\s\S]+npm Trusted Publisher[\s\S]+required reviewers と deployment ref rules[\s\S]+`v\*` リリースタグの作成を保護/u,
+  );
+  assert.match(
+    context,
+    /リポジトリコードでは、これらの外部設定を検証できません[\s\S]+メンテナーに確認を求めます/u,
+  );
 });
 
 test("release-prep prints GitHub release notes from the target changelog section", () => {
@@ -215,6 +277,39 @@ test("release-prep accepts matching exact consumer pins during check-only finali
   assert.match(
     result.stdout,
     /PASS GitHub Actions example retains every maintained npx --no-install renma invocation/,
+  );
+  assert.match(result.stdout, /PASS only release files changed/);
+});
+
+test("release-prep accepts correct consumer pins for a derived next-version fixture", async (t) => {
+  const repositoryVersion = (
+    JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
+  ).version;
+  const nextVersion = nextPatchVersion(repositoryVersion);
+  assert.notEqual(nextVersion, repositoryVersion);
+
+  const root = await releasePrepVersionFixture(t, {
+    baseVersion: repositoryVersion,
+    targetVersion: nextVersion,
+  });
+  const result = runReleasePrepForVersion(
+    root,
+    nextVersion,
+    `v${repositoryVersion}`,
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    new RegExp(
+      `PASS consumer pin docs/user-manual\\.md matches renma@${escapeRegExp(nextVersion)}`,
+    ),
+  );
+  assert.match(
+    result.stdout,
+    new RegExp(
+      `PASS consumer pin examples/github-actions/renma-ci-report\\.yml matches renma@${escapeRegExp(nextVersion)}`,
+    ),
   );
   assert.match(result.stdout, /PASS only release files changed/);
 });
@@ -369,6 +464,14 @@ test("release-prep rejects compound same-line npx invocations", async (t) => {
 });
 
 function runReleasePrep(root: string) {
+  return runReleasePrepForVersion(root, "0.32.0", "v0.31.0");
+}
+
+function runReleasePrepForVersion(
+  root: string,
+  version: string,
+  baseTag: string,
+) {
   return spawnSync(
     "node",
     [
@@ -376,12 +479,47 @@ function runReleasePrep(root: string) {
       "--check-only",
       "--finalize",
       "--version",
-      "0.32.0",
+      version,
       "--from",
-      "v0.31.0",
+      baseTag,
     ],
     { cwd: root, encoding: "utf8" },
   );
+}
+
+async function releasePrepVersionFixture(
+  t: test.TestContext,
+  input: { baseVersion: string; targetVersion: string },
+): Promise<string> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-next-release-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "docs"), { recursive: true });
+  await mkdir(path.join(root, "examples", "github-actions"), {
+    recursive: true,
+  });
+
+  await writeReleaseFixtureFiles(
+    root,
+    input.baseVersion,
+    input.baseVersion,
+    false,
+    input.baseVersion,
+  );
+  git(root, ["init", "-q"]);
+  git(root, ["config", "user.email", "renma@example.test"]);
+  git(root, ["config", "user.name", "Renma Test"]);
+  git(root, ["add", "."]);
+  git(root, ["commit", "-qm", "baseline"]);
+  git(root, ["tag", `v${input.baseVersion}`]);
+
+  await writeReleaseFixtureFiles(
+    root,
+    input.targetVersion,
+    input.targetVersion,
+    false,
+    input.baseVersion,
+  );
+  return root;
 }
 
 async function releasePrepFixture(
@@ -452,6 +590,7 @@ async function writeReleaseFixtureFiles(
   packageVersion: string,
   pinVersion: string | undefined,
   duplicatePin = false,
+  baseVersion = "0.31.0",
 ): Promise<void> {
   await writeFile(
     path.join(root, "package.json"),
@@ -463,7 +602,7 @@ async function writeReleaseFixtureFiles(
   );
   await writeFile(
     path.join(root, "CHANGELOG.md"),
-    `# Changelog\n\n## [${packageVersion}]\n\n### Changed\n\n- Fixture release.\n\n[${packageVersion}]: https://github.com/KazuCocoa/renma/compare/v0.31.0...v${packageVersion}\n`,
+    `# Changelog\n\n## [${packageVersion}]\n\n### Changed\n\n- Fixture release.\n\n[${packageVersion}]: https://github.com/KazuCocoa/renma/compare/v${baseVersion}...v${packageVersion}\n`,
   );
 
   const install =
@@ -511,4 +650,14 @@ async function mutateReleaseFile(
 function git(root: string, args: string[]): void {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
+}
+
+function nextPatchVersion(version: string): string {
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/u);
+  assert.ok(match, `expected stable package version, got ${version}`);
+  return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

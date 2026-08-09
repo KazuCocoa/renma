@@ -116,6 +116,10 @@ export default defineConfig({
             link: "/development/plan-discovery",
           },
           {
+            text: "Release Publication Security",
+            link: "/development/release-security",
+          },
+          {
             text: "External Review Governance (Candidate)",
             link: "/external-review-governance",
           },

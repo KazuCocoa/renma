@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 import { parse } from "yaml";
 
@@ -15,6 +15,7 @@ type WorkflowStep = {
 };
 
 type WorkflowJob = {
+  environment?: string | { name?: string };
   name?: string;
   needs?: string | string[];
   permissions?: Record<string, string>;
@@ -42,6 +43,54 @@ function steps(job: WorkflowJob | undefined): WorkflowStep[] {
 function runCommands(job: WorkflowJob | undefined): string[] {
   return steps(job).flatMap((step) => (step.run ? [step.run] : []));
 }
+
+function actionStep(
+  job: WorkflowJob | undefined,
+  expectedIdentity: string,
+): WorkflowStep | undefined {
+  return steps(job).find(
+    (step) => step.uses?.split("@", 1)[0] === expectedIdentity,
+  );
+}
+
+const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
+  ".github/workflows/ci.yml": [
+    "actions/checkout#v7",
+    "actions/checkout#v7",
+    "actions/setup-node#v7",
+    "actions/setup-node#v7",
+    "SocketDev/action#v1",
+    "SocketDev/action#v1",
+  ],
+  ".github/workflows/docs-pages.yml": [
+    "actions/checkout#v7",
+    "actions/configure-pages#v6",
+    "actions/deploy-pages#v5",
+    "actions/setup-node#v7",
+    "actions/upload-pages-artifact#v5",
+  ],
+  ".github/workflows/npm-publish.yml": [
+    "actions/checkout#v7",
+    "actions/checkout#v7",
+    "actions/checkout#v7",
+    "actions/setup-node#v7",
+    "actions/setup-node#v7",
+  ],
+  ".github/workflows/renma-ci-report.yml": [
+    "actions/checkout#v7",
+    "actions/download-artifact#v8",
+    "actions/github-script#v9",
+    "actions/setup-node#v7",
+    "actions/upload-artifact#v7",
+  ],
+  "examples/github-actions/renma-ci-report.yml": [
+    "actions/checkout#v6",
+    "actions/download-artifact#v8",
+    "actions/github-script#v9",
+    "actions/setup-node#v6",
+    "actions/upload-artifact#v7",
+  ],
+};
 
 test("minimum Node helper derives the normalized package engine floor", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
@@ -76,9 +125,7 @@ test("primary CI preserves LTS quality and adds exact-floor compatibility", () =
   assert.equal(quality?.name, "ESLint, Prettier, and Tests");
   const qualitySteps = steps(quality);
   assert.equal(
-    qualitySteps.find((step) => step.uses === "actions/setup-node@v7")?.with?.[
-      "node-version"
-    ],
+    actionStep(quality, "actions/setup-node")?.with?.["node-version"],
     "lts/*",
   );
   const qualityCommands = runCommands(quality).join("\n");
@@ -103,9 +150,7 @@ test("primary CI preserves LTS quality and adds exact-floor compatibility", () =
     /node scripts\/min-supported-node\.mjs/,
   );
   assert.equal(
-    minimumSteps.find((step) => step.uses === "actions/setup-node@v7")?.with?.[
-      "node-version"
-    ],
+    actionStep(minimum, "actions/setup-node")?.with?.["node-version"],
     "${{ steps.minimum-node.outputs.version }}",
   );
   const minimumCommands = runCommands(minimum).join("\n");
@@ -178,8 +223,20 @@ test("public Renma report is a portable exact package-consumer workflow", () => 
   const generator = workflow.jobs?.["generate-renma-reports"];
   const commenter = workflow.jobs?.["comment-renma-ci-report"];
   const commands = runCommands(generator).join("\n");
+  const packageVersion = (
+    JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
+  ).version;
+  const expectedInstall = `npm install --save-dev --save-exact renma@${packageVersion}`;
 
-  assert.match(source, /npm install --save-dev --save-exact renma@0\.31\.0/);
+  assert.ok(
+    source.split(/\r?\n/u).some((line) => {
+      const trimmed = line.trimStart();
+      return (
+        trimmed.startsWith("#") && trimmed.slice(1).trim() === expectedInstall
+      );
+    }),
+    `missing complete maintained command: ${expectedInstall}`,
+  );
   assert.match(commands, /npm ci/);
   assert.match(commands, /npx --no-install renma catalog/);
   assert.match(commands, /npx --no-install renma graph/);
@@ -187,8 +244,7 @@ test("public Renma report is a portable exact package-consumer workflow", () => 
   assert.match(commands, /npx --no-install renma scan/);
   assert.doesNotMatch(source, /npm run build|node dist\/index\.js/);
   assert.equal(
-    steps(generator).find((step) => step.uses === "actions/checkout@v6")
-      ?.with?.["fetch-depth"],
+    actionStep(generator, "actions/checkout")?.with?.["fetch-depth"],
     0,
   );
   assert.deepEqual(generator?.permissions, { contents: "read" });
@@ -200,9 +256,16 @@ test("public Renma report is a portable exact package-consumer workflow", () => 
   });
 });
 
-test("npm publishing waits for exact-floor and LTS validation", () => {
+test("npm publishing verifies the exact release ref before OIDC publication", () => {
   const workflow = readWorkflow(".github/workflows/npm-publish.yml");
   assert.deepEqual(workflow.permissions, { contents: "read" });
+
+  const refVerification = workflow.jobs?.["verify-release-ref"];
+  assert.equal(refVerification?.permissions, undefined);
+  assert.match(
+    runCommands(refVerification).join("\n"),
+    /node scripts\/verify-release-tag\.mjs/,
+  );
 
   const validation = workflow.jobs?.["validate-supported-runtime"];
   assert.deepEqual(validation?.strategy?.matrix?.runtime, ["minimum", "lts"]);
@@ -212,8 +275,7 @@ test("npm publishing waits for exact-floor and LTS validation", () => {
     /node scripts\/min-supported-node\.mjs/,
   );
   assert.equal(
-    validationSteps.find((step) => step.uses === "actions/setup-node@v7")
-      ?.with?.["node-version"],
+    actionStep(validation, "actions/setup-node")?.with?.["node-version"],
     "${{ matrix.runtime == 'minimum' && steps.minimum-node.outputs.version || 'lts/*' }}",
   );
   const validationCommands = runCommands(validation).join("\n");
@@ -228,20 +290,84 @@ test("npm publishing waits for exact-floor and LTS validation", () => {
   assert.doesNotMatch(validationCommands, /npm publish/);
 
   const publish = workflow.jobs?.publish;
-  assert.equal(publish?.needs, "validate-supported-runtime");
+  assert.deepEqual(publish?.needs, [
+    "verify-release-ref",
+    "validate-supported-runtime",
+  ]);
+  assert.equal(publish?.environment, "npm-publish");
   assert.deepEqual(publish?.permissions, {
     contents: "read",
     "id-token": "write",
   });
   const publishSteps = steps(publish);
   assert.equal(
-    publishSteps.find((step) => step.uses === "actions/setup-node@v7")?.with?.[
-      "node-version"
-    ],
+    actionStep(publish, "actions/setup-node")?.with?.["node-version"],
     "lts/*",
   );
   const publishCommands = runCommands(publish).join("\n");
-  assert.match(publishCommands, /tag_version=/);
+  assert.doesNotMatch(publishCommands, /tag_version=|verify-release-tag/);
   assert.match(publishCommands, /npm run verify:package/);
   assert.match(publishCommands, /npm publish/);
+});
+
+test("all external GitHub Actions use expected identities at immutable SHAs", () => {
+  const workflowFiles = readdirSync(".github/workflows")
+    .filter((file) => file.endsWith(".yml"))
+    .map((file) => `.github/workflows/${file}`)
+    .sort();
+  assert.deepEqual(
+    workflowFiles,
+    Object.keys(EXPECTED_ACTIONS_BY_FILE)
+      .filter((file) => file.startsWith(".github/workflows/"))
+      .sort(),
+    "every repository workflow must be covered by the immutable-action contract",
+  );
+
+  for (const [file, expectedActions] of Object.entries(
+    EXPECTED_ACTIONS_BY_FILE,
+  )) {
+    const source = readFileSync(file, "utf8");
+    const usesLines = source
+      .split(/\r?\n/u)
+      .filter((line) => /^\s*(?:-\s*)?uses:/u.test(line));
+    const actualActions = usesLines.map((line) => {
+      const match = line.match(
+        /^\s*(?:-\s*)?uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\d+)\s*$/u,
+      );
+      assert.ok(
+        match,
+        `${file} must pin this external action to a full SHA with a release-tag comment: ${line.trim()}`,
+      );
+      return `${match[1]}#${match[3]}`;
+    });
+
+    assert.deepEqual(
+      actualActions.sort(),
+      [...expectedActions].sort(),
+      `${file} action identities or intended release tags changed`,
+    );
+  }
+});
+
+test("Dependabot retains the GitHub Actions updater", () => {
+  const source = readFileSync(".github/dependabot.yml", "utf8");
+  assert.match(source, /package-ecosystem: ["']?github-actions["']?/u);
+});
+
+test("release security documentation preserves the external trust boundary", () => {
+  const source = readFileSync("docs/development/release-security.md", "utf8");
+  assert.match(source, /exact workflow filename `npm-publish\.yml`/u);
+  assert.match(source, /`npm-publish` environment/u);
+  assert.match(source, /required reviewers/u);
+  assert.match(source, /deployment branch\/tag rules/u);
+  assert.match(source, /ruleset targeting\s+`v\*`/u);
+  assert.match(
+    source,
+    /Removing\s+`environment: npm-publish`[\s\S]+must cause npm trusted\s+publishing to reject/u,
+  );
+  assert.match(
+    source,
+    /same-workflow checks are not sufficient against an attacker who can\s+modify and push the tagged workflow commit/u,
+  );
+  assert.match(source, /Repository code[\s\S]+cannot verify/u);
 });

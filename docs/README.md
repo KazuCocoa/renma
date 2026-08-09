@@ -100,6 +100,9 @@ source-repository-only and intentionally excluded from the npm package.
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
   [Skill Discovery](skill-discovery.md).
+- [Release Publication Security](development/release-security.md) documents the
+  repository-visible npm publication checks, their limits, and the required
+  npm and GitHub controls outside the repository.
 - [Changelog](changelog.md) owns chronological release history, version-specific
   changes, and compatibility notes.
 
