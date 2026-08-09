@@ -816,8 +816,16 @@ const SECRET_WORD_RE =
   /\b(secret|secrets|credential|credentials|token|password|passwd|api key|apikey|private key|ssh key|signing key|certificate|cert|auth)\b/i;
 const SECRET_ACTION_RE =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e)\b/i;
+// Policy eligibility includes local acquisition verbs such as `read` and
+// `collect`; SECRET_ACTION_RE is narrower because it recognizes disclosure.
+const POLICY_RELEVANT_SENSITIVE_MATERIAL_ACTION_RE =
+  /\b(read|collect|copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|load|provide)\b/i;
 const SAFE_NEGATION_RE =
   /\b(not|never|avoid|exclude|without|redact|mock|fake|sample|placeholder|dummy)\b.{0,40}\b(secret|secrets|credential|credentials|token|password|private key)\b|\b(secret|secrets|credential|credentials|token|password|private key)\b.{0,40}\b(not|never|avoid|exclude|redact|mock|fake|sample|placeholder|dummy)\b/i;
+const SENSITIVE_DISCLOSURE_PROHIBITION_BEFORE_ACTION_RE =
+  /\b(never|do not|don't|avoid|exclude|skip)\b.{0,50}\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b/i;
+const SENSITIVE_DISCLOSURE_ACTION_BEFORE_PROHIBITION_RE =
+  /\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b.{0,50}\b(never|do not|don't|avoid|exclude|skip)\b/i;
 const DEFENSIVE_ACTION_RE =
   /\b(do\s+not|don't|never|avoid|exclude|skip|omit|forbid|forbidden|disallow|block)\b.{0,80}\b(upload|send|post|put|share|attach|submit|sync|push|publish|copy|paste|include|print|cat|echo|log|dump|curl|wget|pipe|bash|sh|sudo|chmod|chown|rm\s+-|git\s+reset|git\s+clean|delete|install|add)\b/i;
 const GUARDED_ACTION_RE =
@@ -844,6 +852,37 @@ type SafeguardBypassPattern = {
   restoredApprovalGuardCanExempt?: boolean;
 };
 
+// These bounds keep each family within a reviewable local statement. They are
+// intentional grammar limits, not an attempt at synonym or coreference coverage.
+const SAFEGUARD_CONTROL_TARGET_SOURCE = String.raw`security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation`;
+const SAFEGUARD_CONTINUATION_ACTION_SOURCE = String.raw`continue|proceed|execute|run|apply|upload|delete|publish`;
+const DIRECT_SAFEGUARD_DISABLEMENT_RE = new RegExp(
+  String.raw`\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(${SAFEGUARD_CONTROL_TARGET_SOURCE})\b`,
+  "i",
+);
+const SAFEGUARD_FIRST_DISABLEMENT_RE = new RegExp(
+  String.raw`\b(${SAFEGUARD_CONTROL_TARGET_SOURCE})\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b`,
+  "i",
+);
+const ACTION_WITHOUT_APPROVAL_RE = new RegExp(
+  String.raw`\b(${SAFEGUARD_CONTINUATION_ACTION_SOURCE})\b.{0,80}\b(without|despite (?:missing|unavailable)|even (?:if|when) (?:there is )?no)\b.{0,60}\b(approval|confirmation|authorization|review|verification)\b`,
+  "i",
+);
+const MISSING_APPROVAL_CONTINUATION_RE = new RegExp(
+  String.raw`\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(${SAFEGUARD_CONTINUATION_ACTION_SOURCE})\b`,
+  "i",
+);
+const POLICY_WEAKENING_TO_SILENCE_DIAGNOSTICS_RE =
+  /\b(weaken|relax|lower|loosen|override|change)\b.{0,80}\b(security policy|security profile|policy|restrictions?|rules?)\b.{0,80}\b(pass|silence|clear|avoid)\b.{0,40}\b(diagnostics?|checks?|scan|warnings?)\b/i;
+const POST_HOC_APPROVAL_RE =
+  /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i;
+const RISKIER_PERMISSION_FALLBACK_RE =
+  /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i;
+const HUMAN_NONRESPONSE_AUTOMATIC_ACTION_RE =
+  /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i;
+const SUPPRESSION_TO_PASS_DIAGNOSTICS_RE =
+  /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i;
+
 /** Bounded missing-approval or missing-review condition before an action. */
 const MISSING_APPROVAL_CONDITION_RE =
   /\b(?:if|when)\b[^.;:!?—–\n\r]{0,80}\b(?:approval|confirmation|authorization|review|user response|human response)\b[^.;:!?—–\n\r]{0,80}\b(?:unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b/iu;
@@ -855,46 +894,39 @@ const HUMAN_NONRESPONSE_CONDITION_RE =
   /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:user|human|owner|reviewer)\b[^.;:!?—–\n\r]{0,60}\b(?:does not|doesn't|fails? to|never)\b[^.;:!?—–\n\r]{0,30}\b(?:respond|reply|confirm|approve)\b/iu;
 const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
   {
-    pattern:
-      /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
+    pattern: DIRECT_SAFEGUARD_DISABLEMENT_RE,
   },
   {
-    pattern:
-      /\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b/i,
+    pattern: SAFEGUARD_FIRST_DISABLEMENT_RE,
   },
   {
-    pattern:
-      /\b(continue|proceed|execute|run|apply|upload|delete|publish)\b.{0,80}\b(without|despite (?:missing|unavailable)|even (?:if|when) (?:there is )?no)\b.{0,60}\b(approval|confirmation|authorization|review|verification)\b/i,
+    pattern: ACTION_WITHOUT_APPROVAL_RE,
   },
   {
-    pattern:
-      /\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+    pattern: MISSING_APPROVAL_CONTINUATION_RE,
     immediateContinuationCondition: MISSING_APPROVAL_CONDITION_RE,
     restoredApprovalGuardCanExempt: true,
   },
   {
-    pattern:
-      /\b(weaken|relax|lower|loosen|override|change)\b.{0,80}\b(security policy|security profile|policy|restrictions?|rules?)\b.{0,80}\b(pass|silence|clear|avoid)\b.{0,40}\b(diagnostics?|checks?|scan|warnings?)\b/i,
+    pattern: POLICY_WEAKENING_TO_SILENCE_DIAGNOSTICS_RE,
   },
   {
-    pattern:
-      /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i,
+    pattern: POST_HOC_APPROVAL_RE,
   },
   {
-    pattern:
-      /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
+    pattern: RISKIER_PERMISSION_FALLBACK_RE,
     immediateContinuationCondition: PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE,
+    // A riskier permission fallback remains fail-closed even when its action
+    // clause adds approval wording; restored approval is not a safe fallback.
     restoredApprovalGuardCanExempt: false,
   },
   {
-    pattern:
-      /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+    pattern: HUMAN_NONRESPONSE_AUTOMATIC_ACTION_RE,
     immediateContinuationCondition: HUMAN_NONRESPONSE_CONDITION_RE,
     restoredApprovalGuardCanExempt: false,
   },
   {
-    pattern:
-      /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
+    pattern: SUPPRESSION_TO_PASS_DIAGNOSTICS_RE,
   },
 ];
 const SAFEGUARD_ACTION_PREDICATE_RE =
@@ -913,13 +945,21 @@ const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
-const UNTRUSTED_CONTENT_EXECUTION_RE =
+// Bounds associate the source and action within one local instruction while
+// deliberately stopping short of general natural-language coreference.
+const UNTRUSTED_EXECUTION_ACTION_RE =
   /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}?\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}?\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}?\b(it|them|the content|the instructions?)\b.{0,40}?\b(verbatim|exactly|without review)\b/i;
+const UNTRUSTED_ACTION_VERB_RE =
+  /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting|treat|regard|accept)\b/i;
 const REVIEW_VOCABULARY_SOURCE = String.raw`(?:review(?:s|ed|ing|ers?)?|validat(?:e|es|ed|ing|ion)|verif(?:y|ies|ied|ying|ication)|inspect(?:s|ed|ing|ion)?|check(?:s|ed|ing)?)`;
 const UNTRUSTED_CONTENT_REVIEW_GUARD_RE = new RegExp(
   String.raw`\b${REVIEW_VOCABULARY_SOURCE}\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b`,
   "i",
 );
+// Review guards govern only executable action verbs. `treat`, `regard`, and
+// `accept` describe trust assignment and are intentionally not review targets.
+const UNTRUSTED_REVIEW_TARGET_ACTION_RE =
+  /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i;
 const BROAD_REVIEW_GUARD_SCOPE_RE =
   /\b(all|each|every)\b.{0,40}\b(proposed\s+)?(actions?|instructions?|steps?)\b|\bproposed actions?\b/i;
 const CONTRADICTORY_REVIEW_ACTION_RE = new RegExp(
@@ -955,6 +995,10 @@ const SENSITIVE_FILE_PATTERNS = [
 
 const CLOUD_DESTINATION_RE =
   /\b(s3:\/\/|gs:\/\/|az:\/\/|https?:\/\/(?:[^/\s]+\.)?(?:s3|storage|blob|drive|dropbox|box|onedrive|pastebin|gist|slack|discord)[^/\s]*\S*)/i;
+const POLICY_RELEVANT_TOOL_INVOCATION_RE =
+  /\b(?:curl|wget)\b|\b(?:npm|pnpm|yarn)\s+(?:install|add)\b|\b(?:pip3?|python(?:\d+(?:\.\d+)*)?\s+-m\s+pip|uv\s+pip)\s+install\b/i;
+const COMMAND_LIKE_TOOL_RE =
+  /\b(npm|pnpm|yarn|pip3?|python(?:\d+(?:\.\d+)*)?|py|uv|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i;
 
 type SecurityDiagnosticsConfig = {
   security?: SecurityConfig;
@@ -2122,6 +2166,9 @@ function canonicalDescriptionInstructionProjection(text: string): string {
   return projected.join("");
 }
 
+// Canonical descriptions may quote example requests for routing. The bounds
+// stop at sentence breaks so masking those literals cannot hide later
+// operational instructions in the description.
 const CANONICAL_DESCRIPTION_ROUTING_EXAMPLE_INTRODUCTION_RE =
   /\b(?:use|apply|select|choose|invoke)\b[^.!?\n]{0,100}\brequests?\b[^.!?\n]{0,40}\b(?:such as|including|like)\b/giu;
 
@@ -2306,20 +2353,14 @@ function policyRelevantInstructionText(text: string): boolean {
   ) {
     return true;
   }
-  if (
-    /\b(?:curl|wget)\b|\b(?:npm|pnpm|yarn)\s+(?:install|add)\b|\b(?:pip3?|python(?:\d+(?:\.\d+)*)?\s+-m\s+pip|uv\s+pip)\s+install\b/i.test(
-      text,
-    )
-  ) {
+  if (POLICY_RELEVANT_TOOL_INVOCATION_RE.test(text)) {
     return true;
   }
 
   const sensitiveTarget =
     SECRET_WORD_RE.test(text) || referencesSensitiveFile(text);
   const sensitiveAction =
-    /\b(read|collect|copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|load|provide)\b/i.test(
-      text,
-    );
+    POLICY_RELEVANT_SENSITIVE_MATERIAL_ACTION_RE.test(text);
   if (
     sensitiveTarget &&
     sensitiveAction &&
@@ -3033,12 +3074,8 @@ function isSafeSensitiveHandlingInstruction(line: string): boolean {
   if (hasPositiveDisclosureAction(line)) return false;
   return (
     SAFE_NEGATION_RE.test(line) ||
-    /\b(never|do not|don't|avoid|exclude|skip)\b.{0,50}\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b/i.test(
-      line,
-    ) ||
-    /\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b.{0,50}\b(never|do not|don't|avoid|exclude|skip)\b/i.test(
-      line,
-    )
+    SENSITIVE_DISCLOSURE_PROHIBITION_BEFORE_ACTION_RE.test(line) ||
+    SENSITIVE_DISCLOSURE_ACTION_BEFORE_PROHIBITION_RE.test(line)
   );
 }
 
@@ -4055,6 +4092,15 @@ type UntrustedExecutionAction = SemanticTextSpan & {
   verb: UntrustedActionVerb;
 };
 
+/**
+ * `matchAll` requires a global expression. Return a fresh instance so repeated
+ * sentence analysis cannot share mutable `lastIndex` state.
+ */
+function cloneWithGlobalFlag(pattern: RegExp): RegExp {
+  const flags = pattern.global ? pattern.flags : `${pattern.flags}g`;
+  return new RegExp(pattern.source, flags);
+}
+
 function semanticSentenceSpans(text: string): SemanticTextSpan[] {
   const sentences: SemanticTextSpan[] = [];
   let start = 0;
@@ -4083,10 +4129,7 @@ function untrustedExecutionActions(
 ): UntrustedExecutionAction[] {
   const actions: UntrustedExecutionAction[] = [];
   for (const [sentenceIndex, sentence] of sentences.entries()) {
-    const pattern = new RegExp(
-      UNTRUSTED_CONTENT_EXECUTION_RE.source,
-      `${UNTRUSTED_CONTENT_EXECUTION_RE.flags}g`,
-    );
+    const pattern = cloneWithGlobalFlag(UNTRUSTED_EXECUTION_ACTION_RE);
     for (const match of sentence.text.matchAll(pattern)) {
       const text = match[0] ?? "";
       const verb = untrustedActionVerb(text);
@@ -4105,9 +4148,7 @@ function untrustedExecutionActions(
 }
 
 function untrustedActionVerb(text: string): UntrustedActionVerb | undefined {
-  const match = text.match(
-    /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting|treat|regard|accept)\b/i,
-  );
+  const match = text.match(UNTRUSTED_ACTION_VERB_RE);
   const verb = match?.[1]?.toLowerCase() ?? "";
   if (verb.startsWith("execut")) return "execute";
   if (verb.startsWith("run")) return "run";
@@ -4184,10 +4225,7 @@ function reviewGuardScopeCovers(
 }
 
 function untrustedSourceSpans(text: string): string[] {
-  const pattern = new RegExp(
-    UNTRUSTED_CONTENT_SOURCE_RE.source,
-    `${UNTRUSTED_CONTENT_SOURCE_RE.flags}g`,
-  );
+  const pattern = cloneWithGlobalFlag(UNTRUSTED_CONTENT_SOURCE_RE);
   return [...text.matchAll(pattern)].map((match) =>
     (match[0] ?? "").toLowerCase(),
   );
@@ -4205,18 +4243,13 @@ function reviewGuardActions(
     targetStart: number;
     verb: UntrustedActionVerb;
   }> = [];
-  const pattern = new RegExp(
-    UNTRUSTED_CONTENT_REVIEW_GUARD_RE.source,
-    `${UNTRUSTED_CONTENT_REVIEW_GUARD_RE.flags}g`,
-  );
+  const pattern = cloneWithGlobalFlag(UNTRUSTED_CONTENT_REVIEW_GUARD_RE);
   for (const match of sentence.text.matchAll(pattern)) {
     const text = match[0] ?? "";
     const before = text.search(/\b(before|prior to)\b/i);
     if (before < 0) continue;
     const targetText = text.slice(before);
-    const target = targetText.match(
-      /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i,
-    );
+    const target = targetText.match(UNTRUSTED_REVIEW_TARGET_ACTION_RE);
     const verb = untrustedActionVerb(target?.[0] ?? "");
     if (target === null || verb === undefined) continue;
     const start = sentence.start + (match.index ?? 0);
@@ -4272,9 +4305,7 @@ function isShellCommentLine(
 }
 
 function isCommandLike(line: string): boolean {
-  return /\b(npm|pnpm|yarn|pip3?|python(?:\d+(?:\.\d+)*)?|py|uv|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i.test(
-    line,
-  );
+  return COMMAND_LIKE_TOOL_RE.test(line);
 }
 
 function hasExplicitHumanApprovalGuard(line: string): boolean {
