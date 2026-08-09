@@ -970,6 +970,7 @@ test("scaffold creates only selected resource directories", async () => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "renma-scaffold-resources-"),
   );
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "skills", "demo", "SKILL.md");
   await runScaffoldCommand({
     kind: "skill",

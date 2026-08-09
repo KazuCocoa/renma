@@ -1,5 +1,9 @@
 name: Renma CI Report
 
+# One-time consumer-repository setup:
+#   npm install --save-dev --save-exact renma@0.31.0
+# Commit package.json and package-lock.json so npm ci installs this exact Renma version.
+
 on:
   pull_request:
 
@@ -24,14 +28,12 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
-
       - name: Generate Renma inventory reports
         run: |
           mkdir -p renma-reports
-          node dist/index.js catalog . \
+          npx --no-install renma catalog . \
             --format markdown > renma-reports/catalog.md
-          node dist/index.js graph . \
+          npx --no-install renma graph . \
             --focus "${RENMA_SKILL_FOCUS}" \
             --view composition \
             --format markdown > renma-reports/skill-composition.md
@@ -40,7 +42,7 @@ jobs:
         id: ci-report
         continue-on-error: true
         run: |
-          node dist/index.js ci-report . \
+          npx --no-install renma ci-report . \
             --from origin/${{ github.base_ref }} \
             --to HEAD \
             --format markdown \
@@ -49,7 +51,7 @@ jobs:
       - name: Validate Renma Skills and Context
         id: scan
         continue-on-error: true
-        run: node dist/index.js scan . --fail-on high --strict
+        run: npx --no-install renma scan . --fail-on high --strict
 
       - name: Upload Renma Skill reports
         uses: actions/upload-artifact@v7

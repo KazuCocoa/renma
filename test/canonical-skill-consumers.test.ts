@@ -528,6 +528,7 @@ async function operationalFixture(
   format: "legacy" | "canonical",
 ): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), `renma-${format}-`));
+  await mkdir(path.join(root, ".git"));
   await writeRepositoryFile(
     root,
     "skills/demo/SKILL.md",

@@ -797,13 +797,17 @@ warnings, replace approval with post-hoc review, choose a more dangerous
 permission fallback, or execute automatically after no user response. The safe
 repair is to keep the existing safeguard, stop and report missing authority,
 and rerun `renma scan` without relaxing policy or adding suppression. Direct
-prohibitions such as “Do not bypass human approval,” quoted examples,
+prohibitions such as “Do not bypass human approval,” ordinary quoted examples,
 HTML-comment content, and fenced prose clearly bounded as an unsafe or negative
 example are excluded from this semantic prose rule. Visible text before or
 after an HTML comment span remains scannable. A fenced `text` or `markdown`
 payload explicitly routed by surrounding prose, an instruction label, or an
-operational instruction heading is scanned as an instruction. A defensive
-sentence does not protect a separate contradictory bypass instruction.
+operational instruction heading is scanned as an instruction. A blockquote is
+also scanned when its local surrounding prose, instruction label, or active
+operational heading explicitly routes it for execution; ordinary quotations
+and unsafe or negative examples remain excluded, and routing does not cross an
+unrelated structural boundary. A defensive sentence does not protect a
+separate contradictory bypass instruction.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including

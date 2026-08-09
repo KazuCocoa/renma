@@ -11,6 +11,7 @@ const execFile = promisify(execFileCallback);
 
 export interface RepositoryFixtureOptions {
   prefix?: string;
+  parentDirectory?: string;
   testContext?: TestContext;
 }
 
@@ -62,8 +63,14 @@ export class RepositoryFixture {
     options: RepositoryFixtureOptions = {},
   ): Promise<RepositoryFixture> {
     const root = await mkdtemp(
-      path.join(os.tmpdir(), options.prefix ?? "renma-fixture-"),
+      path.join(
+        options.parentDirectory ?? os.tmpdir(),
+        options.prefix ?? "renma-fixture-",
+      ),
     );
+    // Every repository-backed fixture owns its boundary. This prevents a host
+    // TMPDIR ancestor marker from changing repository-relative classification.
+    await mkdir(path.join(root, ".git"));
     const fixture = new RepositoryFixture(root);
     options.testContext?.after(() => fixture.cleanup());
     return fixture;

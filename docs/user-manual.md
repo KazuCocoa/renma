@@ -2969,23 +2969,43 @@ Prefer JSON in automation and markdown for human review in pull requests. Use Me
 
 ## CI Workflow
 
-A typical CI flow is:
+### Package-consumer CI
 
-1. Build renma.
-2. Run `renma scan . --fail-on high --strict`.
-3. Run `renma readiness . --format json` and store the result as an artifact.
-4. Compare refs with `renma diff . --base origin/main`.
-5. Publish and enforce
-   `renma ci-report . --base origin/main --format markdown --fail-on-status warn`
-   in the pull-request summary.
-
-Example:
+In an ordinary repository, install and commit Renma once as an exact development
+dependency:
 
 ```bash
+npm install --save-dev --save-exact renma@0.31.0
+```
+
+Commit both `package.json` and `package-lock.json`. CI then restores the locked
+dependency with `npm ci` and invokes its installed binary without allowing
+`npx` to download a missing package:
+
+```bash
+npm ci
+npx --no-install renma scan . --fail-on high --strict
+npx --no-install renma readiness . --format json > renma-readiness.json
+npx --no-install renma ci-report . --base origin/main --format markdown --fail-on-status warn
+```
+
+The public
+[GitHub Actions example](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml)
+uses this package-consumer model, checks out full Git history for `ci-report`,
+and keeps the job that executes repository code read-only while a separate
+same-repository job owns pull-request comment permission.
+
+### Renma source-checkout development
+
+When developing Renma itself from a source checkout, install its locked
+development dependencies, build `dist`, and invoke that checkout directly:
+
+```bash
+npm ci
 npm run build
-renma scan . --fail-on high --strict
-renma readiness . --format json > renma-readiness.json
-renma ci-report . --base origin/main --format markdown --fail-on-status warn
+node dist/index.js scan . --fail-on high --strict
+node dist/index.js readiness . --format json > renma-readiness.json
+node dist/index.js ci-report . --base origin/main --format markdown --fail-on-status warn
 ```
 
 These gates are complementary: strict scan validates the current target state,

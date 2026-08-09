@@ -22,6 +22,7 @@ import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
+import { inspectAgentSkill } from "./agent-skills.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownSourceRange,
@@ -103,6 +104,8 @@ type Detection = {
   snippet: string;
   dedupeKey?: string;
   details?: Record<string, unknown>;
+  semanticEvidenceText?: string;
+  semanticEvidenceSource?: "canonical-description";
 };
 
 type DetectionEvidence = Pick<Detection, "startLine" | "endLine" | "snippet">;
@@ -780,7 +783,7 @@ const REDACTION_TARGET_RE =
 const APPROVAL_RE =
   /\b(ask|prompt|require|obtain|wait for)\b.{0,50}\b(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|consent|authorization|review)\b|\b(human|user|owner|maintainer|reviewer|security)\b.{0,50}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\bonly\b.{0,20}\b(after|with)\b.{0,40}\b(explicit\s+)?(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|review|authorization)\b|\bdo\s+not\s+run\s+automatically\b.{0,60}\b(human|user|maintainer|review|approval|confirmation)\b/i;
 const WEAK_OR_NEGATED_APPROVAL_RE =
-  /\b(no approval|approval is not|approval isn't|approved by default|approval by default|without approval|automatically approved|safe|run carefully|make sure it works)\b/i;
+  /\b(no approval|approval (?:is )?unavailable|approval is not|approval isn't|approved by default|approval by default|without (?:approval|confirmation|authorization)|automatically approved|safe|run carefully|make sure it works)\b/i;
 const RECOVERY_GUARD_RE =
   /\b(create|make|take|keep|verify|confirm|document|check|use|run)\b.{0,40}\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b|\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b.{0,40}\b(first|before|steps?|plan|guidance|confirm|verify|check)\b/i;
 const SECRET_WORD_RE =
@@ -816,9 +819,12 @@ const SAFEGUARD_BYPASS_PATTERNS = [
   /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i,
   /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
   /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+  /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
 ] as const;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
+const DIRECT_DEFENSIVE_SUPPRESSION_RE =
+  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
@@ -890,6 +896,7 @@ interface PreparedSecurityDocumentAnalysis {
   readonly sourceLines: readonly string[];
   readonly visibleLines: readonly string[];
   readonly markdownView: MarkdownSecurityView;
+  readonly canonicalDescription: CanonicalDescriptionSecurityUnit | undefined;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
@@ -897,6 +904,11 @@ interface PreparedSecurityDocumentAnalysis {
     number,
     SecurityParagraphLineContext
   >;
+}
+
+interface CanonicalDescriptionSecurityUnit {
+  readonly text: string;
+  readonly evidence: DetectionEvidence;
 }
 
 interface SecurityGuardHistory {
@@ -998,10 +1010,17 @@ function securityFindingsForDocument(
   const prepared = prepareSecurityDocumentAnalysis(document, securityConfig);
   if (prepared === undefined) return [];
 
-  const detections: Detection[] = [
-    ...collectPolicyPreludeDetections(prepared),
+  const instructionDetections = [
+    ...collectCanonicalDescriptionDetections(prepared),
     ...collectSecurityLineDetections(prepared),
     ...collectSemanticInstructionDetections(prepared),
+  ];
+  const detections: Detection[] = [
+    ...collectPolicyPreludeDetections(
+      prepared,
+      instructionDetections.length > 0,
+    ),
+    ...instructionDetections,
     ...policyContradictions(prepared.effectivePolicy),
   ];
 
@@ -1034,6 +1053,10 @@ function prepareSecurityDocumentAnalysis(
     );
   }
   const markdownView = new MarkdownSecurityView(syntax);
+  const canonicalDescription = canonicalSkillDescriptionSecurityUnit(
+    document,
+    sourceLines,
+  );
   const scanStart = syntax.bodyStartLine - 1;
   const visibleLines = sourceLines.map((_, index) =>
     markdownView.visibleLine(index),
@@ -1060,10 +1083,38 @@ function prepareSecurityDocumentAnalysis(
     sourceLines,
     visibleLines,
     markdownView,
+    canonicalDescription,
     scanStart,
     logicalCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,
     securityParagraphContextByLine: securityParagraphAnalysis.contextByLine,
+  };
+}
+
+function canonicalSkillDescriptionSecurityUnit(
+  document: ParsedDocument,
+  sourceLines: readonly string[],
+): CanonicalDescriptionSecurityUnit | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  const inspection = inspectAgentSkill(document);
+  if (
+    inspection.validation.format !== "agent-skills" ||
+    !inspection.validation.valid ||
+    inspection.validation.description === undefined
+  ) {
+    return undefined;
+  }
+  const field = inspection.frontmatter.fields.find(
+    (candidate) => candidate.key === "description",
+  );
+  if (field === undefined) return undefined;
+  return {
+    text: inspection.validation.description,
+    evidence: {
+      startLine: field.startLine,
+      endLine: field.endLine,
+      snippet: sourceLines.slice(field.startLine - 1, field.endLine).join("\n"),
+    },
   };
 }
 
@@ -1345,6 +1396,7 @@ function prepareLogicalCommandAnalysis(
 
 function collectPolicyPreludeDetections(
   prepared: PreparedSecurityDocumentAnalysis,
+  hasSecuritySensitiveInstructions: boolean,
 ): Detection[] {
   const {
     artifact,
@@ -1368,6 +1420,7 @@ function collectPolicyPreludeDetections(
   ];
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
+    hasSecuritySensitiveInstructions &&
     !parsedPolicy.invalidDeclared.has("allowedData") &&
     effectiveAllowedDataClass(effectivePolicy) === undefined &&
     effectiveAllowedDataList(effectivePolicy).length === 0
@@ -1423,7 +1476,9 @@ function prepareSecurityLineContext(
     return undefined;
   }
 
-  const quotedProse = markdownView.isBlockQuotedLine(index);
+  const quotedProse =
+    markdownView.isBlockQuotedLine(index) &&
+    !markdownView.isOperationalBlockQuotedLine(index);
   const hasHumanApprovalGuard =
     hasExplicitHumanApprovalGuard(line) ||
     (guardHistory.recentHumanApprovalLine > 0 &&
@@ -1731,6 +1786,133 @@ function collectSemanticInstructionDetections(
     );
   }
   return detections;
+}
+
+function collectCanonicalDescriptionDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const description = prepared.canonicalDescription;
+  if (description === undefined) return [];
+  const { text, evidence } = description;
+  const instructionProjection = canonicalDescriptionInstructionProjection(text);
+  const destinationAnalysis = analyzeDestinations(instructionProjection);
+  const unit: MarkdownSemanticUnit = {
+    kind: "paragraph",
+    startLine: evidence.startLine,
+    endLine: evidence.endLine ?? evidence.startLine,
+    lines: [text],
+  };
+  const detections = [
+    ...policyDetections(
+      instructionProjection,
+      evidence,
+      prepared.effectivePolicy,
+      hasExplicitHumanApprovalGuard(instructionProjection),
+      { scope: "all", analysis: destinationAnalysis },
+    ),
+    ...descriptionSensitiveDataDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      prepared.parsedPolicy.allowedFloatingDependencies,
+    ),
+    ...networkAndUploadDetections(
+      instructionProjection,
+      evidence,
+      prepared.effectivePolicy,
+      destinationAnalysis,
+    ),
+    ...contextScopeDetections(text, evidence.startLine),
+    ...semanticInstructionDetections(unit, prepared.markdownView, {
+      evidence,
+      sectionText: text,
+    }),
+    ...descriptionForbiddenInputDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+    ),
+  ];
+  return detections.map((detection) => ({
+    ...detection,
+    ...evidence,
+    semanticEvidenceText: text,
+    semanticEvidenceSource: "canonical-description" as const,
+  }));
+}
+
+function canonicalDescriptionInstructionProjection(text: string): string {
+  const projected = text.split("");
+  const routingExampleIntroduction =
+    /\b(?:use|apply|select|choose|invoke)\b[^.!?\n]{0,100}\brequests?\b[^.!?\n]{0,40}\b(?:such as|including|like)\b/giu;
+
+  for (const introduction of text.matchAll(routingExampleIntroduction)) {
+    if (introduction.index === undefined) continue;
+    const sentenceStart = introduction.index + introduction[0].length;
+    const sentenceRemainder = text.slice(sentenceStart);
+    const sentenceBoundary = sentenceRemainder.search(/[.!?](?:\s|$)/u);
+    const sentenceEnd =
+      sentenceBoundary === -1 ? text.length : sentenceStart + sentenceBoundary;
+    const examples = text.slice(sentenceStart, sentenceEnd);
+    for (const quoted of examples.matchAll(/"[^"\n]*"|“[^”\n]*”/gu)) {
+      if (quoted.index === undefined) continue;
+      const start = sentenceStart + quoted.index;
+      for (let index = start; index < start + quoted[0].length; index += 1) {
+        projected[index] = " ";
+      }
+    }
+  }
+
+  return projected.join("");
+}
+
+function descriptionSensitiveDataDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  policy: SecurityPolicy,
+  allowedFloatingDependencies: SecurityPolicy["allowedFloatingDependencies"],
+): Detection[] {
+  return safeguardSemanticClauses(text).flatMap((clause) => {
+    const analysis = analyzeSecurityCommand({
+      source: {
+        text: clause,
+        startLine: evidence.startLine,
+        endLine: evidence.endLine ?? evidence.startLine,
+        lines: [clause],
+      },
+      guards: [],
+      destinationAnalysis: analyzeDestinations(clause),
+      allowedFloatingDependencies,
+    });
+    return fallbackSensitiveDataDetections(clause, evidence, policy, analysis);
+  });
+}
+
+function descriptionForbiddenInputDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  policy: SecurityPolicy,
+): Detection[] {
+  return policy.forbiddenInputs.flatMap((forbiddenInput) => {
+    const needle = forbiddenInput.trim();
+    if (!needle) return [];
+    const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
+    if (
+      !pattern.test(text) ||
+      SAFE_FORBIDDEN_INPUT_PATTERN.test(text) ||
+      !FORBIDDEN_INPUT_ACTION_PATTERN.test(text)
+    ) {
+      return [];
+    }
+    return [
+      {
+        metadata: RULES.forbiddenInputInstruction,
+        severity: "high" as const,
+        ...evidence,
+        dedupeKey: `forbidden-input:${needle.toLowerCase()}`,
+      },
+    ];
+  });
 }
 
 function requireLogicalDestinationAnalysis(
@@ -2059,7 +2241,8 @@ function policyDetections(
   const defensiveAction =
     isDefensiveActionInstruction(semanticLine) && positiveActions.length === 0;
   const safeOrGuarded =
-    GUARDED_ACTION_RE.test(semanticLine) ||
+    (GUARDED_ACTION_RE.test(semanticLine) &&
+      !WEAK_OR_NEGATED_APPROVAL_RE.test(semanticLine)) ||
     (defensiveAction && !positiveDestinationAction);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
     "approvedNetworkDestinations",
@@ -2419,7 +2602,8 @@ function networkAndUploadDetections(
     semanticLine,
   ).some(({ kind }) => kind === "network" || kind === "external-upload");
   if (
-    GUARDED_ACTION_RE.test(semanticLine) ||
+    (GUARDED_ACTION_RE.test(semanticLine) &&
+      !WEAK_OR_NEGATED_APPROVAL_RE.test(semanticLine)) ||
     (isDefensiveActionInstruction(semanticLine) && !positiveDestinationAction)
   ) {
     return detections;
@@ -3039,6 +3223,10 @@ function isBulkDataSharingInstruction(line: string): boolean {
 function semanticInstructionDetections(
   unit: MarkdownSemanticUnit,
   markdownView: MarkdownSecurityView,
+  options: {
+    evidence?: DetectionEvidence;
+    sectionText?: string;
+  } = {},
 ): Detection[] {
   const detections: Detection[] = [];
   const firstLine =
@@ -3053,32 +3241,28 @@ function semanticInstructionDetections(
       .slice(0, index)
       .reduce((offset, line) => offset + line.length + 1, 0),
   );
-  const windowEvidence = {
+  const windowEvidence = options.evidence ?? {
     startLine: firstLine,
     endLine: firstLine + instructionLines.length - 1,
     snippet: instructionLines.join("\n"),
   };
 
   const safeguardLineIndex = instructionLines.findIndex(
-    (line) =>
-      SAFEGUARD_BYPASS_PATTERNS.some((pattern) => pattern.test(line)) &&
-      !DIRECT_DEFENSIVE_SEMANTIC_RE.test(line),
+    (line) => unsafeSafeguardClause(line) !== undefined,
   );
-  const safeguardWindowMatches = SAFEGUARD_BYPASS_PATTERNS.some((pattern) =>
-    pattern.test(instructionText),
-  );
-  const safeguardInstructionText =
-    safeguardLineIndex >= 0
-      ? (instructionLines[safeguardLineIndex] ?? "")
-      : instructionText;
-  if (
-    (safeguardLineIndex >= 0 || safeguardWindowMatches) &&
-    !DIRECT_DEFENSIVE_SEMANTIC_RE.test(safeguardInstructionText)
-  ) {
+  const safeguardWindowMatches =
+    unsafeSafeguardClause(instructionText) !== undefined;
+  if (safeguardLineIndex >= 0 || safeguardWindowMatches) {
     const evidence =
-      safeguardLineIndex >= 0
-        ? semanticLineEvidence(instructionLines, firstLine, safeguardLineIndex)
-        : windowEvidence;
+      options.evidence !== undefined
+        ? options.evidence
+        : safeguardLineIndex >= 0
+          ? semanticLineEvidence(
+              instructionLines,
+              firstLine,
+              safeguardLineIndex,
+            )
+          : windowEvidence;
     detections.push({
       metadata: RULES.safeguardBypassInstruction,
       severity: "high",
@@ -3131,7 +3315,8 @@ function semanticInstructionDetections(
       continue;
     }
     const evidenceLine = firstLine + lineIndex;
-    const sectionText = markdownView.instructionSectionText(evidenceLine);
+    const sectionText =
+      options.sectionText ?? markdownView.instructionSectionText(evidenceLine);
     const hasAnyBoundary = TRAVERSAL_BOUNDARY_PATTERNS.some((pattern) =>
       pattern.test(sectionText),
     );
@@ -3160,6 +3345,28 @@ function semanticInstructionDetections(
   }
 
   return detections;
+}
+
+function unsafeSafeguardClause(text: string): string | undefined {
+  return safeguardSemanticClauses(text).find(
+    (clause) =>
+      SAFEGUARD_BYPASS_PATTERNS.some((pattern) => pattern.test(clause)) &&
+      !isDirectDefensiveSafeguardClause(clause),
+  );
+}
+
+function safeguardSemanticClauses(text: string): string[] {
+  return text
+    .split(/(?:[;.!?](?:\s+|$)|\s+(?:and(?:\s+then)?|but|however|yet)\s+)/i)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+}
+
+function isDirectDefensiveSafeguardClause(clause: string): boolean {
+  return (
+    DIRECT_DEFENSIVE_SEMANTIC_RE.test(clause) ||
+    DIRECT_DEFENSIVE_SUPPRESSION_RE.test(clause)
+  );
 }
 
 function semanticLineEvidence(
@@ -3636,7 +3843,23 @@ function sensitiveTempWords(line: string): boolean {
 function dedupeDetections(detections: Detection[]): Detection[] {
   const seen = new Set<string>();
   const unique: Detection[] = [];
+  const descriptionDetections = detections.filter(
+    (detection) => detection.semanticEvidenceSource === "canonical-description",
+  );
   for (const detection of detections) {
+    if (
+      detection.semanticEvidenceSource !== "canonical-description" &&
+      descriptionDetections.some(
+        (description) =>
+          description.metadata.id === detection.metadata.id &&
+          equivalentSemanticEvidence(
+            description.semanticEvidenceText ?? "",
+            detection.snippet,
+          ),
+      )
+    ) {
+      continue;
+    }
     const key =
       detection.dedupeKey ?? `${detection.metadata.id}:${detection.snippet}`;
     if (!seen.has(key)) {
@@ -3645,6 +3868,22 @@ function dedupeDetections(detections: Detection[]): Detection[] {
     }
   }
   return unique;
+}
+
+function equivalentSemanticEvidence(first: string, second: string): boolean {
+  const left = normalizeSemanticEvidence(first);
+  const right = normalizeSemanticEvidence(second);
+  if (!left || !right) return false;
+  return left.includes(right) || right.includes(left);
+}
+
+function normalizeSemanticEvidence(value: string): string {
+  return value
+    .replace(/^\s*(?:description:\s*)?[>|*-]?\s*/gim, "")
+    .replace(/[`'".,;:!?()[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function findingFromDetection(

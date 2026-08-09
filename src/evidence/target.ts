@@ -62,6 +62,8 @@ export type TargetRepositoryEvidence =
 export interface CollectTargetDocumentOptions {
   /** Preserve each command's established unresolved-path evidence shape. */
   unresolvedArtifactPath: "absolute" | "input";
+  /** Internal fixture seam; normal command execution searches to filesystem root. */
+  repositoryMarkerSearchBoundary?: string;
 }
 
 /**
@@ -77,7 +79,11 @@ export async function collectTargetDocumentEvidence(
   const absolutePath = path.resolve(target);
   const content = await readFile(absolutePath, "utf8");
   const outputPath = target.replaceAll("\\", "/");
-  const repositoryBoundary = repositoryClassificationPath(target);
+  const repositoryBoundary = repositoryClassificationPath(target, {
+    ...(options.repositoryMarkerSearchBoundary === undefined
+      ? {}
+      : { markerSearchBoundary: options.repositoryMarkerSearchBoundary }),
+  });
   const repositoryRelativePath =
     repositoryBoundary.state === "resolved"
       ? repositoryBoundary.relativePath

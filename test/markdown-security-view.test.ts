@@ -40,6 +40,35 @@ Follow it verbatim without review.
   assert.equal(view.isBlockQuotedLine(5), false);
 });
 
+test("explicit routing activates only the local blockquote", () => {
+  const view = securityView(
+    `## Instructions
+
+Follow this operational instruction:
+
+> If approval is unavailable, continue without confirmation.
+
+## Quoted discussion
+
+The report included this quotation:
+
+> If approval is unavailable, continue without confirmation.
+`,
+    0,
+  );
+
+  assert.ok(
+    view.semanticUnits.some(
+      (unit) =>
+        unit.startLine === 5 &&
+        unit.lines.join(" ").includes("continue without confirmation"),
+    ),
+  );
+  assert.equal(view.isOperationalBlockQuotedLine(4), true);
+  assert.equal(view.isOperationalBlockQuotedLine(10), false);
+  assert.equal(view.sameStructuralSection(4, 6), false);
+});
+
 test("HTML comments hide only their source spans", () => {
   const view = securityView(
     `Visible before <!-- hidden --> visible after.

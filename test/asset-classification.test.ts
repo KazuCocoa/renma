@@ -286,7 +286,9 @@ test("an explicit caller root resolves unstructured paths while target-only evid
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, "# Note\n");
 
-  const unresolved = repositoryClassificationPath(target);
+  const unresolved = repositoryClassificationPath(target, {
+    markerSearchBoundary: root,
+  });
   assert.equal(unresolved.state, "unresolved");
   if (unresolved.state !== "unresolved") return;
   assert.deepEqual(unresolved.candidateRoots, []);
@@ -298,8 +300,12 @@ test("an explicit caller root resolves unstructured paths while target-only evid
   assert.equal(explicit.source, "explicit");
   assert.equal(explicit.relativePath, "docs/note.md");
 
-  const suggestion = await buildMetadataSuggestion(target);
-  const inspect = await buildInspectOutline(target);
+  const suggestion = await buildMetadataSuggestion(target, {
+    repositoryMarkerSearchBoundary: root,
+  });
+  const inspect = await buildInspectOutline(target, {
+    repositoryMarkerSearchBoundary: root,
+  });
   assert.equal(suggestion.decisionStatus, "blocked");
   assert.equal(
     suggestion.decision.reasonCode,
@@ -339,7 +345,9 @@ test("absolute targets outside cwd retain deterministic structural boundaries", 
       target,
       relative.endsWith(".json") ? "{}\n" : "# Fixture\n",
     );
-    const resolution = repositoryClassificationPath(target);
+    const resolution = repositoryClassificationPath(target, {
+      markerSearchBoundary: root,
+    });
     assert.equal(resolution.state, "resolved", relative);
     if (resolution.state !== "resolved") continue;
     assert.equal(resolution.root, root, relative);
@@ -347,8 +355,12 @@ test("absolute targets outside cwd retain deterministic structural boundaries", 
     const classification = classifyAssetPath(resolution.relativePath);
     assert.equal(classification.matchedRule, rule, relative);
     assert.equal(classification.kind, kind, relative);
-    const suggestion = await buildMetadataSuggestion(target);
-    const inspect = await buildInspectOutline(target);
+    const suggestion = await buildMetadataSuggestion(target, {
+      repositoryMarkerSearchBoundary: root,
+    });
+    const inspect = await buildInspectOutline(target, {
+      repositoryMarkerSearchBoundary: root,
+    });
     assert.equal(suggestion.classification.matchedRule, rule, relative);
     assert.equal(inspect.classification.matchedRule, rule, relative);
   }
@@ -380,7 +392,9 @@ test("structural fallback ignores nested boundary-like names after the outer bou
     [".agents/skills/foo/references/tools.md", "skill-local-support"],
   ] as const;
   for (const [relative, expectedRule] of cases) {
-    const resolution = repositoryClassificationPath(path.join(root, relative));
+    const resolution = repositoryClassificationPath(path.join(root, relative), {
+      markerSearchBoundary: root,
+    });
     assert.equal(resolution.state, "resolved", relative);
     if (resolution.state !== "resolved") continue;
     assert.equal(resolution.root, root, relative);
@@ -428,13 +442,19 @@ test("guard directories never establish a structural repository boundary", async
     const target = path.join(base, ...relative.split("/"));
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, "# Guard fixture\n");
-    const resolution = repositoryClassificationPath(target);
+    const resolution = repositoryClassificationPath(target, {
+      markerSearchBoundary: base,
+    });
     assert.equal(resolution.state, "unresolved", relative);
     if (resolution.state !== "unresolved") continue;
     assert.equal(resolution.reasonCode, reasonCode, relative);
     assert.deepEqual(resolution.candidateRoots, candidateRoots, relative);
-    const suggestion = await buildMetadataSuggestion(target);
-    const inspect = await buildInspectOutline(target);
+    const suggestion = await buildMetadataSuggestion(target, {
+      repositoryMarkerSearchBoundary: base,
+    });
+    const inspect = await buildInspectOutline(target, {
+      repositoryMarkerSearchBoundary: base,
+    });
     assert.equal(suggestion.kind, "unknown", relative);
     assert.equal(suggestion.classification.matchedRule, "unknown", relative);
     assert.equal(suggestion.decisionStatus, "blocked", relative);
@@ -468,7 +488,9 @@ test("guard directories never establish a structural repository boundary", async
     const target = path.join(base, guard, "note.md");
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, "# Guard-only fixture\n");
-    const resolution = repositoryClassificationPath(target);
+    const resolution = repositoryClassificationPath(target, {
+      markerSearchBoundary: base,
+    });
     assert.equal(resolution.state, "unresolved", guard);
     if (resolution.state !== "unresolved") continue;
     assert.equal(
@@ -490,7 +512,9 @@ test("competing strong structural roots remain ambiguous", () => {
     "foo",
     "policy.md",
   );
-  const resolution = repositoryClassificationPath(target);
+  const resolution = repositoryClassificationPath(target, {
+    markerSearchBoundary: base,
+  });
   assert.equal(resolution.state, "unresolved");
   if (resolution.state !== "unresolved") return;
   assert.equal(resolution.reasonCode, "repository-boundary-ambiguous");
@@ -584,6 +608,7 @@ test("suggest-metadata preserves explicit Skill-local overrides", async () => {
 
 test("missing Skill parent blocks inheritance and metadata suggestions", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-missing-parent-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "skills", "foo", "references", "policy.md");
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, "# Policy\n");
@@ -604,6 +629,7 @@ test("missing Skill parent blocks inheritance and metadata suggestions", async (
 
 test("ambiguous Skill parents fail closed in inspect and suggest-metadata", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-ambiguous-parent-"));
+  await mkdir(path.join(root, ".git"));
   const skillDirectory = path.join(root, "skills", "foo");
   const target = path.join(skillDirectory, "references", "policy.md");
   await mkdir(path.dirname(target), { recursive: true });
@@ -653,6 +679,7 @@ test("explicit local governance is preserved without an inheritance claim", asyn
 
 test("resolved Skill-local support remains explicitly unowned when its parent has no owner", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-unowned-parent-"));
+  await mkdir(path.join(root, ".git"));
   const skillDirectory = path.join(root, "skills", "foo");
   const target = path.join(skillDirectory, "references", "policy.md");
   await mkdir(path.dirname(target), { recursive: true });
@@ -677,6 +704,7 @@ test("resolved Skill-local support remains explicitly unowned when its parent ha
 
 test("blocked independent ownership conflicts never produce patch guidance", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-owner-conflict-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "contexts", "policy.md");
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(
@@ -735,6 +763,7 @@ test("decisionStatus is authoritative across prompt outcomes", () => {
 
 test("structured command invocations preserve POSIX and Windows argv", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma action's space-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "contexts", "policy's file.md");
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, "# Policy\n");
@@ -762,6 +791,7 @@ test("structured command invocations preserve POSIX and Windows argv", async () 
 
 test("suggest-metadata and inspect expose the same Context classification", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-classify-command-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "contexts", "foo", "references", "policy.md");
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, "# Policy\n\nReusable policy.\n");
@@ -778,6 +808,7 @@ test("discovery, commands, and scan findings retain compatible classification ev
   const root = await mkdtemp(
     path.join(os.tmpdir(), "renma-classification-equivalence-"),
   );
+  await mkdir(path.join(root, ".git"));
   const relativePath = "contexts/foo/references/policy.md";
   const target = path.join(root, ...relativePath.split("/"));
   await mkdir(path.dirname(target), { recursive: true });
@@ -1049,6 +1080,7 @@ test("one canonical Skill parent supplies inherited owner and policy provenance"
 
 test("repository tools receive classification but no fabricated governance", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-classify-tool-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "tools", "helper.mjs");
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, "export const helper = true;\n");
@@ -1089,6 +1121,7 @@ test("metadata diagnostics add classification without changing severity", async 
 
 async function governedSkillFixture(): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-classify-skill-"));
+  await mkdir(path.join(root, ".git"));
   const skillDirectory = path.join(root, "skills", "foo");
   await mkdir(path.join(skillDirectory, "references"), { recursive: true });
   await writeFile(

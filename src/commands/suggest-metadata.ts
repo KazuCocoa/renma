@@ -39,6 +39,8 @@ export type SuggestMetadataFormat = "prompt" | "json";
 export interface SuggestMetadataOptions {
   format?: SuggestMetadataFormat;
   owner?: string;
+  /** Internal fixture seam; not exposed as a CLI option. */
+  repositoryMarkerSearchBoundary?: string;
 }
 
 export class SuggestMetadataTargetError extends CliUserError {
@@ -72,6 +74,12 @@ export async function buildMetadataSuggestion(
   try {
     targetEvidence = await collectTargetDocumentEvidence(target, {
       unresolvedArtifactPath: "input",
+      ...(options.repositoryMarkerSearchBoundary === undefined
+        ? {}
+        : {
+            repositoryMarkerSearchBoundary:
+              options.repositoryMarkerSearchBoundary,
+          }),
     });
   } catch (error) {
     if (isTargetReadError(error)) {
