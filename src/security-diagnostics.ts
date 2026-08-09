@@ -810,6 +810,10 @@ const APPROVAL_RE =
   /\b(ask|prompt|require|obtain|wait for)\b.{0,50}\b(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|consent|authorization|review)\b|\b(human|user|owner|maintainer|reviewer|security)\b.{0,50}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\bonly\b.{0,20}\b(after|with)\b.{0,40}\b(explicit\s+)?(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|review|authorization)\b|\bdo\s+not\s+run\s+automatically\b.{0,60}\b(human|user|maintainer|review|approval|confirmation)\b/i;
 const WEAK_OR_NEGATED_APPROVAL_RE =
   /\b(no approval|approval (?:is )?unavailable|approval is not|approval isn't|approved by default|approval by default|without (?:approval|confirmation|authorization)|automatically approved|safe|run carefully|make sure it works)\b/i;
+// Defensive-action polarity rejects only these explicit permissive claims;
+// the broader weak-guard vocabulary above is not interchangeable here.
+const PERMISSIVE_APPROVAL_CLAIM_RE =
+  /\b(no approval is needed|approved by default|safe to run)\b/i;
 const RECOVERY_GUARD_RE =
   /\b(create|make|take|keep|verify|confirm|document|check|use|run)\b.{0,40}\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b|\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b.{0,40}\b(first|before|steps?|plan|guidance|confirm|verify|check)\b/i;
 const SECRET_WORD_RE =
@@ -941,6 +945,12 @@ const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
 // trailing `to` in that clause does not make it a dependent purpose complement.
 const SAFEGUARD_FINITE_CLAUSE_RE =
   /(?:^|\s)(?:(?:i|you|he|she|it|we|they|this|that|these|those)\b|(?:the|a|an)\s+[\p{L}\p{N}_-]+\b)\s+(?:am|is|are|was|were|be|being|been|has|have|had|do|does|did|can|could|may|might|must|shall|should|will|would)\b/iu;
+const SAFEGUARD_COMMA_ONLY_COORDINATION_BRIDGE_RE = /^\s*,\s*$/u;
+const SAFEGUARD_TRAILING_LIST_COMMA_BRIDGE_RE = /^[^,]{1,70},\s*$/u;
+const SAFEGUARD_CONJUNCTION_COORDINATION_BRIDGE_RE =
+  /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu;
+const SAFEGUARD_INFINITIVAL_PURPOSE_BRIDGE_RE =
+  /\b(?:(?:merely|only)\s+to|(?:in\s+order|so\s+as)\s+to|to)\s*$/iu;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
@@ -952,14 +962,23 @@ const UNTRUSTED_EXECUTION_ACTION_RE =
 const UNTRUSTED_ACTION_VERB_RE =
   /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting|treat|regard|accept)\b/i;
 const REVIEW_VOCABULARY_SOURCE = String.raw`(?:review(?:s|ed|ing|ers?)?|validat(?:e|es|ed|ing|ion)|verif(?:y|ies|ied|ying|ication)|inspect(?:s|ed|ing|ion)?|check(?:s|ed|ing)?)`;
+const UNTRUSTED_REVIEW_ORDERING_SOURCE = String.raw`before|prior to`;
+const UNTRUSTED_REVIEW_TARGET_ACTION_SOURCE = String.raw`execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting`;
 const UNTRUSTED_CONTENT_REVIEW_GUARD_RE = new RegExp(
-  String.raw`\b${REVIEW_VOCABULARY_SOURCE}\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b`,
+  String.raw`\b${REVIEW_VOCABULARY_SOURCE}\b.{0,80}?\b(${UNTRUSTED_REVIEW_ORDERING_SOURCE})\b.{0,60}?\b(${UNTRUSTED_REVIEW_TARGET_ACTION_SOURCE})\b`,
   "i",
 );
 // Review guards govern only executable action verbs. `treat`, `regard`, and
 // `accept` describe trust assignment and are intentionally not review targets.
-const UNTRUSTED_REVIEW_TARGET_ACTION_RE =
-  /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i;
+const UNTRUSTED_REVIEW_ORDERING_RE = new RegExp(
+  String.raw`\b(${UNTRUSTED_REVIEW_ORDERING_SOURCE})\b`,
+  "i",
+);
+const UNTRUSTED_REVIEW_TARGET_ACTION_RE = new RegExp(
+  String.raw`\b(${UNTRUSTED_REVIEW_TARGET_ACTION_SOURCE})\b`,
+  "i",
+);
+const SEMANTIC_SENTENCE_BOUNDARY_RE = /[.!?]+(?=\s+|$)/;
 const BROAD_REVIEW_GUARD_SCOPE_RE =
   /\b(all|each|every)\b.{0,40}\b(proposed\s+)?(actions?|instructions?|steps?)\b|\bproposed actions?\b/i;
 const CONTRADICTORY_REVIEW_ACTION_RE = new RegExp(
@@ -999,6 +1018,8 @@ const POLICY_RELEVANT_TOOL_INVOCATION_RE =
   /\b(?:curl|wget)\b|\b(?:npm|pnpm|yarn)\s+(?:install|add)\b|\b(?:pip3?|python(?:\d+(?:\.\d+)*)?\s+-m\s+pip|uv\s+pip)\s+install\b/i;
 const COMMAND_LIKE_TOOL_RE =
   /\b(npm|pnpm|yarn|pip3?|python(?:\d+(?:\.\d+)*)?|py|uv|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i;
+const COMMAND_LIKE_LEADING_MARKER_RE =
+  /^(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?/u;
 
 type SecurityDiagnosticsConfig = {
   security?: SecurityConfig;
@@ -1454,9 +1475,7 @@ function usesCommandSpecificParagraphSemantics(
   if (CREDENTIAL_ARG_ANY_RE.test(line) || CREDENTIAL_HEADER_RE.test(line)) {
     return true;
   }
-  const commandText = line
-    .trim()
-    .replace(/^(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?/u, "");
+  const commandText = line.trim().replace(COMMAND_LIKE_LEADING_MARKER_RE, "");
   const firstWord = /^[a-z][a-z0-9_-]*/u.exec(commandText)?.[0];
   return firstWord !== undefined && isCommandLike(firstWord);
 }
@@ -4014,9 +4033,9 @@ function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
   ) {
     return false;
   }
-  if (/^\s*,\s*$/u.test(bridge)) return true;
-  if (/^[^,]{1,70},\s*$/u.test(bridge)) return true;
-  return /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu.test(bridge);
+  if (SAFEGUARD_COMMA_ONLY_COORDINATION_BRIDGE_RE.test(bridge)) return true;
+  if (SAFEGUARD_TRAILING_LIST_COMMA_BRIDGE_RE.test(bridge)) return true;
+  return SAFEGUARD_CONJUNCTION_COORDINATION_BRIDGE_RE.test(bridge);
 }
 
 function isDirectSafeguardProhibitionBridge(bridge: string): boolean {
@@ -4036,9 +4055,7 @@ function isDependentInfinitivalPurposeBridge(bridge: string): boolean {
   ) {
     return false;
   }
-  return /\b(?:(?:merely|only)\s+to|(?:in\s+order|so\s+as)\s+to|to)\s*$/iu.test(
-    bridge,
-  );
+  return SAFEGUARD_INFINITIVAL_PURPOSE_BRIDGE_RE.test(bridge);
 }
 
 function hasSafeguardClauseBoundary(bridge: string): boolean {
@@ -4104,7 +4121,9 @@ function cloneWithGlobalFlag(pattern: RegExp): RegExp {
 function semanticSentenceSpans(text: string): SemanticTextSpan[] {
   const sentences: SemanticTextSpan[] = [];
   let start = 0;
-  for (const boundary of text.matchAll(/[.!?]+(?=\s+|$)/g)) {
+  for (const boundary of text.matchAll(
+    cloneWithGlobalFlag(SEMANTIC_SENTENCE_BOUNDARY_RE),
+  )) {
     const end = (boundary.index ?? 0) + boundary[0].length;
     appendTrimmedSemanticSpan(sentences, text, start, end);
     start = end;
@@ -4246,7 +4265,7 @@ function reviewGuardActions(
   const pattern = cloneWithGlobalFlag(UNTRUSTED_CONTENT_REVIEW_GUARD_RE);
   for (const match of sentence.text.matchAll(pattern)) {
     const text = match[0] ?? "";
-    const before = text.search(/\b(before|prior to)\b/i);
+    const before = text.search(UNTRUSTED_REVIEW_ORDERING_RE);
     if (before < 0) continue;
     const targetText = text.slice(before);
     const target = targetText.match(UNTRUSTED_REVIEW_TARGET_ACTION_RE);
@@ -4405,9 +4424,7 @@ function isDefensiveOrGuardedActionInstruction(line: string): boolean {
 }
 
 function isDefensiveActionInstruction(line: string): boolean {
-  if (
-    /\b(no approval is needed|approved by default|safe to run)\b/i.test(line)
-  ) {
+  if (PERMISSIVE_APPROVAL_CLAIM_RE.test(line)) {
     return false;
   }
   return DEFENSIVE_ACTION_RE.test(line);
