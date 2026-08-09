@@ -4,7 +4,7 @@ description: Route Renma release preparation, validation, publication, resumptio
 metadata:
   renma.id: skill.release-prep
   renma.title: Release Prep
-  renma.version: "0.2.0"
+  renma.version: "0.2.1"
   renma.owner: maintainers
   renma.status: stable
   renma.tags: '["release","maintenance","dogfooding"]'
@@ -27,6 +27,12 @@ metadata:
 Apply the required `context.release.prep` to the release stage requested by the user. Treat that Context as authoritative for release commands, approval gates, constraints, validation, and completion evidence.
 
 必須の `context.release.prep` を、ユーザーが依頼したリリース段階に適用します。リリース用コマンド、承認ゲート、制約、検証、および完了証拠については、この Context を正式な情報源として扱います。
+
+## Hard Constraints
+
+When relaying or translating the Context, preserve each explicit human-approval guard next to its external action. Do not weaken, move, or summarize away those guards. If a summary or translation cannot keep a guard adjacent, quote the relevant Context passage instead and stop before the external action.
+
+Context の内容を伝達または翻訳する場合は、人による各明示的な承認ゲートを、対応する外部操作の近くに維持します。これらのゲートを弱めたり、移動したり、要約によって省略したりしません。要約または翻訳でゲートを近くに維持できない場合は、代わりに該当する Context の一節を引用し、外部操作の前で停止します。
 
 ## Completion Criteria
 

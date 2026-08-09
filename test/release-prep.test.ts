@@ -23,6 +23,11 @@ test("release-prep routes broad and resumable release requests", () => {
     /renma\.requires-context: '\["context\.release\.prep"\]'/,
   );
   assert.match(skill, /Treat that Context as authoritative/);
+  assert.match(skill, /renma\.version: "0\.2\.1"/u);
+  assert.match(
+    skill,
+    /preserve each explicit human-approval guard next to its external action/u,
+  );
   assert.match(context, /resume at the earliest incomplete step/);
   assert.match(context, /GitHub-Release-only request on an existing tag/);
   assert.match(context, /Do not require the tag to be absent/);
@@ -114,7 +119,7 @@ test("authoritative release Context gates tag pushes on external publication sec
   );
   assert.match(
     context,
-    /`npm-publish` GitHub Environment may legitimately leave the publish job waiting[\s\S]+authorized reviewer/u,
+    /`npm-publish` GitHub Environment approval gate[\s\S]+Environment approval may legitimately leave the publication job waiting[\s\S]+authorized reviewer/u,
   );
 
   const prerequisite = context.indexOf("Before any release-tag push");

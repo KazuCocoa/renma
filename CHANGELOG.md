@@ -116,9 +116,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   the Environment with reviewers and deployment ref rules, and protect `v*`
   tag creation with a GitHub ruleset. Repository checks cannot verify those
   external settings or defend against a tagged workflow commit that replaces
-  its own checks. The authoritative release Context now stops before tag push
-  unless those external prerequisites are independently observed or explicitly
-  confirmed by a maintainer, and records pending Environment reviewer approval.
+  its own checks. The authoritative release Skill and Context now preserve
+  scan-clean human-approval guards, stop before tag push unless those external
+  prerequisites are independently observed or explicitly confirmed by a
+  maintainer, and record pending Environment reviewer approval.
 - Security diagnostics remain deterministic static checks and bounded,
   best-effort natural-language heuristics; they do not claim complete semantic
   or coreference analysis. Runtime gateway policy, sandboxing, filesystem and
