@@ -169,6 +169,37 @@ test("dedicated Renma report remains PR-only", () => {
   assert.match(source, /node dist\/index\.js scan \. --fail-on high --strict/);
 });
 
+test("public Renma report is a portable exact package-consumer workflow", () => {
+  const source = readFileSync(
+    "examples/github-actions/renma-ci-report.yml",
+    "utf8",
+  );
+  const workflow = readWorkflow("examples/github-actions/renma-ci-report.yml");
+  const generator = workflow.jobs?.["generate-renma-reports"];
+  const commenter = workflow.jobs?.["comment-renma-ci-report"];
+  const commands = runCommands(generator).join("\n");
+
+  assert.match(source, /npm install --save-dev --save-exact renma@0\.31\.0/);
+  assert.match(commands, /npm ci/);
+  assert.match(commands, /npx --no-install renma catalog/);
+  assert.match(commands, /npx --no-install renma graph/);
+  assert.match(commands, /npx --no-install renma ci-report/);
+  assert.match(commands, /npx --no-install renma scan/);
+  assert.doesNotMatch(source, /npm run build|node dist\/index\.js/);
+  assert.equal(
+    steps(generator).find((step) => step.uses === "actions/checkout@v6")
+      ?.with?.["fetch-depth"],
+    0,
+  );
+  assert.deepEqual(generator?.permissions, { contents: "read" });
+  assert.equal(commenter?.needs, "generate-renma-reports");
+  assert.deepEqual(commenter?.permissions, {
+    actions: "read",
+    contents: "read",
+    "pull-requests": "write",
+  });
+});
+
 test("npm publishing waits for exact-floor and LTS validation", () => {
   const workflow = readWorkflow(".github/workflows/npm-publish.yml");
   assert.deepEqual(workflow.permissions, { contents: "read" });

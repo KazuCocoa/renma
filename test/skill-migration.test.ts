@@ -1207,6 +1207,7 @@ async function skillFixture(
   content: string,
 ): Promise<{ target: string; original: string }> {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-skill-migration-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, "skills", name, "SKILL.md");
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, content);
@@ -1218,6 +1219,7 @@ async function skillEntrypointFixture(
   content: string,
 ): Promise<{ root: string; target: string; original: string }> {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-skill-entrypoint-"));
+  await mkdir(path.join(root, ".git"));
   const target = path.join(root, ...relativePath.split("/"));
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, content);

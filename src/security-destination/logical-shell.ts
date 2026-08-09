@@ -265,8 +265,11 @@ export function logicalShellCommands(
       const commandSourceLines = memberLineIndexes.map(
         (lineIndex) => sourceLines[lineIndex] ?? "",
       );
+      const commandInputLines = memberLineIndexes.map(
+        (lineIndex) => visibleLines[lineIndex] ?? "",
+      );
       commands.push({
-        input: commandSourceLines.join("\n"),
+        input: commandInputLines.join("\n"),
         shellProjection: {
           projection: projection.join(""),
           sourceOffsetByProjectionOffset,

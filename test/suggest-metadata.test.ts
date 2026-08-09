@@ -994,7 +994,9 @@ description: Review demo inputs. Use when demo inputs need review.
 });
 
 async function fixture(): Promise<string> {
-  return mkdtemp(path.join(os.tmpdir(), "renma-suggest-metadata-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-suggest-metadata-"));
+  await mkdir(path.join(root, ".git"));
+  return root;
 }
 
 function canonicalSkill(name: string, owner?: string): string {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -101,4 +102,45 @@ test("repository fixture supports filesystem-backed metadata diagnostics", async
   assert.ok(codes.has(DIAGNOSTIC_IDS.META_INVALID_STATUS));
   assert.ok(codes.has(DIAGNOSTIC_IDS.META_CONTEXT_MISSING_WHEN_NOT_TO_USE));
   assert.ok(codes.has(DIAGNOSTIC_IDS.META_CONTEXT_PLACEHOLDER_USAGE_BOUNDARY));
+});
+
+test("repository fixtures are invariant beneath a temporary ancestor .git marker", async (t) => {
+  const ancestor = await mkdtemp(
+    path.join(os.tmpdir(), "renma-fixture-ancestor-"),
+  );
+  t.after(() => rm(ancestor, { recursive: true, force: true }));
+  await mkdir(path.join(ancestor, ".git"));
+  const nestedTemporaryDirectory = path.join(ancestor, "tmp");
+  await mkdir(nestedTemporaryDirectory);
+
+  const ordinary = await RepositoryFixture.create({ testContext: t });
+  const nested = await RepositoryFixture.create({
+    parentDirectory: nestedTemporaryDirectory,
+    testContext: t,
+  });
+  for (const fixture of [ordinary, nested]) {
+    await fixture.skill("review", {
+      owner: "qa",
+      body: "# Review\n\nReview repository evidence and report completion.\n",
+    });
+  }
+
+  const ordinaryCatalog = await catalog(ordinary.root);
+  const nestedCatalog = await catalog(nested.root);
+  assert.deepEqual(
+    nestedCatalog.catalog.entries.map((entry) => [
+      entry.id,
+      entry.kind,
+      entry.sourcePath,
+    ]),
+    ordinaryCatalog.catalog.entries.map((entry) => [
+      entry.id,
+      entry.kind,
+      entry.sourcePath,
+    ]),
+  );
+  assert.deepEqual(
+    nestedCatalog.diagnostics.map((diagnostic) => diagnostic.code),
+    ordinaryCatalog.diagnostics.map((diagnostic) => diagnostic.code),
+  );
 });

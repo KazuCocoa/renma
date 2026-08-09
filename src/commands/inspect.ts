@@ -71,9 +71,16 @@ export async function runInspectCommand(
 
 export async function buildInspectOutline(
   target: string,
+  options: { repositoryMarkerSearchBoundary?: string } = {},
 ): Promise<InspectOutline> {
   const targetEvidence = await collectTargetDocumentEvidence(target, {
     unresolvedArtifactPath: "absolute",
+    ...(options.repositoryMarkerSearchBoundary === undefined
+      ? {}
+      : {
+          repositoryMarkerSearchBoundary:
+            options.repositoryMarkerSearchBoundary,
+        }),
   });
   const repositoryEvidence =
     await collectTargetRepositoryEvidence(targetEvidence);

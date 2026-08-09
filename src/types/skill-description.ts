@@ -1,0 +1,3 @@
+/** Shared authoring boundary for canonical Agent Skill descriptions. */
+export const CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE =
+  "A canonical Skill description is a discovery and routing surface, not an execution surface. Describe capabilities and selection boundaries without literal executable commands, destructive commands, secret-disclosure requests, safeguard-bypass instructions, credentials, or other high-risk operational payloads, even when quoted as request examples. If an exact dangerous example is necessary, place it in the Skill body under a clearly non-operational unsafe-example or review-evidence section.";

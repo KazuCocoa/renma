@@ -25,7 +25,7 @@ import {
 const SCHEMA_PATH = "docs/schemas/skill-authoring-handoff-v1.schema.json";
 
 test("scaffold skill JSON preserves a gate-ready structured handoff", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-json-"));
+  const root = await handoffFixtureRoot("renma-handoff-json-");
   const handoffPath = path.join(root, "handoff.json");
   const target = path.join(root, "skills", "example", "SKILL.md");
   await writeHandoff(handoffPath, gateReadyHandoff());
@@ -97,7 +97,7 @@ test("scaffold skill JSON preserves a gate-ready structured handoff", async () =
 });
 
 test("scaffold skill file mode applies handoff metadata and creates only declared local resources", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-file-"));
+  const root = await handoffFixtureRoot("renma-handoff-file-");
   const handoffPath = path.join(root, "handoff.json");
   const skillDirectory = path.join(root, "skills", "example");
   const target = path.join(skillDirectory, "SKILL.md");
@@ -130,7 +130,7 @@ test("scaffold skill file mode applies handoff metadata and creates only declare
 });
 
 test("scaffold handoff prompt passes caller decisions through without epistemic promotion", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-prompt-"));
+  const root = await handoffFixtureRoot("renma-handoff-prompt-");
   const handoffPath = path.join(root, "handoff.json");
   const target = path.join(root, "skills", "example", "SKILL.md");
   await writeHandoff(handoffPath, gateReadyHandoff());
@@ -218,9 +218,7 @@ test("supporting Context and Lens relationships accept Renma ID-or-path forms wi
 
   for (const fixture of cases) {
     await t.test(fixture.name, async () => {
-      const root = await mkdtemp(
-        path.join(os.tmpdir(), "renma-handoff-relationship-"),
-      );
+      const root = await handoffFixtureRoot("renma-handoff-relationship-");
       const handoffPath = path.join(root, "handoff.json");
       const target = path.join(root, "skills", "example", "SKILL.md");
       const handoff = gateReadyHandoff();
@@ -311,9 +309,7 @@ test("known supporting asset aliases cannot overlap required and optional relati
 
   for (const fixture of cases) {
     await t.test(fixture.name, async () => {
-      const root = await mkdtemp(
-        path.join(os.tmpdir(), "renma-handoff-alias-overlap-"),
-      );
+      const root = await handoffFixtureRoot("renma-handoff-alias-overlap-");
       const handoffPath = path.join(root, "handoff.json");
       const target = path.join(root, "skills", "example", "SKILL.md");
       const handoff = gateReadyHandoff();
@@ -338,8 +334,8 @@ test("known supporting asset aliases cannot overlap required and optional relati
 });
 
 test("distinct required and optional supporting assets remain valid", async () => {
-  const root = await mkdtemp(
-    path.join(os.tmpdir(), "renma-handoff-distinct-relationships-"),
+  const root = await handoffFixtureRoot(
+    "renma-handoff-distinct-relationships-",
   );
   const handoffPath = path.join(root, "handoff.json");
   const target = path.join(root, "skills", "example", "SKILL.md");
@@ -380,9 +376,7 @@ test("distinct required and optional supporting assets remain valid", async () =
 });
 
 test("a supporting asset cannot be satisfied by a relationship of the wrong kind", async () => {
-  const root = await mkdtemp(
-    path.join(os.tmpdir(), "renma-handoff-wrong-kind-"),
-  );
+  const root = await handoffFixtureRoot("renma-handoff-wrong-kind-");
   const handoffPath = path.join(root, "handoff.json");
   const target = path.join(root, "skills", "example", "SKILL.md");
   const handoff = gateReadyHandoff();
@@ -421,7 +415,7 @@ test("a supporting asset cannot be satisfied by a relationship of the wrong kind
 });
 
 test("Blocking handoff decisions return exit 2 and cause no filesystem side effects", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-blocked-"));
+  const root = await handoffFixtureRoot("renma-handoff-blocked-");
   const handoffPath = path.join(root, "handoff.json");
   const target = path.join(root, "skills", "example", "SKILL.md");
   const handoff = gateReadyHandoff();
@@ -440,7 +434,7 @@ test("Blocking handoff decisions return exit 2 and cause no filesystem side effe
 });
 
 test("handoff target mismatch returns exit 2 and writes nothing", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-mismatch-"));
+  const root = await handoffFixtureRoot("renma-handoff-mismatch-");
   const handoffPath = path.join(root, "handoff.json");
   const target = path.join(root, "skills", "different", "SKILL.md");
   await writeHandoff(handoffPath, gateReadyHandoff());
@@ -533,7 +527,7 @@ test("malformed and inconsistent handoffs are caller errors with no writes", asy
 
   for (const fixture of cases) {
     await t.test(fixture.name, async () => {
-      const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-bad-"));
+      const root = await handoffFixtureRoot("renma-handoff-bad-");
       const handoffPath = path.join(root, "handoff.json");
       const target = path.join(
         root,
@@ -559,7 +553,7 @@ test("malformed and inconsistent handoffs are caller errors with no writes", asy
 });
 
 test("missing handoff and mixed structural CLI authorities return exit 2", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-handoff-cli-"));
+  const root = await handoffFixtureRoot("renma-handoff-cli-");
   const target = path.join(root, "skills", "example", "SKILL.md");
   const missing = path.join(root, "missing.json");
   const missingResult = await capture(() =>
@@ -729,6 +723,12 @@ test("existing scaffold JSON remains compatible when no handoff is supplied", as
   assert.equal("handoff" in bundle, false);
   assert.doesNotMatch(String(bundle.content), /renma\.requires-lens/);
 });
+
+async function handoffFixtureRoot(prefix: string): Promise<string> {
+  const root = await mkdtemp(path.join(os.tmpdir(), prefix));
+  await mkdir(path.join(root, ".git"));
+  return root;
+}
 
 function gateReadyHandoff(): SkillAuthoringHandoff {
   return {

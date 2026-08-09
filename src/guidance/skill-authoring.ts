@@ -3,6 +3,7 @@ import {
   SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
   type SkillAuthoringHandoff,
 } from "../skill-authoring-handoff.js";
+import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "../types/skill-description.js";
 
 export const SKILL_AUTHORING_PRINCIPLE =
   "Create the smallest non-redundant Renma asset graph that preserves execution clarity and traceability.";
@@ -325,6 +326,7 @@ export function buildSkillAuthoringGuidance(
       "Do not enable runtime network access, require authoring-time external consultation, ask the author to resolve future task findings, or split a Skill merely because those choices appear in an example; each requires evidence from the actual workflow.",
     ],
     artifactRules: [
+      CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE,
       "Create a script only when deterministic implementation is materially safer than model judgment, an exact repeated transformation or validation is required, ordering or behavior is safety-critical, the implementation is meaningfully tested, or the user explicitly requests executable implementation.",
       "Do not create a script merely because the output is JSON, YAML, XML, or another structured format; straightforward JSON construction from a documented schema does not justify a script by itself.",
       "Add an example only when it resolves a real ambiguity.",

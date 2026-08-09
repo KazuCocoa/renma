@@ -9,6 +9,15 @@ finding definitions, see the [Diagnostics Reference](diagnostics.md).
 
 Renma security diagnostics are deterministic repository checks for agent-facing operational instructions. They do not execute commands, call an LLM, enforce runtime behavior, inject context, or turn Renma into a broad supply-chain scanner. They are not language-specific SAST, dependency scanning, runtime monitoring, sandboxing, permission enforcement, telemetry collection, or a proof that an agent workflow is safe. No findings means only that the enabled deterministic checks found no matching repository evidence.
 
+Renma combines deterministic static checks with bounded, high-confidence
+natural-language heuristics. It does not claim complete semantic or coreference
+analysis of arbitrary prose. Scaffold, guide, and authoring diagnostics reduce
+the chance that generated Skills place operational payloads in routing
+descriptions; runtime gateway policy, sandboxing, filesystem and network
+restrictions, and approval controls remain the execution environment's
+responsibility. Renma is one layer in that combined defense, not a complete
+runtime security boundary.
+
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. It uses bounded structure-aware recognition for selected commands and
 JavaScript environment/file-access forms, not complete language
@@ -64,6 +73,11 @@ Add small security policy metadata to agent-facing Skills or context assets when
 they include network, upload, secret-handling, command execution, or other
 sensitive operational instructions. Skills and non-Skill assets use different
 serialization boundaries.
+
+Renma determines this policy requirement independently from the findings that
+an instruction happens to emit. Operational fetch or upload guidance and
+sensitive-input handling therefore require policy metadata even when another
+rule is not triggered. Benign local-only review and scaffold guidance do not.
 
 The examples below are feature-specific subsets. Use the
 [complete metadata table](user-manual.md#renma-operational-metadata-table) for
@@ -438,7 +452,25 @@ Never copy private keys, tokens, credentials, or `.env` files into prompts, logs
 
 ### Defensive guidance and false positives
 
-Renma security diagnostics are conservative heuristics for discovered agent-facing assets. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
+Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma applies the relevant policy, sensitive-data, prose, command, dependency-install, remote-script, privileged, destructive, credential, and configured disallowed-command diagnostics to that value and reports the exact frontmatter field range. Every operational description detector uses one bounded instruction projection: a paired ASCII or curly single- or double-quoted request, or a paired backtick inline literal, is masked only while it remains in the comma- or conjunction-separated example list introduced by `such as`, `including`, or `like`. A clause or operational transition ends that list, so later instructions remain visible. Apostrophes in words and unmatched delimiters are not masked. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
+
+Masking keeps a legitimate quoted routing example from becoming an operational
+high-severity instruction; it does not make concrete high-risk payloads good
+description content. Renma separately applies its existing command,
+sensitive-data, policy, and safeguard classifiers to those structurally bounded
+example spans. A recognized high-risk literal emits the medium advisory
+`QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL`, with exact description-field
+evidence and semantic-paraphrase guidance, rather than an operational
+`SEC-DESTRUCTIVE-COMMAND` solely because it was quoted. This authoring check
+does not automatically rewrite the description.
+
+Renma does not enumerate references such as “the second example,” “the latter,”
+or “do it,” and does not claim to resolve arbitrary natural-language
+coreference. A dangerous quoted example remains reviewable through the
+authoring diagnostic, while independently explicit operational text after the
+bounded example remains visible to the existing security diagnostics. Put any
+necessary exact dangerous evidence in a clearly non-operational unsafe-example
+or review-evidence section in the Skill body.
 
 ### Structure-aware command boundaries
 
@@ -447,9 +479,16 @@ projects multiple security decisions from that result. Guard text is associated
 through exact Markdown structure: the same instruction, the same list item, the
 immediately preceding paragraph, or an active safety section. A guard does not
 cross an unrelated heading or thematic break, move between sibling list items,
-come from an unrelated code block, or become operational from a block quote.
-Generic wording such as “handle this carefully” is not an approval or
-no-disclosure guard.
+or come from an unrelated code block. Ordinary quotations remain
+non-operational. Local quotation or bounded source attribution such as “the
+incident report says:” or “the audit states:” keeps a blockquote inert even
+beneath a generic instruction heading; attribution does not need to contain the
+word “quote.” An explicit local execution route takes precedence. A routed blockquote is
+analyzed as an instruction only within that local structural boundary. For a
+routed multiline shell instruction, quote markers are removed only from the
+logical-shell analysis projection, while findings retain the exact quoted
+source lines. Generic wording such as “handle this carefully” is not an
+approval or no-disclosure guard.
 
 `SEC-UNPINNED-DEPENDENCY-INSTALL` combines structured command and selector
 analysis with established bounded compatibility fallback:
@@ -691,12 +730,22 @@ Keep the security policy and verification enabled; do not add a suppression mere
 ```
 
 Renma reports the unsafe form as
-`SEC-SAFEGUARD-BYPASS-INSTRUCTION`. Direct prohibitions, quoted examples,
-HTML-comment content, and fenced prose clearly marked as an unsafe or negative
-example do not become semantic bypass findings. Visible text outside an HTML
-comment span is still scanned. Fenced `text` or `markdown` payloads become
-operational when surrounding prose, an instruction label, or an operational
-instruction heading explicitly routes them as instructions. Approval guards
+`SEC-SAFEGUARD-BYPASS-INSTRUCTION`. Direct prohibitions, ordinary quoted
+examples, HTML-comment content, and fenced or blockquoted prose clearly marked
+as an unsafe or negative example do not become semantic bypass findings.
+Safeguard polarity is evaluated at each action predicate. A prohibition applies
+to the action it directly governs and may continue through bounded grammatical
+coordination or a dependent infinitival-purpose complement, but it does not
+hide a later independently expressed unsafe action across punctuation,
+conditional wording, fallback wording, or another clause boundary.
+Hard clause terminators end direct prohibition lookup. A new subject plus a
+finite auxiliary or copula also starts a new polarity scope, so a later `to`
+inside that finite clause is not treated as a purpose complement of the earlier
+prohibited action.
+Visible text outside an HTML comment span is still scanned. Fenced `text` or
+`markdown` payloads and blockquotes become operational when local surrounding
+prose, an instruction label, or an operational instruction heading explicitly
+routes them as instructions. Approval guards
 remain local: wording in an unrelated peer Markdown section does not authorize
 a later action, and dry-run, backup, or rollback does not substitute for
 approval when policy requires it. Inside any fenced code block, `<!--` and
@@ -989,19 +1038,20 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 
 | Finding                                   | Usually means                                                                                                                        | What to change                                                                                                                                                                                                                                                                                                                                                              | Fix area                                   |
 | --- | --- | --- | --- |
+| `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` | A canonical Skill routing example contains a concrete high-risk literal.                                                            | Replace it with semantic capability and selection wording, or move necessary exact evidence to a clearly non-operational body section. Do not automatically rewrite owner-authored prose.                                                                                                                                                                                  | Canonical Skill `description`              |
 | `SEC-SUSPICIOUS-BIDI-CONTROL`             | Original source contains a bidi formatting control that can change displayed order.                                                  | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional.                                                                                                                                                                                                                                                  | Any discovered UTF-8 text artifact         |
 | `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, or ASCII-token-internal ZWJ/ZWNJ.              | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding.                                                        | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value.                                                                                                                                                                                                                                                    | Skill metadata                             |
 | `SEC-MISSING-POLICY-METADATA`             | Sensitive instructions lack a declared policy.                                                                                       | Add local policy fields or select a configured security profile using the syntax for that asset kind.                                                                                                                                                                                                                                                                       | Metadata                                   |
-| `SEC-INSTRUCTION-VIOLATES-POLICY`         | Body text asks for behavior denied by policy.                                                                                        | Rewrite the instruction or adjust policy only after review.                                                                                                                                                                                                                                                                                                                 | Body text and metadata                     |
-| `SEC-MISSING-HUMAN-APPROVAL-GUARD`        | A sensitive action lacks nearby approval wording.                                                                                    | Add explicit human approval close to the action.                                                                                                                                                                                                                                                                                                                            | Body text                                  |
-| `SEC-UNAPPROVED-NETWORK-DESTINATION`      | An instruction contacts a host outside approved network destinations.                                                                | Enumerate the actual required domains in asset/profile/repo network approvals after review.                                                                                                                                                                                                                                                                                 | Body text, metadata, or config             |
-| `SEC-UNAPPROVED-UPLOAD-DESTINATION`       | An upload target is not in upload approvals.                                                                                         | Use an approved upload target or update upload approvals intentionally.                                                                                                                                                                                                                                                                                                     | Body text, metadata, or config             |
-| `SEC-FORBIDDEN-INPUT-INSTRUCTION`         | The asset asks for data listed in its forbidden-input policy.                                                                        | Remove the request or replace it with redaction and placeholder guidance.                                                                                                                                                                                                                                                                                                   | Body text and metadata                     |
-| `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body text                                  |
-| `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text                                  |
-| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body text                                  |
-| `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary.                                                      | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section.                                                                                                                                                                                                                                                                  | Body text                                  |
+| `SEC-INSTRUCTION-VIOLATES-POLICY`         | Agent-facing text asks for behavior denied by policy.                                                                                 | Rewrite the instruction or adjust policy only after review.                                                                                                                                                                                                                                                                                                                 | Body, canonical Skill `description`, or metadata |
+| `SEC-MISSING-HUMAN-APPROVAL-GUARD`        | A sensitive action lacks nearby approval wording.                                                                                    | Add explicit human approval close to the action.                                                                                                                                                                                                                                                                                                                            | Body or canonical Skill `description`      |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION`      | An instruction contacts a host outside approved network destinations.                                                                | Enumerate the actual required domains in asset/profile/repo network approvals after review.                                                                                                                                                                                                                                                                                 | Body, canonical Skill `description`, metadata, or config |
+| `SEC-UNAPPROVED-UPLOAD-DESTINATION`       | An upload target is not in upload approvals.                                                                                         | Use an approved upload target or update upload approvals intentionally.                                                                                                                                                                                                                                                                                                     | Body, canonical Skill `description`, metadata, or config |
+| `SEC-FORBIDDEN-INPUT-INSTRUCTION`         | The asset asks for data listed in its forbidden-input policy.                                                                        | Remove the request or replace it with redaction and placeholder guidance.                                                                                                                                                                                                                                                                                                   | Body, canonical Skill `description`, or metadata |
+| `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body or canonical Skill `description`      |
+| `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text or canonical Skill `description` |
+| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body or canonical Skill `description`      |
+| `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary.                                                      | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section.                                                                                                                                                                                                                                                                  | Body or canonical Skill `description`      |
 | `SEC-DESTRUCTIVE-COMMAND`                 | A destructive command appears without enough local safety context.                                                                   | Remove it, scope it tightly, or add explicit approval and recovery guidance.                                                                                                                                                                                                                                                                                                | Body text                                  |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`    | `sudo` or similar privileged action lacks guardrails.                                                                                | Add prerequisites, confirmation, rollback, and verification guidance.                                                                                                                                                                                                                                                                                                       | Body text                                  |
 | `SEC-UNPINNED-REMOTE-SCRIPT`              | A remote script is executed without an immutable source or verification.                                                             | Pin and verify the source, or avoid remote execution.                                                                                                                                                                                                                                                                                                                       | Body text                                  |

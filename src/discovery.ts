@@ -101,6 +101,8 @@ export interface RepositoryClassificationPathOptions {
   repositoryRoot?: string;
   /** Base directory used only to resolve a relative target path. */
   cwd?: string;
+  /** Internal fixture seam; production callers leave marker traversal unbounded. */
+  markerSearchBoundary?: string;
 }
 
 export type RepositoryClassificationPathResolution =
@@ -302,7 +304,12 @@ export function repositoryClassificationPath(
         };
   }
 
-  const markerBoundary = nearestRepositoryMarker(path.dirname(absolutePath));
+  const markerBoundary = nearestRepositoryMarker(
+    path.dirname(absolutePath),
+    normalizedOptions.markerSearchBoundary === undefined
+      ? undefined
+      : path.resolve(cwd, normalizedOptions.markerSearchBoundary),
+  );
   if (markerBoundary) {
     const relativePath = repositoryRelativePath(
       markerBoundary.root,
@@ -599,7 +606,10 @@ function repositoryRelativePath(
   return normalizeAssetRepositoryRelativePath(relative);
 }
 
-function nearestRepositoryMarker(startDirectory: string):
+function nearestRepositoryMarker(
+  startDirectory: string,
+  searchBoundary?: string,
+):
   | {
       root: string;
       marker:
@@ -607,6 +617,7 @@ function nearestRepositoryMarker(startDirectory: string):
     }
   | undefined {
   let directory = path.resolve(startDirectory);
+  const boundary = searchBoundary && path.resolve(searchBoundary);
   while (true) {
     for (const marker of [
       ".git",
@@ -627,6 +638,7 @@ function nearestRepositoryMarker(startDirectory: string):
         // Missing or unreadable markers do not establish a safe boundary.
       }
     }
+    if (boundary !== undefined && directory === boundary) return undefined;
     const parent = path.dirname(directory);
     if (parent === directory) return undefined;
     directory = parent;

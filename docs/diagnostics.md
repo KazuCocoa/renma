@@ -539,7 +539,11 @@ Renma scan findings always include `severity` and `confidence`. Security finding
 
 `suspicious` means a risky or ambiguous instruction should be reviewed but is not necessarily a direct policy violation. Examples include external upload instructions, cloud upload instructions, broad data sharing, overbroad context collection, unpinned remote scripts, unpinned dependency installs, privileged commands without guardrails, and risky temporary paths.
 
-`advisory` means a governance or hardening recommendation. For example, `SEC-MISSING-POLICY-METADATA` advises adding explicit policy metadata.
+`advisory` means a governance or hardening recommendation. For example,
+`SEC-MISSING-POLICY-METADATA` advises adding explicit policy metadata. Its
+eligibility is evaluated independently from other emitted findings:
+operational fetch, upload, or sensitive-input handling requires a declared
+policy, while benign local-only review and scaffold guidance does not.
 
 `riskClass` also powers aggregate security posture summaries in readiness and CI reports.
 
@@ -797,13 +801,22 @@ warnings, replace approval with post-hoc review, choose a more dangerous
 permission fallback, or execute automatically after no user response. The safe
 repair is to keep the existing safeguard, stop and report missing authority,
 and rerun `renma scan` without relaxing policy or adding suppression. Direct
-prohibitions such as “Do not bypass human approval,” quoted examples,
+prohibitions such as “Do not bypass human approval,” ordinary quoted examples,
 HTML-comment content, and fenced prose clearly bounded as an unsafe or negative
 example are excluded from this semantic prose rule. Visible text before or
 after an HTML comment span remains scannable. A fenced `text` or `markdown`
 payload explicitly routed by surrounding prose, an instruction label, or an
-operational instruction heading is scanned as an instruction. A defensive
-sentence does not protect a separate contradictory bypass instruction.
+operational instruction heading is scanned as an instruction. A blockquote is
+also scanned when its local surrounding prose or instruction label explicitly
+routes it for execution. Local quotation or bounded source attribution such as
+“the incident report says:” or “the audit states:” keeps an ordinary quote inert
+beneath a generic instruction heading without requiring the word “quote,” but
+an explicit local execution route takes precedence. Routed
+multiline shell analysis removes quote markers only in its logical-command
+projection; diagnostic evidence retains the exact quoted source lines. Routing
+does not cross an unrelated structural boundary. Safeguard polarity attaches a
+prohibition to the directly governed action and bounded coordinated predicates;
+a later independently expressed unsafe action is evaluated separately.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
@@ -1118,6 +1131,7 @@ written during scanning.
 | `QUAL-MISSING-ROUTING-CLARITY`                   | Routing guidance is unclear.                         | A Skill or Agent lacks explicit selection language in its effective description or Markdown body.                 | Add a bounded phrase such as `Use when`, `When to use`, or another clear trigger, role, or routing statement. |
 | `QUAL-MISSING-VERIFICATION`                      | Verification guidance is missing.                    | Markdown headings and body text lack recognizable static guidance for checking the workflow result.              | Add verification or validation steps, tests, or an expected output/result.                                  |
 | `QUAL-SHORT-DESCRIPTION`                         | Disabled compatibility identifier.                   | 0.17 applied an independent 150-character minimum.                                                  | Use Agent Skills validity and selection-boundary diagnostics; short clear descriptions are accepted.  |
+| `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL`       | Canonical Skill description contains a high-risk routing literal. | A bounded quoted routing example is non-operational but existing command, disclosure, policy, or safeguard classifiers recognize its concrete payload. | Replace the literal with semantic routing wording. If exact evidence is necessary, move it to a clearly non-operational unsafe-example or review-evidence body section; do not automatically rewrite owner-authored prose. |
 | `QUAL-SKILL-MIXED-RESPONSIBILITY`                | Skill may mix workflow and reusable knowledge.       | A sufficiently large Skill has multiple distinct reusable-knowledge signals.                       | Promote only independently owned shared knowledge; keep Skill-local workflow and detail local.         |
 | `QUAL-SKILL-PROGRESSIVE-DISCLOSURE`              | Progressive disclosure needs review.                 | Reserved 0.18 focused-workflow contract identifier.                                                | Keep read conditions and core workflow in `SKILL.md`; place details by semantic responsibility.        |
 | `QUAL-SKILL-TOKEN-BUDGET`                        | Skill body exceeds its effective repository token-budget threshold. | Markdown body is above the effective warning threshold or above the effective High threshold. | Review progressive disclosure while retaining core workflow, constraints, and completion criteria; never split or move content by size alone. |

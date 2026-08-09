@@ -114,12 +114,13 @@ test(".agents/skills entrypoints are classified as skills before generic agent d
     ),
     [[".agents/skills/demo/SKILL.md", "skill"]],
   );
-  assert.ok(
+  assert.equal(
     result.findings.some(
       (finding) =>
         finding.id === "SEC-MISSING-POLICY-METADATA" &&
         finding.evidence.path === ".agents/skills/demo/SKILL.md",
     ),
+    false,
   );
 });
 
@@ -2206,7 +2207,14 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
   assert.match(result.stdout, /^Created .+SKILL\.md\n\nNext steps:/);
-  assert.match(result.stdout, /renma guide skill/);
+  assert.match(
+    result.stdout,
+    /`renma guide skill` authoring gate already established/,
+  );
+  assert.match(
+    result.stdout,
+    /Use `renma guide skill` again only when intentionally reconsidering/,
+  );
   assert.match(
     result.stdout,
     /smallest non-redundant intended asset structure/,
@@ -2214,7 +2222,7 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(result.stdout, /renma scan \. --fail-on high/);
   assert.match(
     result.stdout,
-    /6\. Have a human review meaningful semantic changes and unresolved decisions before merging\.\n$/,
+    /7\. Have a human review meaningful semantic changes and unresolved decisions before merging\.\n$/,
   );
   const content = await readFile(target, "utf8");
   assert.match(content, /^name: spec-review$/m);
@@ -2234,14 +2242,40 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(content, /^## Required Inputs$/m);
   assert.match(content, /^## Context References$/m);
   assert.match(content, /^## Constraints$/m);
-  assert.match(content, /Do not choose runtime task context/);
-  assert.match(content, /Do not assemble prompts for live model calls/);
+  assert.match(
+    content,
+    /stop and report requests that require different runtime task context/,
+  );
+  assert.match(
+    content,
+    /reviewable workflow guidance instead of prompt material/,
+  );
+  assert.match(
+    content,
+    /description is a discovery and routing surface, not an execution surface/,
+  );
+  assert.match(content, /clearly non-operational unsafe-example/);
+  assert.doesNotMatch(
+    content,
+    /rm\s+-rf|upload the \.env|continue without approval/i,
+  );
   assert.doesNotMatch(content, /Renma can verify/);
 
   const scanResult = await scan(root);
   assert.equal(scanResult.agentSkills.results[0]?.format, "agent-skills");
   assert.equal(scanResult.agentSkills.results[0]?.valid, true);
   assert.equal(scanResult.agentSkills.results[0]?.migrationRecommended, false);
+  assert.equal(scanResult.agentSkills.results[0]?.warningCount, 0);
+  assert.equal(
+    scanResult.findings.some((finding) => finding.id.startsWith("SEC-")),
+    false,
+  );
+  assert.equal(
+    scanResult.findings.some(
+      (finding) => finding.id === "QUAL-MISSING-NEGATIVE-ROUTING",
+    ),
+    false,
+  );
 
   const catalogResult = await withCapturedConsole(() =>
     main(["catalog", root, "--format", "json"]),
@@ -2682,6 +2716,11 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
     result.stdout,
     /trigger description, instructions, workflow, constraints, completion criteria/,
   );
+  assert.match(
+    result.stdout,
+    /description is a discovery and routing surface, not an execution surface/,
+  );
+  assert.match(result.stdout, /clearly non-operational unsafe-example/);
   assert.match(result.stdout, /renma scan \. --fail-on high/);
   assert.match(
     result.stdout,
@@ -2695,7 +2734,9 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
 });
 
 async function fixture(): Promise<string> {
-  return mkdtemp(path.join(os.tmpdir(), "renma-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-"));
+  await mkdir(path.join(root, ".git"));
+  return root;
 }
 
 function escapeRegExp(value: string): string {

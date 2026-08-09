@@ -668,12 +668,12 @@ test("readiness markdown prints a compact reviewable report", async () => {
   const markdown = formatReadinessMarkdown(await readiness(root));
 
   assert.match(markdown, /^# Agent Readiness/m);
-  assert.match(markdown, /^- Status: Ready with advisories$/m);
+  assert.match(markdown, /^- Status: Ready$/m);
   assert.match(markdown, /^- Level: ready$/m);
   assert.match(markdown, /^- Score: 100$/m);
   assert.match(markdown, /^- Failing checks: 0$/m);
   assert.match(markdown, /^- Warning checks: 0$/m);
-  assert.match(markdown, /^- Findings: 1 \(non-blocking for Readiness\)$/m);
+  assert.match(markdown, /^- Findings: 0$/m);
   assert.match(markdown, /\| Total assets \| 1 \|/);
   assert.match(markdown, /^## Workflow Readiness$/m);
   assert.match(markdown, /\| Skill entrypoints \| 1 \|/);

@@ -8,6 +8,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added the Medium advisory
+  `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` for concrete high-risk literals in
+  structurally bounded, non-operational routing examples. Skill scaffolds,
+  `renma guide skill`, remediation, and authoring guidance now direct authors
+  toward semantic capability and selection wording, with exact dangerous
+  evidence kept in clearly non-operational body sections when necessary.
 - Added repository-level `metadata.required` policy for the registry-backed
   Skill/non-Skill metadata vocabulary, with strict configuration validation,
   declared-value presence semantics, canonical Skill enforcement, and the High
@@ -33,6 +39,23 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Canonical Agent Skill descriptions are now security-governed semantic units
+  with exact frontmatter evidence. Bounded quoted routing-example lists remain
+  non-operational, while later operational clauses stay visible; actual
+  destructive commands and other operational policy violations in descriptions
+  retain their existing High-severity security findings.
+- Improved bounded safeguard-bypass analysis for action-local prohibition and
+  negation scope, dependent purpose clauses, finite and conditional clauses,
+  punctuation-separated fallback actions, and Markdown-presentational emphasis.
+  Operationally routed blockquotes are scanned while ordinary attributed report
+  quotations remain inert, with original source evidence preserved.
+- Security-policy metadata eligibility is now evaluated independently from
+  whichever individual findings an operational instruction emits. Fetch,
+  upload, and sensitive-input workflows therefore continue to require declared
+  policy even when no separate destination or disclosure rule fires.
+- Updated the GitHub Actions example and CI guidance to use an exact installed
+  Renma dependency through `npm ci` and `npx --no-install`; source-checkout
+  development continues to build and invoke `dist` directly.
 - Tuned the Renma default to Skill (6,400/8,000): no finding
   through 6,400 estimated tokens, Medium above 6,400 through 8,000, and High
   above 8,000. The separate portable Agent Skills recommendation remains 5,000
@@ -50,6 +73,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
+- Security diagnostics remain deterministic static checks and bounded,
+  best-effort natural-language heuristics; they do not claim complete semantic
+  or coreference analysis. Runtime gateway policy, sandboxing, filesystem and
+  network restrictions, and approval enforcement remain required execution
+  controls, with Renma serving as one layer of the combined defense.
 - Portable Agent Skills requirements, ownership inheritance, scaffold and
   migration behavior, Context Lens compatibility, security metadata, and token
   budgets are unchanged. An inherited effective owner remains available to

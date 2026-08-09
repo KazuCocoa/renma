@@ -19,6 +19,7 @@ import {
   validateSkillAuthoringHandoffTarget,
   type SkillAuthoringHandoff,
 } from "../skill-authoring-handoff.js";
+import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "../types/skill-description.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -193,7 +194,7 @@ function renderSkillScaffold(metadata: {
   const relationships = metadata.relationships;
   return `---
 name: ${metadata.name}
-description: Replace this description with clear routing guidance. Use when the intended workflow applies.
+description: Replace this capability and routing placeholder with repository-grounded wording. Use when the agreed recurring workflow needs this Skill; do not use for unrelated tasks or runtime context selection.
 metadata:
   renma.id: ${yamlString(metadata.id)}
   renma.title: ${yamlString(metadata.title)}
@@ -236,11 +237,11 @@ Move knowledge into a Context Asset under \`contexts/\` only when it has an inde
 
 ## Constraints
 
+- ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}
 - Keep recommendations grounded in provided inputs and repository evidence.
-- Do not invent domain facts, policies, owners, dependencies, or product behavior.
-- Do not choose runtime task context beyond this skill's declared scope.
-- Do not assemble prompts for live model calls.
-- Access an external service only when this Skill's reviewed workflow requires it and effective security policy explicitly permits it; a Markdown link alone is not permission.
+- Leave domain facts, policies, owners, dependencies, and product behavior unspecified when repository evidence does not declare them; stop and report any resulting blocker.
+- Stay within this Skill's declared scope; stop and report requests that require different runtime task context.
+- Keep the result as reviewable workflow guidance instead of prompt material for live model calls.
 
 ## Validation
 
@@ -364,6 +365,7 @@ function renderPrompt(input: {
     input.kind === "skill"
       ? [
           "- Keep the Skill in Agent Skills format with Renma extensions under `metadata.renma.*`.",
+          `- ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}`,
           "- Use `metadata.renma.requires-context` for context the skill normally depends on, encoded as a JSON-array string.",
           "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
@@ -501,12 +503,13 @@ function renderSkillNextSteps(fromHandoff = false): string {
   }
   return [
     "Next steps:",
-    "1. Run `renma guide skill` and confirm this is the smallest non-redundant intended asset structure.",
+    "1. Confirm the `renma guide skill` authoring gate already established the smallest non-redundant intended asset structure.",
     "2. Scaffold or reuse only Context Assets justified by an independent maintenance or governance boundary.",
     "3. Complete the focused workflow and any evidence-backed security policy; use platform-native Skill authoring guidance only to refine semantics within Renma boundaries.",
-    "4. Run `renma scan . --fail-on high` and inspect catalog and graph evidence.",
-    "5. Fix relevant findings and rerun validation.",
-    "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",
+    "4. Use `renma guide skill` again only when intentionally reconsidering the agreed asset boundaries.",
+    "5. Run `renma scan . --fail-on high` and inspect catalog and graph evidence.",
+    "6. Fix relevant findings and rerun validation.",
+    "7. Have a human review meaningful semantic changes and unresolved decisions before merging.",
   ].join("\n");
 }
 

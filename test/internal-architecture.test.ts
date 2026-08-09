@@ -111,6 +111,7 @@ test("target repository evidence preserves exact unavailable boundary reasons", 
     await writeFile(targetPath, "# Boundary fixture\n");
     const target = await collectTargetDocumentEvidence(targetPath, {
       unresolvedArtifactPath: "absolute",
+      repositoryMarkerSearchBoundary: root,
     });
     const repository = await collectTargetRepositoryEvidence(target);
 

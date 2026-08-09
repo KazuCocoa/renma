@@ -4,6 +4,7 @@ import { hiddenUnicodeFindings } from "./hidden-unicode.js";
 import {
   classifyNpmSelector,
   classifyPythonSelector,
+  type FloatingDependencyAllowance,
 } from "./dependency-selectors.js";
 import {
   applySecurityConfig,
@@ -22,9 +23,12 @@ import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
+import { inspectAgentSkill } from "./agent-skills.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownSourceRange,
+  parseMarkdownSyntax,
+  requiredMarkdownPosition,
   type MarkdownSyntax,
 } from "./markdown-syntax.js";
 import {
@@ -66,6 +70,7 @@ import {
   type BodyPolicyClauseFacts,
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
+import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "./types/skill-description.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -80,7 +85,7 @@ export type {
   NetworkDestination,
 } from "./security-destination/index.js";
 
-type SecurityCategory = "safety";
+type SecurityCategory = "quality" | "safety";
 
 type RuleMetadata = {
   id: DiagnosticId;
@@ -103,6 +108,8 @@ type Detection = {
   snippet: string;
   dedupeKey?: string;
   details?: Record<string, unknown>;
+  semanticEvidenceText?: string;
+  semanticEvidenceSource?: "canonical-description";
 };
 
 type DetectionEvidence = Pick<Detection, "startLine" | "endLine" | "snippet">;
@@ -657,6 +664,28 @@ const RULES = {
     confidence: "medium",
     riskClass: "suspicious",
   },
+  canonicalDescriptionHighRiskLiteral: {
+    id: DIAGNOSTIC_IDS.QUAL_SKILL_DESCRIPTION_HIGH_RISK_LITERAL,
+    category: "quality",
+    title: "Canonical Skill description contains a high-risk routing literal",
+    whyItMatters:
+      "Quoted request examples are non-operational routing evidence, but concrete high-risk payloads in top-level descriptions are easy for generators and reviewers to reuse outside that boundary.",
+    remediation: `Replace the literal with semantic routing wording. ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}`,
+    constraints: [
+      "Do not reinterpret the quoted literal as an operational instruction solely to raise severity.",
+      "Do not automatically rewrite an owner-authored description.",
+      "Keep real operational text visible to the existing security diagnostics.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the description contains capabilities and selection boundaries rather than a concrete high-risk payload.",
+      "If exact evidence is necessary, confirm it is in a clearly non-operational Skill body section.",
+    ],
+    llmHint:
+      "Recommend a semantic routing paraphrase without automatically rewriting the description. If the exact dangerous literal must be retained, move it to a clearly non-operational unsafe-example or review-evidence section in the Skill body.",
+    confidence: "high",
+    riskClass: "advisory",
+  },
   destructiveCommand: {
     id: DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
     category: "safety",
@@ -780,7 +809,7 @@ const REDACTION_TARGET_RE =
 const APPROVAL_RE =
   /\b(ask|prompt|require|obtain|wait for)\b.{0,50}\b(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|consent|authorization|review)\b|\b(human|user|owner|maintainer|reviewer|security)\b.{0,50}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\bonly\b.{0,20}\b(after|with)\b.{0,40}\b(explicit\s+)?(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|review|authorization)\b|\bdo\s+not\s+run\s+automatically\b.{0,60}\b(human|user|maintainer|review|approval|confirmation)\b/i;
 const WEAK_OR_NEGATED_APPROVAL_RE =
-  /\b(no approval|approval is not|approval isn't|approved by default|approval by default|without approval|automatically approved|safe|run carefully|make sure it works)\b/i;
+  /\b(no approval|approval (?:is )?unavailable|approval is not|approval isn't|approved by default|approval by default|without (?:approval|confirmation|authorization)|automatically approved|safe|run carefully|make sure it works)\b/i;
 const RECOVERY_GUARD_RE =
   /\b(create|make|take|keep|verify|confirm|document|check|use|run)\b.{0,40}\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b|\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b.{0,40}\b(first|before|steps?|plan|guidance|confirm|verify|check)\b/i;
 const SECRET_WORD_RE =
@@ -807,16 +836,79 @@ const CREDENTIAL_HEADER_RE =
   /\bAuthorization:\s*Bearer\s+(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
 const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
-const SAFEGUARD_BYPASS_PATTERNS = [
-  /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
-  /\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b/i,
-  /\b(continue|proceed|execute|run|apply|upload|delete|publish)\b.{0,80}\b(without|despite (?:missing|unavailable)|even (?:if|when) (?:there is )?no)\b.{0,60}\b(approval|confirmation|authorization|review|verification)\b/i,
-  /\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
-  /\b(weaken|relax|lower|loosen|override|change)\b.{0,80}\b(security policy|security profile|policy|restrictions?|rules?)\b.{0,80}\b(pass|silence|clear|avoid)\b.{0,40}\b(diagnostics?|checks?|scan|warnings?)\b/i,
-  /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i,
-  /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
-  /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
-] as const;
+type SafeguardBypassPattern = {
+  pattern: RegExp;
+  /** Presence opts this pattern into bounded immediate next-clause association. */
+  immediateContinuationCondition?: RegExp;
+  /** Only selected condition families treat restored approval as defensive. */
+  restoredApprovalGuardCanExempt?: boolean;
+};
+
+/** Bounded missing-approval or missing-review condition before an action. */
+const MISSING_APPROVAL_CONDITION_RE =
+  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,80}\b(?:approval|confirmation|authorization|review|user response|human response)\b[^.;:!?—–\n\r]{0,80}\b(?:unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b/iu;
+/** Bounded permission or access failure condition before a privileged fallback. */
+const PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE =
+  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:permission|permissions|access)\b[^.;:!?—–\n\r]{0,60}\b(?:denied|unavailable|insufficient|missing)\b/iu;
+/** Bounded human nonresponse or nonapproval condition before a default action. */
+const HUMAN_NONRESPONSE_CONDITION_RE =
+  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:user|human|owner|reviewer)\b[^.;:!?—–\n\r]{0,60}\b(?:does not|doesn't|fails? to|never)\b[^.;:!?—–\n\r]{0,30}\b(?:respond|reply|confirm|approve)\b/iu;
+const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
+  {
+    pattern:
+      /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
+  },
+  {
+    pattern:
+      /\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b/i,
+  },
+  {
+    pattern:
+      /\b(continue|proceed|execute|run|apply|upload|delete|publish)\b.{0,80}\b(without|despite (?:missing|unavailable)|even (?:if|when) (?:there is )?no)\b.{0,60}\b(approval|confirmation|authorization|review|verification)\b/i,
+  },
+  {
+    pattern:
+      /\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+    immediateContinuationCondition: MISSING_APPROVAL_CONDITION_RE,
+    restoredApprovalGuardCanExempt: true,
+  },
+  {
+    pattern:
+      /\b(weaken|relax|lower|loosen|override|change)\b.{0,80}\b(security policy|security profile|policy|restrictions?|rules?)\b.{0,80}\b(pass|silence|clear|avoid)\b.{0,40}\b(diagnostics?|checks?|scan|warnings?)\b/i,
+  },
+  {
+    pattern:
+      /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i,
+  },
+  {
+    pattern:
+      /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
+    immediateContinuationCondition: PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE,
+    restoredApprovalGuardCanExempt: false,
+  },
+  {
+    pattern:
+      /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+    immediateContinuationCondition: HUMAN_NONRESPONSE_CONDITION_RE,
+    restoredApprovalGuardCanExempt: false,
+  },
+  {
+    pattern:
+      /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
+  },
+];
+const SAFEGUARD_ACTION_PREDICATE_RE =
+  /(?<![\p{L}\p{N}_-])(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
+const SAFEGUARD_PROHIBITION_RE =
+  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
+const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
+const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–]+$/u;
+const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
+  /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu;
+// A subject followed by a finite auxiliary/copula starts a new clause; a
+// trailing `to` in that clause does not make it a dependent purpose complement.
+const SAFEGUARD_FINITE_CLAUSE_RE =
+  /(?:^|\s)(?:(?:i|you|he|she|it|we|they|this|that|these|those)\b|(?:the|a|an)\s+[\p{L}\p{N}_-]+\b)\s+(?:am|is|are|was|were|be|being|been|has|have|had|do|does|did|can|could|may|might|must|shall|should|will|would)\b/iu;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
@@ -890,6 +982,7 @@ interface PreparedSecurityDocumentAnalysis {
   readonly sourceLines: readonly string[];
   readonly visibleLines: readonly string[];
   readonly markdownView: MarkdownSecurityView;
+  readonly canonicalDescription: CanonicalDescriptionSecurityUnit | undefined;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
@@ -897,6 +990,11 @@ interface PreparedSecurityDocumentAnalysis {
     number,
     SecurityParagraphLineContext
   >;
+}
+
+interface CanonicalDescriptionSecurityUnit {
+  readonly text: string;
+  readonly evidence: DetectionEvidence;
 }
 
 interface SecurityGuardHistory {
@@ -998,10 +1096,17 @@ function securityFindingsForDocument(
   const prepared = prepareSecurityDocumentAnalysis(document, securityConfig);
   if (prepared === undefined) return [];
 
-  const detections: Detection[] = [
-    ...collectPolicyPreludeDetections(prepared),
+  const instructionDetections = [
+    ...collectCanonicalDescriptionDetections(prepared),
     ...collectSecurityLineDetections(prepared),
     ...collectSemanticInstructionDetections(prepared),
+  ];
+  const detections: Detection[] = [
+    ...collectPolicyPreludeDetections(
+      prepared,
+      hasPolicyRelevantInstructionSurface(prepared),
+    ),
+    ...instructionDetections,
     ...policyContradictions(prepared.effectivePolicy),
   ];
 
@@ -1034,6 +1139,10 @@ function prepareSecurityDocumentAnalysis(
     );
   }
   const markdownView = new MarkdownSecurityView(syntax);
+  const canonicalDescription = canonicalSkillDescriptionSecurityUnit(
+    document,
+    sourceLines,
+  );
   const scanStart = syntax.bodyStartLine - 1;
   const visibleLines = sourceLines.map((_, index) =>
     markdownView.visibleLine(index),
@@ -1060,10 +1169,38 @@ function prepareSecurityDocumentAnalysis(
     sourceLines,
     visibleLines,
     markdownView,
+    canonicalDescription,
     scanStart,
     logicalCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,
     securityParagraphContextByLine: securityParagraphAnalysis.contextByLine,
+  };
+}
+
+function canonicalSkillDescriptionSecurityUnit(
+  document: ParsedDocument,
+  sourceLines: readonly string[],
+): CanonicalDescriptionSecurityUnit | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  const inspection = inspectAgentSkill(document);
+  if (
+    inspection.validation.format !== "agent-skills" ||
+    !inspection.validation.valid ||
+    inspection.validation.description === undefined
+  ) {
+    return undefined;
+  }
+  const field = inspection.frontmatter.fields.find(
+    (candidate) => candidate.key === "description",
+  );
+  if (field === undefined) return undefined;
+  return {
+    text: inspection.validation.description,
+    evidence: {
+      startLine: field.startLine,
+      endLine: field.endLine,
+      snippet: sourceLines.slice(field.startLine - 1, field.endLine).join("\n"),
+    },
   };
 }
 
@@ -1287,18 +1424,27 @@ function prepareLogicalCommandAnalysis(
   markdownView: MarkdownSecurityView,
   policy: SecurityPolicy,
 ): PreparedLogicalCommandAnalysis {
-  const commands = logicalShellCommands(sourceLines, visibleLines, scanStart, {
-    isLineEligible: (lineIndex) =>
-      isLogicalShellLineEligible(
-        sourceLines,
-        visibleLines,
-        lineIndex,
-        markdownView,
-      ),
-    sameBlock: (firstLineIndex, secondLineIndex) =>
-      markdownView.sameMarkdownBlock(firstLineIndex, secondLineIndex),
-    isCodeContentLine: (lineIndex) => markdownView.isCodeContentLine(lineIndex),
-  });
+  const instructionLines = visibleLines.map((_, lineIndex) =>
+    markdownView.instructionLine(lineIndex),
+  );
+  const commands = logicalShellCommands(
+    sourceLines,
+    instructionLines,
+    scanStart,
+    {
+      isLineEligible: (lineIndex) =>
+        isLogicalShellLineEligible(
+          sourceLines,
+          visibleLines,
+          lineIndex,
+          markdownView,
+        ),
+      sameBlock: (firstLineIndex, secondLineIndex) =>
+        markdownView.sameMarkdownBlock(firstLineIndex, secondLineIndex),
+      isCodeContentLine: (lineIndex) =>
+        markdownView.isCodeContentLine(lineIndex),
+    },
+  );
   const destinationByCommand = analyzeLogicalShellCommands(commands);
   const securityByCommand = new Map(
     commands.map((command) => {
@@ -1345,6 +1491,7 @@ function prepareLogicalCommandAnalysis(
 
 function collectPolicyPreludeDetections(
   prepared: PreparedSecurityDocumentAnalysis,
+  hasSecuritySensitiveInstructions: boolean,
 ): Detection[] {
   const {
     artifact,
@@ -1368,6 +1515,7 @@ function collectPolicyPreludeDetections(
   ];
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
+    hasSecuritySensitiveInstructions &&
     !parsedPolicy.invalidDeclared.has("allowedData") &&
     effectiveAllowedDataClass(effectivePolicy) === undefined &&
     effectiveAllowedDataList(effectivePolicy).length === 0
@@ -1413,9 +1561,10 @@ function prepareSecurityLineContext(
   guardHistory: SecurityGuardHistory,
   index: number,
 ): SecurityLineContext | undefined {
-  const { artifact, visibleLines, markdownView, logicalCommands } = prepared;
+  const { artifact, sourceLines, visibleLines, markdownView, logicalCommands } =
+    prepared;
   const lineNumber = index + 1;
-  const line = visibleLines[index] ?? "";
+  const line = markdownView.instructionLine(index);
   if (isShellCommentLine(line, index, markdownView)) {
     return undefined;
   }
@@ -1423,7 +1572,9 @@ function prepareSecurityLineContext(
     return undefined;
   }
 
-  const quotedProse = markdownView.isBlockQuotedLine(index);
+  const quotedProse =
+    markdownView.isBlockQuotedLine(index) &&
+    !markdownView.isOperationalBlockQuotedLine(index);
   const hasHumanApprovalGuard =
     hasExplicitHumanApprovalGuard(line) ||
     (guardHistory.recentHumanApprovalLine > 0 &&
@@ -1466,7 +1617,7 @@ function prepareSecurityLineContext(
     CREDENTIAL_HEADER_RE.test(line);
   const evidence: DetectionEvidence = {
     startLine: lineNumber,
-    snippet: line,
+    snippet: sourceLines[index] ?? visibleLines[index] ?? line,
   };
   const logicalCommand = logicalCommands.commandByLine.get(index);
   const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
@@ -1546,6 +1697,7 @@ function securityLineDetections(
 ): Detection[] {
   const { effectivePolicy: policy } = prepared;
   const {
+    index,
     lineNumber,
     line,
     paragraphText,
@@ -1692,9 +1844,30 @@ function securityLineDetections(
   }
 
   if (commandLine && !quotedProse) {
-    detections.push(
-      ...commandDetections(
-        line,
+    const operationalBlockquote =
+      prepared.markdownView.isOperationalBlockQuotedLine(index);
+    if (operationalBlockquote && logicalCommand !== undefined) {
+      if (logicalCommandStart) {
+        const commandEvidence = logicalShellCommandEvidence(logicalCommand);
+        detections.push(
+          ...commandDetections(
+            logicalCommand.shellProjection.projection,
+            lineNumber,
+            hasCommandRiskGuard,
+            logicalSecurityAnalysis,
+          ).map((detection) => ({
+            ...detection,
+            ...commandEvidence,
+          })),
+        );
+      }
+    } else {
+      const commandText =
+        logicalCommand !== undefined && logicalCommandStart
+          ? logicalCommand.shellProjection.projection
+          : line;
+      const commandRiskDetections = commandDetections(
+        commandText,
         lineNumber,
         hasCommandRiskGuard,
         logicalCommand === undefined
@@ -1702,8 +1875,16 @@ function securityLineDetections(
           : logicalCommandStart
             ? logicalSecurityAnalysis
             : undefined,
-      ),
-    );
+      );
+      detections.push(
+        ...(logicalCommand !== undefined && logicalCommandStart
+          ? commandRiskDetections.map((detection) => ({
+              ...detection,
+              ...evidence,
+            }))
+          : commandRiskDetections),
+      );
+    }
   }
 
   return detections;
@@ -1733,6 +1914,458 @@ function collectSemanticInstructionDetections(
   return detections;
 }
 
+function collectCanonicalDescriptionDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const description = prepared.canonicalDescription;
+  if (description === undefined) return [];
+  const { text, evidence } = description;
+  const instructionProjection = canonicalDescriptionInstructionProjection(text);
+  const detections = [
+    ...canonicalDescriptionRoutingLiteralAuthoringDetections(
+      text,
+      evidence,
+      prepared,
+    ),
+    ...canonicalDescriptionOperationalDetections(
+      instructionProjection,
+      evidence,
+      prepared,
+    ),
+  ];
+  return detections.map((detection) => ({
+    ...detection,
+    ...evidence,
+    semanticEvidenceText: instructionProjection,
+    semanticEvidenceSource: "canonical-description" as const,
+  }));
+}
+
+function canonicalDescriptionOperationalDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const destinationAnalysis = analyzeDestinations(text);
+  const commandProjection = text
+    .replace(/\\\r?\n[ \t]*/gu, " ")
+    .replace(/\r?\n/gu, " ");
+  const commandAnalysis = analyzeSecurityCommand({
+    source: {
+      text,
+      startLine: evidence.startLine,
+      endLine: evidence.endLine ?? evidence.startLine,
+      lines: text.split(/\r?\n/u),
+    },
+    guards: [],
+    destinationAnalysis,
+    allowedFloatingDependencies:
+      prepared.parsedPolicy.allowedFloatingDependencies,
+  });
+  const hasHumanApprovalGuard = hasExplicitHumanApprovalGuard(text);
+  const hasCommandRiskGuard =
+    hasHumanApprovalGuard || hasLocalRiskMitigationGuard(text);
+  const unit: MarkdownSemanticUnit = {
+    kind: "paragraph",
+    startLine: evidence.startLine,
+    endLine: evidence.endLine ?? evidence.startLine,
+    lines: text.split(/\r?\n/u),
+  };
+  return [
+    ...policyDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      hasHumanApprovalGuard,
+      { scope: "all", analysis: destinationAnalysis },
+    ),
+    ...disallowedCommandDetections(
+      text,
+      evidence.startLine,
+      prepared.effectivePolicy,
+    ),
+    ...canonicalDescriptionSensitiveDataDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      prepared.parsedPolicy.allowedFloatingDependencies,
+    ),
+    ...networkAndUploadDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      destinationAnalysis,
+    ),
+    ...contextScopeDetections(text, evidence.startLine),
+    ...predictableTempDetections(text, evidence.startLine),
+    ...commandDetections(
+      commandProjection,
+      evidence.startLine,
+      hasCommandRiskGuard,
+      commandAnalysis,
+    ),
+    ...semanticInstructionDetections(unit, prepared.markdownView, {
+      evidence,
+      sectionText: text,
+    }),
+    ...descriptionForbiddenInputDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+    ),
+  ];
+}
+
+const CANONICAL_DESCRIPTION_ROUTING_LITERAL_RISK_IDS = new Set<DiagnosticId>([
+  DIAGNOSTIC_IDS.SEC_BULK_DATA_SHARING_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_CLOUD_UPLOAD_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_CREDENTIAL_IN_COMMAND_ARG,
+  DIAGNOSTIC_IDS.SEC_DANGEROUS_TOOL_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
+  DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_FORBIDDEN_INPUT_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_INSTRUCTION_VIOLATES_POLICY,
+  DIAGNOSTIC_IDS.SEC_MISSING_HUMAN_APPROVAL_GUARD,
+  DIAGNOSTIC_IDS.SEC_NO_REDACTION_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_OVERBROAD_CONTEXT_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_PRIVILEGED_COMMAND_WITHOUT_GUARD,
+  DIAGNOSTIC_IDS.SEC_SAFEGUARD_BYPASS_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_SECRET_MATERIAL_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_SENSITIVE_FILE_REFERENCE,
+  DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION,
+  DIAGNOSTIC_IDS.SEC_UNAPPROVED_UPLOAD_DESTINATION,
+  DIAGNOSTIC_IDS.SEC_UNBOUNDED_EXTERNAL_SOURCE_TRAVERSAL,
+  DIAGNOSTIC_IDS.SEC_UNPINNED_DEPENDENCY_INSTALL,
+  DIAGNOSTIC_IDS.SEC_UNPINNED_REMOTE_SCRIPT,
+  DIAGNOSTIC_IDS.SEC_UNTRUSTED_CONTENT_AS_INSTRUCTION,
+]);
+
+function canonicalDescriptionRoutingLiteralAuthoringDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const underlyingDiagnosticIds = new Set<DiagnosticId>();
+  for (const span of canonicalDescriptionRoutingExampleSpans(text)) {
+    const literal = text.slice(span.start + 1, span.end - 1).trim();
+    if (!literal) continue;
+    for (const detection of canonicalDescriptionOperationalDetections(
+      literal,
+      evidence,
+      prepared,
+    )) {
+      if (
+        CANONICAL_DESCRIPTION_ROUTING_LITERAL_RISK_IDS.has(
+          detection.metadata.id,
+        )
+      ) {
+        underlyingDiagnosticIds.add(detection.metadata.id);
+      }
+    }
+  }
+  if (underlyingDiagnosticIds.size === 0) return [];
+
+  return [
+    {
+      metadata: RULES.canonicalDescriptionHighRiskLiteral,
+      severity: "medium",
+      ...evidence,
+      dedupeKey: `${RULES.canonicalDescriptionHighRiskLiteral.id}:${evidence.startLine}`,
+      details: {
+        underlyingDiagnosticIds: [...underlyingDiagnosticIds].sort(),
+      },
+    },
+  ];
+}
+
+function canonicalDescriptionSensitiveDataDetections(
+  instructionProjection: string,
+  evidence: DetectionEvidence,
+  policy: SecurityPolicy,
+  allowedFloatingDependencies: readonly FloatingDependencyAllowance[],
+): Detection[] {
+  const ranges = disclosureClauseRangesIntersectingRange(
+    instructionProjection,
+    0,
+    instructionProjection.length,
+  );
+  const clauses =
+    ranges.length === 0
+      ? [instructionProjection]
+      : ranges.map(({ start, end }) => instructionProjection.slice(start, end));
+
+  return clauses.flatMap((clause) => {
+    const destinationAnalysis = analyzeDestinations(clause);
+    const analysis = analyzeSecurityCommand({
+      source: {
+        text: clause,
+        startLine: evidence.startLine,
+        endLine: evidence.endLine ?? evidence.startLine,
+        lines: clause.split(/\r?\n/u),
+      },
+      guards: [],
+      destinationAnalysis,
+      allowedFloatingDependencies,
+    });
+    return fallbackSensitiveDataDetections(clause, evidence, policy, analysis);
+  });
+}
+
+function canonicalDescriptionInstructionProjection(text: string): string {
+  const projected = text.split("");
+  for (const span of canonicalDescriptionRoutingExampleSpans(text)) {
+    for (let index = span.start; index < span.end; index += 1) {
+      projected[index] = " ";
+    }
+  }
+
+  return projected.join("");
+}
+
+const CANONICAL_DESCRIPTION_ROUTING_EXAMPLE_INTRODUCTION_RE =
+  /\b(?:use|apply|select|choose|invoke)\b[^.!?\n]{0,100}\brequests?\b[^.!?\n]{0,40}\b(?:such as|including|like)\b/giu;
+
+function canonicalDescriptionRoutingExampleSpans(
+  text: string,
+): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  for (const introduction of text.matchAll(
+    CANONICAL_DESCRIPTION_ROUTING_EXAMPLE_INTRODUCTION_RE,
+  )) {
+    if (introduction.index === undefined) continue;
+    const sentenceStart = introduction.index + introduction[0].length;
+    const sentenceRemainder = text.slice(sentenceStart);
+    const sentenceBoundary = sentenceRemainder.search(/[.!?](?:\s|$)/u);
+    const sentenceEnd =
+      sentenceBoundary === -1 ? text.length : sentenceStart + sentenceBoundary;
+    const examples = text.slice(sentenceStart, sentenceEnd);
+    for (const span of routingExampleListSpans(examples)) {
+      spans.push({
+        start: sentenceStart + span.start,
+        end: sentenceStart + span.end,
+      });
+    }
+  }
+  return spans;
+}
+
+function routingExampleListSpans(
+  text: string,
+): Array<{ start: number; end: number }> {
+  const pairedSpans = pairedRoutingExampleSpans(text);
+  const first = pairedSpans.find(({ start }) =>
+    /^\s*:?\s*$/u.test(text.slice(0, start)),
+  );
+  if (first === undefined) return [];
+
+  const listSpans = [first];
+  for (const span of pairedSpans) {
+    if (span.start <= first.start) continue;
+    const previous = listSpans[listSpans.length - 1];
+    if (
+      previous === undefined ||
+      !isRoutingExampleListSeparator(text.slice(previous.end, span.start))
+    ) {
+      break;
+    }
+    listSpans.push(span);
+  }
+  return listSpans;
+}
+
+function isRoutingExampleListSeparator(text: string): boolean {
+  return /^\s*(?:,\s*(?:(?:and|or)\s*)?|(?:and|or)\s+)\s*$/iu.test(text);
+}
+
+function pairedRoutingExampleSpans(
+  text: string,
+): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  const pairedDelimiters = new Map([
+    ['"', '"'],
+    ["“", "”"],
+    ["'", "'"],
+    ["‘", "’"],
+    ["`", "`"],
+  ]);
+
+  for (let start = 0; start < text.length; start += 1) {
+    const opener = text[start] ?? "";
+    const closer = pairedDelimiters.get(opener);
+    if (closer === undefined || !isRoutingExampleSpanOpening(text, start)) {
+      continue;
+    }
+    let end = start + 1;
+    for (; end < text.length; end += 1) {
+      if (text[end] === "\n" || text[end] === "\r") break;
+      if (
+        text[end] === closer &&
+        isRoutingExampleSpanClosing(text, end, closer)
+      ) {
+        break;
+      }
+    }
+    if (end >= text.length || text[end] !== closer || end === start + 1) {
+      continue;
+    }
+    spans.push({ start, end: end + 1 });
+    start = end;
+  }
+
+  return spans;
+}
+
+function isRoutingExampleSpanOpening(text: string, index: number): boolean {
+  const delimiter = text[index];
+  if (delimiter === "'") {
+    return (
+      !isRoutingExampleWordCharacter(text[index - 1]) &&
+      !/^\s$/u.test(text[index + 1] ?? "")
+    );
+  }
+  if (delimiter === "`") {
+    return text[index - 1] !== "`" && text[index + 1] !== "`";
+  }
+  return true;
+}
+
+function isRoutingExampleSpanClosing(
+  text: string,
+  index: number,
+  delimiter: string,
+): boolean {
+  if (delimiter === "'") {
+    return (
+      !/^\s$/u.test(text[index - 1] ?? "") &&
+      !isRoutingExampleWordCharacter(text[index + 1])
+    );
+  }
+  if (delimiter === "`") {
+    return text[index - 1] !== "`" && text[index + 1] !== "`";
+  }
+  return true;
+}
+
+function isRoutingExampleWordCharacter(character: string | undefined): boolean {
+  return character !== undefined && /[\p{L}\p{N}_]/u.test(character);
+}
+
+function hasPolicyRelevantInstructionSurface(
+  prepared: PreparedSecurityDocumentAnalysis,
+): boolean {
+  const candidates: string[] = [];
+  if (prepared.canonicalDescription !== undefined) {
+    candidates.push(
+      canonicalDescriptionInstructionProjection(
+        prepared.canonicalDescription.text,
+      ),
+    );
+  }
+  for (const unit of prepared.markdownView.semanticUnits) {
+    candidates.push(unit.lines.join("\n"));
+  }
+  for (const command of prepared.logicalCommands.commands) {
+    candidates.push(command.shellProjection.projection);
+  }
+  for (
+    let lineIndex = prepared.scanStart;
+    lineIndex < prepared.visibleLines.length;
+    lineIndex += 1
+  ) {
+    if (
+      prepared.markdownView.isBlockQuotedLine(lineIndex) &&
+      !prepared.markdownView.isOperationalBlockQuotedLine(lineIndex)
+    ) {
+      continue;
+    }
+    const line = prepared.markdownView.instructionLine(lineIndex);
+    if (
+      isPolicyLine(line) ||
+      isShellCommentLine(line, lineIndex, prepared.markdownView)
+    ) {
+      continue;
+    }
+    candidates.push(line);
+  }
+  return candidates.some(policyRelevantInstructionText);
+}
+
+function policyRelevantInstructionText(text: string): boolean {
+  if (!text.trim()) return false;
+  const positiveDisclosureActionsForText = positiveDisclosureActions(text);
+  const defensiveOnly =
+    isDefensiveActionInstruction(text) &&
+    positiveDisclosureActionsForText.length === 0 &&
+    unsafeSafeguardClause(text) === undefined;
+  if (defensiveOnly) return false;
+
+  const destinationAnalysis = analyzeDestinations(text);
+  if (
+    isNetworkInstruction(destinationAnalysis) ||
+    isUploadInstruction(destinationAnalysis)
+  ) {
+    return true;
+  }
+  if (
+    /\b(?:curl|wget)\b|\b(?:npm|pnpm|yarn)\s+(?:install|add)\b|\b(?:pip3?|python(?:\d+(?:\.\d+)*)?\s+-m\s+pip|uv\s+pip)\s+install\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+
+  const sensitiveTarget =
+    SECRET_WORD_RE.test(text) || referencesSensitiveFile(text);
+  const sensitiveAction =
+    /\b(read|collect|copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|load|provide)\b/i.test(
+      text,
+    );
+  if (
+    sensitiveTarget &&
+    sensitiveAction &&
+    !SAFE_FORBIDDEN_INPUT_PATTERN.test(text) &&
+    !isSafeSensitiveHandlingInstruction(text)
+  ) {
+    return true;
+  }
+
+  return (
+    requiresLineLocalApprovalGuard(text) ||
+    unsafeSafeguardClause(text) !== undefined ||
+    OVERBROAD_CONTEXT_RE.test(text) ||
+    NO_REDACTION_RE.test(text) ||
+    (UNREDACTED_SENSITIVE_DATA_RE.test(text) &&
+      DATA_DISCLOSURE_ACTION_RE.test(text))
+  );
+}
+
+function descriptionForbiddenInputDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  policy: SecurityPolicy,
+): Detection[] {
+  return policy.forbiddenInputs.flatMap((forbiddenInput) => {
+    const needle = forbiddenInput.trim();
+    if (!needle) return [];
+    const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
+    if (
+      !pattern.test(text) ||
+      SAFE_FORBIDDEN_INPUT_PATTERN.test(text) ||
+      !FORBIDDEN_INPUT_ACTION_PATTERN.test(text)
+    ) {
+      return [];
+    }
+    return [
+      {
+        metadata: RULES.forbiddenInputInstruction,
+        severity: "high" as const,
+        ...evidence,
+        dedupeKey: `forbidden-input:${needle.toLowerCase()}`,
+      },
+    ];
+  });
+}
+
 function requireLogicalDestinationAnalysis(
   command: LogicalShellCommand,
   analysis: DestinationAnalysis | undefined,
@@ -1751,9 +2384,11 @@ function isLogicalShellLineEligible(
 ): boolean {
   const source = sourceLines[lineIndex] ?? "";
   const visible = visibleLines[lineIndex] ?? "";
+  const operationalBlockQuote =
+    markdownView.isOperationalBlockQuotedLine(lineIndex);
   return (
-    source === visible &&
-    !markdownView.isBlockQuotedLine(lineIndex) &&
+    (source === visible || operationalBlockQuote) &&
+    (!markdownView.isBlockQuotedLine(lineIndex) || operationalBlockQuote) &&
     !isPolicyLine(visible) &&
     !isShellCommentLine(visible, lineIndex, markdownView)
   );
@@ -2059,7 +2694,8 @@ function policyDetections(
   const defensiveAction =
     isDefensiveActionInstruction(semanticLine) && positiveActions.length === 0;
   const safeOrGuarded =
-    GUARDED_ACTION_RE.test(semanticLine) ||
+    (GUARDED_ACTION_RE.test(semanticLine) &&
+      !WEAK_OR_NEGATED_APPROVAL_RE.test(semanticLine)) ||
     (defensiveAction && !positiveDestinationAction);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
     "approvedNetworkDestinations",
@@ -2419,7 +3055,8 @@ function networkAndUploadDetections(
     semanticLine,
   ).some(({ kind }) => kind === "network" || kind === "external-upload");
   if (
-    GUARDED_ACTION_RE.test(semanticLine) ||
+    (GUARDED_ACTION_RE.test(semanticLine) &&
+      !WEAK_OR_NEGATED_APPROVAL_RE.test(semanticLine)) ||
     (isDefensiveActionInstruction(semanticLine) && !positiveDestinationAction)
   ) {
     return detections;
@@ -3039,6 +3676,10 @@ function isBulkDataSharingInstruction(line: string): boolean {
 function semanticInstructionDetections(
   unit: MarkdownSemanticUnit,
   markdownView: MarkdownSecurityView,
+  options: {
+    evidence?: DetectionEvidence;
+    sectionText?: string;
+  } = {},
 ): Detection[] {
   const detections: Detection[] = [];
   const firstLine =
@@ -3053,32 +3694,28 @@ function semanticInstructionDetections(
       .slice(0, index)
       .reduce((offset, line) => offset + line.length + 1, 0),
   );
-  const windowEvidence = {
+  const windowEvidence = options.evidence ?? {
     startLine: firstLine,
     endLine: firstLine + instructionLines.length - 1,
     snippet: instructionLines.join("\n"),
   };
 
   const safeguardLineIndex = instructionLines.findIndex(
-    (line) =>
-      SAFEGUARD_BYPASS_PATTERNS.some((pattern) => pattern.test(line)) &&
-      !DIRECT_DEFENSIVE_SEMANTIC_RE.test(line),
+    (line) => unsafeSafeguardClause(line) !== undefined,
   );
-  const safeguardWindowMatches = SAFEGUARD_BYPASS_PATTERNS.some((pattern) =>
-    pattern.test(instructionText),
-  );
-  const safeguardInstructionText =
-    safeguardLineIndex >= 0
-      ? (instructionLines[safeguardLineIndex] ?? "")
-      : instructionText;
-  if (
-    (safeguardLineIndex >= 0 || safeguardWindowMatches) &&
-    !DIRECT_DEFENSIVE_SEMANTIC_RE.test(safeguardInstructionText)
-  ) {
+  const safeguardWindowMatches =
+    unsafeSafeguardClause(instructionText) !== undefined;
+  if (safeguardLineIndex >= 0 || safeguardWindowMatches) {
     const evidence =
-      safeguardLineIndex >= 0
-        ? semanticLineEvidence(instructionLines, firstLine, safeguardLineIndex)
-        : windowEvidence;
+      options.evidence !== undefined
+        ? options.evidence
+        : safeguardLineIndex >= 0
+          ? semanticLineEvidence(
+              instructionLines,
+              firstLine,
+              safeguardLineIndex,
+            )
+          : windowEvidence;
     detections.push({
       metadata: RULES.safeguardBypassInstruction,
       severity: "high",
@@ -3131,7 +3768,8 @@ function semanticInstructionDetections(
       continue;
     }
     const evidenceLine = firstLine + lineIndex;
-    const sectionText = markdownView.instructionSectionText(evidenceLine);
+    const sectionText =
+      options.sectionText ?? markdownView.instructionSectionText(evidenceLine);
     const hasAnyBoundary = TRAVERSAL_BOUNDARY_PATTERNS.some((pattern) =>
       pattern.test(sectionText),
     );
@@ -3160,6 +3798,217 @@ function semanticInstructionDetections(
   }
 
   return detections;
+}
+
+function unsafeSafeguardClause(text: string): string | undefined {
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  const actions = safeguardActionPolarities(analysisText);
+  for (const {
+    pattern,
+    immediateContinuationCondition,
+    restoredApprovalGuardCanExempt,
+  } of SAFEGUARD_BYPASS_PATTERNS) {
+    for (const match of overlappingPatternMatches(analysisText, pattern)) {
+      const matchEnd = match.start + match.text.length;
+      const matchedActions = actions.filter(
+        ({ start }) =>
+          start >= match.start &&
+          start < matchEnd &&
+          isSafeguardPatternActionAssociated(
+            analysisText,
+            match.start,
+            start,
+            immediateContinuationCondition,
+            restoredApprovalGuardCanExempt ?? false,
+          ),
+      );
+      if (matchedActions.some(({ prohibited }) => !prohibited)) {
+        return text.slice(match.start, matchEnd);
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
+function safeguardMarkdownPresentationProjection(text: string): string {
+  if (!/[*_]/u.test(text)) return text;
+  const projected = text.split("");
+  const syntax = parseMarkdownSyntax(text, 1);
+  for (const { node } of syntax.records) {
+    if (node.type !== "emphasis" && node.type !== "strong") continue;
+    const position = requiredMarkdownPosition(node);
+    const start = position.start.offset;
+    const end = position.end.offset;
+    if (start === undefined || end === undefined) continue;
+    const delimiterLength = node.type === "strong" ? 2 : 1;
+    const delimiter = text[start];
+    const closingStart = end - delimiterLength;
+    if (
+      (delimiter !== "*" && delimiter !== "_") ||
+      text.slice(start, start + delimiterLength) !==
+        delimiter.repeat(delimiterLength) ||
+      text.slice(closingStart, end) !== delimiter.repeat(delimiterLength)
+    ) {
+      continue;
+    }
+    for (let index = start; index < start + delimiterLength; index += 1) {
+      projected[index] = " ";
+    }
+    for (let index = closingStart; index < end; index += 1) {
+      projected[index] = " ";
+    }
+  }
+  return projected.join("");
+}
+
+function isSafeguardPatternActionAssociated(
+  text: string,
+  matchStart: number,
+  actionStart: number,
+  immediateContinuationCondition: RegExp | undefined,
+  restoredApprovalGuardCanExempt: boolean,
+): boolean {
+  const prefix = text.slice(matchStart, actionStart);
+  const crossesHardBoundary = SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(prefix);
+  if (immediateContinuationCondition === undefined) {
+    return !crossesHardBoundary;
+  }
+  if (!crossesHardBoundary) {
+    return (
+      !restoredApprovalGuardCanExempt ||
+      !safeguardActionHasExplicitApprovalGuard(text, actionStart)
+    );
+  }
+
+  const condition = immediateContinuationCondition.exec(prefix);
+  if (condition?.index === undefined) return false;
+  const bridge = prefix.slice(condition.index + condition[0].length);
+  if (!SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE.test(bridge)) {
+    return false;
+  }
+  // Approval restoration is an explicit per-family policy, not a universal
+  // exemption from conditional safeguard-bypass recognition.
+  if (!restoredApprovalGuardCanExempt) return true;
+
+  return !safeguardActionHasExplicitApprovalGuard(text, actionStart);
+}
+
+function safeguardActionHasExplicitApprovalGuard(
+  text: string,
+  actionStart: number,
+): boolean {
+  const actionRemainder = text.slice(actionStart, actionStart + 160);
+  const nextBoundary = actionRemainder.search(SAFEGUARD_HARD_SCOPE_BOUNDARY_RE);
+  const actionClause =
+    nextBoundary === -1
+      ? actionRemainder
+      : actionRemainder.slice(0, nextBoundary);
+  return hasExplicitHumanApprovalGuard(actionClause);
+}
+
+function overlappingPatternMatches(
+  text: string,
+  pattern: RegExp,
+): Array<{ text: string; start: number }> {
+  const matches: Array<{ text: string; start: number }> = [];
+  const flags = pattern.flags.replace(/[gy]/gu, "");
+  let cursor = 0;
+  while (cursor < text.length) {
+    const match = new RegExp(pattern.source, flags).exec(text.slice(cursor));
+    if (match?.index === undefined) break;
+    const start = cursor + match.index;
+    matches.push({ text: match[0], start });
+    cursor = start + 1;
+  }
+  return matches;
+}
+
+function safeguardActionPolarities(
+  text: string,
+): Array<{ start: number; end: number; prohibited: boolean }> {
+  const actions = [...text.matchAll(SAFEGUARD_ACTION_PREDICATE_RE)].flatMap(
+    (match) =>
+      match.index === undefined
+        ? []
+        : [
+            {
+              start: match.index,
+              end: match.index + match[0].length,
+              prohibited: false,
+            },
+          ],
+  );
+
+  for (const [index, action] of actions.entries()) {
+    const previous = actions[index - 1];
+    const localStart = previous?.end ?? Math.max(0, action.start - 120);
+    const localPrefix = text.slice(localStart, action.start);
+    const prohibitions = [...localPrefix.matchAll(SAFEGUARD_PROHIBITION_RE)];
+    const directProhibition = prohibitions[prohibitions.length - 1];
+    if (directProhibition?.index !== undefined) {
+      const directBridge = localPrefix.slice(
+        directProhibition.index + directProhibition[0].length,
+      );
+      action.prohibited = isDirectSafeguardProhibitionBridge(directBridge);
+      continue;
+    }
+    if (
+      previous?.prohibited === true &&
+      (isCoordinatedSafeguardActionBridge(
+        text.slice(previous.end, action.start),
+      ) ||
+        isDependentInfinitivalPurposeBridge(
+          text.slice(previous.end, action.start),
+        ))
+    ) {
+      action.prohibited = true;
+    }
+  }
+
+  return actions;
+}
+
+function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
+  if (
+    bridge.length > 80 ||
+    SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(bridge) ||
+    bridge.trim().length === 0
+  ) {
+    return false;
+  }
+  if (/^\s*,\s*$/u.test(bridge)) return true;
+  if (/^[^,]{1,70},\s*$/u.test(bridge)) return true;
+  return /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu.test(bridge);
+}
+
+function isDirectSafeguardProhibitionBridge(bridge: string): boolean {
+  return (
+    bridge.length <= 80 &&
+    !hasSafeguardClauseBoundary(bridge) &&
+    !SAFEGUARD_FINITE_CLAUSE_RE.test(bridge)
+  );
+}
+
+function isDependentInfinitivalPurposeBridge(bridge: string): boolean {
+  if (
+    bridge.length > 80 ||
+    /,/u.test(bridge) ||
+    hasSafeguardClauseBoundary(bridge) ||
+    SAFEGUARD_FINITE_CLAUSE_RE.test(bridge)
+  ) {
+    return false;
+  }
+  return /\b(?:(?:merely|only)\s+to|(?:in\s+order|so\s+as)\s+to|to)\s*$/iu.test(
+    bridge,
+  );
+}
+
+function hasSafeguardClauseBoundary(bridge: string): boolean {
+  return (
+    SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(bridge) ||
+    SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE.test(bridge)
+  );
 }
 
 function semanticLineEvidence(
@@ -3636,7 +4485,23 @@ function sensitiveTempWords(line: string): boolean {
 function dedupeDetections(detections: Detection[]): Detection[] {
   const seen = new Set<string>();
   const unique: Detection[] = [];
+  const descriptionDetections = detections.filter(
+    (detection) => detection.semanticEvidenceSource === "canonical-description",
+  );
   for (const detection of detections) {
+    if (
+      detection.semanticEvidenceSource !== "canonical-description" &&
+      descriptionDetections.some(
+        (description) =>
+          description.metadata.id === detection.metadata.id &&
+          equivalentSemanticEvidence(
+            description.semanticEvidenceText ?? "",
+            detection.snippet,
+          ),
+      )
+    ) {
+      continue;
+    }
     const key =
       detection.dedupeKey ?? `${detection.metadata.id}:${detection.snippet}`;
     if (!seen.has(key)) {
@@ -3645,6 +4510,22 @@ function dedupeDetections(detections: Detection[]): Detection[] {
     }
   }
   return unique;
+}
+
+function equivalentSemanticEvidence(first: string, second: string): boolean {
+  const left = normalizeSemanticEvidence(first);
+  const right = normalizeSemanticEvidence(second);
+  if (!left || !right) return false;
+  return left.includes(right) || right.includes(left);
+}
+
+function normalizeSemanticEvidence(value: string): string {
+  return value
+    .replace(/^\s*(?:description:\s*)?[>|*-]?\s*/gim, "")
+    .replace(/[`'".,;:!?()[\]{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function findingFromDetection(

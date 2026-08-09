@@ -71,12 +71,16 @@ const EXAMPLE_BOUNDARY_RE =
   /\b(unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+(?:example|pattern)s?\b|\bwhat not to do\b/i;
 const EXAMPLE_LABEL_RE =
   /\b(unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+examples?\s*:\s*$/i;
-const OPERATIONAL_FENCE_ROUTING_RE =
-  /\b(use|follow|apply|execute|run|perform|carry out)\b.{0,60}\b(following|below|these)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b|\b(following|below)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b.{0,40}\b(exactly|verbatim|as written)\b/i;
-const OPERATIONAL_FENCE_LABEL_RE =
+const OPERATIONAL_BLOCK_ROUTING_RE =
+  /\b(use|follow|apply|execute|run|perform|carry out)\b.{0,60}\b(following|below|these)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b|\b(following|below)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b.{0,40}\b(exactly|verbatim|as written)\b|\bfollow\b.{0,40}\b(?:this|the)\b.{0,20}\b(?:operational\s+)?instruction\b/i;
+const OPERATIONAL_BLOCK_LABEL_RE =
   /^\s*(?:(?:operational|execution)\s+)?(?:instructions?|steps?|procedure|workflow|payload)\s*:\s*$/i;
-const OPERATIONAL_FENCE_HEADING_RE =
+const OPERATIONAL_BLOCK_HEADING_RE =
   /\b(instructions?|operational instructions?|execution instructions?|procedure|runbook)\b/i;
+const NON_OPERATIONAL_QUOTATION_CONTEXT_RE =
+  /\b(?:ordinary|illustrative|reported|cited)\s+(?:quotation|quote|excerpt)\b|\b(?:incident|audit|review|source)\s+(?:report|evidence)\b.{0,60}\b(?:quotation|quote|excerpt)\b|\b(?:quotation|quote|excerpt)\b.{0,60}\b(?:incident|report|evidence)\b|\b(?:included|contains?|records?|quoted)\b.{0,40}\b(?:quotation|quote|excerpt)\b/i;
+const NON_OPERATIONAL_ATTRIBUTION_CONTEXT_RE =
+  /^\s*(?:(?:the\s+)?(?:(?:incident|security|audit|review|source)\s+)?(?:report|audit|evidence|record|transcript|log|finding)s?\s+(?:says?|states?|reports?|notes?|records?|reads?|shows?)|according\s+to\s+(?:the\s+)?(?:(?:incident|security|audit|review|source)\s+)?(?:report|audit|evidence|record|transcript|log|finding)s?)\s*:\s*$/i;
 const SAFETY_HEADING_RE =
   /\b(human approval|safety|constraints?|guardrails?)\b/i;
 
@@ -90,6 +94,7 @@ export class MarkdownSecurityView {
   private readonly headings: HeadingRecord[];
   private readonly thematicBreaks: MarkdownSourceRange[];
   private readonly blockQuoteLines = new Set<number>();
+  private readonly operationalBlockQuoteLines = new Set<number>();
   private readonly codeBlockLines = new Set<number>();
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
@@ -216,6 +221,18 @@ export class MarkdownSecurityView {
     return this.blockQuoteLines.has(lineIndex);
   }
 
+  isOperationalBlockQuotedLine(lineIndex: number): boolean {
+    return this.operationalBlockQuoteLines.has(lineIndex);
+  }
+
+  instructionLine(lineIndex: number): string {
+    const line = this.visibleLine(lineIndex);
+    if (!this.isOperationalBlockQuotedLine(lineIndex)) return line;
+    return line.replace(/^(?:\s{0,3}>[ \t]?)+/u, (prefix) =>
+      " ".repeat(prefix.length),
+    );
+  }
+
   isCodeBlockLine(lineIndex: number): boolean {
     return this.codeBlockLines.has(lineIndex);
   }
@@ -254,6 +271,12 @@ export class MarkdownSecurityView {
     firstLineIndex: number,
     lastLineIndex: number,
   ): boolean {
+    if (
+      this.isBlockQuotedLine(firstLineIndex) !==
+      this.isBlockQuotedLine(lastLineIndex)
+    ) {
+      return false;
+    }
     const startLine = firstLineIndex + 1;
     const endLine = lastLineIndex + 1;
     return ![...this.headings, ...this.thematicBreaks].some(
@@ -357,10 +380,15 @@ export class MarkdownSecurityView {
     const blockQuoted = record.ancestors.some(
       (ancestor) => ancestor.type === "blockquote",
     );
+    const operationalBlockQuote =
+      blockQuoted && this.isOperationalBlockQuote(record, range.startLine);
+    if (operationalBlockQuote) {
+      addLines(this.operationalBlockQuoteLines, range);
+    }
     return {
       unit: { kind: "paragraph", ...range, lines },
       operational:
-        !blockQuoted &&
+        (!blockQuoted || operationalBlockQuote) &&
         !lines.every((line) => /^\s*\/\//.test(line)) &&
         !this.isNonOperationalExample(record, range.startLine),
     };
@@ -395,13 +423,18 @@ export class MarkdownSecurityView {
     const blockQuoted = record.ancestors.some(
       (ancestor) => ancestor.type === "blockquote",
     );
+    const operationalBlockQuote =
+      blockQuoted && this.isOperationalBlockQuote(record, range.startLine);
+    if (operationalBlockQuote) {
+      addLines(this.operationalBlockQuoteLines, range);
+    }
     return {
       unit: { kind: "code", ...range, contentStartLine, lines },
       contentEndLine,
       operational:
         fenced &&
         semanticLanguage &&
-        !blockQuoted &&
+        (!blockQuoted || operationalBlockQuote) &&
         !this.isNonOperationalExample(record, range.startLine) &&
         this.isOperationalFence(record, range.startLine),
     };
@@ -428,6 +461,14 @@ export class MarkdownSecurityView {
         const blockQuoted = record.ancestors.some(
           (ancestor) => ancestor.type === "blockquote",
         );
+        const operationalBlockQuote =
+          blockQuoted && this.isOperationalBlockQuote(record, startLine);
+        if (operationalBlockQuote) {
+          addLines(this.operationalBlockQuoteLines, {
+            startLine,
+            endLine: startLine + lines.length - 1,
+          });
+        }
         candidates.push({
           unit: {
             kind: "paragraph",
@@ -436,7 +477,7 @@ export class MarkdownSecurityView {
             lines,
           },
           operational:
-            !blockQuoted &&
+            (!blockQuoted || operationalBlockQuote) &&
             !this.isNonOperationalExample(record, startLine) &&
             !lines.every((line) => /^\s*\/\//.test(line)),
           htmlDerived: true,
@@ -465,25 +506,57 @@ export class MarkdownSecurityView {
   }
 
   private isOperationalFence(record: NodeRecord, line: number): boolean {
-    const previous = record.parent.children[record.index - 1];
+    const container = this.routedContainerRecord(record);
+    const previous = container.parent.children[container.index - 1];
     const previousText = previous === undefined ? "" : nodeText(previous);
     return (
-      OPERATIONAL_FENCE_ROUTING_RE.test(previousText) ||
-      OPERATIONAL_FENCE_LABEL_RE.test(previousText) ||
+      OPERATIONAL_BLOCK_ROUTING_RE.test(previousText) ||
+      OPERATIONAL_BLOCK_LABEL_RE.test(previousText) ||
       this.headingChainAt(line).some((heading) =>
-        OPERATIONAL_FENCE_HEADING_RE.test(heading.text),
+        OPERATIONAL_BLOCK_HEADING_RE.test(heading.text),
       )
+    );
+  }
+
+  private isOperationalBlockQuote(record: NodeRecord, line: number): boolean {
+    if (this.isNonOperationalExample(record, line)) return false;
+    const container = this.routedContainerRecord(record);
+    const previous = container.parent.children[container.index - 1];
+    const previousText = previous === undefined ? "" : nodeText(previous);
+    const explicitlyRouted =
+      OPERATIONAL_BLOCK_ROUTING_RE.test(previousText) ||
+      OPERATIONAL_BLOCK_LABEL_RE.test(previousText);
+    if (explicitlyRouted) return true;
+    if (
+      NON_OPERATIONAL_QUOTATION_CONTEXT_RE.test(previousText) ||
+      NON_OPERATIONAL_ATTRIBUTION_CONTEXT_RE.test(previousText)
+    ) {
+      return false;
+    }
+    return this.headingChainAt(line).some((heading) =>
+      OPERATIONAL_BLOCK_HEADING_RE.test(heading.text),
     );
   }
 
   private isNonOperationalExample(record: NodeRecord, line: number): boolean {
     if (EXAMPLE_BOUNDARY_RE.test(nodeText(record.node))) return true;
-    const previous = record.parent.children[record.index - 1];
+    const container = this.routedContainerRecord(record);
+    const previous = container.parent.children[container.index - 1];
     if (previous !== undefined && EXAMPLE_LABEL_RE.test(nodeText(previous))) {
       return true;
     }
     return this.headingChainAt(line).some((heading) =>
       EXAMPLE_BOUNDARY_RE.test(heading.text),
+    );
+  }
+
+  private routedContainerRecord(record: NodeRecord): NodeRecord {
+    const blockQuote = [...record.ancestors]
+      .reverse()
+      .find((ancestor) => ancestor.type === "blockquote");
+    if (blockQuote === undefined) return record;
+    return (
+      this.records.find((candidate) => candidate.node === blockQuote) ?? record
     );
   }
 
