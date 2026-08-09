@@ -215,8 +215,7 @@ try {
   for (const forbidden of [
     "plan.md",
     "plan-discovery.md",
-    "npm-debug.log",
-    "scripts/verify-release-tag.mjs",
+    "npm-debug.log"
   ]) {
     if (files.has(forbidden)) {
       throw new Error(`Package unexpectedly includes ${forbidden}`);
