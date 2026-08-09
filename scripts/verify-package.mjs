@@ -212,7 +212,12 @@ try {
       throw new Error(`Package unexpectedly includes ${forbiddenPrefix}`);
     }
   }
-  for (const forbidden of ["plan.md", "plan-discovery.md", "npm-debug.log"]) {
+  for (const forbidden of [
+    "plan.md",
+    "plan-discovery.md",
+    "npm-debug.log",
+    "scripts/verify-release-tag.mjs",
+  ]) {
     if (files.has(forbidden)) {
       throw new Error(`Package unexpectedly includes ${forbidden}`);
     }

@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import test from "node:test";
 
 const FIXTURE_PACKAGE_VERSION = "9.8.7";
-const VERIFY_SCRIPT = path.resolve("tools/verify-release-tag.mjs");
+const VERIFY_SCRIPT = path.resolve("scripts/verify-release-tag.mjs");
 
 test("release-tag verifier accepts an annotated tag at exact origin/main", async (t) => {
   const fixture = await releaseTagFixture(t, {

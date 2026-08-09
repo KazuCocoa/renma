@@ -115,6 +115,7 @@
   "files": [
     "dist",
     "scripts",
+    "!scripts/verify-release-tag.mjs",
     "docs",
     "!docs/public/branding",
     "!docs/development/",

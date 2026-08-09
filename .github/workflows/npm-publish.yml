@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Verify annotated release tag at exact origin/main
-        run: node tools/verify-release-tag.mjs
+        run: node scripts/verify-release-tag.mjs
 
   validate-supported-runtime:
     name: Supported runtime (${{ matrix.runtime }})

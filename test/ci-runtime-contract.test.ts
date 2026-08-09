@@ -264,7 +264,7 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
   assert.equal(refVerification?.permissions, undefined);
   assert.match(
     runCommands(refVerification).join("\n"),
-    /node tools\/verify-release-tag\.mjs/,
+    /node scripts\/verify-release-tag\.mjs/,
   );
 
   const validation = workflow.jobs?.["validate-supported-runtime"];

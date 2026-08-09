@@ -8,7 +8,7 @@ complete authorization boundary by themselves.
 ## Repository-visible checks
 
 Before the workflow enters its OIDC-enabled publish job,
-`tools/verify-release-tag.mjs` fetches the exact triggering tag object and
+`scripts/verify-release-tag.mjs` fetches the exact triggering tag object and
 `origin/main` from `origin`. It does not rely on checkout depth or a pre-existing
 local tag. The verifier requires a stable annotated version tag, recursively
 peels it to a commit, binds it to the checked-out workflow commit, requires
