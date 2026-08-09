@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 test("release-prep routes broad and resumable release requests", () => {
@@ -140,3 +143,130 @@ test("release-prep preserves wrapped changelog bullets in release notes", () => 
     assert.ok(result.stdout.includes(heading), `missing heading: ${heading}`);
   }
 });
+
+test("release-prep rejects stale maintained consumer pins during check-only finalization", async (t) => {
+  const root = await releasePrepFixture(t, "0.31.0");
+  const result = runReleasePrep(root);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stdout,
+    /FAIL consumer pin docs\/user-manual\.md is stale \(found renma@0\.31\.0; expected renma@0\.32\.0\)/,
+  );
+  assert.match(
+    result.stdout,
+    /FAIL consumer pin examples\/github-actions\/renma-ci-report\.yml is stale \(found renma@0\.31\.0; expected renma@0\.32\.0\)/,
+  );
+});
+
+test("release-prep accepts matching exact consumer pins during check-only finalization", async (t) => {
+  const root = await releasePrepFixture(t, "0.32.0");
+  const result = runReleasePrep(root);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /PASS consumer pin docs\/user-manual\.md matches renma@0\.32\.0/,
+  );
+  assert.match(
+    result.stdout,
+    /PASS consumer pin examples\/github-actions\/renma-ci-report\.yml matches renma@0\.32\.0/,
+  );
+  assert.match(result.stdout, /PASS only release files changed/);
+});
+
+test("release-prep reports missing and ambiguous maintained consumer pins clearly", async (t) => {
+  const missingRoot = await releasePrepFixture(t, undefined);
+  const missing = runReleasePrep(missingRoot);
+  assert.equal(missing.status, 1);
+  assert.match(
+    missing.stdout,
+    /consumer pin docs\/user-manual\.md is missing \(expected renma@0\.32\.0\)/,
+  );
+
+  const ambiguousRoot = await releasePrepFixture(t, "0.32.0", true);
+  const ambiguous = runReleasePrep(ambiguousRoot);
+  assert.equal(ambiguous.status, 1);
+  assert.match(
+    ambiguous.stdout,
+    /consumer pin docs\/user-manual\.md is ambiguous .*expected one renma@0\.32\.0/,
+  );
+});
+
+function runReleasePrep(root: string) {
+  return spawnSync(
+    "node",
+    [
+      path.resolve("tools/release-prep.mjs"),
+      "--check-only",
+      "--finalize",
+      "--version",
+      "0.32.0",
+      "--from",
+      "v0.31.0",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+}
+
+async function releasePrepFixture(
+  t: test.TestContext,
+  pinVersion: string | undefined,
+  duplicatePin = false,
+): Promise<string> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-release-prep-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "docs"), { recursive: true });
+  await mkdir(path.join(root, "examples", "github-actions"), {
+    recursive: true,
+  });
+
+  await writeReleaseFixtureFiles(root, "0.31.0", "0.31.0");
+  git(root, ["init", "-q"]);
+  git(root, ["config", "user.email", "renma@example.test"]);
+  git(root, ["config", "user.name", "Renma Test"]);
+  git(root, ["add", "."]);
+  git(root, ["commit", "-qm", "baseline"]);
+  git(root, ["tag", "v0.31.0"]);
+
+  await writeReleaseFixtureFiles(root, "0.32.0", pinVersion, duplicatePin);
+  return root;
+}
+
+async function writeReleaseFixtureFiles(
+  root: string,
+  packageVersion: string,
+  pinVersion: string | undefined,
+  duplicatePin = false,
+): Promise<void> {
+  await writeFile(
+    path.join(root, "package.json"),
+    `${JSON.stringify({ name: "renma", version: packageVersion }, null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(root, "package-lock.json"),
+    `${JSON.stringify({ name: "renma", version: packageVersion }, null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(root, "CHANGELOG.md"),
+    `# Changelog\n\n## [${packageVersion}]\n\n### Changed\n\n- Fixture release.\n\n[${packageVersion}]: https://github.com/KazuCocoa/renma/compare/v0.31.0...v${packageVersion}\n`,
+  );
+
+  const install =
+    pinVersion === undefined
+      ? "npm install --save-dev --save-exact renma"
+      : `npm install --save-dev --save-exact renma@${pinVersion}`;
+  await writeFile(
+    path.join(root, "docs", "user-manual.md"),
+    `${install}\n${duplicatePin ? `${install}\n` : ""}`,
+  );
+  await writeFile(
+    path.join(root, "examples", "github-actions", "renma-ci-report.yml"),
+    `# ${install}\n# npx --no-install renma scan . --strict\n`,
+  );
+}
+
+function git(root: string, args: string[]): void {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+}

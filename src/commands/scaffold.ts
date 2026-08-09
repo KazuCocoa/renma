@@ -20,6 +20,7 @@ import {
   type SkillAuthoringHandoff,
 } from "../skill-authoring-handoff.js";
 import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "../types/skill-description.js";
+import { RENMA_SCAFFOLD_PLACEHOLDERS } from "../scaffold-placeholders.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -194,7 +195,7 @@ function renderSkillScaffold(metadata: {
   const relationships = metadata.relationships;
   return `---
 name: ${metadata.name}
-description: Replace this capability and routing placeholder with repository-grounded wording. Use when the agreed recurring workflow needs this Skill; do not use for unrelated tasks or runtime context selection.
+description: ${RENMA_SCAFFOLD_PLACEHOLDERS.skill.description}
 metadata:
   renma.id: ${yamlString(metadata.id)}
   renma.title: ${yamlString(metadata.title)}
@@ -217,17 +218,17 @@ ${
 
 ## Purpose
 
-Describe the recurring task, decision, or workflow this skill should guide.
+${RENMA_SCAFFOLD_PLACEHOLDERS.skill.purpose}
 
 ## Required Inputs
 
-- List the inputs, evidence, or repository artifacts the agent should inspect before acting.
+${RENMA_SCAFFOLD_PLACEHOLDERS.skill.requiredInput}
 
 ## Instructions
 
-1. State the inputs, evidence, or repository artifacts the agent should inspect.
-2. Describe the review steps, checks, or decision points that should remain explicit and reviewable.
-3. Identify the expected output, artifact, or handoff.
+${RENMA_SCAFFOLD_PLACEHOLDERS.skill.inspectInstruction}
+${RENMA_SCAFFOLD_PLACEHOLDERS.skill.reviewInstruction}
+${RENMA_SCAFFOLD_PLACEHOLDERS.skill.expectedOutput}
 
 ## Context References
 
@@ -268,17 +269,17 @@ ${renderTagBlock(metadata.tags)}
 
 ## Summary
 
-Describe the durable context, rule, constraint, or domain fact this asset records.
+${RENMA_SCAFFOLD_PLACEHOLDERS.context.summary}
 
 ## Scope
 
 This context applies when:
 
-- Describe the systems, workflows, or skills that should consider this context.
+${RENMA_SCAFFOLD_PLACEHOLDERS.context.appliesWhen}
 
 This context does not apply when:
 
-- Describe nearby cases that should use a different context asset.
+${RENMA_SCAFFOLD_PLACEHOLDERS.context.doesNotApplyWhen}
 
 ## Guidance
 
@@ -428,6 +429,7 @@ ${contextLensGuidance.join("\n")}
 - Do not assemble prompts for live model calls.
 - Scaffold generation performs no network operations. A finished Skill may access a reviewed external source only when its authored workflow and effective security policy explicitly permit it.
 - Keep the asset LLM-facing and Renma-verifiable.
+- Renma reports its own exact generated Skill and Context starter markers as High findings. Replace every marker before the strict release/CI scan; this exact-marker check does not prove broader semantic completeness.
 - After creating files, run \`renma scan .\`, \`renma catalog . --format json\`, and \`renma graph . --focus ${input.id} --format mermaid\`.
 `;
 }
@@ -496,7 +498,7 @@ function renderSkillNextSteps(fromHandoff = false): string {
       "1. Author within the supplied handoff's asset boundary without promoting Proposed or Unresolved state to Confirmed.",
       "2. Create supporting assets only through separate explicit scaffold commands when intended.",
       "3. Re-enter clarification if new evidence creates a Blocking decision or changes the agreed asset boundary.",
-      "4. Run `renma scan . --fail-on high` and inspect catalog, graph, and readiness evidence.",
+      "4. Run `renma scan . --fail-on high` and inspect catalog, graph, and readiness evidence; exact generated scaffold residue is a High finding.",
       "5. Fix relevant findings and rerun validation.",
       "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",
     ].join("\n");
@@ -507,7 +509,7 @@ function renderSkillNextSteps(fromHandoff = false): string {
     "2. Scaffold or reuse only Context Assets justified by an independent maintenance or governance boundary.",
     "3. Complete the focused workflow and any evidence-backed security policy; use platform-native Skill authoring guidance only to refine semantics within Renma boundaries.",
     "4. Use `renma guide skill` again only when intentionally reconsidering the agreed asset boundaries.",
-    "5. Run `renma scan . --fail-on high` and inspect catalog and graph evidence.",
+    "5. Run `renma scan . --fail-on high` and inspect catalog and graph evidence; exact generated scaffold residue is a High finding.",
     "6. Fix relevant findings and rerun validation.",
     "7. Have a human review meaningful semantic changes and unresolved decisions before merging.",
   ].join("\n");

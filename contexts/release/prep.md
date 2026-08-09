@@ -109,18 +109,18 @@ For full release preparation:
 
 完全なリリース準備では、次の手順を実行します。
 
-1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, and release-relevant docs.
-   - `package.json`、`package-lock.json`、`CHANGELOG.md`、およびリリースに関係するドキュメントを確認します。
-2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, and base-tag consistency.
-   - `node tools/release-prep.mjs --check-only` を実行し、バージョン、changelog、およびベースタグの整合性を確認します。
-3. Edit release artifacts: version fields, changelog section/links, release notes, and docs affected by changed commands or diagnostics.
-   - バージョンフィールド、changelog のセクションとリンク、リリースノート、および変更されたコマンドや診断の影響を受けるドキュメントを編集します。
+1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, release-relevant docs, and the exact Renma consumer pins in `docs/user-manual.md` and `examples/github-actions/renma-ci-report.yml`.
+   - `package.json`、`package-lock.json`、`CHANGELOG.md`、リリース関連ドキュメント、および `docs/user-manual.md` と `examples/github-actions/renma-ci-report.yml` にある Renma コンシューマー向けの正確なバージョン固定を確認します。
+2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, base-tag, and maintained exact consumer-pin consistency. A missing, stale, ambiguous, or package-version-disagreeing pin is a blocker.
+   - `node tools/release-prep.mjs --check-only` を実行し、バージョン、changelog、ベースタグ、および保守対象の正確なコンシューマー向けバージョン固定の整合性を確認します。固定の欠落、古い値、曖昧さ、または package バージョンとの不一致はブロッカーです。
+3. Edit release artifacts: version fields, changelog section/links, release notes, affected docs, and both maintained exact consumer pins. Keep `--save-exact`, `npm ci`, and `npx --no-install`; do not replace the version with a floating range.
+   - バージョンフィールド、changelog のセクションとリンク、リリースノート、影響を受けるドキュメント、および保守対象の 2 つの正確なコンシューマー向け固定値を編集します。`--save-exact`、`npm ci`、`npx --no-install` を維持し、バージョンを変動範囲に置き換えません。
 4. Run `node tools/release-prep.mjs --release-notes --version <version>` to generate the GitHub Release body from `CHANGELOG.md`. Add `--from <tag>` or `--to <ref>` when generating notes for an older tag or a non-default comparison range.
    - `node tools/release-prep.mjs --release-notes --version <version>` を実行し、`CHANGELOG.md` から GitHub Release の本文を生成します。過去のタグまたはデフォルト以外の比較範囲からノートを生成する場合は、`--from <tag>` または `--to <ref>` を追加します。
 5. Run `node tools/release-prep.mjs` to execute tests, build, Renma scan/catalog/readiness/graph, diff, and CI report.
    - `node tools/release-prep.mjs` を実行し、テスト、ビルド、Renma の scan、catalog、readiness、graph、diff、および CI report を実行します。
-6. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files and create the local version commit and annotated tag.
-   - 依頼された場合は、`node tools/release-prep.mjs --finalize` を実行し、意図したリリースファイルだけをステージして、ローカルのバージョンコミットと注釈付きタグを作成します。
+6. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files—including both maintained pin-bearing consumer examples—and create the local version commit and annotated tag.
+   - 依頼された場合は、`node tools/release-prep.mjs --finalize` を実行し、保守対象のバージョン固定を含む 2 つのコンシューマー例を含め、意図したリリースファイルだけをステージして、ローカルのバージョンコミットと注釈付きタグを作成します。
 7. Hand off changed artifacts, generated release notes, validation results, blockers, residual risks, commit hash, and tag name.
    - 変更した成果物、生成したリリースノート、検証結果、ブロッカー、残存リスク、コミットハッシュ、およびタグ名を引き継ぎます。
 
@@ -182,14 +182,16 @@ For a GitHub-Release-only request on an existing tag, verify steps 4, 6, and 7 a
 
 ## Validation
 
-Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only, `--release-notes` for GitHub Release body generation, and `--finalize` for local commit/tag creation after validation.
+Run `node tools/release-prep.mjs`; use `--check-only` for metadata and maintained exact consumer-pin checks only, `--release-notes` for GitHub Release body generation, and `--finalize` for local commit/tag creation after validation.
 
-`node tools/release-prep.mjs` を実行します。メタデータチェックだけを行う場合は `--check-only`、GitHub Release の本文を生成する場合は `--release-notes`、検証後にローカルのコミットとタグを作成する場合は `--finalize` を使用します。
+`node tools/release-prep.mjs` を実行します。メタデータと保守対象の正確なコンシューマー向けバージョン固定だけを確認する場合は `--check-only`、GitHub Release の本文を生成する場合は `--release-notes`、検証後にローカルのコミットとタグを作成する場合は `--finalize` を使用します。
 
 ## Completion Criteria
 
 - Release metadata, changelog, docs, and release notes are consistent for the target version.
 - リリースメタデータ、changelog、ドキュメント、およびリリースノートが対象バージョンについて整合しています。
+- Every maintained consumer installation example uses one unambiguous exact `renma@<version>` target pin and retains `--save-exact`, `npm ci`, and `npx --no-install` behavior.
+- 保守対象の各コンシューマー向けインストール例が、曖昧さのない正確な `renma@<version>` 対象バージョンを 1 つ使用し、`--save-exact`、`npm ci`、`npx --no-install` の動作を維持しています。
 - GitHub-ready release notes are generated from `CHANGELOG.md` and the intended comparison range, and displayed directly when that is the user's request.
 - GitHub 向けリリースノートが `CHANGELOG.md` と意図した比較範囲から生成され、ユーザーが求めた場合はそのまま表示されています。
 - Required Renma reports have been run, or any skipped report is explained.

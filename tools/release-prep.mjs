@@ -2,7 +2,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const RELEASE_FILES = ["package.json", "package-lock.json", "CHANGELOG.md"];
+const CONSUMER_INSTALLATION_FILES = [
+  "docs/user-manual.md",
+  "examples/github-actions/renma-ci-report.yml",
+];
+const RELEASE_FILES = [
+  "package.json",
+  "package-lock.json",
+  "CHANGELOG.md",
+  ...CONSUMER_INSTALLATION_FILES,
+];
 const REPOSITORY_URL = "https://github.com/KazuCocoa/renma";
 
 const args = process.argv.slice(2);
@@ -31,12 +40,19 @@ if (options.releaseNotes) {
 
 const checks = [];
 
-checks.push(check("package.json version", readPackageVersion() === version));
+const packageVersion = readPackageVersion();
+checks.push(
+  check(
+    `target version agrees with package.json (${version})`,
+    packageVersion === version,
+  ),
+);
 checks.push(check("package-lock.json version", readLockVersion() === version));
 checks.push(check("CHANGELOG section", changelogHasVersion(version)));
 checks.push(
   check("CHANGELOG compare link", changelogHasCompareLink(version, base)),
 );
+checks.push(...consumerInstallationPinChecks(version));
 
 if (base) {
   checks.push(check("base tag exists", gitOk(["rev-parse", "--verify", base])));
@@ -207,6 +223,58 @@ function changelogHasCompareLink(releaseVersion, baseTag) {
   return readFileSync("CHANGELOG.md", "utf8").includes(
     `[${releaseVersion}]: ${REPOSITORY_URL}/compare/${baseTag}...v${releaseVersion}`,
   );
+}
+
+function consumerInstallationPinChecks(releaseVersion) {
+  return CONSUMER_INSTALLATION_FILES.map((file) => {
+    if (!existsSync(file)) {
+      return check(
+        `consumer pin ${file} is missing (expected renma@${releaseVersion})`,
+        false,
+      );
+    }
+
+    const content = readFileSync(file, "utf8");
+    const pins = [...content.matchAll(/\brenma@([^\s`"'\\]+)/g)].map((match) =>
+      (match[1] ?? "").replace(/[),.;:]+$/u, ""),
+    );
+    if (pins.length === 0) {
+      return check(
+        `consumer pin ${file} is missing (expected renma@${releaseVersion})`,
+        false,
+      );
+    }
+    if (pins.length !== 1) {
+      return check(
+        `consumer pin ${file} is ambiguous (found ${pins.map((pin) => `renma@${pin}`).join(", ")}; expected one renma@${releaseVersion})`,
+        false,
+      );
+    }
+
+    const [pin] = pins;
+    if (pin !== releaseVersion) {
+      return check(
+        `consumer pin ${file} is stale (found renma@${pin}; expected renma@${releaseVersion})`,
+        false,
+      );
+    }
+
+    const exactInstallLines = content.split(/\r?\n/).filter((line) => {
+      return (
+        /\bnpm\s+install\b/u.test(line) &&
+        line.includes("--save-exact") &&
+        line.includes(`renma@${releaseVersion}`)
+      );
+    });
+    if (exactInstallLines.length !== 1) {
+      return check(
+        `consumer pin ${file} is not one unambiguous npm --save-exact installation example for renma@${releaseVersion}`,
+        false,
+      );
+    }
+
+    return check(`consumer pin ${file} matches renma@${releaseVersion}`, true);
+  });
 }
 
 function latestVersionTag(releaseVersion) {
@@ -472,9 +540,9 @@ Options:
   --version <version>  Release version. Defaults to package.json version.
   --from <tag>         Base tag. Defaults to latest v* tag.
   --to <ref>           Target ref for Renma diff reports. Defaults to HEAD.
-  --check-only         Check metadata consistency without running commands.
+  --check-only         Check metadata and exact consumer-pin consistency without running commands.
   --release-notes      Print GitHub-ready release notes from CHANGELOG.md.
-  --finalize           After validation, stage release files and create local version commit/tag.
+  --finalize           After validation, stage version, changelog, and maintained consumer-pin files, then create a local commit/tag.
   --help               Show this help.
 `);
 }

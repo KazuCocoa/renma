@@ -171,9 +171,9 @@ sufficient structural evidence.
 ## Readiness policy
 
 Readiness starts at 100. Specification failures, high or critical security
-findings, diagnostic errors, and unresolved required graph closure remain
-blocking even when the numeric score would otherwise pass. Deprecated or
-archived assets have no existence penalty.
+findings, diagnostic errors, unresolved required graph closure, and exact
+Renma-owned scaffold residue remain blocking even when the numeric score would
+otherwise pass. Deprecated or archived assets have no existence penalty.
 
 Readiness answers whether a repository passes these gates; it does not require
 the report to contain zero findings. A `ready` report may still have actionable,
@@ -198,6 +198,7 @@ Readiness penalties and thresholds below are unchanged.
 | `readiness.unresolvedRequiredGraphPenalty` | 30 | points; one or more unresolved required edges | subtract once and fail check | Renma | Required context closure is operationally necessary; optional edges are excluded | `graph.unresolved_edges` | 0.18.0 | possibly |
 | `readiness.ownershipMaximumPenalty` | 20 | points; proportional to unowned assets | subtract 0-20 | Renma | Ownership supports review, but small or imported repositories may intentionally omit it | `ownership.coverage` | 0.18.0 | possibly |
 | `readiness.emptyInventoryPenalty` | 10 | points; no cataloged assets | subtract once | Renma | Usually signals a wrong root or incomplete repository; an intentionally empty repository can be valid | `assets.minimum_inventory` | 0.18.0 | possibly |
+| `readiness.scaffoldResiduePenalty` | 20 | points; one or more exact Renma-owned Skill or Context scaffold markers remain | subtract once and fail check | Renma | Generated starter prose is not authored content; exact-marker matching keeps the boundary deterministic and narrow | `assets.scaffold_completeness` / `QUAL-RENMA-SCAFFOLD-PLACEHOLDER` | Unreleased | possibly |
 | `readiness.workflowClarityPenalty` | 10 | points; workflow clarity warning | subtract once | Renma | Missing routing clarity impairs use; prose phrasing may evade static recognition | `workflow.clarity` and related `RN-SKILL-*` diagnostics | 0.18.0 | possibly |
 | `readiness.workflowOptionalContextPenalty` | 5 | points; unusable optional context | subtract once | Renma | Optional context should resolve but does not block the core workflow | `workflow.optional_context` | 0.18.0 | possibly |
 | `readiness.workflowRequiredInputsPenalty` | 5 | points; required inputs are unclear | subtract once | Renma | Review signal only because some Skills require no external inputs | `workflow.required_inputs` | 0.18.0 | possibly |

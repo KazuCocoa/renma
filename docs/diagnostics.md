@@ -11,6 +11,11 @@ warnings do not make an otherwise specification-valid Skill invalid. The
 canonical identifier table is in
 [Agent Skills Diagnostic Identifiers](agent-skills-compatibility.md#agent-skills-diagnostic-identifiers).
 
+`QUAL-RENMA-SCAFFOLD-PLACEHOLDER` is intentionally not a general prose-quality
+heuristic. It matches only canonical Renma-generated Skill and Context starter
+strings, after bounded whitespace/YAML resolution, and retains the exact source
+line. Marker-free content may still be incomplete and requires human review.
+
 ## Diagnostic Types
 
 renma uses two severity systems:
@@ -1130,6 +1135,7 @@ written during scanning.
 | `QUAL-MISSING-REQUIRED-INPUTS`                   | Required inputs are unclear.                         | The asset does not state what information is needed.                                               | Add an explicit required-inputs section.                                                               |
 | `QUAL-MISSING-ROUTING-CLARITY`                   | Routing guidance is unclear.                         | A Skill or Agent lacks explicit selection language in its effective description or Markdown body.                 | Add a bounded phrase such as `Use when`, `When to use`, or another clear trigger, role, or routing statement. |
 | `QUAL-MISSING-VERIFICATION`                      | Verification guidance is missing.                    | Markdown headings and body text lack recognizable static guidance for checking the workflow result.              | Add verification or validation steps, tests, or an expected output/result.                                  |
+| `QUAL-RENMA-SCAFFOLD-PLACEHOLDER`               | Exact Renma-generated scaffold prose remains unresolved. | A canonical Skill description or complete Skill/Context body line still equals one of Renma's own starter markers. | Replace the evidenced marker with repository-grounded content; do not infer missing domain or governance truth. Clearing exact markers does not certify semantic completeness. |
 | `QUAL-SHORT-DESCRIPTION`                         | Disabled compatibility identifier.                   | 0.17 applied an independent 150-character minimum.                                                  | Use Agent Skills validity and selection-boundary diagnostics; short clear descriptions are accepted.  |
 | `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL`       | Canonical Skill description contains a high-risk routing literal. | A bounded quoted routing example is non-operational but existing command, disclosure, policy, or safeguard classifiers recognize its concrete payload. | Replace the literal with semantic routing wording. If exact evidence is necessary, move it to a clearly non-operational unsafe-example or review-evidence body section; do not automatically rewrite owner-authored prose. |
 | `QUAL-SKILL-MIXED-RESPONSIBILITY`                | Skill may mix workflow and reusable knowledge.       | A sufficiently large Skill has multiple distinct reusable-knowledge signals.                       | Promote only independently owned shared knowledge; keep Skill-local workflow and detail local.         |

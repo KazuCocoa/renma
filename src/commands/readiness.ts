@@ -252,6 +252,9 @@ export function buildReadinessReport(
       node.status === "archived",
   );
   const discoveryReadiness = buildSkillDiscoveryReadiness(skillDiscovery);
+  const scaffoldResidueFindings = findings.filter(
+    (finding) => finding.id === DIAGNOSTIC_IDS.QUAL_RENMA_SCAFFOLD_PLACEHOLDER,
+  );
 
   /**
    * Workflow checks are static entrypoint-readiness checks.
@@ -273,6 +276,9 @@ export function buildReadinessReport(
     lifecycleCheck(lifecycleAssets),
     freshnessCheck(findings),
     minimumInventoryCheck(totalAssets),
+    ...(scaffoldResidueFindings.length > 0
+      ? [scaffoldCompletenessCheck(scaffoldResidueFindings)]
+      : []),
     findingCheck(
       "workflow.skills_focused",
       "Focused skill workflows",
@@ -379,6 +385,9 @@ export function buildReadinessReport(
         : 0) -
       ownershipPenalty -
       (totalAssets === 0 ? QUALITY.readiness.emptyInventoryPenalty : 0) -
+      (scaffoldResidueFindings.length > 0
+        ? QUALITY.readiness.scaffoldResiduePenalty
+        : 0) -
       layoutPenalty -
       workflowClarityPenalty -
       workflowOptionalContextPenalty -
@@ -884,6 +893,21 @@ function blockingSecurityCheck(findings: Finding[]): ReadinessCheck {
       id: finding.id,
       path: finding.evidence.path,
       message: finding.remediation,
+    })),
+  };
+}
+
+function scaffoldCompletenessCheck(findings: Finding[]): ReadinessCheck {
+  return {
+    id: "assets.scaffold_completeness",
+    title: "Renma scaffold completeness",
+    status: "fail",
+    severity: "error",
+    summary: `${findings.length} exact Renma-generated scaffold marker${findings.length === 1 ? " remains" : "s remain"} unresolved.`,
+    evidence: findings.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: `${finding.remediation} Evidence: ${finding.evidence.snippet}`,
     })),
   };
 }

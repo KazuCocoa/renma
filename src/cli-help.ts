@@ -855,6 +855,7 @@ export const COMMAND_HELP = [
       "Proposed reversible defaults and Unresolved Deferred decisions may remain when progression.blocking is empty.",
       "--resources creates only selected empty directories and never placeholder files.",
       "Generated scaffold content is a starting structure, not a complete asset.",
+      "Renma reports only its own exact generated Skill and Context starter markers as High findings. Replace every marker before the strict release or CI scan; this deterministic check does not certify general semantic completeness.",
       "For Skills, first use renma guide skill to establish the smallest asset structure and repository boundaries; use platform-native Skill authoring guidance only to refine semantics within those boundaries.",
       "Correctness importance alone does not justify a Context Asset without an independent maintenance or governance boundary.",
       "A finished Skill may access a reviewed external source only when its workflow and effective security policy explicitly permit it; scaffold generation itself performs no network operations.",
@@ -863,7 +864,7 @@ export const COMMAND_HELP = [
     ],
     nextSteps: [
       "Review and complete the generated content with evidence-backed details.",
-      "Run renma scan . --fail-on high, fix relevant diagnostics, and rerun the scan.",
+      "Run renma scan . --fail-on high --strict, replace any exact Renma scaffold markers, fix relevant diagnostics, and rerun the scan.",
       `Use ${AUTHORING_GUIDE_URL} for placement decisions and ${CONTEXT_LENS_GUIDE_URL} for Lens semantics.`,
       "Have a human review meaningful semantic content before merging.",
     ],
