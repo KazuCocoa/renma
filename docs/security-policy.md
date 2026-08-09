@@ -65,6 +65,11 @@ they include network, upload, secret-handling, command execution, or other
 sensitive operational instructions. Skills and non-Skill assets use different
 serialization boundaries.
 
+Renma determines this policy requirement independently from the findings that
+an instruction happens to emit. Operational fetch or upload guidance and
+sensitive-input handling therefore require policy metadata even when another
+rule is not triggered. Benign local-only review and scaffold guidance do not.
+
 The examples below are feature-specific subsets. Use the
 [complete metadata table](user-manual.md#renma-operational-metadata-table) for
 all recognized Skill and non-Skill security fields, including
@@ -438,7 +443,7 @@ Never copy private keys, tokens, credentials, or `.env` files into prompts, logs
 
 ### Defensive guidance and false positives
 
-Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma analyzes that value as one security semantic unit under the Skill's effective policy and reports the exact frontmatter field range. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
+Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma applies the relevant policy, sensitive-data, prose, command, dependency-install, remote-script, privileged, destructive, credential, and configured disallowed-command diagnostics to that value and reports the exact frontmatter field range. Every description detector uses one bounded instruction projection: a quoted request supplied only as a routing example is masked, while operational text after the quotation remains visible. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
 
 ### Structure-aware command boundaries
 
@@ -448,10 +453,13 @@ through exact Markdown structure: the same instruction, the same list item, the
 immediately preceding paragraph, or an active safety section. A guard does not
 cross an unrelated heading or thematic break, move between sibling list items,
 or come from an unrelated code block. Ordinary quotations remain
-non-operational. A blockquote is analyzed as an instruction only when its local
-preceding prose, instruction label, or active operational heading explicitly
-routes it for execution; that routing does not cross into an unrelated heading
-or paragraph. Generic wording such as “handle this carefully” is not an
+non-operational. Local quotation, incident-report, audit, or source-evidence
+context keeps a blockquote inert even beneath a generic instruction heading;
+an explicit local execution route takes precedence. A routed blockquote is
+analyzed as an instruction only within that local structural boundary. For a
+routed multiline shell instruction, quote markers are removed only from the
+logical-shell analysis projection, while findings retain the exact quoted
+source lines. Generic wording such as “handle this carefully” is not an
 approval or no-disclosure guard.
 
 `SEC-UNPINNED-DEPENDENCY-INSTALL` combines structured command and selector
@@ -697,6 +705,9 @@ Renma reports the unsafe form as
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION`. Direct prohibitions, ordinary quoted
 examples, HTML-comment content, and fenced or blockquoted prose clearly marked
 as an unsafe or negative example do not become semantic bypass findings.
+Safeguard polarity is evaluated at each action: a defensive clause does not
+hide a later unsafe action introduced by wording such as “instead,” “then,” a
+colon, or another contrast transition.
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding
 prose, an instruction label, or an operational instruction heading explicitly

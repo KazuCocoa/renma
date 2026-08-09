@@ -4,6 +4,7 @@ import { hiddenUnicodeFindings } from "./hidden-unicode.js";
 import {
   classifyNpmSelector,
   classifyPythonSelector,
+  type FloatingDependencyAllowance,
 } from "./dependency-selectors.js";
 import {
   applySecurityConfig,
@@ -823,8 +824,6 @@ const SAFEGUARD_BYPASS_PATTERNS = [
 ] as const;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
-const DIRECT_DEFENSIVE_SUPPRESSION_RE =
-  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
@@ -1018,7 +1017,7 @@ function securityFindingsForDocument(
   const detections: Detection[] = [
     ...collectPolicyPreludeDetections(
       prepared,
-      instructionDetections.length > 0,
+      hasPolicyRelevantInstructionSurface(prepared),
     ),
     ...instructionDetections,
     ...policyContradictions(prepared.effectivePolicy),
@@ -1338,18 +1337,27 @@ function prepareLogicalCommandAnalysis(
   markdownView: MarkdownSecurityView,
   policy: SecurityPolicy,
 ): PreparedLogicalCommandAnalysis {
-  const commands = logicalShellCommands(sourceLines, visibleLines, scanStart, {
-    isLineEligible: (lineIndex) =>
-      isLogicalShellLineEligible(
-        sourceLines,
-        visibleLines,
-        lineIndex,
-        markdownView,
-      ),
-    sameBlock: (firstLineIndex, secondLineIndex) =>
-      markdownView.sameMarkdownBlock(firstLineIndex, secondLineIndex),
-    isCodeContentLine: (lineIndex) => markdownView.isCodeContentLine(lineIndex),
-  });
+  const instructionLines = visibleLines.map((_, lineIndex) =>
+    markdownView.instructionLine(lineIndex),
+  );
+  const commands = logicalShellCommands(
+    sourceLines,
+    instructionLines,
+    scanStart,
+    {
+      isLineEligible: (lineIndex) =>
+        isLogicalShellLineEligible(
+          sourceLines,
+          visibleLines,
+          lineIndex,
+          markdownView,
+        ),
+      sameBlock: (firstLineIndex, secondLineIndex) =>
+        markdownView.sameMarkdownBlock(firstLineIndex, secondLineIndex),
+      isCodeContentLine: (lineIndex) =>
+        markdownView.isCodeContentLine(lineIndex),
+    },
+  );
   const destinationByCommand = analyzeLogicalShellCommands(commands);
   const securityByCommand = new Map(
     commands.map((command) => {
@@ -1466,9 +1474,10 @@ function prepareSecurityLineContext(
   guardHistory: SecurityGuardHistory,
   index: number,
 ): SecurityLineContext | undefined {
-  const { artifact, visibleLines, markdownView, logicalCommands } = prepared;
+  const { artifact, sourceLines, visibleLines, markdownView, logicalCommands } =
+    prepared;
   const lineNumber = index + 1;
-  const line = visibleLines[index] ?? "";
+  const line = markdownView.instructionLine(index);
   if (isShellCommentLine(line, index, markdownView)) {
     return undefined;
   }
@@ -1521,7 +1530,7 @@ function prepareSecurityLineContext(
     CREDENTIAL_HEADER_RE.test(line);
   const evidence: DetectionEvidence = {
     startLine: lineNumber,
-    snippet: line,
+    snippet: sourceLines[index] ?? visibleLines[index] ?? line,
   };
   const logicalCommand = logicalCommands.commandByLine.get(index);
   const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
@@ -1601,6 +1610,7 @@ function securityLineDetections(
 ): Detection[] {
   const { effectivePolicy: policy } = prepared;
   const {
+    index,
     lineNumber,
     line,
     paragraphText,
@@ -1747,9 +1757,30 @@ function securityLineDetections(
   }
 
   if (commandLine && !quotedProse) {
-    detections.push(
-      ...commandDetections(
-        line,
+    const operationalBlockquote =
+      prepared.markdownView.isOperationalBlockQuotedLine(index);
+    if (operationalBlockquote && logicalCommand !== undefined) {
+      if (logicalCommandStart) {
+        const commandEvidence = logicalShellCommandEvidence(logicalCommand);
+        detections.push(
+          ...commandDetections(
+            logicalCommand.shellProjection.projection,
+            lineNumber,
+            hasCommandRiskGuard,
+            logicalSecurityAnalysis,
+          ).map((detection) => ({
+            ...detection,
+            ...commandEvidence,
+          })),
+        );
+      }
+    } else {
+      const commandText =
+        logicalCommand !== undefined && logicalCommandStart
+          ? logicalCommand.shellProjection.projection
+          : line;
+      const commandRiskDetections = commandDetections(
+        commandText,
         lineNumber,
         hasCommandRiskGuard,
         logicalCommand === undefined
@@ -1757,8 +1788,16 @@ function securityLineDetections(
           : logicalCommandStart
             ? logicalSecurityAnalysis
             : undefined,
-      ),
-    );
+      );
+      detections.push(
+        ...(logicalCommand !== undefined && logicalCommandStart
+          ? commandRiskDetections.map((detection) => ({
+              ...detection,
+              ...evidence,
+            }))
+          : commandRiskDetections),
+      );
+    }
   }
 
   return detections;
@@ -1796,22 +1835,47 @@ function collectCanonicalDescriptionDetections(
   const { text, evidence } = description;
   const instructionProjection = canonicalDescriptionInstructionProjection(text);
   const destinationAnalysis = analyzeDestinations(instructionProjection);
+  const commandProjection = instructionProjection
+    .replace(/\\\r?\n[ \t]*/gu, " ")
+    .replace(/\r?\n/gu, " ");
+  const commandAnalysis = analyzeSecurityCommand({
+    source: {
+      text: instructionProjection,
+      startLine: evidence.startLine,
+      endLine: evidence.endLine ?? evidence.startLine,
+      lines: instructionProjection.split(/\r?\n/u),
+    },
+    guards: [],
+    destinationAnalysis,
+    allowedFloatingDependencies:
+      prepared.parsedPolicy.allowedFloatingDependencies,
+  });
+  const hasHumanApprovalGuard = hasExplicitHumanApprovalGuard(
+    instructionProjection,
+  );
+  const hasCommandRiskGuard =
+    hasHumanApprovalGuard || hasLocalRiskMitigationGuard(instructionProjection);
   const unit: MarkdownSemanticUnit = {
     kind: "paragraph",
     startLine: evidence.startLine,
     endLine: evidence.endLine ?? evidence.startLine,
-    lines: [text],
+    lines: instructionProjection.split(/\r?\n/u),
   };
   const detections = [
     ...policyDetections(
       instructionProjection,
       evidence,
       prepared.effectivePolicy,
-      hasExplicitHumanApprovalGuard(instructionProjection),
+      hasHumanApprovalGuard,
       { scope: "all", analysis: destinationAnalysis },
     ),
-    ...descriptionSensitiveDataDetections(
-      text,
+    ...disallowedCommandDetections(
+      instructionProjection,
+      evidence.startLine,
+      prepared.effectivePolicy,
+    ),
+    ...canonicalDescriptionSensitiveDataDetections(
+      instructionProjection,
       evidence,
       prepared.effectivePolicy,
       prepared.parsedPolicy.allowedFloatingDependencies,
@@ -1822,13 +1886,20 @@ function collectCanonicalDescriptionDetections(
       prepared.effectivePolicy,
       destinationAnalysis,
     ),
-    ...contextScopeDetections(text, evidence.startLine),
+    ...contextScopeDetections(instructionProjection, evidence.startLine),
+    ...predictableTempDetections(instructionProjection, evidence.startLine),
+    ...commandDetections(
+      commandProjection,
+      evidence.startLine,
+      hasCommandRiskGuard,
+      commandAnalysis,
+    ),
     ...semanticInstructionDetections(unit, prepared.markdownView, {
       evidence,
-      sectionText: text,
+      sectionText: instructionProjection,
     }),
     ...descriptionForbiddenInputDetections(
-      text,
+      instructionProjection,
       evidence,
       prepared.effectivePolicy,
     ),
@@ -1836,9 +1907,42 @@ function collectCanonicalDescriptionDetections(
   return detections.map((detection) => ({
     ...detection,
     ...evidence,
-    semanticEvidenceText: text,
+    semanticEvidenceText: instructionProjection,
     semanticEvidenceSource: "canonical-description" as const,
   }));
+}
+
+function canonicalDescriptionSensitiveDataDetections(
+  instructionProjection: string,
+  evidence: DetectionEvidence,
+  policy: SecurityPolicy,
+  allowedFloatingDependencies: readonly FloatingDependencyAllowance[],
+): Detection[] {
+  const ranges = disclosureClauseRangesIntersectingRange(
+    instructionProjection,
+    0,
+    instructionProjection.length,
+  );
+  const clauses =
+    ranges.length === 0
+      ? [instructionProjection]
+      : ranges.map(({ start, end }) => instructionProjection.slice(start, end));
+
+  return clauses.flatMap((clause) => {
+    const destinationAnalysis = analyzeDestinations(clause);
+    const analysis = analyzeSecurityCommand({
+      source: {
+        text: clause,
+        startLine: evidence.startLine,
+        endLine: evidence.endLine ?? evidence.startLine,
+        lines: clause.split(/\r?\n/u),
+      },
+      guards: [],
+      destinationAnalysis,
+      allowedFloatingDependencies,
+    });
+    return fallbackSensitiveDataDetections(clause, evidence, policy, analysis);
+  });
 }
 
 function canonicalDescriptionInstructionProjection(text: string): string {
@@ -1866,26 +1970,93 @@ function canonicalDescriptionInstructionProjection(text: string): string {
   return projected.join("");
 }
 
-function descriptionSensitiveDataDetections(
-  text: string,
-  evidence: DetectionEvidence,
-  policy: SecurityPolicy,
-  allowedFloatingDependencies: SecurityPolicy["allowedFloatingDependencies"],
-): Detection[] {
-  return safeguardSemanticClauses(text).flatMap((clause) => {
-    const analysis = analyzeSecurityCommand({
-      source: {
-        text: clause,
-        startLine: evidence.startLine,
-        endLine: evidence.endLine ?? evidence.startLine,
-        lines: [clause],
-      },
-      guards: [],
-      destinationAnalysis: analyzeDestinations(clause),
-      allowedFloatingDependencies,
-    });
-    return fallbackSensitiveDataDetections(clause, evidence, policy, analysis);
-  });
+function hasPolicyRelevantInstructionSurface(
+  prepared: PreparedSecurityDocumentAnalysis,
+): boolean {
+  const candidates: string[] = [];
+  if (prepared.canonicalDescription !== undefined) {
+    candidates.push(
+      canonicalDescriptionInstructionProjection(
+        prepared.canonicalDescription.text,
+      ),
+    );
+  }
+  for (const unit of prepared.markdownView.semanticUnits) {
+    candidates.push(unit.lines.join("\n"));
+  }
+  for (const command of prepared.logicalCommands.commands) {
+    candidates.push(command.shellProjection.projection);
+  }
+  for (
+    let lineIndex = prepared.scanStart;
+    lineIndex < prepared.visibleLines.length;
+    lineIndex += 1
+  ) {
+    if (
+      prepared.markdownView.isBlockQuotedLine(lineIndex) &&
+      !prepared.markdownView.isOperationalBlockQuotedLine(lineIndex)
+    ) {
+      continue;
+    }
+    const line = prepared.markdownView.instructionLine(lineIndex);
+    if (
+      isPolicyLine(line) ||
+      isShellCommentLine(line, lineIndex, prepared.markdownView)
+    ) {
+      continue;
+    }
+    candidates.push(line);
+  }
+  return candidates.some(policyRelevantInstructionText);
+}
+
+function policyRelevantInstructionText(text: string): boolean {
+  if (!text.trim()) return false;
+  const positiveDisclosureActionsForText = positiveDisclosureActions(text);
+  const defensiveOnly =
+    isDefensiveActionInstruction(text) &&
+    positiveDisclosureActionsForText.length === 0 &&
+    unsafeSafeguardClause(text) === undefined;
+  if (defensiveOnly) return false;
+
+  const destinationAnalysis = analyzeDestinations(text);
+  if (
+    isNetworkInstruction(destinationAnalysis) ||
+    isUploadInstruction(destinationAnalysis)
+  ) {
+    return true;
+  }
+  if (
+    /\b(?:curl|wget)\b|\b(?:npm|pnpm|yarn)\s+(?:install|add)\b|\b(?:pip3?|python(?:\d+(?:\.\d+)*)?\s+-m\s+pip|uv\s+pip)\s+install\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+
+  const sensitiveTarget =
+    SECRET_WORD_RE.test(text) || referencesSensitiveFile(text);
+  const sensitiveAction =
+    /\b(read|collect|copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|load|provide)\b/i.test(
+      text,
+    );
+  if (
+    sensitiveTarget &&
+    sensitiveAction &&
+    !SAFE_FORBIDDEN_INPUT_PATTERN.test(text) &&
+    !isSafeSensitiveHandlingInstruction(text)
+  ) {
+    return true;
+  }
+
+  return (
+    requiresLineLocalApprovalGuard(text) ||
+    unsafeSafeguardClause(text) !== undefined ||
+    OVERBROAD_CONTEXT_RE.test(text) ||
+    NO_REDACTION_RE.test(text) ||
+    (UNREDACTED_SENSITIVE_DATA_RE.test(text) &&
+      DATA_DISCLOSURE_ACTION_RE.test(text))
+  );
 }
 
 function descriptionForbiddenInputDetections(
@@ -1933,9 +2104,11 @@ function isLogicalShellLineEligible(
 ): boolean {
   const source = sourceLines[lineIndex] ?? "";
   const visible = visibleLines[lineIndex] ?? "";
+  const operationalBlockQuote =
+    markdownView.isOperationalBlockQuotedLine(lineIndex);
   return (
-    source === visible &&
-    !markdownView.isBlockQuotedLine(lineIndex) &&
+    (source === visible || operationalBlockQuote) &&
+    (!markdownView.isBlockQuotedLine(lineIndex) || operationalBlockQuote) &&
     !isPolicyLine(visible) &&
     !isShellCommentLine(visible, lineIndex, markdownView)
   );
@@ -3348,24 +3521,68 @@ function semanticInstructionDetections(
 }
 
 function unsafeSafeguardClause(text: string): string | undefined {
-  return safeguardSemanticClauses(text).find(
-    (clause) =>
-      SAFEGUARD_BYPASS_PATTERNS.some((pattern) => pattern.test(clause)) &&
-      !isDirectDefensiveSafeguardClause(clause),
-  );
+  for (const pattern of SAFEGUARD_BYPASS_PATTERNS) {
+    for (const match of overlappingPatternMatches(text, pattern)) {
+      const actionOffsets = safeguardUnsafeActionOffsets(match.text);
+      if (
+        actionOffsets.some(
+          (offset) =>
+            !isSafeguardActionDirectlyProhibited(text, match.start + offset),
+        )
+      ) {
+        return match.text;
+      }
+    }
+  }
+  return undefined;
 }
 
-function safeguardSemanticClauses(text: string): string[] {
-  return text
-    .split(/(?:[;.!?](?:\s+|$)|\s+(?:and(?:\s+then)?|but|however|yet)\s+)/i)
-    .map((clause) => clause.trim())
-    .filter(Boolean);
+function safeguardUnsafeActionOffsets(text: string): number[] {
+  const offsets = [
+    ...text.matchAll(
+      /\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu,
+    ),
+  ]
+    .map((match) => match.index)
+    .filter((offset): offset is number => offset !== undefined);
+  return offsets.length > 0 ? offsets : [0];
 }
 
-function isDirectDefensiveSafeguardClause(clause: string): boolean {
-  return (
-    DIRECT_DEFENSIVE_SEMANTIC_RE.test(clause) ||
-    DIRECT_DEFENSIVE_SUPPRESSION_RE.test(clause)
+function overlappingPatternMatches(
+  text: string,
+  pattern: RegExp,
+): Array<{ text: string; start: number }> {
+  const matches: Array<{ text: string; start: number }> = [];
+  const flags = pattern.flags.replace(/[gy]/gu, "");
+  let cursor = 0;
+  while (cursor < text.length) {
+    const match = new RegExp(pattern.source, flags).exec(text.slice(cursor));
+    if (match?.index === undefined) break;
+    const start = cursor + match.index;
+    matches.push({ text: match[0], start });
+    cursor = start + 1;
+  }
+  return matches;
+}
+
+function isSafeguardActionDirectlyProhibited(
+  text: string,
+  actionStart: number,
+): boolean {
+  const prefixStart = Math.max(0, actionStart - 120);
+  const prefix = text.slice(prefixStart, actionStart);
+  const transitions = [
+    ...prefix.matchAll(
+      /[;.!?:]|,\s*(?:instead|rather|otherwise)\b|\b(?:but|however|yet|instead|then|nevertheless|nonetheless)\b/giu,
+    ),
+  ];
+  const latestTransition = transitions[transitions.length - 1];
+  const polarityScope =
+    latestTransition?.index === undefined
+      ? prefix
+      : prefix.slice(latestTransition.index + latestTransition[0].length);
+  return /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b[\s\S]{0,80}$/iu.test(
+    polarityScope,
   );
 }
 

@@ -77,6 +77,8 @@ const OPERATIONAL_BLOCK_LABEL_RE =
   /^\s*(?:(?:operational|execution)\s+)?(?:instructions?|steps?|procedure|workflow|payload)\s*:\s*$/i;
 const OPERATIONAL_BLOCK_HEADING_RE =
   /\b(instructions?|operational instructions?|execution instructions?|procedure|runbook)\b/i;
+const NON_OPERATIONAL_QUOTATION_CONTEXT_RE =
+  /\b(?:ordinary|illustrative|reported|cited)\s+(?:quotation|quote|excerpt)\b|\b(?:incident|audit|review|source)\s+(?:report|evidence)\b.{0,60}\b(?:quotation|quote|excerpt)\b|\b(?:quotation|quote|excerpt)\b.{0,60}\b(?:incident|report|evidence)\b|\b(?:included|contains?|records?|quoted)\b.{0,40}\b(?:quotation|quote|excerpt)\b/i;
 const SAFETY_HEADING_RE =
   /\b(human approval|safety|constraints?|guardrails?)\b/i;
 
@@ -219,6 +221,14 @@ export class MarkdownSecurityView {
 
   isOperationalBlockQuotedLine(lineIndex: number): boolean {
     return this.operationalBlockQuoteLines.has(lineIndex);
+  }
+
+  instructionLine(lineIndex: number): string {
+    const line = this.visibleLine(lineIndex);
+    if (!this.isOperationalBlockQuotedLine(lineIndex)) return line;
+    return line.replace(/^(?:\s{0,3}>[ \t]?)+/u, (prefix) =>
+      " ".repeat(prefix.length),
+    );
   }
 
   isCodeBlockLine(lineIndex: number): boolean {
@@ -511,12 +521,13 @@ export class MarkdownSecurityView {
     const container = this.routedContainerRecord(record);
     const previous = container.parent.children[container.index - 1];
     const previousText = previous === undefined ? "" : nodeText(previous);
-    return (
+    const explicitlyRouted =
       OPERATIONAL_BLOCK_ROUTING_RE.test(previousText) ||
-      OPERATIONAL_BLOCK_LABEL_RE.test(previousText) ||
-      this.headingChainAt(line).some((heading) =>
-        OPERATIONAL_BLOCK_HEADING_RE.test(heading.text),
-      )
+      OPERATIONAL_BLOCK_LABEL_RE.test(previousText);
+    if (explicitlyRouted) return true;
+    if (NON_OPERATIONAL_QUOTATION_CONTEXT_RE.test(previousText)) return false;
+    return this.headingChainAt(line).some((heading) =>
+      OPERATIONAL_BLOCK_HEADING_RE.test(heading.text),
     );
   }
 

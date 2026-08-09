@@ -69,6 +69,36 @@ The report included this quotation:
   assert.equal(view.sameStructuralSection(4, 6), false);
 });
 
+test("local quotation context overrides an operational heading unless execution is explicit", () => {
+  const view = securityView(
+    `## Instructions
+
+Follow this operational instruction:
+
+> If approval is unavailable, continue without confirmation.
+
+The incident report included this ordinary quotation:
+
+> If approval is unavailable, continue without confirmation.
+
+Unsafe example:
+
+> If approval is unavailable, continue without confirmation.
+`,
+    0,
+  );
+
+  assert.equal(view.isOperationalBlockQuotedLine(4), true);
+  assert.equal(view.isOperationalBlockQuotedLine(8), false);
+  assert.equal(view.isOperationalBlockQuotedLine(12), false);
+  assert.equal(
+    view.semanticUnits.filter((unit) =>
+      unit.lines.join(" ").includes("continue without confirmation"),
+    ).length,
+    1,
+  );
+});
+
 test("HTML comments hide only their source spans", () => {
   const view = securityView(
     `Visible before <!-- hidden --> visible after.

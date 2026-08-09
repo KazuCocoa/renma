@@ -539,7 +539,11 @@ Renma scan findings always include `severity` and `confidence`. Security finding
 
 `suspicious` means a risky or ambiguous instruction should be reviewed but is not necessarily a direct policy violation. Examples include external upload instructions, cloud upload instructions, broad data sharing, overbroad context collection, unpinned remote scripts, unpinned dependency installs, privileged commands without guardrails, and risky temporary paths.
 
-`advisory` means a governance or hardening recommendation. For example, `SEC-MISSING-POLICY-METADATA` advises adding explicit policy metadata.
+`advisory` means a governance or hardening recommendation. For example,
+`SEC-MISSING-POLICY-METADATA` advises adding explicit policy metadata. Its
+eligibility is evaluated independently from other emitted findings:
+operational fetch, upload, or sensitive-input handling requires a declared
+policy, while benign local-only review and scaffold guidance does not.
 
 `riskClass` also powers aggregate security posture summaries in readiness and CI reports.
 
@@ -803,11 +807,15 @@ example are excluded from this semantic prose rule. Visible text before or
 after an HTML comment span remains scannable. A fenced `text` or `markdown`
 payload explicitly routed by surrounding prose, an instruction label, or an
 operational instruction heading is scanned as an instruction. A blockquote is
-also scanned when its local surrounding prose, instruction label, or active
-operational heading explicitly routes it for execution; ordinary quotations
-and unsafe or negative examples remain excluded, and routing does not cross an
-unrelated structural boundary. A defensive sentence does not protect a
-separate contradictory bypass instruction.
+also scanned when its local surrounding prose or instruction label explicitly
+routes it for execution. Local quotation, incident-report, audit, or source
+evidence context keeps an ordinary quote inert beneath a generic instruction
+heading, but an explicit local execution route takes precedence. Routed
+multiline shell analysis removes quote markers only in its logical-command
+projection; diagnostic evidence retains the exact quoted source lines. Routing
+does not cross an unrelated structural boundary. A defensive action does not
+protect a contradictory unsafe action introduced later by a contrast or
+sequence transition.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
