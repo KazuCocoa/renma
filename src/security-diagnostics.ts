@@ -834,22 +834,58 @@ const CREDENTIAL_HEADER_RE =
   /\bAuthorization:\s*Bearer\s+(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
 const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
-const SAFEGUARD_BYPASS_PATTERNS = [
-  /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
-  /\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b/i,
-  /\b(continue|proceed|execute|run|apply|upload|delete|publish)\b.{0,80}\b(without|despite (?:missing|unavailable)|even (?:if|when) (?:there is )?no)\b.{0,60}\b(approval|confirmation|authorization|review|verification)\b/i,
-  /\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
-  /\b(weaken|relax|lower|loosen|override|change)\b.{0,80}\b(security policy|security profile|policy|restrictions?|rules?)\b.{0,80}\b(pass|silence|clear|avoid)\b.{0,40}\b(diagnostics?|checks?|scan|warnings?)\b/i,
-  /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i,
-  /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
-  /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
-  /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
-] as const;
+type SafeguardBypassPattern = {
+  pattern: RegExp;
+  immediateContinuationCondition?: RegExp;
+};
+
+const MISSING_APPROVAL_CONDITION_RE =
+  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,80}\b(?:approval|confirmation|authorization|review|user response|human response)\b[^.;:!?—–\n\r]{0,80}\b(?:unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b/iu;
+const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
+  {
+    pattern:
+      /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
+  },
+  {
+    pattern:
+      /\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b/i,
+  },
+  {
+    pattern:
+      /\b(continue|proceed|execute|run|apply|upload|delete|publish)\b.{0,80}\b(without|despite (?:missing|unavailable)|even (?:if|when) (?:there is )?no)\b.{0,60}\b(approval|confirmation|authorization|review|verification)\b/i,
+  },
+  {
+    pattern:
+      /\b(if|when)\b.{0,80}\b(approval|confirmation|authorization|review|user response|human response)\b.{0,80}\b(unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b.{0,100}\b(continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+    immediateContinuationCondition: MISSING_APPROVAL_CONDITION_RE,
+  },
+  {
+    pattern:
+      /\b(weaken|relax|lower|loosen|override|change)\b.{0,80}\b(security policy|security profile|policy|restrictions?|rules?)\b.{0,80}\b(pass|silence|clear|avoid)\b.{0,40}\b(diagnostics?|checks?|scan|warnings?)\b/i,
+  },
+  {
+    pattern:
+      /\b(obtain|request|record|seek|get|ask for)\b.{0,30}\b(approval|confirmation|authorization|review)\b.{0,40}\b(afterward|later|retroactively|post[- ]hoc|after the (?:action|operation|upload|change))\b|\b(approval|confirmation|authorization|review)\b.{0,30}\b(can|may|will|should)\b.{0,20}\b(obtained|requested|recorded|given)\b.{0,30}\b(afterward|later|retroactively|post[- ]hoc)\b/i,
+  },
+  {
+    pattern:
+      /\b(if|when)\b.{0,100}\b(permission|permissions|access)\b.{0,60}\b(denied|unavailable|insufficient|missing)\b.{0,100}\b(fall back|fallback|switch|retry|use)\b.{0,60}\b(sudo|privileged|force|insecure|unsafe|less safe|broader access)\b/i,
+  },
+  {
+    pattern:
+      /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
+  },
+  {
+    pattern:
+      /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
+  },
+];
 const SAFEGUARD_ACTION_PREDICATE_RE =
   /(?<![\p{L}\p{N}_-])(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
 const SAFEGUARD_PROHIBITION_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
 const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
+const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–]+$/u;
 const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
   /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu;
 // A subject followed by a finite auxiliary/copula starts a new clause; a
@@ -3749,15 +3785,21 @@ function semanticInstructionDetections(
 
 function unsafeSafeguardClause(text: string): string | undefined {
   const actions = safeguardActionPolarities(text);
-  for (const pattern of SAFEGUARD_BYPASS_PATTERNS) {
+  for (const {
+    pattern,
+    immediateContinuationCondition,
+  } of SAFEGUARD_BYPASS_PATTERNS) {
     for (const match of overlappingPatternMatches(text, pattern)) {
       const matchEnd = match.start + match.text.length;
       const matchedActions = actions.filter(
         ({ start }) =>
           start >= match.start &&
           start < matchEnd &&
-          !SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(
-            text.slice(match.start, start),
+          isSafeguardPatternActionAssociated(
+            text,
+            match.start,
+            start,
+            immediateContinuationCondition,
           ),
       );
       if (matchedActions.some(({ prohibited }) => !prohibited)) {
@@ -3766,6 +3808,35 @@ function unsafeSafeguardClause(text: string): string | undefined {
     }
   }
   return undefined;
+}
+
+function isSafeguardPatternActionAssociated(
+  text: string,
+  matchStart: number,
+  actionStart: number,
+  immediateContinuationCondition: RegExp | undefined,
+): boolean {
+  const prefix = text.slice(matchStart, actionStart);
+  if (immediateContinuationCondition === undefined) {
+    return !SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(prefix);
+  }
+
+  const condition = immediateContinuationCondition.exec(prefix);
+  if (condition?.index === undefined) return false;
+  const bridge = prefix.slice(condition.index + condition[0].length);
+  if (!SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE.test(bridge)) {
+    return false;
+  }
+
+  const actionRemainder = text.slice(actionStart, actionStart + 160);
+  const nextBoundary = actionRemainder.search(SAFEGUARD_HARD_SCOPE_BOUNDARY_RE);
+  const actionClause =
+    nextBoundary === -1
+      ? actionRemainder
+      : actionRemainder.slice(0, nextBoundary);
+  // This association is independent of prohibition polarity: it accepts only
+  // an immediate conditional continuation and rejects a restored safeguard.
+  return !hasExplicitHumanApprovalGuard(actionClause);
 }
 
 function overlappingPatternMatches(

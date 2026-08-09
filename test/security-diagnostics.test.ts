@@ -876,6 +876,46 @@ test("dependent infinitival-purpose complements retain safeguard prohibition", (
   }
 });
 
+test("missing-approval conditions retain only an immediate bypass action across punctuation", () => {
+  const unsafeForms = [
+    "If approval is unavailable. Continue the operation.",
+    "If approval is unavailable—execute the change.",
+    "When review cannot be obtained; proceed with deployment.",
+    "If approval is unavailable, continue the operation.",
+  ];
+  const defensiveForms = [
+    "If approval is unavailable. Stop and report the blocker.",
+    "If approval is unavailable. Continue only after approval is obtained.",
+    "If approval is unavailable, stop and report the blocker. Continue only after approval is obtained.",
+    "If approval or required permission is unavailable, stop and report the blocker.",
+  ];
+
+  for (const body of unsafeForms) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Workflow\n\n${body}\n`),
+    ]);
+    assert.ok(
+      findings.some(
+        (finding) => finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
+      ),
+      body,
+    );
+  }
+
+  for (const body of defensiveForms) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Workflow\n\n${body}\n`),
+    ]);
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
+      ),
+      false,
+      body,
+    );
+  }
+});
+
 test("a defensive sentence does not hide a contradictory bypass instruction", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(
