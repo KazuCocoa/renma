@@ -56,6 +56,12 @@ test("guide skill defaults to deterministic prompt output for the installed vers
     defaultResult.stdout,
     /Do not create a script merely because the output is JSON/,
   );
+  assert.match(
+    defaultResult.stdout,
+    /description is a discovery and routing surface, not an execution surface/,
+  );
+  assert.match(defaultResult.stdout, /even when quoted as request examples/);
+  assert.match(defaultResult.stdout, /clearly non-operational unsafe-example/);
   assert.match(defaultResult.stdout, /State each requirement once/);
   assert.match(defaultResult.stdout, /Do not copy the full external document/);
   assert.match(

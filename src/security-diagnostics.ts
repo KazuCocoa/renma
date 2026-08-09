@@ -68,6 +68,7 @@ import {
   type BodyPolicyClauseFacts,
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
+import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "./types/skill-description.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -82,7 +83,7 @@ export type {
   NetworkDestination,
 } from "./security-destination/index.js";
 
-type SecurityCategory = "safety";
+type SecurityCategory = "quality" | "safety";
 
 type RuleMetadata = {
   id: DiagnosticId;
@@ -661,6 +662,28 @@ const RULES = {
     confidence: "medium",
     riskClass: "suspicious",
   },
+  canonicalDescriptionHighRiskLiteral: {
+    id: DIAGNOSTIC_IDS.QUAL_SKILL_DESCRIPTION_HIGH_RISK_LITERAL,
+    category: "quality",
+    title: "Canonical Skill description contains a high-risk routing literal",
+    whyItMatters:
+      "Quoted request examples are non-operational routing evidence, but concrete high-risk payloads in top-level descriptions are easy for generators and reviewers to reuse outside that boundary.",
+    remediation: `Replace the literal with semantic routing wording. ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}`,
+    constraints: [
+      "Do not reinterpret the quoted literal as an operational instruction solely to raise severity.",
+      "Do not automatically rewrite an owner-authored description.",
+      "Keep real operational text visible to the existing security diagnostics.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the description contains capabilities and selection boundaries rather than a concrete high-risk payload.",
+      "If exact evidence is necessary, confirm it is in a clearly non-operational Skill body section.",
+    ],
+    llmHint:
+      "Recommend a semantic routing paraphrase without automatically rewriting the description. If the exact dangerous literal must be retained, move it to a clearly non-operational unsafe-example or review-evidence section in the Skill body.",
+    confidence: "high",
+    riskClass: "advisory",
+  },
   destructiveCommand: {
     id: DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
     category: "safety",
@@ -823,9 +846,16 @@ const SAFEGUARD_BYPASS_PATTERNS = [
   /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
 ] as const;
 const SAFEGUARD_ACTION_PREDICATE_RE =
-  /\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
+  /(?<![\p{L}\p{N}_-])(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
 const SAFEGUARD_PROHIBITION_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
+const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
+const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
+  /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu;
+// A subject followed by a finite auxiliary/copula starts a new clause; a
+// trailing `to` in that clause does not make it a dependent purpose complement.
+const SAFEGUARD_FINITE_CLAUSE_RE =
+  /(?:^|\s)(?:(?:i|you|he|she|it|we|they|this|that|these|those)\b|(?:the|a|an)\s+[\p{L}\p{N}_-]+\b)\s+(?:am|is|are|was|were|be|being|been|has|have|had|do|does|did|can|could|may|might|must|shall|should|will|would)\b/iu;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
@@ -1838,74 +1868,16 @@ function collectCanonicalDescriptionDetections(
   if (description === undefined) return [];
   const { text, evidence } = description;
   const instructionProjection = canonicalDescriptionInstructionProjection(text);
-  const destinationAnalysis = analyzeDestinations(instructionProjection);
-  const commandProjection = instructionProjection
-    .replace(/\\\r?\n[ \t]*/gu, " ")
-    .replace(/\r?\n/gu, " ");
-  const commandAnalysis = analyzeSecurityCommand({
-    source: {
-      text: instructionProjection,
-      startLine: evidence.startLine,
-      endLine: evidence.endLine ?? evidence.startLine,
-      lines: instructionProjection.split(/\r?\n/u),
-    },
-    guards: [],
-    destinationAnalysis,
-    allowedFloatingDependencies:
-      prepared.parsedPolicy.allowedFloatingDependencies,
-  });
-  const hasHumanApprovalGuard = hasExplicitHumanApprovalGuard(
-    instructionProjection,
-  );
-  const hasCommandRiskGuard =
-    hasHumanApprovalGuard || hasLocalRiskMitigationGuard(instructionProjection);
-  const unit: MarkdownSemanticUnit = {
-    kind: "paragraph",
-    startLine: evidence.startLine,
-    endLine: evidence.endLine ?? evidence.startLine,
-    lines: instructionProjection.split(/\r?\n/u),
-  };
   const detections = [
-    ...policyDetections(
+    ...canonicalDescriptionRoutingLiteralAuthoringDetections(
+      text,
+      evidence,
+      prepared,
+    ),
+    ...canonicalDescriptionOperationalDetections(
       instructionProjection,
       evidence,
-      prepared.effectivePolicy,
-      hasHumanApprovalGuard,
-      { scope: "all", analysis: destinationAnalysis },
-    ),
-    ...disallowedCommandDetections(
-      instructionProjection,
-      evidence.startLine,
-      prepared.effectivePolicy,
-    ),
-    ...canonicalDescriptionSensitiveDataDetections(
-      instructionProjection,
-      evidence,
-      prepared.effectivePolicy,
-      prepared.parsedPolicy.allowedFloatingDependencies,
-    ),
-    ...networkAndUploadDetections(
-      instructionProjection,
-      evidence,
-      prepared.effectivePolicy,
-      destinationAnalysis,
-    ),
-    ...contextScopeDetections(instructionProjection, evidence.startLine),
-    ...predictableTempDetections(instructionProjection, evidence.startLine),
-    ...commandDetections(
-      commandProjection,
-      evidence.startLine,
-      hasCommandRiskGuard,
-      commandAnalysis,
-    ),
-    ...semanticInstructionDetections(unit, prepared.markdownView, {
-      evidence,
-      sectionText: instructionProjection,
-    }),
-    ...descriptionForbiddenInputDetections(
-      instructionProjection,
-      evidence,
-      prepared.effectivePolicy,
+      prepared,
     ),
   ];
   return detections.map((detection) => ({
@@ -1914,6 +1886,143 @@ function collectCanonicalDescriptionDetections(
     semanticEvidenceText: instructionProjection,
     semanticEvidenceSource: "canonical-description" as const,
   }));
+}
+
+function canonicalDescriptionOperationalDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const destinationAnalysis = analyzeDestinations(text);
+  const commandProjection = text
+    .replace(/\\\r?\n[ \t]*/gu, " ")
+    .replace(/\r?\n/gu, " ");
+  const commandAnalysis = analyzeSecurityCommand({
+    source: {
+      text,
+      startLine: evidence.startLine,
+      endLine: evidence.endLine ?? evidence.startLine,
+      lines: text.split(/\r?\n/u),
+    },
+    guards: [],
+    destinationAnalysis,
+    allowedFloatingDependencies:
+      prepared.parsedPolicy.allowedFloatingDependencies,
+  });
+  const hasHumanApprovalGuard = hasExplicitHumanApprovalGuard(text);
+  const hasCommandRiskGuard =
+    hasHumanApprovalGuard || hasLocalRiskMitigationGuard(text);
+  const unit: MarkdownSemanticUnit = {
+    kind: "paragraph",
+    startLine: evidence.startLine,
+    endLine: evidence.endLine ?? evidence.startLine,
+    lines: text.split(/\r?\n/u),
+  };
+  return [
+    ...policyDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      hasHumanApprovalGuard,
+      { scope: "all", analysis: destinationAnalysis },
+    ),
+    ...disallowedCommandDetections(
+      text,
+      evidence.startLine,
+      prepared.effectivePolicy,
+    ),
+    ...canonicalDescriptionSensitiveDataDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      prepared.parsedPolicy.allowedFloatingDependencies,
+    ),
+    ...networkAndUploadDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+      destinationAnalysis,
+    ),
+    ...contextScopeDetections(text, evidence.startLine),
+    ...predictableTempDetections(text, evidence.startLine),
+    ...commandDetections(
+      commandProjection,
+      evidence.startLine,
+      hasCommandRiskGuard,
+      commandAnalysis,
+    ),
+    ...semanticInstructionDetections(unit, prepared.markdownView, {
+      evidence,
+      sectionText: text,
+    }),
+    ...descriptionForbiddenInputDetections(
+      text,
+      evidence,
+      prepared.effectivePolicy,
+    ),
+  ];
+}
+
+const CANONICAL_DESCRIPTION_ROUTING_LITERAL_RISK_IDS = new Set<DiagnosticId>([
+  DIAGNOSTIC_IDS.SEC_BULK_DATA_SHARING_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_CLOUD_UPLOAD_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_CREDENTIAL_IN_COMMAND_ARG,
+  DIAGNOSTIC_IDS.SEC_DANGEROUS_TOOL_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
+  DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_FORBIDDEN_INPUT_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_INSTRUCTION_VIOLATES_POLICY,
+  DIAGNOSTIC_IDS.SEC_MISSING_HUMAN_APPROVAL_GUARD,
+  DIAGNOSTIC_IDS.SEC_NO_REDACTION_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_OVERBROAD_CONTEXT_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_PRIVILEGED_COMMAND_WITHOUT_GUARD,
+  DIAGNOSTIC_IDS.SEC_SAFEGUARD_BYPASS_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_SECRET_MATERIAL_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_SENSITIVE_FILE_REFERENCE,
+  DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION,
+  DIAGNOSTIC_IDS.SEC_UNAPPROVED_UPLOAD_DESTINATION,
+  DIAGNOSTIC_IDS.SEC_UNBOUNDED_EXTERNAL_SOURCE_TRAVERSAL,
+  DIAGNOSTIC_IDS.SEC_UNPINNED_DEPENDENCY_INSTALL,
+  DIAGNOSTIC_IDS.SEC_UNPINNED_REMOTE_SCRIPT,
+  DIAGNOSTIC_IDS.SEC_UNTRUSTED_CONTENT_AS_INSTRUCTION,
+]);
+
+function canonicalDescriptionRoutingLiteralAuthoringDetections(
+  text: string,
+  evidence: DetectionEvidence,
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const underlyingDiagnosticIds = new Set<DiagnosticId>();
+  for (const span of canonicalDescriptionRoutingExampleSpans(text)) {
+    const literal = text.slice(span.start + 1, span.end - 1).trim();
+    if (!literal) continue;
+    for (const detection of canonicalDescriptionOperationalDetections(
+      literal,
+      evidence,
+      prepared,
+    )) {
+      if (
+        CANONICAL_DESCRIPTION_ROUTING_LITERAL_RISK_IDS.has(
+          detection.metadata.id,
+        )
+      ) {
+        underlyingDiagnosticIds.add(detection.metadata.id);
+      }
+    }
+  }
+  if (underlyingDiagnosticIds.size === 0) return [];
+
+  return [
+    {
+      metadata: RULES.canonicalDescriptionHighRiskLiteral,
+      severity: "medium",
+      ...evidence,
+      dedupeKey: `${RULES.canonicalDescriptionHighRiskLiteral.id}:${evidence.startLine}`,
+      details: {
+        underlyingDiagnosticIds: [...underlyingDiagnosticIds].sort(),
+      },
+    },
+  ];
 }
 
 function canonicalDescriptionSensitiveDataDetections(
@@ -1951,10 +2060,25 @@ function canonicalDescriptionSensitiveDataDetections(
 
 function canonicalDescriptionInstructionProjection(text: string): string {
   const projected = text.split("");
-  const routingExampleIntroduction =
-    /\b(?:use|apply|select|choose|invoke)\b[^.!?\n]{0,100}\brequests?\b[^.!?\n]{0,40}\b(?:such as|including|like)\b/giu;
+  for (const span of canonicalDescriptionRoutingExampleSpans(text)) {
+    for (let index = span.start; index < span.end; index += 1) {
+      projected[index] = " ";
+    }
+  }
 
-  for (const introduction of text.matchAll(routingExampleIntroduction)) {
+  return projected.join("");
+}
+
+const CANONICAL_DESCRIPTION_ROUTING_EXAMPLE_INTRODUCTION_RE =
+  /\b(?:use|apply|select|choose|invoke)\b[^.!?\n]{0,100}\brequests?\b[^.!?\n]{0,40}\b(?:such as|including|like)\b/giu;
+
+function canonicalDescriptionRoutingExampleSpans(
+  text: string,
+): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  for (const introduction of text.matchAll(
+    CANONICAL_DESCRIPTION_ROUTING_EXAMPLE_INTRODUCTION_RE,
+  )) {
     if (introduction.index === undefined) continue;
     const sentenceStart = introduction.index + introduction[0].length;
     const sentenceRemainder = text.slice(sentenceStart);
@@ -1963,15 +2087,13 @@ function canonicalDescriptionInstructionProjection(text: string): string {
       sentenceBoundary === -1 ? text.length : sentenceStart + sentenceBoundary;
     const examples = text.slice(sentenceStart, sentenceEnd);
     for (const span of routingExampleListSpans(examples)) {
-      const start = sentenceStart + span.start;
-      const end = sentenceStart + span.end;
-      for (let index = start; index < end; index += 1) {
-        projected[index] = " ";
-      }
+      spans.push({
+        start: sentenceStart + span.start,
+        end: sentenceStart + span.end,
+      });
     }
   }
-
-  return projected.join("");
+  return spans;
 }
 
 function routingExampleListSpans(
@@ -3631,7 +3753,12 @@ function unsafeSafeguardClause(text: string): string | undefined {
     for (const match of overlappingPatternMatches(text, pattern)) {
       const matchEnd = match.start + match.text.length;
       const matchedActions = actions.filter(
-        ({ start }) => start >= match.start && start < matchEnd,
+        ({ start }) =>
+          start >= match.start &&
+          start < matchEnd &&
+          !SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(
+            text.slice(match.start, start),
+          ),
       );
       if (matchedActions.some(({ prohibited }) => !prohibited)) {
         return match.text;
@@ -3684,7 +3811,7 @@ function safeguardActionPolarities(
       const directBridge = localPrefix.slice(
         directProhibition.index + directProhibition[0].length,
       );
-      action.prohibited = directBridge.length <= 80;
+      action.prohibited = isDirectSafeguardProhibitionBridge(directBridge);
       continue;
     }
     if (
@@ -3706,7 +3833,7 @@ function safeguardActionPolarities(
 function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
   if (
     bridge.length > 80 ||
-    /[.;:!?—–\n\r]/u.test(bridge) ||
+    SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(bridge) ||
     bridge.trim().length === 0
   ) {
     return false;
@@ -3716,18 +3843,32 @@ function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
   return /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu.test(bridge);
 }
 
+function isDirectSafeguardProhibitionBridge(bridge: string): boolean {
+  return (
+    bridge.length <= 80 &&
+    !hasSafeguardClauseBoundary(bridge) &&
+    !SAFEGUARD_FINITE_CLAUSE_RE.test(bridge)
+  );
+}
+
 function isDependentInfinitivalPurposeBridge(bridge: string): boolean {
   if (
     bridge.length > 80 ||
-    /[,.;:!?—–\n\r]/u.test(bridge) ||
-    /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu.test(
-      bridge,
-    )
+    /,/u.test(bridge) ||
+    hasSafeguardClauseBoundary(bridge) ||
+    SAFEGUARD_FINITE_CLAUSE_RE.test(bridge)
   ) {
     return false;
   }
   return /\b(?:(?:merely|only)\s+to|(?:in\s+order|so\s+as)\s+to|to)\s*$/iu.test(
     bridge,
+  );
+}
+
+function hasSafeguardClauseBoundary(bridge: string): boolean {
+  return (
+    SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(bridge) ||
+    SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE.test(bridge)
   );
 }
 

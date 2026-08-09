@@ -19,6 +19,7 @@ import {
   validateSkillAuthoringHandoffTarget,
   type SkillAuthoringHandoff,
 } from "../skill-authoring-handoff.js";
+import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "../types/skill-description.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -236,6 +237,7 @@ Move knowledge into a Context Asset under \`contexts/\` only when it has an inde
 
 ## Constraints
 
+- ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}
 - Keep recommendations grounded in provided inputs and repository evidence.
 - Leave domain facts, policies, owners, dependencies, and product behavior unspecified when repository evidence does not declare them; stop and report any resulting blocker.
 - Stay within this Skill's declared scope; stop and report requests that require different runtime task context.
@@ -363,6 +365,7 @@ function renderPrompt(input: {
     input.kind === "skill"
       ? [
           "- Keep the Skill in Agent Skills format with Renma extensions under `metadata.renma.*`.",
+          `- ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}`,
           "- Use `metadata.renma.requires-context` for context the skill normally depends on, encoded as a JSON-array string.",
           "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",

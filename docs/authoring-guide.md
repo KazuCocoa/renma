@@ -1037,6 +1037,19 @@ description that only says what output the Skill produces does not establish
 when or why it should be selected. Negative routing remains a separate evidence
 dimension: `Do not use ...` does not replace positive selection guidance.
 
+The canonical description is a discovery and routing surface, not an execution
+surface. Describe capabilities and selection boundaries semantically. Do not
+place literal executable or destructive commands, secret-disclosure requests,
+safeguard-bypass instructions, credentials, or other high-risk operational
+payloads there, even as quoted request examples. Route a Skill as reviewing
+destructive-cleanup, attempted secret-disclosure, or approval-bypass requests
+rather than embedding the exact requested operation. If exact dangerous
+evidence is necessary, put it in the Skill body under a clearly non-operational
+unsafe-example or review-evidence section. The scaffold, `renma guide skill`,
+and `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` diagnostic reinforce this
+boundary; the diagnostic recommends review and does not rewrite owner-authored
+prose.
+
 Keep recognizable result-checking guidance in the Markdown body. A concise
 `Verification`, `Validation`, or `Testing` section is sufficient, and inline
 instructions using forms such as `verify`, `validate`, or `expected result` are

@@ -2250,6 +2250,15 @@ test("scaffold skill writes deterministic file output", async () => {
     content,
     /reviewable workflow guidance instead of prompt material/,
   );
+  assert.match(
+    content,
+    /description is a discovery and routing surface, not an execution surface/,
+  );
+  assert.match(content, /clearly non-operational unsafe-example/);
+  assert.doesNotMatch(
+    content,
+    /rm\s+-rf|upload the \.env|continue without approval/i,
+  );
   assert.doesNotMatch(content, /Renma can verify/);
 
   const scanResult = await scan(root);
@@ -2707,6 +2716,11 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
     result.stdout,
     /trigger description, instructions, workflow, constraints, completion criteria/,
   );
+  assert.match(
+    result.stdout,
+    /description is a discovery and routing surface, not an execution surface/,
+  );
+  assert.match(result.stdout, /clearly non-operational unsafe-example/);
   assert.match(result.stdout, /renma scan \. --fail-on high/);
   assert.match(
     result.stdout,
