@@ -2986,10 +2986,13 @@ dependency:
 npm install --save-dev --save-exact renma@0.31.0
 ```
 
-Renma release preparation verifies this maintained pin and the matching pin in
-the GitHub Actions example against the exact target version. Both files are
-part of the intended release-finalization set; a missing, stale, or ambiguous
-pin blocks release preparation.
+Renma release preparation verifies this complete maintained command and the
+matching setup comment in the GitHub Actions example against the exact target
+version, including `--save-dev` and `--save-exact`. For the workflow, it also
+requires the exact `npm ci` step and every maintained
+`npx --no-install renma` invocation. Both files are part of the intended
+release-finalization set; a missing, stale, duplicate, floating, or malformed
+installation command blocks release preparation.
 
 Commit both `package.json` and `package-lock.json`. CI then restores the locked
 dependency with `npm ci` and invokes its installed binary without allowing

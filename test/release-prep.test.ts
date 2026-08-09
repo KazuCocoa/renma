@@ -144,6 +144,34 @@ test("release-prep preserves wrapped changelog bullets in release notes", () => 
   }
 });
 
+test("release-prep accepts the current maintained consumer examples", () => {
+  const packageVersion = JSON.parse(readFileSync("package.json", "utf8"))
+    .version as string;
+  const result = spawnSync(
+    "node",
+    ["tools/release-prep.mjs", "--check-only", "--version", packageVersion],
+    { cwd: process.cwd(), encoding: "utf8" },
+  );
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /PASS consumer pin docs\/user-manual\.md matches renma@/,
+  );
+  assert.match(
+    result.stdout,
+    /PASS consumer pin examples\/github-actions\/renma-ci-report\.yml matches renma@/,
+  );
+  assert.match(
+    result.stdout,
+    /PASS GitHub Actions example retains the exact npm ci install step/,
+  );
+  assert.match(
+    result.stdout,
+    /PASS GitHub Actions example retains every maintained npx --no-install renma invocation/,
+  );
+});
+
 test("release-prep rejects stale maintained consumer pins during check-only finalization", async (t) => {
   const root = await releasePrepFixture(t, "0.31.0");
   const result = runReleasePrep(root);
@@ -172,6 +200,14 @@ test("release-prep accepts matching exact consumer pins during check-only finali
     result.stdout,
     /PASS consumer pin examples\/github-actions\/renma-ci-report\.yml matches renma@0\.32\.0/,
   );
+  assert.match(
+    result.stdout,
+    /PASS GitHub Actions example retains the exact npm ci install step/,
+  );
+  assert.match(
+    result.stdout,
+    /PASS GitHub Actions example retains every maintained npx --no-install renma invocation/,
+  );
   assert.match(result.stdout, /PASS only release files changed/);
 });
 
@@ -191,6 +227,111 @@ test("release-prep reports missing and ambiguous maintained consumer pins clearl
     ambiguous.stdout,
     /consumer pin docs\/user-manual\.md is ambiguous .*expected one renma@0\.32\.0/,
   );
+
+  const floatingRoot = await releasePrepFixture(t, "^0.32.0");
+  const floating = runReleasePrep(floatingRoot);
+  assert.equal(floating.status, 1);
+  assert.match(
+    floating.stdout,
+    /consumer pin docs\/user-manual\.md is stale \(found renma@\^0\.32\.0; expected renma@0\.32\.0\)/,
+  );
+});
+
+test("release-prep rejects a target pin outside npm install arguments", async (t) => {
+  const root = await releasePrepFixture(t, "0.32.0");
+  await mutateReleaseFile(
+    root,
+    "examples/github-actions/renma-ci-report.yml",
+    (content) =>
+      content.replace(
+        "# npm install --save-dev --save-exact renma@0.32.0",
+        "# npm install --save-dev --save-exact unrelated-package && echo renma@0.32.0",
+      ),
+  );
+
+  const result = runReleasePrep(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stdout,
+    /FAIL consumer install examples\/github-actions\/renma-ci-report\.yml is not the maintained exact command/,
+  );
+});
+
+test("release-prep rejects a maintained install without --save-dev", async (t) => {
+  const root = await releasePrepFixture(t, "0.32.0");
+  await mutateReleaseFile(root, "docs/user-manual.md", (content) =>
+    content.replace(
+      "npm install --save-dev --save-exact renma@0.32.0",
+      "npm install --save-exact renma@0.32.0",
+    ),
+  );
+
+  const result = runReleasePrep(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stdout,
+    /FAIL consumer install docs\/user-manual\.md is not the maintained exact command/,
+  );
+});
+
+test("release-prep rejects a maintained install without --save-exact", async (t) => {
+  const root = await releasePrepFixture(t, "0.32.0");
+  await mutateReleaseFile(
+    root,
+    "examples/github-actions/renma-ci-report.yml",
+    (content) =>
+      content.replace(
+        "npm install --save-dev --save-exact renma@0.32.0",
+        "npm install --save-dev renma@0.32.0",
+      ),
+  );
+
+  const result = runReleasePrep(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stdout,
+    /FAIL consumer install examples\/github-actions\/renma-ci-report\.yml is not the maintained exact command/,
+  );
+});
+
+test("release-prep rejects a GitHub Actions example without npm ci", async (t) => {
+  const root = await releasePrepFixture(t, "0.32.0");
+  await mutateReleaseFile(
+    root,
+    "examples/github-actions/renma-ci-report.yml",
+    (content) => content.replace("- run: npm ci", "- run: npm install"),
+  );
+
+  const result = runReleasePrep(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stdout,
+    /FAIL GitHub Actions example retains the exact npm ci install step/,
+  );
+});
+
+test("release-prep rejects any maintained npx renma command without --no-install", async (t) => {
+  for (const command of ["catalog", "graph", "ci-report", "scan"]) {
+    await t.test(command, async (t) => {
+      const root = await releasePrepFixture(t, "0.32.0");
+      await mutateReleaseFile(
+        root,
+        "examples/github-actions/renma-ci-report.yml",
+        (content) =>
+          content.replace(
+            `npx --no-install renma ${command}`,
+            `npx renma ${command}`,
+          ),
+      );
+
+      const result = runReleasePrep(root);
+      assert.equal(result.status, 1);
+      assert.match(
+        result.stdout,
+        /FAIL GitHub Actions example retains every maintained npx --no-install renma invocation/,
+      );
+    });
+  }
 });
 
 function runReleasePrep(root: string) {
@@ -258,12 +399,40 @@ async function writeReleaseFixtureFiles(
       : `npm install --save-dev --save-exact renma@${pinVersion}`;
   await writeFile(
     path.join(root, "docs", "user-manual.md"),
-    `${install}\n${duplicatePin ? `${install}\n` : ""}`,
+    [
+      "# User Manual",
+      "",
+      "```bash",
+      install,
+      duplicatePin ? install : "",
+      "```",
+      "",
+    ].join("\n"),
   );
   await writeFile(
     path.join(root, "examples", "github-actions", "renma-ci-report.yml"),
-    `# ${install}\n# npx --no-install renma scan . --strict\n`,
+    [
+      `# ${install}`,
+      "jobs:",
+      "  verify:",
+      "    steps:",
+      "      - run: npm ci",
+      "      - run: npx --no-install renma catalog .",
+      "      - run: npx --no-install renma graph .",
+      "      - run: npx --no-install renma ci-report .",
+      "      - run: npx --no-install renma scan . --strict",
+      "",
+    ].join("\n"),
   );
+}
+
+async function mutateReleaseFile(
+  root: string,
+  relativePath: string,
+  transform: (content: string) => string,
+): Promise<void> {
+  const file = path.join(root, ...relativePath.split("/"));
+  await writeFile(file, transform(readFileSync(file, "utf8")));
 }
 
 function git(root: string, args: string[]): void {

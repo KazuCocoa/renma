@@ -39,10 +39,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
-- Release preparation now verifies that every maintained consumer installation
-  example contains one exact target-version `renma@<version>` pin with
-  `--save-exact`, and includes both pin-bearing files in the local release
-  finalization set while preserving `npm ci` and `npx --no-install` behavior.
+- Release preparation now verifies each maintained consumer installation using
+  its narrow file-specific command form: one exact
+  `npm install --save-dev --save-exact renma@<version>` command, the GitHub
+  Actions `npm ci` step, and every maintained
+  `npx --no-install renma` invocation. Separate shell expressions cannot supply
+  pieces of the contract. Both pin-bearing files remain in the local release
+  finalization set.
 
 - Canonical Agent Skill descriptions are now security-governed semantic units
   with exact frontmatter evidence. Bounded quoted routing-example lists remain
