@@ -1962,7 +1962,7 @@ function canonicalDescriptionInstructionProjection(text: string): string {
     const sentenceEnd =
       sentenceBoundary === -1 ? text.length : sentenceStart + sentenceBoundary;
     const examples = text.slice(sentenceStart, sentenceEnd);
-    for (const span of pairedRoutingExampleSpans(examples)) {
+    for (const span of routingExampleListSpans(examples)) {
       const start = sentenceStart + span.start;
       const end = sentenceStart + span.end;
       for (let index = start; index < end; index += 1) {
@@ -1972,6 +1972,34 @@ function canonicalDescriptionInstructionProjection(text: string): string {
   }
 
   return projected.join("");
+}
+
+function routingExampleListSpans(
+  text: string,
+): Array<{ start: number; end: number }> {
+  const pairedSpans = pairedRoutingExampleSpans(text);
+  const first = pairedSpans.find(({ start }) =>
+    /^\s*:?\s*$/u.test(text.slice(0, start)),
+  );
+  if (first === undefined) return [];
+
+  const listSpans = [first];
+  for (const span of pairedSpans) {
+    if (span.start <= first.start) continue;
+    const previous = listSpans[listSpans.length - 1];
+    if (
+      previous === undefined ||
+      !isRoutingExampleListSeparator(text.slice(previous.end, span.start))
+    ) {
+      break;
+    }
+    listSpans.push(span);
+  }
+  return listSpans;
+}
+
+function isRoutingExampleListSeparator(text: string): boolean {
+  return /^\s*(?:,\s*(?:(?:and|or)\s*)?|(?:and|or)\s+)\s*$/iu.test(text);
 }
 
 function pairedRoutingExampleSpans(
@@ -3661,7 +3689,12 @@ function safeguardActionPolarities(
     }
     if (
       previous?.prohibited === true &&
-      isCoordinatedSafeguardActionBridge(text.slice(previous.end, action.start))
+      (isCoordinatedSafeguardActionBridge(
+        text.slice(previous.end, action.start),
+      ) ||
+        isDependentInfinitivalPurposeBridge(
+          text.slice(previous.end, action.start),
+        ))
     ) {
       action.prohibited = true;
     }
@@ -3681,6 +3714,21 @@ function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
   if (/^\s*,\s*$/u.test(bridge)) return true;
   if (/^[^,]{1,70},\s*$/u.test(bridge)) return true;
   return /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu.test(bridge);
+}
+
+function isDependentInfinitivalPurposeBridge(bridge: string): boolean {
+  if (
+    bridge.length > 80 ||
+    /[,.;:!?—–\n\r]/u.test(bridge) ||
+    /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu.test(
+      bridge,
+    )
+  ) {
+    return false;
+  }
+  return /\b(?:(?:merely|only)\s+to|(?:in\s+order|so\s+as)\s+to|to)\s*$/iu.test(
+    bridge,
+  );
 }
 
 function semanticLineEvidence(

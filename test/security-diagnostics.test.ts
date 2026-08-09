@@ -849,6 +849,28 @@ Keep the security policy and verification enabled; do not add a suppression mere
   }
 });
 
+test("dependent infinitival-purpose complements retain safeguard prohibition", () => {
+  const defensiveForms = [
+    "Do not suppress diagnostics to continue without approval.",
+    "Never disable verification to proceed without review.",
+    "Do not suppress diagnostics merely to continue without approval.",
+    "Never disable verification in order to proceed without review.",
+  ];
+
+  for (const body of defensiveForms) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Workflow\n\n${body}\n`),
+    ]);
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
+      ),
+      false,
+      body,
+    );
+  }
+});
+
 test("a defensive sentence does not hide a contradictory bypass instruction", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(

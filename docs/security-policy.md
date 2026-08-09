@@ -443,7 +443,7 @@ Never copy private keys, tokens, credentials, or `.env` files into prompts, logs
 
 ### Defensive guidance and false positives
 
-Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma applies the relevant policy, sensitive-data, prose, command, dependency-install, remote-script, privileged, destructive, credential, and configured disallowed-command diagnostics to that value and reports the exact frontmatter field range. Every description detector uses one bounded instruction projection: a paired ASCII or curly single- or double-quoted request, or a paired backtick inline literal, is masked only inside the established routing-example construct, while operational text after it remains visible. Apostrophes in words and unmatched delimiters are not masked. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
+Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma applies the relevant policy, sensitive-data, prose, command, dependency-install, remote-script, privileged, destructive, credential, and configured disallowed-command diagnostics to that value and reports the exact frontmatter field range. Every description detector uses one bounded instruction projection: a paired ASCII or curly single- or double-quoted request, or a paired backtick inline literal, is masked only while it remains in the comma- or conjunction-separated example list introduced by `such as`, `including`, or `like`. A clause or operational transition ends that list, so later instructions remain visible. Apostrophes in words and unmatched delimiters are not masked. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
 
 ### Structure-aware command boundaries
 
@@ -708,8 +708,9 @@ examples, HTML-comment content, and fenced or blockquoted prose clearly marked
 as an unsafe or negative example do not become semantic bypass findings.
 Safeguard polarity is evaluated at each action predicate. A prohibition applies
 to the action it directly governs and may continue through bounded grammatical
-coordination, but it does not hide a later independently expressed unsafe
-action across punctuation, conditional wording, or another clause boundary.
+coordination or a dependent infinitival-purpose complement, but it does not
+hide a later independently expressed unsafe action across punctuation,
+conditional wording, fallback wording, or another clause boundary.
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding
 prose, an instruction label, or an operational instruction heading explicitly
