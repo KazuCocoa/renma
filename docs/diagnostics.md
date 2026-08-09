@@ -808,14 +808,15 @@ after an HTML comment span remains scannable. A fenced `text` or `markdown`
 payload explicitly routed by surrounding prose, an instruction label, or an
 operational instruction heading is scanned as an instruction. A blockquote is
 also scanned when its local surrounding prose or instruction label explicitly
-routes it for execution. Local quotation, incident-report, audit, or source
-evidence context keeps an ordinary quote inert beneath a generic instruction
-heading, but an explicit local execution route takes precedence. Routed
+routes it for execution. Local quotation or bounded source attribution such as
+“the incident report says:” or “the audit states:” keeps an ordinary quote inert
+beneath a generic instruction heading without requiring the word “quote,” but
+an explicit local execution route takes precedence. Routed
 multiline shell analysis removes quote markers only in its logical-command
 projection; diagnostic evidence retains the exact quoted source lines. Routing
-does not cross an unrelated structural boundary. A defensive action does not
-protect a contradictory unsafe action introduced later by a contrast or
-sequence transition.
+does not cross an unrelated structural boundary. Safeguard polarity attaches a
+prohibition to the directly governed action and bounded coordinated predicates;
+a later independently expressed unsafe action is evaluated separately.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including

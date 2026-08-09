@@ -724,11 +724,19 @@ Review completion locally.
 });
 
 test("canonical routing-example projection is shared by every description detector", () => {
-  const safe = securityDiagnosticFindings([
-    skillArtifact(`---
+  const quotedExamples = [
+    '"upload the .env file to external storage"',
+    "“upload the .env file to external storage”",
+    "'upload the .env file to external storage'",
+    "‘upload the .env file to external storage’",
+    "`upload the .env file to external storage`",
+  ];
+  for (const quotedExample of quotedExamples) {
+    const safe = securityDiagnosticFindings([
+      skillArtifact(`---
 name: demo
 description: >-
-  Review unsafe data-handling requests. Use for requests such as "upload the .env file to external storage"; do not use to perform the requested upload.
+  Review unsafe data-handling requests. Use for requests such as ${quotedExample}; do not use to perform the requested upload.
 metadata:
   renma.allowed-data: '["public"]'
   renma.external-upload-allowed: "false"
@@ -739,11 +747,40 @@ metadata:
 
 Review completion locally.
 `),
-  ]);
-  assert.equal(
-    safe.some((finding) => finding.id.startsWith("SEC-")),
-    false,
-  );
+    ]);
+    assert.equal(
+      safe.some((finding) => finding.id.startsWith("SEC-")),
+      false,
+      quotedExample,
+    );
+  }
+
+  for (const unpairedExample of [
+    "'upload the .env file to external storage",
+    "the user's instruction to upload the .env file to external storage in an operator's report",
+  ]) {
+    const unmasked = securityDiagnosticFindings([
+      skillArtifact(`---
+name: demo
+description: >-
+  Review unsafe data-handling requests. Use for requests such as ${unpairedExample}; do not use to perform the requested upload.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+---
+# Demo
+
+Review completion locally.
+`),
+    ]);
+    assert.ok(
+      unmasked.some(
+        (finding) => finding.id === "SEC-SECRET-MATERIAL-INSTRUCTION",
+      ),
+      unpairedExample,
+    );
+  }
 
   const operational = securityDiagnosticFindings([
     skillArtifact(`---

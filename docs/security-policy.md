@@ -443,7 +443,7 @@ Never copy private keys, tokens, credentials, or `.env` files into prompts, logs
 
 ### Defensive guidance and false positives
 
-Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma applies the relevant policy, sensitive-data, prose, command, dependency-install, remote-script, privileged, destructive, credential, and configured disallowed-command diagnostics to that value and reports the exact frontmatter field range. Every description detector uses one bounded instruction projection: a quoted request supplied only as a routing example is masked, while operational text after the quotation remains visible. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
+Renma security diagnostics are conservative heuristics for discovered agent-facing assets. For a specification-valid canonical Agent Skill, the parsed top-level `description` is an agent-facing discovery and routing surface, so Renma applies the relevant policy, sensitive-data, prose, command, dependency-install, remote-script, privileged, destructive, credential, and configured disallowed-command diagnostics to that value and reports the exact frontmatter field range. Every description detector uses one bounded instruction projection: a paired ASCII or curly single- or double-quoted request, or a paired backtick inline literal, is masked only inside the established routing-example construct, while operational text after it remains visible. Apostrophes in words and unmatched delimiters are not masked. Other frontmatter fields do not become general prose-scanning inputs. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
 
 ### Structure-aware command boundaries
 
@@ -453,9 +453,10 @@ through exact Markdown structure: the same instruction, the same list item, the
 immediately preceding paragraph, or an active safety section. A guard does not
 cross an unrelated heading or thematic break, move between sibling list items,
 or come from an unrelated code block. Ordinary quotations remain
-non-operational. Local quotation, incident-report, audit, or source-evidence
-context keeps a blockquote inert even beneath a generic instruction heading;
-an explicit local execution route takes precedence. A routed blockquote is
+non-operational. Local quotation or bounded source attribution such as “the
+incident report says:” or “the audit states:” keeps a blockquote inert even
+beneath a generic instruction heading; attribution does not need to contain the
+word “quote.” An explicit local execution route takes precedence. A routed blockquote is
 analyzed as an instruction only within that local structural boundary. For a
 routed multiline shell instruction, quote markers are removed only from the
 logical-shell analysis projection, while findings retain the exact quoted
@@ -705,9 +706,10 @@ Renma reports the unsafe form as
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION`. Direct prohibitions, ordinary quoted
 examples, HTML-comment content, and fenced or blockquoted prose clearly marked
 as an unsafe or negative example do not become semantic bypass findings.
-Safeguard polarity is evaluated at each action: a defensive clause does not
-hide a later unsafe action introduced by wording such as “instead,” “then,” a
-colon, or another contrast transition.
+Safeguard polarity is evaluated at each action predicate. A prohibition applies
+to the action it directly governs and may continue through bounded grammatical
+coordination, but it does not hide a later independently expressed unsafe
+action across punctuation, conditional wording, or another clause boundary.
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding
 prose, an instruction label, or an operational instruction heading explicitly

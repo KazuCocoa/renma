@@ -822,6 +822,10 @@ const SAFEGUARD_BYPASS_PATTERNS = [
   /\b(if|when)\b.{0,100}\b(user|human|owner|reviewer)\b.{0,60}\b(does not|doesn't|fails? to|never)\b.{0,30}\b(respond|reply|confirm|approve)\b.{0,100}\b(automatically|by default|continue|proceed|execute|run|apply|upload|delete|publish)\b/i,
   /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i,
 ] as const;
+const SAFEGUARD_ACTION_PREDICATE_RE =
+  /\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
+const SAFEGUARD_PROHIBITION_RE =
+  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
 const UNTRUSTED_CONTENT_SOURCE_RE =
@@ -1958,16 +1962,89 @@ function canonicalDescriptionInstructionProjection(text: string): string {
     const sentenceEnd =
       sentenceBoundary === -1 ? text.length : sentenceStart + sentenceBoundary;
     const examples = text.slice(sentenceStart, sentenceEnd);
-    for (const quoted of examples.matchAll(/"[^"\n]*"|“[^”\n]*”/gu)) {
-      if (quoted.index === undefined) continue;
-      const start = sentenceStart + quoted.index;
-      for (let index = start; index < start + quoted[0].length; index += 1) {
+    for (const span of pairedRoutingExampleSpans(examples)) {
+      const start = sentenceStart + span.start;
+      const end = sentenceStart + span.end;
+      for (let index = start; index < end; index += 1) {
         projected[index] = " ";
       }
     }
   }
 
   return projected.join("");
+}
+
+function pairedRoutingExampleSpans(
+  text: string,
+): Array<{ start: number; end: number }> {
+  const spans: Array<{ start: number; end: number }> = [];
+  const pairedDelimiters = new Map([
+    ['"', '"'],
+    ["“", "”"],
+    ["'", "'"],
+    ["‘", "’"],
+    ["`", "`"],
+  ]);
+
+  for (let start = 0; start < text.length; start += 1) {
+    const opener = text[start] ?? "";
+    const closer = pairedDelimiters.get(opener);
+    if (closer === undefined || !isRoutingExampleSpanOpening(text, start)) {
+      continue;
+    }
+    let end = start + 1;
+    for (; end < text.length; end += 1) {
+      if (text[end] === "\n" || text[end] === "\r") break;
+      if (
+        text[end] === closer &&
+        isRoutingExampleSpanClosing(text, end, closer)
+      ) {
+        break;
+      }
+    }
+    if (end >= text.length || text[end] !== closer || end === start + 1) {
+      continue;
+    }
+    spans.push({ start, end: end + 1 });
+    start = end;
+  }
+
+  return spans;
+}
+
+function isRoutingExampleSpanOpening(text: string, index: number): boolean {
+  const delimiter = text[index];
+  if (delimiter === "'") {
+    return (
+      !isRoutingExampleWordCharacter(text[index - 1]) &&
+      !/^\s$/u.test(text[index + 1] ?? "")
+    );
+  }
+  if (delimiter === "`") {
+    return text[index - 1] !== "`" && text[index + 1] !== "`";
+  }
+  return true;
+}
+
+function isRoutingExampleSpanClosing(
+  text: string,
+  index: number,
+  delimiter: string,
+): boolean {
+  if (delimiter === "'") {
+    return (
+      !/^\s$/u.test(text[index - 1] ?? "") &&
+      !isRoutingExampleWordCharacter(text[index + 1])
+    );
+  }
+  if (delimiter === "`") {
+    return text[index - 1] !== "`" && text[index + 1] !== "`";
+  }
+  return true;
+}
+
+function isRoutingExampleWordCharacter(character: string | undefined): boolean {
+  return character !== undefined && /[\p{L}\p{N}_]/u.test(character);
 }
 
 function hasPolicyRelevantInstructionSurface(
@@ -3521,31 +3598,19 @@ function semanticInstructionDetections(
 }
 
 function unsafeSafeguardClause(text: string): string | undefined {
+  const actions = safeguardActionPolarities(text);
   for (const pattern of SAFEGUARD_BYPASS_PATTERNS) {
     for (const match of overlappingPatternMatches(text, pattern)) {
-      const actionOffsets = safeguardUnsafeActionOffsets(match.text);
-      if (
-        actionOffsets.some(
-          (offset) =>
-            !isSafeguardActionDirectlyProhibited(text, match.start + offset),
-        )
-      ) {
+      const matchEnd = match.start + match.text.length;
+      const matchedActions = actions.filter(
+        ({ start }) => start >= match.start && start < matchEnd,
+      );
+      if (matchedActions.some(({ prohibited }) => !prohibited)) {
         return match.text;
       }
     }
   }
   return undefined;
-}
-
-function safeguardUnsafeActionOffsets(text: string): number[] {
-  const offsets = [
-    ...text.matchAll(
-      /\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu,
-    ),
-  ]
-    .map((match) => match.index)
-    .filter((offset): offset is number => offset !== undefined);
-  return offsets.length > 0 ? offsets : [0];
 }
 
 function overlappingPatternMatches(
@@ -3565,25 +3630,57 @@ function overlappingPatternMatches(
   return matches;
 }
 
-function isSafeguardActionDirectlyProhibited(
+function safeguardActionPolarities(
   text: string,
-  actionStart: number,
-): boolean {
-  const prefixStart = Math.max(0, actionStart - 120);
-  const prefix = text.slice(prefixStart, actionStart);
-  const transitions = [
-    ...prefix.matchAll(
-      /[;.!?:]|,\s*(?:instead|rather|otherwise)\b|\b(?:but|however|yet|instead|then|nevertheless|nonetheless)\b/giu,
-    ),
-  ];
-  const latestTransition = transitions[transitions.length - 1];
-  const polarityScope =
-    latestTransition?.index === undefined
-      ? prefix
-      : prefix.slice(latestTransition.index + latestTransition[0].length);
-  return /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b[\s\S]{0,80}$/iu.test(
-    polarityScope,
+): Array<{ start: number; end: number; prohibited: boolean }> {
+  const actions = [...text.matchAll(SAFEGUARD_ACTION_PREDICATE_RE)].flatMap(
+    (match) =>
+      match.index === undefined
+        ? []
+        : [
+            {
+              start: match.index,
+              end: match.index + match[0].length,
+              prohibited: false,
+            },
+          ],
   );
+
+  for (const [index, action] of actions.entries()) {
+    const previous = actions[index - 1];
+    const localStart = previous?.end ?? Math.max(0, action.start - 120);
+    const localPrefix = text.slice(localStart, action.start);
+    const prohibitions = [...localPrefix.matchAll(SAFEGUARD_PROHIBITION_RE)];
+    const directProhibition = prohibitions[prohibitions.length - 1];
+    if (directProhibition?.index !== undefined) {
+      const directBridge = localPrefix.slice(
+        directProhibition.index + directProhibition[0].length,
+      );
+      action.prohibited = directBridge.length <= 80;
+      continue;
+    }
+    if (
+      previous?.prohibited === true &&
+      isCoordinatedSafeguardActionBridge(text.slice(previous.end, action.start))
+    ) {
+      action.prohibited = true;
+    }
+  }
+
+  return actions;
+}
+
+function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
+  if (
+    bridge.length > 80 ||
+    /[.;:!?—–\n\r]/u.test(bridge) ||
+    bridge.trim().length === 0
+  ) {
+    return false;
+  }
+  if (/^\s*,\s*$/u.test(bridge)) return true;
+  if (/^[^,]{1,70},\s*$/u.test(bridge)) return true;
+  return /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu.test(bridge);
 }
 
 function semanticLineEvidence(

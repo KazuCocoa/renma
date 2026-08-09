@@ -77,7 +77,7 @@ Follow this operational instruction:
 
 > If approval is unavailable, continue without confirmation.
 
-The incident report included this ordinary quotation:
+The incident report says:
 
 > If approval is unavailable, continue without confirmation.
 
