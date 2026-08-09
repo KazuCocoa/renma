@@ -77,6 +77,7 @@ test("quality profile pins every package-version default", () => {
       unresolvedRequiredGraphPenalty: 30,
       ownershipMaximumPenalty: 20,
       emptyInventoryPenalty: 10,
+      scaffoldResiduePenalty: 20,
       workflowClarityPenalty: 10,
       workflowOptionalContextPenalty: 5,
       workflowRequiredInputsPenalty: 5,

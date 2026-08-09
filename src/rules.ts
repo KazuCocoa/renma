@@ -38,6 +38,11 @@ import {
   staticSupportReferences,
 } from "./static-support.js";
 import { isLifecycleUsable } from "./lifecycle.js";
+import {
+  RENMA_SCAFFOLD_PLACEHOLDER_MARKERS,
+  type RenmaScaffoldPlaceholderMarker,
+  type RenmaScaffoldPlaceholderName,
+} from "./scaffold-placeholders.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -245,6 +250,13 @@ function rulesForEvaluationDate(
           ...contextBudgetFindings(document, config),
           ...profileFindings(document),
         ]),
+    },
+    {
+      id: "renma-scaffold-placeholder",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          renmaScaffoldPlaceholderFindings(document),
+        ),
     },
     {
       id: "skill-local-support-reachability",
@@ -928,6 +940,7 @@ function shapeFindings(
 
   const text = document.artifact.content.toLowerCase();
   const findings: Finding[] = [];
+  const scaffoldResidue = renmaScaffoldPlaceholderResidue(document);
   const description =
     document.artifact.kind === "skill"
       ? (resolvedAgentSkillDescription(document) ?? "")
@@ -1084,7 +1097,14 @@ function shapeFindings(
     );
   }
 
-  if (!hasRoutingClarity(document, metadataText(description) ?? "")) {
+  const routingResidue = firstScaffoldResidue(scaffoldResidue, [
+    "description",
+    "purpose",
+  ]);
+  if (
+    !hasRoutingClarity(document, metadataText(description) ?? "") ||
+    routingResidue
+  ) {
     findings.push(
       documentFinding(
         document,
@@ -1093,6 +1113,7 @@ function shapeFindings(
         "quality",
         "low",
         "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations.",
+        routingResidue ? { evidence: routingResidue.evidence } : {},
       ),
     );
   }
@@ -1125,9 +1146,13 @@ function shapeFindings(
     );
   }
 
+  const requiredInputResidue = firstScaffoldResidue(scaffoldResidue, [
+    "requiredInput",
+    "inspectInstruction",
+  ]);
   if (
     document.artifact.kind === "skill" &&
-    !REQUIRED_INPUTS_PATTERN.test(text)
+    (!REQUIRED_INPUTS_PATTERN.test(text) || requiredInputResidue)
   ) {
     findings.push(
       documentFinding(
@@ -1154,14 +1179,20 @@ function shapeFindings(
           ],
           llmHint:
             "Add a concise Required inputs or Prerequisites section to this SKILL.md. State user-provided inputs, target files, repository state, permissions, credentials, and environment assumptions needed before the workflow starts. Do not add runtime context selection or prompt assembly behavior.",
+          ...(requiredInputResidue
+            ? { evidence: requiredInputResidue.evidence }
+            : {}),
         },
       ),
     );
   }
 
+  const completionResidue = firstScaffoldResidue(scaffoldResidue, [
+    "expectedOutput",
+  ]);
   if (
     document.artifact.kind === "skill" &&
-    !COMPLETION_CRITERIA_PATTERN.test(text)
+    (!COMPLETION_CRITERIA_PATTERN.test(text) || completionResidue)
   ) {
     findings.push(
       documentFinding(
@@ -1188,12 +1219,18 @@ function shapeFindings(
           ],
           llmHint:
             "Add a concise Completion criteria, Success requirements, Deliverables, or Final response section to this SKILL.md. State the observable outputs, checks, or final-response conditions that mean the workflow is complete. Do not add runtime context selection or prompt assembly behavior.",
+          ...(completionResidue
+            ? { evidence: completionResidue.evidence }
+            : {}),
         },
       ),
     );
   }
 
-  if (!hasVerificationGuidance(document)) {
+  const verificationResidue = firstScaffoldResidue(scaffoldResidue, [
+    "reviewInstruction",
+  ]);
+  if (!hasVerificationGuidance(document) || verificationResidue) {
     findings.push(
       documentFinding(
         document,
@@ -1202,6 +1239,7 @@ function shapeFindings(
         "quality",
         "medium",
         "State how to verify success with a command, check, or observable result.",
+        verificationResidue ? { evidence: verificationResidue.evidence } : {},
       ),
     );
   }
@@ -1232,6 +1270,97 @@ function shapeFindings(
   }
 
   return findings;
+}
+
+interface RenmaScaffoldPlaceholderResidue {
+  marker: RenmaScaffoldPlaceholderMarker;
+  evidence: Evidence;
+}
+
+/**
+ * Match only canonical Renma scaffold residue. This deliberately does not try
+ * to decide whether arbitrary author prose is semantically complete.
+ */
+function renmaScaffoldPlaceholderResidue(
+  document: ParsedDocument,
+): RenmaScaffoldPlaceholderResidue[] {
+  if (
+    document.artifact.kind !== "skill" &&
+    document.artifact.kind !== "context"
+  ) {
+    return [];
+  }
+
+  const markers = RENMA_SCAFFOLD_PLACEHOLDER_MARKERS.filter(
+    (marker) => marker.kind === document.artifact.kind,
+  );
+  const residues: RenmaScaffoldPlaceholderResidue[] = [];
+
+  for (const marker of markers) {
+    if (marker.source === "description") {
+      if (resolvedAgentSkillDescription(document) !== marker.text) continue;
+      residues.push({
+        marker,
+        evidence:
+          exactMetadataFieldEvidence(document.metadataFields.description) ??
+          metadataScopeEvidence(document),
+      });
+      continue;
+    }
+
+    for (let index = 0; index < document.lines.length; index += 1) {
+      const line = document.lines[index] ?? "";
+      if (line.trim() !== marker.text) continue;
+      residues.push({
+        marker,
+        evidence: evidence(document, index + 1, line),
+      });
+    }
+  }
+
+  return residues;
+}
+
+function firstScaffoldResidue(
+  residues: readonly RenmaScaffoldPlaceholderResidue[],
+  names: readonly RenmaScaffoldPlaceholderName[],
+): RenmaScaffoldPlaceholderResidue | undefined {
+  return residues.find((residue) => names.includes(residue.marker.name));
+}
+
+function renmaScaffoldPlaceholderFindings(document: ParsedDocument): Finding[] {
+  return renmaScaffoldPlaceholderResidue(document).map(
+    ({ marker, evidence: markerEvidence }) =>
+      documentFinding(
+        document,
+        DIAGNOSTIC_IDS.QUAL_RENMA_SCAFFOLD_PLACEHOLDER,
+        "Renma scaffold placeholder remains unresolved",
+        "quality",
+        "high",
+        "Replace this exact Renma-generated starter line with repository-grounded content before treating the asset as complete.",
+        {
+          evidence: markerEvidence,
+          whyItMatters:
+            "Renma's own starter prose is deterministic creation guidance, not authored workflow or Context content. Leaving it in place can make keyword-based quality checks overstate readiness.",
+          constraints: [
+            "Replace only the evidenced Renma-generated marker.",
+            "Do not invent domain facts, owners, policies, dependencies, or source authority.",
+            "Do not treat this exact-marker check as proof of general semantic completeness.",
+          ],
+          verificationSteps: [
+            "Run renma scan . --fail-on high --strict.",
+            "Run renma readiness . and confirm scaffold completeness passes.",
+          ],
+          llmHint:
+            "Use repository evidence or human input to replace the exact scaffold marker. Preserve the asset's intended boundary and report any truth that remains unresolved.",
+          details: {
+            scaffoldKind: marker.kind,
+            placeholder: marker.name,
+            matchBoundary: "exact_renma_generated_marker",
+          },
+        },
+      ),
+  );
 }
 
 function hasVerificationGuidance(document: ParsedDocument): boolean {

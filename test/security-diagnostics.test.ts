@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { scan } from "../src/scanner.js";
 import { parseDocument } from "../src/markdown.js";
+import { RENMA_SCAFFOLD_PLACEHOLDERS } from "../src/scaffold-placeholders.js";
 import {
   associatedNetworkDestinations,
   associatedUploadDestinations,
@@ -3352,17 +3353,18 @@ Use local fixtures.
 });
 
 test("policy-neutral generated Skill scaffold guidance remains clean", () => {
+  const markers = RENMA_SCAFFOLD_PLACEHOLDERS.skill;
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---
-description: Replace this capability and routing placeholder with repository-grounded wording. Use when the agreed recurring workflow needs this Skill; do not use for unrelated tasks or runtime context selection.
+description: ${markers.description}
 ---
 # Scaffold
 
 ## Instructions
 
-1. State the inputs, evidence, or repository artifacts the agent should inspect.
-2. Describe the review steps, checks, or decision points that should remain explicit and reviewable.
-3. Identify the expected output, artifact, or handoff.
+${markers.inspectInstruction}
+${markers.reviewInstruction}
+${markers.expectedOutput}
 
 ## Constraints
 

@@ -729,6 +729,14 @@ justified Context Assets, complete the focused workflow, and validate with
 [Authoring Guide](authoring-guide.md). For rule details, see the
 [Diagnostics Reference](diagnostics.md).
 
+Generated Skill and Context starter prose is intentionally incomplete. Renma
+matches only its own exact generated marker strings and reports each remaining
+frontmatter description or body line as the High
+`QUAL-RENMA-SCAFFOLD-PLACEHOLDER` finding. Untouched and partially edited
+scaffolds therefore fail `renma scan . --fail-on high --strict` and fail the
+Readiness `assets.scaffold_completeness` check. This is deterministic scaffold
+residue detection, not a claim that marker-free prose is semantically complete.
+
 ## LLM-Assisted Skill Maintenance
 
 Renma output can support a human or coding agent, but the authoring and
@@ -2977,6 +2985,14 @@ dependency:
 ```bash
 npm install --save-dev --save-exact renma@0.31.0
 ```
+
+Renma release preparation verifies this complete maintained command and the
+matching setup comment in the GitHub Actions example against the exact target
+version, including `--save-dev` and `--save-exact`. For the workflow, it also
+requires the exact `npm ci` step and every maintained
+`npx --no-install renma` invocation. Both files are part of the intended
+release-finalization set; a missing, stale, duplicate, floating, or malformed
+installation command blocks release preparation.
 
 Commit both `package.json` and `package-lock.json`. CI then restores the locked
 dependency with `npm ci` and invokes its installed binary without allowing

@@ -39,6 +39,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Release preparation now verifies each maintained consumer installation using
+  its narrow file-specific command form: one exact
+  `npm install --save-dev --save-exact renma@<version>` command, the GitHub
+  Actions `npm ci` step, and every maintained
+  `npx --no-install renma` invocation, including every exact `npx` word in
+  same-line shell compositions. Separate shell expressions cannot supply pieces
+  of the contract. Current-example tests run in an isolated tagged fixture, so
+  shallow or tagless caller checkouts remain supported. Both pin-bearing files
+  remain in the local release finalization set.
+
 - Canonical Agent Skill descriptions are now security-governed semantic units
   with exact frontmatter evidence. Bounded quoted routing-example lists remain
   non-operational, while later operational clauses stay visible; actual
@@ -70,6 +80,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Content-only edits now appear as changed assets in `diff` and `ci-report`,
   with a visible bounded content-change count, while remaining neutral unless
   an independent finding or governance rule changes CI status.
+
+### Fixed
+
+- Unedited or partially edited Renma Skill and Context scaffolds now emit the
+  High `QUAL-RENMA-SCAFFOLD-PLACEHOLDER` finding for each exact Renma-owned
+  marker with line-level evidence. Strict High scans fail, Readiness applies a
+  blocking scaffold-completeness check and penalty, and workflow projections no
+  longer count the generated routing, input, completion, or verification prose
+  as authored evidence. Detection is limited to canonical generated strings
+  and does not claim general semantic-incompleteness analysis.
+- Release preparation now fails clearly when a maintained consumer Renma pin is
+  missing, stale, ambiguous, or inconsistent with the requested/package
+  version, including `--check-only --finalize` validation.
 
 ### Compatibility
 

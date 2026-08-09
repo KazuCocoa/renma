@@ -580,6 +580,15 @@ implementation.
 
 ### 4. Review and complete the scaffold
 
+Renma treats its own exact generated Skill and Context starter strings as
+unfinished scaffold residue. Each remaining marker emits the High
+`QUAL-RENMA-SCAFFOLD-PLACEHOLDER` finding with evidence on the exact
+frontmatter description or body line, so `renma scan . --fail-on high
+--strict` blocks an untouched or partially edited scaffold. The boundary is
+deliberately narrow: this rule does not flag general words such as
+“placeholder,” “describe,” “input,” or “output,” and clearing it does not prove
+semantic completeness.
+
 Within the Renma boundaries, use platform-native Skill authoring guidance to
 complete:
 

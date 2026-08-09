@@ -84,6 +84,7 @@ export const DEFAULT_QUALITY_PROFILE = {
     unresolvedRequiredGraphPenalty: 30,
     ownershipMaximumPenalty: 20,
     emptyInventoryPenalty: 10,
+    scaffoldResiduePenalty: 20,
     workflowClarityPenalty: 10,
     workflowOptionalContextPenalty: 5,
     workflowRequiredInputsPenalty: 5,

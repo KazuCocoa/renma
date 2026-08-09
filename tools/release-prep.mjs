@@ -2,7 +2,27 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const RELEASE_FILES = ["package.json", "package-lock.json", "CHANGELOG.md"];
+const USER_MANUAL_PATH = "docs/user-manual.md";
+const GITHUB_ACTIONS_EXAMPLE_PATH =
+  "examples/github-actions/renma-ci-report.yml";
+const CONSUMER_INSTALLATION_FILES = [
+  USER_MANUAL_PATH,
+  GITHUB_ACTIONS_EXAMPLE_PATH,
+];
+const ACTIONS_INSTALL_COMMAND = "npm ci";
+const MAINTAINED_ACTIONS_NPX_COMMANDS = [
+  "catalog",
+  "graph",
+  "ci-report",
+  "scan",
+];
+const RENMA_PACKAGE_REFERENCE_PATTERN = /\brenma@([^\s`"'\\]+)/g;
+const RELEASE_FILES = [
+  "package.json",
+  "package-lock.json",
+  "CHANGELOG.md",
+  ...CONSUMER_INSTALLATION_FILES,
+];
 const REPOSITORY_URL = "https://github.com/KazuCocoa/renma";
 
 const args = process.argv.slice(2);
@@ -31,12 +51,19 @@ if (options.releaseNotes) {
 
 const checks = [];
 
-checks.push(check("package.json version", readPackageVersion() === version));
+const packageVersion = readPackageVersion();
+checks.push(
+  check(
+    `target version agrees with package.json (${version})`,
+    packageVersion === version,
+  ),
+);
 checks.push(check("package-lock.json version", readLockVersion() === version));
 checks.push(check("CHANGELOG section", changelogHasVersion(version)));
 checks.push(
   check("CHANGELOG compare link", changelogHasCompareLink(version, base)),
 );
+checks.push(...consumerInstallationChecks(version));
 
 if (base) {
   checks.push(check("base tag exists", gitOk(["rev-parse", "--verify", base])));
@@ -206,6 +233,212 @@ function changelogHasCompareLink(releaseVersion, baseTag) {
   if (!baseTag) return true;
   return readFileSync("CHANGELOG.md", "utf8").includes(
     `[${releaseVersion}]: ${REPOSITORY_URL}/compare/${baseTag}...v${releaseVersion}`,
+  );
+}
+
+function consumerInstallationChecks(releaseVersion) {
+  const checks = CONSUMER_INSTALLATION_FILES.map((file) => {
+    if (!existsSync(file)) {
+      return check(
+        `consumer pin ${file} is missing (expected renma@${releaseVersion})`,
+        false,
+      );
+    }
+
+    const content = readFileSync(file, "utf8");
+    const pins = renmaPackageReferences(content);
+    if (pins.length === 0) {
+      return check(
+        `consumer pin ${file} is missing (expected renma@${releaseVersion})`,
+        false,
+      );
+    }
+    if (pins.length !== 1) {
+      return check(
+        `consumer pin ${file} is ambiguous (found ${pins.map((pin) => `renma@${pin}`).join(", ")}; expected one renma@${releaseVersion})`,
+        false,
+      );
+    }
+
+    const [pin] = pins;
+    if (pin !== releaseVersion) {
+      return check(
+        `consumer pin ${file} is stale (found renma@${pin}; expected renma@${releaseVersion})`,
+        false,
+      );
+    }
+
+    const expectedCommand = maintainedConsumerInstallCommand(releaseVersion);
+    if (!hasMaintainedInstallCommand(file, content, expectedCommand)) {
+      return check(
+        `consumer install ${file} is not the maintained exact command (expected ${expectedCommand})`,
+        false,
+      );
+    }
+
+    return check(`consumer pin ${file} matches renma@${releaseVersion}`, true);
+  });
+
+  if (!existsSync(GITHUB_ACTIONS_EXAMPLE_PATH)) return checks;
+  const actionsExample = readFileSync(GITHUB_ACTIONS_EXAMPLE_PATH, "utf8");
+  checks.push(
+    check(
+      "GitHub Actions example retains the exact npm ci install step",
+      hasExactActionsRunStep(actionsExample, ACTIONS_INSTALL_COMMAND),
+    ),
+    check(
+      "GitHub Actions example retains every maintained npx --no-install renma invocation",
+      hasMaintainedActionsNpxInvocations(actionsExample),
+    ),
+  );
+  return checks;
+}
+
+function renmaPackageReferences(content) {
+  return [...content.matchAll(RENMA_PACKAGE_REFERENCE_PATTERN)].map((match) =>
+    (match[1] ?? "").replace(/[),.;:]+$/u, ""),
+  );
+}
+
+function maintainedConsumerInstallCommand(releaseVersion) {
+  return `npm install --save-dev --save-exact renma@${releaseVersion}`;
+}
+
+/**
+ * Accept only the two maintained presentation forms: an exact standalone line
+ * inside a fenced User Manual example, or the exact content of the one-time
+ * setup comment in the Actions example. Shell compounds and prose elsewhere
+ * cannot satisfy this check because no substring search is used.
+ */
+function hasMaintainedInstallCommand(file, content, expectedCommand) {
+  const candidates =
+    file === USER_MANUAL_PATH
+      ? markdownFencedCodeLines(content)
+      : file === GITHUB_ACTIONS_EXAMPLE_PATH
+        ? yamlCommentContents(content)
+        : [];
+  return candidates.filter((line) => line === expectedCommand).length === 1;
+}
+
+/** Return complete trimmed lines inside backtick-fenced Markdown examples. */
+function markdownFencedCodeLines(content) {
+  const lines = [];
+  let insideFence = false;
+  for (const line of content.split(/\r?\n/)) {
+    if (line.trimStart().startsWith("```")) {
+      insideFence = !insideFence;
+      continue;
+    }
+    if (insideFence) lines.push(line.trim());
+  }
+  return lines;
+}
+
+/** Return exact comment content without treating YAML commands as comments. */
+function yamlCommentContents(content) {
+  return content.split(/\r?\n/).flatMap((line) => {
+    const trimmed = line.trimStart();
+    return trimmed.startsWith("#") ? [trimmed.slice(1).trim()] : [];
+  });
+}
+
+/**
+ * Accept only the maintained single-line YAML run-step spelling. This excludes
+ * comments, block scalar text, and nearby npm install commands.
+ */
+function hasExactActionsRunStep(content, command) {
+  const expected = `- run: ${command}`;
+  return (
+    content.split(/\r?\n/).filter((line) => line.trim() === expected).length ===
+    1
+  );
+}
+
+/**
+ * Require exactly one catalog, graph, ci-report, and scan invocation in the
+ * maintained `npx --no-install renma <command>` form. Only a shell command at
+ * the start of a YAML run scalar or block line is considered; later shell
+ * expressions and comments cannot donate the required tokens.
+ */
+function hasMaintainedActionsNpxInvocations(content) {
+  const invocations = actionsRunCommands(content).flatMap((command) =>
+    actionsNpxRenmaInvocation(command),
+  );
+  if (invocations.some((invocation) => !invocation.valid)) return false;
+  const commands = invocations.map((invocation) => invocation.command).sort();
+  return sameStrings(commands, [...MAINTAINED_ACTIONS_NPX_COMMANDS].sort());
+}
+
+/**
+ * Accept one leading `npx --no-install renma <command>` invocation per
+ * maintained shell line. Exact shell-word counting also rejects a second npx
+ * or Renma invocation after `&&`, `||`, `;`, parentheses, or quoted shell text.
+ * This intentionally covers the maintained unquoted syntax, not general shell
+ * parsing or variable-expanded command names.
+ */
+function actionsNpxRenmaInvocation(command) {
+  const npxOccurrences = actionsShellWordCount(command, "npx");
+  const renmaOccurrences = actionsShellWordCount(command, "renma");
+  if (npxOccurrences === 0) return [];
+  if (npxOccurrences !== 1 || renmaOccurrences !== 1) {
+    return [{ command: "", valid: false }];
+  }
+
+  const tokens = command.split(/\s+/u);
+  if (
+    tokens[0] === "npx" &&
+    tokens[1] === "--no-install" &&
+    tokens[2] === "renma"
+  ) {
+    return [{ command: tokens[3] ?? "", valid: true }];
+  }
+  return [{ command: "", valid: false }];
+}
+
+/** Count exact command words at the bounded separators used by this example. */
+function actionsShellWordCount(command, word) {
+  return command.split(/[\s;&|()`'"]+/u).filter((token) => token === word)
+    .length;
+}
+
+/**
+ * Read only the Actions example's maintained unquoted `run: <command>` scalars
+ * and literal `run: |` blocks. Other YAML values and comments are deliberately
+ * excluded rather than treated as shell text.
+ */
+function actionsRunCommands(content) {
+  const commands = [];
+  let runBlockIndent;
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    const indent = line.length - line.trimStart().length;
+    if (runBlockIndent !== undefined) {
+      if (!trimmed) continue;
+      if (indent > runBlockIndent) {
+        commands.push(trimmed);
+        continue;
+      }
+      runBlockIndent = undefined;
+    }
+
+    if (trimmed === "run: |" || trimmed === "- run: |") {
+      runBlockIndent = indent;
+      continue;
+    }
+    for (const prefix of ["- run: ", "run: "]) {
+      if (trimmed.startsWith(prefix)) {
+        commands.push(trimmed.slice(prefix.length).trim());
+        break;
+      }
+    }
+  }
+  return commands;
+}
+
+function sameStrings(left, right) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
   );
 }
 
@@ -472,9 +705,9 @@ Options:
   --version <version>  Release version. Defaults to package.json version.
   --from <tag>         Base tag. Defaults to latest v* tag.
   --to <ref>           Target ref for Renma diff reports. Defaults to HEAD.
-  --check-only         Check metadata consistency without running commands.
+  --check-only         Check metadata and maintained consumer-example commands without running commands.
   --release-notes      Print GitHub-ready release notes from CHANGELOG.md.
-  --finalize           After validation, stage release files and create local version commit/tag.
+  --finalize           After validation, stage version, changelog, and maintained consumer-pin files, then create a local commit/tag.
   --help               Show this help.
 `);
 }
