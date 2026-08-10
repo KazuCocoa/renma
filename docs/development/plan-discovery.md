@@ -4,10 +4,10 @@
 
 Status: stable single-repository static Discovery core, fully implemented.
 
-As of Renma 0.28.4, the accepted Discovery design is shipped across the
-dedicated graph view, Skill Index, Readiness, semantic diff, and CI report. CI
-enforcement remains explicitly opt-in and warn-only. Route cycles are review
-evidence, and no Discovery condition can produce a CI failure.
+The accepted Discovery design is shipped across the dedicated graph view,
+Skill Index, Readiness, semantic diff, and CI report. CI enforcement remains
+explicitly opt-in and warn-only. Route cycles are review evidence, and no
+Discovery condition can produce a CI failure.
 
 The newer executable-surface inventory and focused executable graph describe
 bounded Skill-to-script and script-to-script evidence. They do not create
