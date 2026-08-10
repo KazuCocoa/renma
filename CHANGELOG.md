@@ -6,12 +6,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-### Fixed
-
-- Matched the bounded PowerShell and CMD grammar tokens with their native
-  case-insensitive semantics: PowerShell `-File`, `$PSScriptRoot`, `.ps1`, CMD
-  `call`, `/c`, `%~dp0`, `.bat`, and `.cmd` now accept casing variants. Captured
-  repository path spelling remains exact; path lookup is not case-folded.
+## [0.32.0] - 2026-08-10
 
 ### Added
 
@@ -134,6 +129,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Matched the bounded PowerShell and CMD grammar tokens with their native
+  case-insensitive semantics: PowerShell `-File`, `$PSScriptRoot`, `.ps1`, CMD
+  `call`, `/c`, `%~dp0`, `.bat`, and `.cmd` now accept casing variants. Captured
+  repository path spelling remains exact; path lookup is not case-folded.
 - Closed the raw-Markdown HTML-comment security blind spot with the dedicated,
   suppressible `SEC-HIDDEN-OPERATIONAL-INSTRUCTION` diagnostic. Each real
   comment is analyzed as an isolated raw-agent-visible span with exact source
@@ -205,12 +204,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   or coreference analysis. Runtime gateway policy, sandboxing, filesystem and
   network restrictions, and approval enforcement remain required execution
   controls, with Renma serving as one layer of the combined defense.
-- Portable Agent Skills requirements, ownership inheritance, scaffold and
-  migration behavior, Context Lens compatibility, security metadata, and token
-  budgets are unchanged. An inherited effective owner remains available to
-  ownership consumers but does not satisfy an explicit declared-field policy.
-  Binary, non-metadata-capable, configuration, unknown, and runtime-only assets
-  do not receive impossible metadata requirements.
+- The repository-required metadata policy leaves portable Agent Skills
+  validity, ownership inheritance, scaffold and migration behavior, and Context
+  Lens compatibility unchanged. Security fields and token-budget decision
+  metadata are not eligible required fields. An inherited effective owner
+  remains available to ownership consumers but does not satisfy an explicit
+  declared-field policy. Binary, non-metadata-capable, configuration, unknown,
+  and runtime-only assets do not receive impossible metadata requirements.
 
 - Repositories without `quality` configuration continue to load without
   migration and receive the documented Renma defaults for every governed asset
@@ -2328,7 +2328,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/KazuCocoa/renma/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/KazuCocoa/renma/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/KazuCocoa/renma/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/KazuCocoa/renma/compare/v0.28.5...v0.29.0
