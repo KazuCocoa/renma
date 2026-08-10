@@ -126,8 +126,12 @@ test("reuses the established launcher, extension, and options grammar", () => {
     "pwsh.exe -File tools\\check.ps1",
     "powershell -File scripts/check.ps1",
     'powershell.exe -File "tools/check.ps1"',
+    "pwsh -FILE tools/check.PS1",
+    "powershell -fIlE tools/Entry.Ps1",
     "cmd /c tools\\check.cmd",
     'cmd.exe /c "tools/check.bat"',
+    "CMD /C tools\\check.CMD",
+    'CMD.EXE /C "tools/check.BAT"',
   ];
   const rejected = [
     "npm test",
@@ -160,10 +164,10 @@ test("Windows helper launchers preserve exact evidence and normalize separators 
   const evidence = collect(
     [
       "```powershell",
-      "pwsh -File tools\\check.ps1",
-      "powershell.exe -File scripts\\local.ps1",
-      "cmd /c tools\\check.cmd",
-      'cmd.exe /c "tools\\check.bat"',
+      "pwsh -FILE tools\\Entry.PS1",
+      "PoWeRsHeLl.ExE -fIlE scripts\\Local.Ps1",
+      "CMD /C tools\\Worker.CMD",
+      'CmD.ExE /c "tools\\Runner.BAT"',
       "```",
     ].join("\n"),
   );
@@ -177,37 +181,37 @@ test("Windows helper launchers preserve exact evidence and normalize separators 
     [
       {
         launcher: "pwsh",
-        rawTarget: "tools\\check.ps1",
+        rawTarget: "tools\\Entry.PS1",
         pathResolution: {
           kind: "candidate",
-          path: "tools/check.ps1",
+          path: "tools/Entry.PS1",
           source: "repository-root",
         },
       },
       {
         launcher: "powershell.exe",
-        rawTarget: "scripts\\local.ps1",
+        rawTarget: "scripts\\Local.Ps1",
         pathResolution: {
           kind: "candidate",
-          path: "skills/demo/scripts/local.ps1",
+          path: "skills/demo/scripts/Local.Ps1",
           source: "skill-relative",
         },
       },
       {
         launcher: "cmd",
-        rawTarget: "tools\\check.cmd",
+        rawTarget: "tools\\Worker.CMD",
         pathResolution: {
           kind: "candidate",
-          path: "tools/check.cmd",
+          path: "tools/Worker.CMD",
           source: "repository-root",
         },
       },
       {
         launcher: "cmd.exe",
-        rawTarget: "tools\\check.bat",
+        rawTarget: "tools\\Runner.BAT",
         pathResolution: {
           kind: "candidate",
-          path: "tools/check.bat",
+          path: "tools/Runner.BAT",
           source: "repository-root",
         },
       },

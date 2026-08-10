@@ -6,12 +6,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Fixed
+
+- Matched the bounded PowerShell and CMD grammar tokens with their native
+  case-insensitive semantics: PowerShell `-File`, `$PSScriptRoot`, `.ps1`, CMD
+  `call`, `/c`, `%~dp0`, `.bat`, and `.cmd` now accept casing variants. Captured
+  repository path spelling remains exact; path lookup is not case-folded.
+
 ### Added
 
 - Added bounded static executable-dependency analysis for PowerShell `.ps1`
   and Windows batch `.bat` / `.cmd` surfaces. Explicit relative execution,
-  PowerShell call and dot-source forms, exact `$PSScriptRoot`, batch `call`,
-  exact `%~dp0`, and bounded `pwsh` / `powershell -File` and `cmd /c` forms now
+  PowerShell call and dot-source forms, sole `$PSScriptRoot`, batch `call`,
+  sole `%~dp0`, and bounded `pwsh` / `powershell -File` and `cmd /c` forms now
   feed the shared inventory, graph, reachability, execution-contract, diff, and
   CI evidence paths. Comments, here-strings, multiline data, and continuation
   lines are suppressed conservatively; dynamic expressions, bare/PATH command

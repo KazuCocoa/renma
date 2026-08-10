@@ -197,7 +197,7 @@ function normalizeBatchTarget(
   value: string,
 ): { path?: string; unsafe: boolean } | undefined {
   let repositoryRelative: string;
-  if (value.startsWith(SCRIPT_DIRECTORY_ANCHOR)) {
+  if (hasBatchScriptDirectoryAnchor(value)) {
     const suffix = value.slice(SCRIPT_DIRECTORY_ANCHOR.length);
     if (!suffix || !isStaticBatchPath(suffix)) return undefined;
     repositoryRelative = path.posix.join(
@@ -228,6 +228,13 @@ function normalizeBatchTarget(
     return { unsafe: true };
   }
   return { path: normalized, unsafe: false };
+}
+
+function hasBatchScriptDirectoryAnchor(value: string): boolean {
+  return (
+    value.slice(0, SCRIPT_DIRECTORY_ANCHOR.length).toLowerCase() ===
+    SCRIPT_DIRECTORY_ANCHOR
+  );
 }
 
 function isStaticBatchPath(value: string): boolean {

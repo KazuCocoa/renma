@@ -550,7 +550,9 @@ The PowerShell collector supports only `.ps1` sources and targets. At the
 beginning of an eligible physical line it recognizes direct explicit relative
 execution, the `&` call operator, dot-sourcing, and exact `pwsh` / `powershell`
 `-File` forms, including their `.exe` spellings. Its only variable-like path
-form is an exact `$PSScriptRoot` anchor followed by a static suffix. A bounded
+form is the `$PSScriptRoot` anchor, matched case-insensitively, followed by a
+static suffix. Launcher names, `-File`, and `.ps1` extensions are also matched
+case-insensitively. A bounded
 lexical state suppresses line and nested block comments, here-strings,
 multiline quoted data, and backtick-continued data lines. An encountered
 PowerShell `data` statement makes the remainder opaque rather than introducing
@@ -560,8 +562,9 @@ subexpressions, interpolation, wildcards, aliases, discovery commands,
 
 The batch collector supports only `.bat` and `.cmd` sources and targets. It
 recognizes direct explicit relative execution, immediate `call`, exact
-`cmd /c` or `cmd.exe /c`, and the exact `%~dp0` anchor followed by a static
-suffix.
+`cmd /c` or `cmd.exe /c`, and the sole `%~dp0` anchor followed by a static
+suffix. CMD grammar tokens, the anchor modifier spelling, and `.bat` / `.cmd`
+extensions are matched case-insensitively.
 It suppresses `REM`, `::`, and caret-continued data lines. Arbitrary percent or
 delayed expansion, labels, bare command names, generated command text, and
 general CMD parsing remain unsupported. Both Windows collectors normalize
@@ -574,7 +577,9 @@ inventory. The established `node`, `bash`, `sh`, `python`, and `python3`
 behavior is unchanged. Explicit `pwsh -File`, `powershell -File`, `cmd /c`, and
 `.exe` equivalents add Windows entrypoints without becoming generic option
 parsers. PowerShell targets must end in `.ps1`; CMD targets must end in `.bat`
-or `.cmd`. Backslashes are normalized before the unchanged repository-root and
+or `.cmd`. Windows launcher names, bounded switches, and these extensions are
+matched case-insensitively. Captured path spelling remains exact; only
+backslashes are normalized before the unchanged repository-root and
 Skill-relative path rules.
 The collector recognizes complete helper commands on fenced-code lines and one
 additional mdast-bounded form: a single-line `inlineCode` node directly owned

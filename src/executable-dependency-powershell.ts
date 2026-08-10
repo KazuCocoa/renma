@@ -8,7 +8,7 @@ import type {
 
 const TARGET_EXTENSION = /\.ps1$/iu;
 const STATIC_PATH_FORBIDDEN_RE = /[\0\r\n`*?\[\]{}()$#|;&<>:]/u;
-const PSSCRIPTROOT = "$PSScriptRoot";
+const PSSCRIPTROOT = "$psscriptroot";
 
 interface PowerShellWord {
   value: string;
@@ -295,10 +295,7 @@ function normalizePowerShellTarget(
 ): { path?: string; unsafe: boolean } | undefined {
   const value = specifier.value;
   let repositoryRelative: string;
-  if (
-    value.startsWith(`${PSSCRIPTROOT}\\`) ||
-    value.startsWith(`${PSSCRIPTROOT}/`)
-  ) {
+  if (hasPowerShellScriptRootAnchor(value)) {
     if (specifier.quote === "'") return undefined;
     const suffix = value.slice(PSSCRIPTROOT.length + 1);
     if (!isStaticPowerShellPath(suffix)) return undefined;
@@ -330,6 +327,13 @@ function normalizePowerShellTarget(
     return { unsafe: true };
   }
   return { path: normalized, unsafe: false };
+}
+
+function hasPowerShellScriptRootAnchor(value: string): boolean {
+  return (
+    value.slice(0, PSSCRIPTROOT.length).toLowerCase() === PSSCRIPTROOT &&
+    (value[PSSCRIPTROOT.length] === "\\" || value[PSSCRIPTROOT.length] === "/")
+  );
 }
 
 function isStaticPowerShellPath(value: string): boolean {

@@ -540,6 +540,57 @@ test("PowerShell repository escapes remain unsafe and duplicate occurrences stay
   ]);
 });
 
+test("PowerShell grammar casing is ignored without folding repository path casing", () => {
+  const candidates = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/Entry.PS1",
+    content: [
+      '& "$psscriptroot\\Worker.PS1"',
+      '& "$PSSCRIPTROOT\\worker.ps1"',
+      "PWSH -fIlE .\\Mixed.Ps1",
+      '& "$SCRIPTROOT\\arbitrary.ps1"',
+      '& "${PSScriptRoot}\\braced.ps1"',
+      '& "$psscriptrootExtra\\prefixed.ps1"',
+      '& "$PSSCRIPTROOT\\$(Get-Path).ps1"',
+    ].join("\n"),
+  });
+
+  assert.deepEqual(
+    candidates.map(({ rawSpecifier, normalizedTargetCandidates }) => ({
+      rawSpecifier,
+      target: normalizedTargetCandidates[0],
+    })),
+    [
+      {
+        rawSpecifier: "$psscriptroot\\Worker.PS1",
+        target: "tools/Worker.PS1",
+      },
+      {
+        rawSpecifier: "$PSSCRIPTROOT\\worker.ps1",
+        target: "tools/worker.ps1",
+      },
+      {
+        rawSpecifier: ".\\Mixed.Ps1",
+        target: "tools/Mixed.Ps1",
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    resolveExecutableDependencies(
+      candidates.slice(0, 2),
+      new Map([["tools/Worker.PS1", "parsed"]]),
+      new Map([["tools/Worker.PS1", "repository-tool"]]),
+    ).map(({ normalizedTarget, resolution }) => ({
+      normalizedTarget,
+      resolution,
+    })),
+    [
+      { normalizedTarget: "tools/Worker.PS1", resolution: "resolved" },
+      { normalizedTarget: "tools/worker.ps1", resolution: "missing" },
+    ],
+  );
+});
+
 test("a PowerShell data statement fails closed for later topology", () => {
   const candidates = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
     path: "tools/entry.ps1",
@@ -695,6 +746,36 @@ test("batch repository escapes remain unsafe and duplicate occurrences stay audi
       normalizedTarget: "tools/repeat.cmd",
     },
   ]);
+});
+
+test("batch grammar casing is ignored without folding repository path casing", () => {
+  const candidates = BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/Entry.CMD",
+    content: [
+      "CALL .\\Worker.CMD",
+      "CMD /C .\\Runner.BAT",
+      'call "%~DP0Anchored.CmD"',
+      'CaLl "%~dP0Mixed.BaT"',
+      'call "%OTHER%\\arbitrary.CMD"',
+      'call "%~DP0%HELPER%.CMD"',
+    ].join("\n"),
+  });
+
+  assert.deepEqual(
+    candidates.map(({ rawSpecifier, normalizedTargetCandidates }) => ({
+      rawSpecifier,
+      target: normalizedTargetCandidates[0],
+    })),
+    [
+      { rawSpecifier: ".\\Worker.CMD", target: "tools/Worker.CMD" },
+      { rawSpecifier: ".\\Runner.BAT", target: "tools/Runner.BAT" },
+      {
+        rawSpecifier: "%~DP0Anchored.CmD",
+        target: "tools/Anchored.CmD",
+      },
+      { rawSpecifier: "%~dP0Mixed.BaT", target: "tools/Mixed.BaT" },
+    ],
+  );
 });
 
 test("JS and TypeScript collector recognizes only bounded static declarations", () => {
@@ -1189,7 +1270,7 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
       "---",
       "# PowerShell",
       "```powershell",
-      "pwsh -File tools/powershell/entry.ps1",
+      "pwsh -FILE tools/powershell/Entry.PS1",
       "```",
     ].join("\n"),
   );
@@ -1202,35 +1283,35 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
       "---",
       "# Batch",
       "```bat",
-      "cmd /c tools\\batch\\entry.cmd",
+      "CMD /C tools\\batch\\Entry.CMD",
       "```",
     ].join("\n"),
   );
   await writeFile(
-    path.join(root, "tools", "powershell", "entry.ps1"),
+    path.join(root, "tools", "powershell", "Entry.PS1"),
     "# no dependencies yet\n",
   );
   await writeFile(
-    path.join(root, "tools", "powershell", "worker.ps1"),
+    path.join(root, "tools", "powershell", "Worker.PS1"),
     "# worker\n",
   );
   await writeFile(
-    path.join(root, "tools", "batch", "entry.cmd"),
+    path.join(root, "tools", "batch", "Entry.CMD"),
     "REM no dependencies yet\n",
   );
   await writeFile(
-    path.join(root, "tools", "batch", "worker.cmd"),
+    path.join(root, "tools", "batch", "Worker.BAT"),
     "@echo off\n",
   );
 
   const before = await collectRepositorySnapshot(root);
   await writeFile(
-    path.join(root, "tools", "powershell", "entry.ps1"),
-    ['& ".\\worker.ps1"', "& $dynamic", ""].join("\n"),
+    path.join(root, "tools", "powershell", "Entry.PS1"),
+    ['& "$psscriptroot\\Worker.PS1"', "& $dynamic", ""].join("\n"),
   );
   await writeFile(
-    path.join(root, "tools", "batch", "entry.cmd"),
-    ["call .\\worker.cmd", "call %DYNAMIC%", ""].join("\n"),
+    path.join(root, "tools", "batch", "Entry.CMD"),
+    ['CALL "%~DP0Worker.BAT"', "call %DYNAMIC%", ""].join("\n"),
   );
 
   const after = await collectRepositorySnapshot(root);
@@ -1241,10 +1322,10 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
       normalizedTarget,
     })),
     [
-      { launcher: "cmd", normalizedTarget: "tools/batch/entry.cmd" },
+      { launcher: "cmd", normalizedTarget: "tools/batch/Entry.CMD" },
       {
         launcher: "pwsh",
-        normalizedTarget: "tools/powershell/entry.ps1",
+        normalizedTarget: "tools/powershell/Entry.PS1",
       },
     ],
   );
@@ -1252,12 +1333,12 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
     canonicalExecutableDependencyGraphEdges(inventory.dependencies),
     [
       {
-        sourcePath: "tools/batch/entry.cmd",
-        normalizedTarget: "tools/batch/worker.cmd",
+        sourcePath: "tools/batch/Entry.CMD",
+        normalizedTarget: "tools/batch/Worker.BAT",
       },
       {
-        sourcePath: "tools/powershell/entry.ps1",
-        normalizedTarget: "tools/powershell/worker.ps1",
+        sourcePath: "tools/powershell/Entry.PS1",
+        normalizedTarget: "tools/powershell/Worker.PS1",
       },
     ],
   );
@@ -1266,26 +1347,26 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
     { analyzer: "powershell", count: 1 },
   ]);
   assert.equal(
-    surface(inventory, "tools/powershell/entry.ps1").dependencyEvidence
+    surface(inventory, "tools/powershell/Entry.PS1").dependencyEvidence
       .staticInvocationReachability,
     "direct",
   );
   assert.equal(
-    surface(inventory, "tools/powershell/worker.ps1").dependencyEvidence
+    surface(inventory, "tools/powershell/Worker.PS1").dependencyEvidence
       .minimumInvocationDependencyDepth,
     1,
   );
   assert.deepEqual(
-    surface(inventory, "tools/powershell/worker.ps1").interpreterHints,
+    surface(inventory, "tools/powershell/Worker.PS1").interpreterHints,
     ["powershell"],
   );
   assert.equal(
-    surface(inventory, "tools/batch/worker.cmd").dependencyEvidence
+    surface(inventory, "tools/batch/Worker.BAT").dependencyEvidence
       .staticInvocationReachability,
     "transitive",
   );
   assert.deepEqual(
-    surface(inventory, "tools/batch/worker.cmd").interpreterHints,
+    surface(inventory, "tools/batch/Worker.BAT").interpreterHints,
     ["cmd"],
   );
   assert.equal(
@@ -1298,8 +1379,8 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
   );
 
   for (const [entrypoint, analyzer, worker] of [
-    ["skills/powershell/SKILL.md", "powershell", "tools/powershell/worker.ps1"],
-    ["skills/batch/SKILL.md", "batch", "tools/batch/worker.cmd"],
+    ["skills/powershell/SKILL.md", "powershell", "tools/powershell/Worker.PS1"],
+    ["skills/batch/SKILL.md", "batch", "tools/batch/Worker.BAT"],
   ] as const) {
     const contract = buildExecutionContract(after, { entrypoint });
     const relationship = contract.executableEvidence.relationships.find(
@@ -1326,13 +1407,13 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
       target,
     })),
     [
-      { analyzer: "batch", target: "tools/batch/worker.cmd" },
-      { analyzer: "powershell", target: "tools/powershell/worker.ps1" },
+      { analyzer: "batch", target: "tools/batch/Worker.BAT" },
+      { analyzer: "powershell", target: "tools/powershell/Worker.PS1" },
     ],
   );
   assert.deepEqual(diff.newlyTransitivelyReachableSurfacePaths, [
-    "tools/batch/worker.cmd",
-    "tools/powershell/worker.ps1",
+    "tools/batch/Worker.BAT",
+    "tools/powershell/Worker.PS1",
   ]);
   const ci = evaluateExecutableSurfaceCiPolicy(diff, {
     from: "fail",
@@ -1346,7 +1427,7 @@ test("PowerShell and batch Skill chains propagate through inventory, contracts, 
           EXECUTABLE_SURFACE_CI_MATCH_IDS.TRANSITIVE_REACHABILITY_ADDED,
       )
       .map((match) => (match.kind === "surface" ? match.path : undefined)),
-    ["tools/batch/worker.cmd", "tools/powershell/worker.ps1"],
+    ["tools/batch/Worker.BAT", "tools/powershell/Worker.PS1"],
   );
 });
 

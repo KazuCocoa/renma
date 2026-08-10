@@ -1582,15 +1582,18 @@ Dependency analysis is deliberately limited to five private built-ins:
   relative `.ps1` path at the start of a physical line, the `&` call operator,
   dot-sourcing, and exact `pwsh -File` or `powershell -File` forms; `.exe`
   launcher spellings are accepted under the same grammar. Single- and
-  double-quoted relative literals qualify. The exact `$PSScriptRoot` anchor is
-  accepted only when followed by a static literal suffix with no other
-  expansion. Execution emits `static-execution`; dot-sourcing emits
+  double-quoted relative literals qualify. Launcher names, `-File`, `.ps1`, and
+  the sole supported `$PSScriptRoot` anchor are matched case-insensitively. The
+  anchor is accepted only when followed by a static literal suffix with no
+  other expansion. Execution emits `static-execution`; dot-sourcing emits
   `static-source`.
 - `batch` analyzes text `.bat` and `.cmd` surfaces. It recognizes a direct
   explicit `./` or `../` batch path, immediate `call`, and exact `cmd /c` or
-  `cmd.exe /c` forms. Double-quoted paths and the exact `%~dp0` script-directory
-  anchor with a static literal suffix qualify. All recognized forms emit
-  `static-execution`; transfer-versus-return behavior is not modeled.
+  `cmd.exe /c` forms. Double-quoted paths and the sole `%~dp0` script-directory
+  anchor with a static literal suffix qualify. CMD grammar tokens, the anchor
+  modifier spelling, and `.bat` / `.cmd` extensions are matched
+  case-insensitively. All recognized forms emit `static-execution`;
+  transfer-versus-return behavior is not modeled.
 
 The JS/TS collector ignores `.cjs` sources, `.jsx`, `.tsx`, dynamic `import()`,
 CommonJS `require`, packages, `node:` built-ins, absolute paths, template
@@ -1618,8 +1621,9 @@ not enter heredoc state, so collection resumes for later supported commands.
 Bash `<<<` here-string operators are advanced over as complete non-heredoc
 tokens. Their operands do not create dependency evidence, and a later supported
 physical line remains eligible for collection.
-The PowerShell collector ignores variables other than its exact
-`$PSScriptRoot` anchor, subexpressions, interpolation, wildcards,
+The PowerShell collector ignores variables other than its sole
+`$PSScriptRoot` anchor (matched case-insensitively), subexpressions,
+interpolation, wildcards,
 `Invoke-Expression`, `Get-Command`, aliases, bare command names, module loading,
 and runtime command discovery. It suppresses line comments, nested block
 comments, single- and double-quoted here-strings, multiline quoted data, and a
@@ -1710,10 +1714,13 @@ Skill or Skill reachability state.
 The inventory recognizes the existing `node`, `bash`, `sh`, `python`, and
 `python3` helper grammar plus exact Windows launcher forms: `pwsh -File`,
 `powershell -File`, `cmd /c`, and their `.exe` spellings. PowerShell launchers
-accept only `.ps1`; CMD launchers accept only `.bat` or `.cmd`. This is not a
-generic option parser: `pwsh -Command`, `cmd /k`, dynamic targets, and arbitrary
-interpreter expressions remain unresolved. Backslashes are normalized before
-the existing repository-root and Skill-relative `scripts/**` rules.
+accept only `.ps1`; CMD launchers accept only `.bat` or `.cmd`. Windows
+launcher names, the bounded `-File` and `/c` switches, and these extensions are
+matched case-insensitively. This is not a generic option parser: `pwsh
+-Command`, `cmd /k`, dynamic targets, and arbitrary interpreter expressions
+remain unresolved. Captured path spelling remains exact; backslashes are
+normalized before the existing repository-root and Skill-relative `scripts/**`
+rules.
 Interpreter hints come from recognized launchers, a bounded first-line shebang
 for text files, then a supported extension fallback. Hints are descriptive
 evidence, not an execution decision.

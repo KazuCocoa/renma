@@ -68,12 +68,12 @@ export interface ResolvedHelperCommandEvidence extends HelperCommandEvidence {
 
 const LEGACY_HELPER_COMMAND_PATTERN = /^(node|bash|sh|python|python3)\s+/;
 const POWERSHELL_HELPER_COMMAND_PATTERN =
-  /^(pwsh(?:\.exe)?|powershell(?:\.exe)?)\s+-File\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|(\S+))/u;
+  /^(pwsh(?:\.exe)?|powershell(?:\.exe)?)\s+-File\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|(\S+))/iu;
 const CMD_HELPER_COMMAND_PATTERN =
-  /^(cmd(?:\.exe)?)\s+\/c\s+(?:"([^"\r\n]+)"|(\S+))/u;
+  /^(cmd(?:\.exe)?)\s+\/c\s+(?:"([^"\r\n]+)"|(\S+))/iu;
 const LEGACY_HELPER_EXTENSION = /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/u;
-const POWERSHELL_HELPER_EXTENSION = /\.ps1$/u;
-const BATCH_HELPER_EXTENSION = /\.(?:bat|cmd)$/u;
+const POWERSHELL_HELPER_EXTENSION = /\.ps1$/iu;
+const BATCH_HELPER_EXTENSION = /\.(?:bat|cmd)$/iu;
 const STATIC_WINDOWS_HELPER_PATH_FORBIDDEN_RE = /[\0\r\n`$%!*?\[\]{}()|;&<>]/u;
 
 interface ParsedHelperCommand {
@@ -127,7 +127,7 @@ function parseHelperCommand(command: string): ParsedHelperCommand | undefined {
       return undefined;
     }
     return {
-      launcher: powershell[1] as HelperCommandLauncher,
+      launcher: powershell[1]!.toLowerCase() as HelperCommandLauncher,
       rawTarget,
       targetKind: "powershell",
     };
@@ -139,7 +139,7 @@ function parseHelperCommand(command: string): ParsedHelperCommand | undefined {
       return undefined;
     }
     return {
-      launcher: cmd[1] as HelperCommandLauncher,
+      launcher: cmd[1]!.toLowerCase() as HelperCommandLauncher,
       rawTarget,
       targetKind: "batch",
     };
@@ -246,7 +246,11 @@ export function isCanonicalHelperTarget(candidate: string): boolean {
 }
 
 export function hasSupportedHelperExtension(candidate: string): boolean {
-  return /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py|ps1|bat|cmd)$/u.test(candidate);
+  return (
+    LEGACY_HELPER_EXTENSION.test(candidate) ||
+    POWERSHELL_HELPER_EXTENSION.test(candidate) ||
+    BATCH_HELPER_EXTENSION.test(candidate)
+  );
 }
 
 function repositoryStateResolution(

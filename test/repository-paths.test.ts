@@ -133,17 +133,31 @@ test("helper script extraction forwards plausible traversal without parsing arbi
 
 test("Windows helper extraction uses explicit launcher grammars", () => {
   assert.equal(
-    helperScriptPath("pwsh -File tools\\check.ps1"),
-    "tools\\check.ps1",
+    helperScriptPath("pwsh -FILE tools\\Entry.PS1"),
+    "tools\\Entry.PS1",
   );
   assert.equal(
-    helperScriptPath('powershell.exe -File "scripts\\check.ps1"'),
-    "scripts\\check.ps1",
+    helperScriptPath('PowerShell.EXE -fIlE "scripts\\Check.Ps1"'),
+    "scripts\\Check.Ps1",
   );
-  assert.equal(helperScriptPath("cmd /c tools\\check.cmd"), "tools\\check.cmd");
   assert.equal(
-    helperScriptPath('cmd.exe /c "tools\\check.bat"'),
-    "tools\\check.bat",
+    helperScriptPath("CMD /C tools\\Worker.CMD"),
+    "tools\\Worker.CMD",
+  );
+  assert.equal(
+    helperScriptPath('CMD.EXE /c "tools\\Runner.BAT"'),
+    "tools\\Runner.BAT",
+  );
+  assert.deepEqual(
+    resolveHelperScriptPath(
+      "skills/testing/demo/SKILL.md",
+      helperScriptPath("pwsh -FILE tools\\Entry.PS1")!,
+    ),
+    {
+      kind: "candidate",
+      path: "tools/Entry.PS1",
+      source: "repository-root",
+    },
   );
   assert.equal(helperScriptPath("pwsh -Command tools/check.ps1"), undefined);
   assert.equal(helperScriptPath("cmd /k tools/check.cmd"), undefined);
