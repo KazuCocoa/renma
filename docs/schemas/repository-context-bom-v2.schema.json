@@ -779,7 +779,9 @@
             "additionalProperties": false,
             "required": ["analyzer", "count"],
             "properties": {
-              "analyzer": { "enum": ["js-ts", "python", "shell"] },
+              "analyzer": {
+                "enum": ["js-ts", "python", "shell", "powershell", "batch"]
+              },
               "count": { "$ref": "#/$defs/nonNegativeInteger" }
             }
           }
@@ -952,7 +954,9 @@
         "occurrenceOrdinal"
       ],
       "properties": {
-        "analyzer": { "enum": ["js-ts", "python", "shell"] },
+        "analyzer": {
+          "enum": ["js-ts", "python", "shell", "powershell", "batch"]
+        },
         "sourcePath": { "type": "string" },
         "line": { "type": "integer", "minimum": 1 },
         "snippet": { "type": "string", "maxLength": 240 },
@@ -1019,7 +1023,19 @@
         "line": { "type": "integer", "minimum": 1 },
         "snippet": { "type": "string", "maxLength": 240 },
         "launcher": {
-          "enum": ["node", "bash", "sh", "python", "python3"]
+          "enum": [
+            "node",
+            "bash",
+            "sh",
+            "python",
+            "python3",
+            "pwsh",
+            "pwsh.exe",
+            "powershell",
+            "powershell.exe",
+            "cmd",
+            "cmd.exe"
+          ]
         },
         "rawTarget": { "type": "string" },
         "normalizedTarget": { "type": "string" },

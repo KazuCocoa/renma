@@ -5,9 +5,11 @@ import { hasSupportedHelperExtension } from "./helper-command-evidence.js";
 import { JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-js-ts.js";
 import { PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-python.js";
 import { SHELL_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-shell.js";
+import { POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-powershell.js";
+import { BATCH_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-batch.js";
 
 export type BuiltInExecutableDependencyAnalyzerId =
-  "js-ts" | "python" | "shell";
+  "js-ts" | "python" | "shell" | "powershell" | "batch";
 
 export type ExecutableDependencyRelation =
   "static-execution" | "static-import" | "static-reexport" | "static-source";
@@ -42,6 +44,8 @@ export const BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS: readonly ExecutableDepend
     JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER,
     PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER,
     SHELL_EXECUTABLE_DEPENDENCY_ANALYZER,
+    POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER,
+    BATCH_EXECUTABLE_DEPENDENCY_ANALYZER,
   ]);
 
 /** Identify the existing inventory surface candidates before path-state resolution. */

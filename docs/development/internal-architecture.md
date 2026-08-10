@@ -486,18 +486,21 @@ source or rerunning an analyzer.
 `src/executable-dependency-analyzer.ts` owns the private, fixed built-in
 analyzer registry and the language-neutral candidate contract.
 `src/executable-dependency-js-ts.ts`,
-`src/executable-dependency-python.ts`, and
-`src/executable-dependency-shell.ts` are bounded lexical collectors.
+`src/executable-dependency-python.ts`,
+`src/executable-dependency-shell.ts`,
+`src/executable-dependency-powershell.ts`, and
+`src/executable-dependency-batch.ts` are bounded lexical collectors.
 `src/executable-dependency-resolution.ts` owns the single Renma repository
 resolver. The analyzers interpret supplied text only; repository discovery,
 exclusions, depth, size, symlink safety, path states, surface identity,
 ordering, and graph construction remain Renma responsibilities.
 
-The registry order is `js-ts`, then `python`, then `shell`. It dynamically loads nothing,
-executes no subprocess, has no configuration or package export, and is not a
-public plugin system. The boundary permits a future external provider without
-coupling language syntax to inventory construction, but provider discovery,
-installation, permissions, and version negotiation are deliberately absent.
+The registry order is `js-ts`, `python`, `shell`, `powershell`, then `batch`.
+It dynamically loads nothing, executes no subprocess, has no configuration or
+package export, and is not a public plugin system. The boundary permits a
+future external provider without coupling language syntax to inventory
+construction, but provider discovery, installation, permissions, and version
+negotiation are deliberately absent.
 
 Dependency sources are only text surfaces already eligible for the inventory:
 Skill-local scripts, repository-root tools, and non-canonical discovered or
@@ -543,11 +546,41 @@ as non-heredoc tokens so their overlapping suffix cannot enter heredoc state;
 the operand remains non-topological data. Repository escape remains `unsafe`
 evidence and never becomes topology.
 
+The PowerShell collector supports only `.ps1` sources and targets. At the
+beginning of an eligible physical line it recognizes direct explicit relative
+execution, the `&` call operator, dot-sourcing, and exact `pwsh` / `powershell`
+`-File` forms, including their `.exe` spellings. Its only variable-like path
+form is the `$PSScriptRoot` anchor, matched case-insensitively, followed by a
+static suffix. Launcher names, `-File`, and `.ps1` extensions are also matched
+case-insensitively. A bounded
+lexical state suppresses line and nested block comments, here-strings,
+multiline quoted data, and backtick-continued data lines. An encountered
+PowerShell `data` statement makes the remainder opaque rather than introducing
+brace semantics. Variables,
+subexpressions, interpolation, wildcards, aliases, discovery commands,
+`.psm1`, and `Import-Module` remain unsupported.
+
+The batch collector supports only `.bat` and `.cmd` sources and targets. It
+recognizes direct explicit relative execution, immediate `call`, exact
+`cmd /c` or `cmd.exe /c`, and the sole `%~dp0` anchor followed by a static
+suffix. CMD grammar tokens, the anchor modifier spelling, and `.bat` / `.cmd`
+extensions are matched case-insensitively.
+It suppresses `REM`, `::`, and caret-continued data lines. Arbitrary percent or
+delayed expansion, labels, bare command names, generated command text, and
+general CMD parsing remain unsupported. Both Windows collectors normalize
+backslashes before the shared resolver, which preserves exact repository path
+case and all existing boundary and symlink protections.
+
 `src/helper-command-evidence.ts` owns the bounded helper grammar shared by
 repository path candidate collection, existing path diagnostics, and the
-inventory. The recognized launchers remain `node`, `bash`, `sh`, `python`, and
-`python3`; `.ts`, `.mts`, and `.cts` join the established helper extensions,
-while safe path boundaries are unchanged.
+inventory. The established `node`, `bash`, `sh`, `python`, and `python3`
+behavior is unchanged. Explicit `pwsh -File`, `powershell -File`, `cmd /c`, and
+`.exe` equivalents add Windows entrypoints without becoming generic option
+parsers. PowerShell targets must end in `.ps1`; CMD targets must end in `.bat`
+or `.cmd`. Windows launcher names, bounded switches, and these extensions are
+matched case-insensitively. Captured path spelling remains exact; only
+backslashes are normalized before the unchanged repository-root and
+Skill-relative path rules.
 The collector recognizes complete helper commands on fenced-code lines and one
 additional mdast-bounded form: a single-line `inlineCode` node directly owned
 by a paragraph whose preceding visible text, after whitespace normalization,

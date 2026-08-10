@@ -274,6 +274,22 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   currentGovernanceInventory.invocations = [schemaInvocation(true)];
   assertValid(validateBom, currentGovernanceBom);
 
+  for (const launcher of [
+    "pwsh",
+    "pwsh.exe",
+    "powershell",
+    "powershell.exe",
+    "cmd",
+    "cmd.exe",
+  ]) {
+    const windowsLauncherBom = structuredClone(currentGovernanceBom);
+    (
+      windowsLauncherBom.executableSurfaceInventory
+        .invocations[0] as unknown as { launcher: string }
+    ).launcher = launcher;
+    assertValid(validateBom, windowsLauncherBom);
+  }
+
   for (const field of [
     "invocationsWithEffectivePolicyEvidence",
     "invocationsWithoutEffectivePolicyEvidence",
@@ -389,6 +405,37 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   shellDependency.normalizedTargetCandidates = ["tools/helper.sh"];
   shellDependency.normalizedTarget = "tools/helper.sh";
   assertValid(validateBom, shellDependencyBom);
+
+  for (const fixture of [
+    {
+      analyzer: "powershell",
+      sourcePath: "tools/check.ps1",
+      snippet: '& ".\\helper.ps1"',
+      rawSpecifier: ".\\helper.ps1",
+      normalizedTarget: "tools/helper.ps1",
+    },
+    {
+      analyzer: "batch",
+      sourcePath: "tools/check.cmd",
+      snippet: "call .\\helper.cmd",
+      rawSpecifier: ".\\helper.cmd",
+      normalizedTarget: "tools/helper.cmd",
+    },
+  ]) {
+    const windowsDependencyBom = structuredClone(currentDependencyBom);
+    const dependency = (
+      windowsDependencyBom.executableSurfaceInventory
+        .dependencies as unknown as Array<Record<string, unknown>>
+    )[0]!;
+    dependency.analyzer = fixture.analyzer;
+    dependency.relation = "static-execution";
+    dependency.sourcePath = fixture.sourcePath;
+    dependency.snippet = fixture.snippet;
+    dependency.rawSpecifier = fixture.rawSpecifier;
+    dependency.normalizedTargetCandidates = [fixture.normalizedTarget];
+    dependency.normalizedTarget = fixture.normalizedTarget;
+    assertValid(validateBom, windowsDependencyBom);
+  }
 
   for (const field of [
     "incomingResolvedDependencyCount",

@@ -126,6 +126,6 @@ test("documentation keeps bounded dependency evidence outside security diagnosti
   );
   assert.match(
     guide,
-    /recognizes only documented static import,[\s\S]*shell execution, and shell source relationships;[\s\S]*does not analyze\s+general script behavior/,
+    /recognizes only documented static import, re-export,\s+execution, and source relationships;[\s\S]*PowerShell module resolution,[\s\S]*general script behavior remain outside the boundary/,
   );
 });

@@ -735,12 +735,14 @@ repository-wide supply-chain metadata by default.
 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. Separately, the reporting-only Executable Surface Inventory uses
-bounded JS/TS, Python, and shell lexical collectors for documented explicit
-relative dependency evidence. Those collectors do not contribute security
-findings or analyze general executable behavior; use appropriate SAST and
-dependency-scanning tools for executable code. Markdown instructions that tell
-an agent to fetch, trust, execute, or invoke a script remain within this
-diagnostic boundary.
+bounded JS/TS, Python, POSIX shell, PowerShell `.ps1`, and Windows batch `.bat`
+/ `.cmd` lexical collectors for documented explicit relative dependency
+evidence. Those collectors do not contribute security findings or analyze
+general executable behavior; use appropriate SAST and dependency-scanning
+tools for executable code. Dynamic expressions, runtime/PATH lookup,
+PowerShell module loading, and unsupported interpreter syntax remain
+unresolved. Markdown instructions that tell an agent to fetch, trust, execute,
+or invoke a script remain within this diagnostic boundary.
 
 These checks inspect repository knowledge and operational instructions.
 Selected command and JavaScript forms use bounded structure-aware recognition,

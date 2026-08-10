@@ -18,6 +18,12 @@ export const HELPER_COMMAND_LAUNCHERS = [
   "sh",
   "python",
   "python3",
+  "pwsh",
+  "pwsh.exe",
+  "powershell",
+  "powershell.exe",
+  "cmd",
+  "cmd.exe",
 ] as const;
 
 export type HelperCommandLauncher = (typeof HELPER_COMMAND_LAUNCHERS)[number];
@@ -60,23 +66,89 @@ export interface ResolvedHelperCommandEvidence extends HelperCommandEvidence {
   targetPathState?: RepositoryPathState;
 }
 
-const HELPER_COMMAND_PATTERN = /^(node|bash|sh|python|python3)\s+/;
+const LEGACY_HELPER_COMMAND_PATTERN = /^(node|bash|sh|python|python3)\s+/;
+const POWERSHELL_HELPER_COMMAND_PATTERN =
+  /^(pwsh(?:\.exe)?|powershell(?:\.exe)?)\s+-File\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|(\S+))/iu;
+const CMD_HELPER_COMMAND_PATTERN =
+  /^(cmd(?:\.exe)?)\s+\/c\s+(?:"([^"\r\n]+)"|(\S+))/iu;
+const LEGACY_HELPER_EXTENSION = /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/u;
+const POWERSHELL_HELPER_EXTENSION = /\.ps1$/iu;
+const BATCH_HELPER_EXTENSION = /\.(?:bat|cmd)$/iu;
+const STATIC_WINDOWS_HELPER_PATH_FORBIDDEN_RE = /[\0\r\n`$%!*?\[\]{}()|;&<>]/u;
+
+interface ParsedHelperCommand {
+  launcher: HelperCommandLauncher;
+  rawTarget: string;
+  targetKind: "legacy" | "powershell" | "batch";
+}
 
 /** Extract the same bounded helper target grammar used by path diagnostics. */
 export function helperScriptPath(command: string): string | undefined {
-  const parts = command.split(/\s+/).slice(1);
-  const target = parts.find((part) => !part.startsWith("-"));
-  if (!target) return undefined;
-
-  const hasSupportedExtension = /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/.test(
-    target,
-  );
+  const parsed = parseHelperCommand(command);
+  if (!parsed) return undefined;
+  const target = parsed.rawTarget;
+  const normalizedSeparators = target.replace(/\\/gu, "/");
+  const hasSupportedExtension =
+    parsed.targetKind === "legacy"
+      ? LEGACY_HELPER_EXTENSION.test(normalizedSeparators)
+      : parsed.targetKind === "powershell"
+        ? POWERSHELL_HELPER_EXTENSION.test(normalizedSeparators)
+        : BATCH_HELPER_EXTENSION.test(normalizedSeparators);
   if (!hasSupportedExtension) return undefined;
-  const startsAtSupportedRoot = /^(?:(?:\.\.?\/)+)?(?:scripts|tools)\//.test(
-    target,
+  if (
+    parsed.targetKind !== "legacy" &&
+    STATIC_WINDOWS_HELPER_PATH_FORBIDDEN_RE.test(normalizedSeparators)
+  ) {
+    return undefined;
+  }
+  const startsAtSupportedRoot = /^(?:(?:\.\.?\/)+)?(?:scripts|tools)\//u.test(
+    normalizedSeparators,
   );
-  const isExplicitSkillScript = /(?:^|\/)scripts\//.test(target);
+  const isExplicitSkillScript = /(?:^|\/)scripts\//u.test(normalizedSeparators);
   return startsAtSupportedRoot || isExplicitSkillScript ? target : undefined;
+}
+
+function parseHelperCommand(command: string): ParsedHelperCommand | undefined {
+  const legacy = LEGACY_HELPER_COMMAND_PATTERN.exec(command);
+  if (legacy) {
+    const parts = command.split(/\s+/u).slice(1);
+    const rawTarget = parts.find((part) => !part.startsWith("-"));
+    if (!rawTarget) return undefined;
+    return {
+      launcher: legacy[1] as HelperCommandLauncher,
+      rawTarget,
+      targetKind: "legacy",
+    };
+  }
+  const powershell = POWERSHELL_HELPER_COMMAND_PATTERN.exec(command);
+  if (powershell) {
+    const rawTarget = powershell[2] ?? powershell[3] ?? powershell[4];
+    if (!rawTarget || !helperTargetBoundary(command, powershell[0].length)) {
+      return undefined;
+    }
+    return {
+      launcher: powershell[1]!.toLowerCase() as HelperCommandLauncher,
+      rawTarget,
+      targetKind: "powershell",
+    };
+  }
+  const cmd = CMD_HELPER_COMMAND_PATTERN.exec(command);
+  if (cmd) {
+    const rawTarget = cmd[2] ?? cmd[3];
+    if (!rawTarget || !helperTargetBoundary(command, cmd[0].length)) {
+      return undefined;
+    }
+    return {
+      launcher: cmd[1]!.toLowerCase() as HelperCommandLauncher,
+      rawTarget,
+      targetKind: "batch",
+    };
+  }
+  return undefined;
+}
+
+function helperTargetBoundary(command: string, end: number): boolean {
+  return end >= command.length || /\s/u.test(command[end]!);
 }
 
 /** Resolve a helper command path without escaping an unambiguous owning Skill. */
@@ -174,7 +246,11 @@ export function isCanonicalHelperTarget(candidate: string): boolean {
 }
 
 export function hasSupportedHelperExtension(candidate: string): boolean {
-  return /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/.test(candidate);
+  return (
+    LEGACY_HELPER_EXTENSION.test(candidate) ||
+    POWERSHELL_HELPER_EXTENSION.test(candidate) ||
+    BATCH_HELPER_EXTENSION.test(candidate)
+  );
 }
 
 function repositoryStateResolution(
@@ -224,17 +300,16 @@ function helperCommandEvidenceFromSnippet(
   commandSnippet: string,
 ): HelperCommandEvidence | undefined {
   const snippet = commandSnippet.trim();
-  const launcherMatch = HELPER_COMMAND_PATTERN.exec(snippet);
-  if (!launcherMatch) return undefined;
+  const parsed = parseHelperCommand(snippet);
+  if (!parsed) return undefined;
   const rawTarget = helperScriptPath(snippet);
   if (!rawTarget) return undefined;
-  const launcher = launcherMatch[1] as HelperCommandLauncher;
   const sourceSkillDirectory = logicalSkillDirectory(document.artifact.path);
   return {
     sourcePath: document.artifact.path,
     line,
     snippet,
-    launcher,
+    launcher: parsed.launcher,
     rawTarget,
     ...(sourceSkillDirectory ? { sourceSkillDirectory } : {}),
     pathResolution: resolveHelperScriptPath(document.artifact.path, rawTarget),

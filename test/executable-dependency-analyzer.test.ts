@@ -6,6 +6,7 @@ import test from "node:test";
 import fc from "fast-check";
 
 import { bom, formatBomMarkdown } from "../src/commands/bom.js";
+import { buildExecutionContract } from "../src/commands/execution-contract.js";
 import {
   BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS,
   collectExecutableDependencyCandidates,
@@ -13,11 +14,17 @@ import {
 import { JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-js-ts.js";
 import { PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-python.js";
 import { SHELL_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-shell.js";
+import { POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-powershell.js";
+import { BATCH_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-batch.js";
 import {
   canonicalExecutableDependencyGraphEdges,
   resolveExecutableDependencies,
 } from "../src/executable-dependency-resolution.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
+import {
+  evaluateExecutableSurfaceCiPolicy,
+  EXECUTABLE_SURFACE_CI_MATCH_IDS,
+} from "../src/executable-surface-ci-policy.js";
 import { parseDocument } from "../src/markdown.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import {
@@ -31,7 +38,7 @@ import type { Artifact } from "../src/types/artifact.js";
 test("built-in analyzer registry is fixed, ordered, and extension bounded", () => {
   assert.deepEqual(
     BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS.map((analyzer) => analyzer.id),
-    ["js-ts", "python", "shell"],
+    ["js-ts", "python", "shell", "powershell", "batch"],
   );
   for (const extension of [".js", ".mjs", ".ts", ".mts", ".cts"]) {
     assert.equal(
@@ -95,6 +102,47 @@ test("built-in analyzer registry is fixed, ordered, and extension bounded", () =
   assert.equal(
     SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
       path: "tools/check.sh",
+      contentClassification: "binary",
+    }),
+    false,
+  );
+  assert.equal(
+    POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+      path: "tools/check.ps1",
+      contentClassification: "text",
+    }),
+    true,
+  );
+  for (const extension of [".psm1", ".psd1", ".sh", ".cmd"]) {
+    assert.equal(
+      POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+        path: `tools/check${extension}`,
+        contentClassification: "text",
+      }),
+      false,
+    );
+  }
+  for (const extension of [".bat", ".cmd"]) {
+    assert.equal(
+      BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+        path: `tools/check${extension}`,
+        contentClassification: "text",
+      }),
+      true,
+    );
+  }
+  for (const extension of [".ps1", ".btm", ".sh"]) {
+    assert.equal(
+      BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+        path: `tools/check${extension}`,
+        contentClassification: "text",
+      }),
+      false,
+    );
+  }
+  assert.equal(
+    BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+      path: "tools/check.cmd",
       contentClassification: "binary",
     }),
     false,
@@ -332,6 +380,402 @@ test("shell collector retains repository-escape evidence without inventing a tar
 
   assert.equal(candidate?.unsafe, true);
   assert.deepEqual(candidate?.normalizedTargetCandidates, []);
+});
+
+test("PowerShell collector recognizes bounded execution, dot-source, and PSScriptRoot forms", () => {
+  const content = [
+    ".\\direct.ps1",
+    "& .\\call.ps1",
+    '& ".\\quoted.ps1"',
+    "& '.\\single-quoted.ps1'",
+    "pwsh -File .\\pwsh-file.ps1",
+    "powershell -File ..\\shared\\windows.ps1",
+    ". .\\lib.ps1",
+    '. "$PSScriptRoot\\root-lib.ps1"',
+    '& "$PSScriptRoot\\..\\shared\\anchor.ps1"',
+    "& .\\call.ps1",
+    "& $helper",
+    '& "$dir\\dynamic.ps1"',
+    '& "$(Get-Path)\\dynamic.ps1"',
+    "Invoke-Expression $command",
+    "Get-Command helper",
+    "helper.ps1",
+    "<#",
+    "& .\\block-comment.ps1",
+    "#>",
+    "$single = @'",
+    ".\\single-here-string.ps1",
+    "'@",
+    '$double = @"',
+    "& .\\double-here-string.ps1",
+    '"@',
+    '$multiline = "',
+    ".\\multiline-data.ps1",
+    '"',
+    "Write-Output `",
+    ".\\continued-data.ps1",
+    ".\\after-data.ps1",
+  ].join("\n");
+  const first = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/sub/entry.ps1",
+    content,
+  });
+  const second = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/sub/entry.ps1",
+    content,
+  });
+
+  assert.deepEqual(second, first);
+  assert.deepEqual(
+    first.map((candidate) => ({
+      line: candidate.line,
+      relation: candidate.relation,
+      rawSpecifier: candidate.rawSpecifier,
+      targets: candidate.normalizedTargetCandidates,
+    })),
+    [
+      {
+        line: 1,
+        relation: "static-execution",
+        rawSpecifier: ".\\direct.ps1",
+        targets: ["tools/sub/direct.ps1"],
+      },
+      {
+        line: 2,
+        relation: "static-execution",
+        rawSpecifier: ".\\call.ps1",
+        targets: ["tools/sub/call.ps1"],
+      },
+      {
+        line: 3,
+        relation: "static-execution",
+        rawSpecifier: ".\\quoted.ps1",
+        targets: ["tools/sub/quoted.ps1"],
+      },
+      {
+        line: 4,
+        relation: "static-execution",
+        rawSpecifier: ".\\single-quoted.ps1",
+        targets: ["tools/sub/single-quoted.ps1"],
+      },
+      {
+        line: 5,
+        relation: "static-execution",
+        rawSpecifier: ".\\pwsh-file.ps1",
+        targets: ["tools/sub/pwsh-file.ps1"],
+      },
+      {
+        line: 6,
+        relation: "static-execution",
+        rawSpecifier: "..\\shared\\windows.ps1",
+        targets: ["tools/shared/windows.ps1"],
+      },
+      {
+        line: 7,
+        relation: "static-source",
+        rawSpecifier: ".\\lib.ps1",
+        targets: ["tools/sub/lib.ps1"],
+      },
+      {
+        line: 8,
+        relation: "static-source",
+        rawSpecifier: "$PSScriptRoot\\root-lib.ps1",
+        targets: ["tools/sub/root-lib.ps1"],
+      },
+      {
+        line: 9,
+        relation: "static-execution",
+        rawSpecifier: "$PSScriptRoot\\..\\shared\\anchor.ps1",
+        targets: ["tools/shared/anchor.ps1"],
+      },
+      {
+        line: 10,
+        relation: "static-execution",
+        rawSpecifier: ".\\call.ps1",
+        targets: ["tools/sub/call.ps1"],
+      },
+      {
+        line: 31,
+        relation: "static-execution",
+        rawSpecifier: ".\\after-data.ps1",
+        targets: ["tools/sub/after-data.ps1"],
+      },
+    ],
+  );
+  assert.ok(first.every((candidate) => candidate.snippet.length <= 240));
+});
+
+test("PowerShell repository escapes remain unsafe and duplicate occurrences stay auditable", () => {
+  const candidates = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/entry.ps1",
+    content: [
+      '& "$PSScriptRoot\\..\\..\\outside.ps1"',
+      "& .\\repeat.ps1",
+      "& .\\repeat.ps1",
+    ].join("\n"),
+  });
+  assert.equal(candidates[0]?.unsafe, true);
+  assert.deepEqual(candidates[0]?.normalizedTargetCandidates, []);
+  const dependencies = resolveExecutableDependencies(
+    candidates,
+    new Map([["tools/repeat.ps1", "parsed"]]),
+    new Map([["tools/repeat.ps1", "repository-tool"]]),
+  );
+  assert.deepEqual(
+    dependencies.map(({ resolution, occurrenceOrdinal }) => ({
+      resolution,
+      occurrenceOrdinal,
+    })),
+    [
+      { resolution: "unsafe", occurrenceOrdinal: 1 },
+      { resolution: "resolved", occurrenceOrdinal: 1 },
+      { resolution: "resolved", occurrenceOrdinal: 2 },
+    ],
+  );
+  assert.deepEqual(canonicalExecutableDependencyGraphEdges(dependencies), [
+    {
+      sourcePath: "tools/entry.ps1",
+      normalizedTarget: "tools/repeat.ps1",
+    },
+  ]);
+});
+
+test("PowerShell grammar casing is ignored without folding repository path casing", () => {
+  const candidates = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/Entry.PS1",
+    content: [
+      '& "$psscriptroot\\Worker.PS1"',
+      '& "$PSSCRIPTROOT\\worker.ps1"',
+      "PWSH -fIlE .\\Mixed.Ps1",
+      '& "$SCRIPTROOT\\arbitrary.ps1"',
+      '& "${PSScriptRoot}\\braced.ps1"',
+      '& "$psscriptrootExtra\\prefixed.ps1"',
+      '& "$PSSCRIPTROOT\\$(Get-Path).ps1"',
+    ].join("\n"),
+  });
+
+  assert.deepEqual(
+    candidates.map(({ rawSpecifier, normalizedTargetCandidates }) => ({
+      rawSpecifier,
+      target: normalizedTargetCandidates[0],
+    })),
+    [
+      {
+        rawSpecifier: "$psscriptroot\\Worker.PS1",
+        target: "tools/Worker.PS1",
+      },
+      {
+        rawSpecifier: "$PSSCRIPTROOT\\worker.ps1",
+        target: "tools/worker.ps1",
+      },
+      {
+        rawSpecifier: ".\\Mixed.Ps1",
+        target: "tools/Mixed.Ps1",
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    resolveExecutableDependencies(
+      candidates.slice(0, 2),
+      new Map([["tools/Worker.PS1", "parsed"]]),
+      new Map([["tools/Worker.PS1", "repository-tool"]]),
+    ).map(({ normalizedTarget, resolution }) => ({
+      normalizedTarget,
+      resolution,
+    })),
+    [
+      { normalizedTarget: "tools/Worker.PS1", resolution: "resolved" },
+      { normalizedTarget: "tools/worker.ps1", resolution: "missing" },
+    ],
+  );
+});
+
+test("a PowerShell data statement fails closed for later topology", () => {
+  const candidates = POWERSHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/entry.ps1",
+    content: [
+      ".\\before-data.ps1",
+      "data Messages {",
+      "  .\\data-only.ps1",
+      "}",
+      ".\\after-data.ps1",
+    ].join("\n"),
+  });
+
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.rawSpecifier),
+    [".\\before-data.ps1"],
+  );
+});
+
+test("batch collector recognizes bounded direct, call, cmd, and percent-dp0 forms", () => {
+  const content = [
+    ".\\direct.bat",
+    ".\\direct.cmd",
+    "call .\\called.bat",
+    "call .\\called.cmd",
+    'call ".\\quoted.bat"',
+    'cmd /c ".\\nested.cmd"',
+    'call "%~dp0anchored.bat"',
+    '"%~dp0..\\shared\\anchored.cmd"',
+    "@call .\\called.cmd",
+    "call %HELPER%",
+    "call !HELPER!",
+    "call :localLabel",
+    "cmd /c %COMMAND%",
+    "helper.cmd",
+    "REM call .\\comment.bat",
+    ":: .\\comment.cmd",
+    "echo argument ^",
+    ".\\continued-data.cmd",
+    ".\\after-data.cmd",
+  ].join("\n");
+  const first = BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/sub/entry.cmd",
+    content,
+  });
+  const second = BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/sub/entry.cmd",
+    content,
+  });
+
+  assert.deepEqual(second, first);
+  assert.deepEqual(
+    first.map((candidate) => ({
+      line: candidate.line,
+      rawSpecifier: candidate.rawSpecifier,
+      target: candidate.normalizedTargetCandidates[0],
+      relation: candidate.relation,
+    })),
+    [
+      {
+        line: 1,
+        rawSpecifier: ".\\direct.bat",
+        target: "tools/sub/direct.bat",
+        relation: "static-execution",
+      },
+      {
+        line: 2,
+        rawSpecifier: ".\\direct.cmd",
+        target: "tools/sub/direct.cmd",
+        relation: "static-execution",
+      },
+      {
+        line: 3,
+        rawSpecifier: ".\\called.bat",
+        target: "tools/sub/called.bat",
+        relation: "static-execution",
+      },
+      {
+        line: 4,
+        rawSpecifier: ".\\called.cmd",
+        target: "tools/sub/called.cmd",
+        relation: "static-execution",
+      },
+      {
+        line: 5,
+        rawSpecifier: ".\\quoted.bat",
+        target: "tools/sub/quoted.bat",
+        relation: "static-execution",
+      },
+      {
+        line: 6,
+        rawSpecifier: ".\\nested.cmd",
+        target: "tools/sub/nested.cmd",
+        relation: "static-execution",
+      },
+      {
+        line: 7,
+        rawSpecifier: "%~dp0anchored.bat",
+        target: "tools/sub/anchored.bat",
+        relation: "static-execution",
+      },
+      {
+        line: 8,
+        rawSpecifier: "%~dp0..\\shared\\anchored.cmd",
+        target: "tools/shared/anchored.cmd",
+        relation: "static-execution",
+      },
+      {
+        line: 9,
+        rawSpecifier: ".\\called.cmd",
+        target: "tools/sub/called.cmd",
+        relation: "static-execution",
+      },
+      {
+        line: 19,
+        rawSpecifier: ".\\after-data.cmd",
+        target: "tools/sub/after-data.cmd",
+        relation: "static-execution",
+      },
+    ],
+  );
+});
+
+test("batch repository escapes remain unsafe and duplicate occurrences stay auditable", () => {
+  const candidates = BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/entry.cmd",
+    content: [
+      'call "%~dp0..\\..\\outside.cmd"',
+      "call .\\repeat.cmd",
+      "call .\\repeat.cmd",
+    ].join("\n"),
+  });
+  assert.equal(candidates[0]?.unsafe, true);
+  assert.deepEqual(candidates[0]?.normalizedTargetCandidates, []);
+  const dependencies = resolveExecutableDependencies(
+    candidates,
+    new Map([["tools/repeat.cmd", "parsed"]]),
+    new Map([["tools/repeat.cmd", "repository-tool"]]),
+  );
+  assert.deepEqual(
+    dependencies.map(({ resolution, occurrenceOrdinal }) => ({
+      resolution,
+      occurrenceOrdinal,
+    })),
+    [
+      { resolution: "unsafe", occurrenceOrdinal: 1 },
+      { resolution: "resolved", occurrenceOrdinal: 1 },
+      { resolution: "resolved", occurrenceOrdinal: 2 },
+    ],
+  );
+  assert.deepEqual(canonicalExecutableDependencyGraphEdges(dependencies), [
+    {
+      sourcePath: "tools/entry.cmd",
+      normalizedTarget: "tools/repeat.cmd",
+    },
+  ]);
+});
+
+test("batch grammar casing is ignored without folding repository path casing", () => {
+  const candidates = BATCH_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/Entry.CMD",
+    content: [
+      "CALL .\\Worker.CMD",
+      "CMD /C .\\Runner.BAT",
+      'call "%~DP0Anchored.CmD"',
+      'CaLl "%~dP0Mixed.BaT"',
+      'call "%OTHER%\\arbitrary.CMD"',
+      'call "%~DP0%HELPER%.CMD"',
+    ].join("\n"),
+  });
+
+  assert.deepEqual(
+    candidates.map(({ rawSpecifier, normalizedTargetCandidates }) => ({
+      rawSpecifier,
+      target: normalizedTargetCandidates[0],
+    })),
+    [
+      { rawSpecifier: ".\\Worker.CMD", target: "tools/Worker.CMD" },
+      { rawSpecifier: ".\\Runner.BAT", target: "tools/Runner.BAT" },
+      {
+        rawSpecifier: "%~DP0Anchored.CmD",
+        target: "tools/Anchored.CmD",
+      },
+      { rawSpecifier: "%~dP0Mixed.BaT", target: "tools/Mixed.BaT" },
+    ],
+  );
 });
 
 test("JS and TypeScript collector recognizes only bounded static declarations", () => {
@@ -805,6 +1249,185 @@ test("shell dependency evidence propagates through graph reachability and semant
         change.path === "tools/entry.sh" &&
         change.reasons.includes("dependency-graph"),
     ),
+  );
+});
+
+test("PowerShell and batch Skill chains propagate through inventory, contracts, diff, and CI evidence", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-windows-dependency-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "skills", "powershell"), { recursive: true });
+  await mkdir(path.join(root, "skills", "batch"), { recursive: true });
+  await mkdir(path.join(root, "tools", "powershell"), { recursive: true });
+  await mkdir(path.join(root, "tools", "batch"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "powershell", "SKILL.md"),
+    [
+      "---",
+      "name: powershell",
+      "description: Check PowerShell dependencies. Use when Windows automation topology needs review.",
+      "---",
+      "# PowerShell",
+      "```powershell",
+      "pwsh -FILE tools/powershell/Entry.PS1",
+      "```",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "skills", "batch", "SKILL.md"),
+    [
+      "---",
+      "name: batch",
+      "description: Check batch dependencies. Use when Windows command topology needs review.",
+      "---",
+      "# Batch",
+      "```bat",
+      "CMD /C tools\\batch\\Entry.CMD",
+      "```",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "tools", "powershell", "Entry.PS1"),
+    "# no dependencies yet\n",
+  );
+  await writeFile(
+    path.join(root, "tools", "powershell", "Worker.PS1"),
+    "# worker\n",
+  );
+  await writeFile(
+    path.join(root, "tools", "batch", "Entry.CMD"),
+    "REM no dependencies yet\n",
+  );
+  await writeFile(
+    path.join(root, "tools", "batch", "Worker.BAT"),
+    "@echo off\n",
+  );
+
+  const before = await collectRepositorySnapshot(root);
+  await writeFile(
+    path.join(root, "tools", "powershell", "Entry.PS1"),
+    ['& "$psscriptroot\\Worker.PS1"', "& $dynamic", ""].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "tools", "batch", "Entry.CMD"),
+    ['CALL "%~DP0Worker.BAT"', "call %DYNAMIC%", ""].join("\n"),
+  );
+
+  const after = await collectRepositorySnapshot(root);
+  const inventory = after.executableSurfaceInventory;
+  assert.deepEqual(
+    inventory.invocations.map(({ launcher, normalizedTarget }) => ({
+      launcher,
+      normalizedTarget,
+    })),
+    [
+      { launcher: "cmd", normalizedTarget: "tools/batch/Entry.CMD" },
+      {
+        launcher: "pwsh",
+        normalizedTarget: "tools/powershell/Entry.PS1",
+      },
+    ],
+  );
+  assert.deepEqual(
+    canonicalExecutableDependencyGraphEdges(inventory.dependencies),
+    [
+      {
+        sourcePath: "tools/batch/Entry.CMD",
+        normalizedTarget: "tools/batch/Worker.BAT",
+      },
+      {
+        sourcePath: "tools/powershell/Entry.PS1",
+        normalizedTarget: "tools/powershell/Worker.PS1",
+      },
+    ],
+  );
+  assert.deepEqual(inventory.summary.dependencyAnalyzers, [
+    { analyzer: "batch", count: 1 },
+    { analyzer: "powershell", count: 1 },
+  ]);
+  assert.equal(
+    surface(inventory, "tools/powershell/Entry.PS1").dependencyEvidence
+      .staticInvocationReachability,
+    "direct",
+  );
+  assert.equal(
+    surface(inventory, "tools/powershell/Worker.PS1").dependencyEvidence
+      .minimumInvocationDependencyDepth,
+    1,
+  );
+  assert.deepEqual(
+    surface(inventory, "tools/powershell/Worker.PS1").interpreterHints,
+    ["powershell"],
+  );
+  assert.equal(
+    surface(inventory, "tools/batch/Worker.BAT").dependencyEvidence
+      .staticInvocationReachability,
+    "transitive",
+  );
+  assert.deepEqual(
+    surface(inventory, "tools/batch/Worker.BAT").interpreterHints,
+    ["cmd"],
+  );
+  assert.equal(
+    inventory.dependencies.some(
+      (dependency) =>
+        dependency.rawSpecifier === "$dynamic" ||
+        dependency.rawSpecifier === "%DYNAMIC%",
+    ),
+    false,
+  );
+
+  for (const [entrypoint, analyzer, worker] of [
+    ["skills/powershell/SKILL.md", "powershell", "tools/powershell/Worker.PS1"],
+    ["skills/batch/SKILL.md", "batch", "tools/batch/Worker.BAT"],
+  ] as const) {
+    const contract = buildExecutionContract(after, { entrypoint });
+    const relationship = contract.executableEvidence.relationships.find(
+      (candidate) => candidate.to.sourcePath === worker,
+    );
+    assert.equal(relationship?.reachability, "transitive");
+    assert.equal(relationship?.minimumTargetDepth, 2);
+    assert.equal(
+      relationship?.evidence.some(
+        (evidence) =>
+          evidence.type === "dependency" && evidence.analyzer === analyzer,
+      ),
+      true,
+    );
+  }
+
+  const diff = buildExecutableSurfaceDiff(
+    before.executableSurfaceInventory,
+    inventory,
+  );
+  assert.deepEqual(
+    diff.addedDependencies.map(({ analyzer, target }) => ({
+      analyzer,
+      target,
+    })),
+    [
+      { analyzer: "batch", target: "tools/batch/Worker.BAT" },
+      { analyzer: "powershell", target: "tools/powershell/Worker.PS1" },
+    ],
+  );
+  assert.deepEqual(diff.newlyTransitivelyReachableSurfacePaths, [
+    "tools/batch/Worker.BAT",
+    "tools/powershell/Worker.PS1",
+  ]);
+  const ci = evaluateExecutableSurfaceCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+  assert.deepEqual(
+    ci.matches
+      .filter(
+        (match) =>
+          match.id ===
+          EXECUTABLE_SURFACE_CI_MATCH_IDS.TRANSITIVE_REACHABILITY_ADDED,
+      )
+      .map((match) => (match.kind === "surface" ? match.path : undefined)),
+    ["tools/batch/Worker.BAT", "tools/powershell/Worker.PS1"],
   );
 });
 

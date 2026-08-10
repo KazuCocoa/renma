@@ -6,8 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Fixed
+
+- Matched the bounded PowerShell and CMD grammar tokens with their native
+  case-insensitive semantics: PowerShell `-File`, `$PSScriptRoot`, `.ps1`, CMD
+  `call`, `/c`, `%~dp0`, `.bat`, and `.cmd` now accept casing variants. Captured
+  repository path spelling remains exact; path lookup is not case-folded.
+
 ### Added
 
+- Added bounded static executable-dependency analysis for PowerShell `.ps1`
+  and Windows batch `.bat` / `.cmd` surfaces. Explicit relative execution,
+  PowerShell call and dot-source forms, sole `$PSScriptRoot`, batch `call`,
+  sole `%~dp0`, and bounded `pwsh` / `powershell -File` and `cmd /c` forms now
+  feed the shared inventory, graph, reachability, execution-contract, diff, and
+  CI evidence paths. Comments, here-strings, multiline data, and continuation
+  lines are suppressed conservatively; dynamic expressions, bare/PATH command
+  lookup, PowerShell modules, and general interpreter semantics remain
+  unsupported.
 - Added bounded static shell executable-dependency analysis for text `.sh` and
   `.bash` surfaces. Direct relative execution through `./` or `../`, immediate
   `bash` / `sh` invocation, and `source` / dot-source forms now contribute
@@ -150,6 +166,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
+- Repository Context BOM v2 additively accepts the `powershell` and `batch`
+  dependency analyzer values and the `pwsh`, `powershell`, `cmd`, and `.exe`
+  launcher spellings. Existing fields, meanings, relation values, and ordering
+  remain unchanged. Repositories with recognized Windows chains may now show
+  additive surface, invocation, dependency, reachability, execution-contract,
+  semantic-diff, and CI evidence. Consumers with exhaustive enum switches must
+  accept the new values; BOM v2 and executable-surface inventory v1 identifiers
+  are unchanged.
 - Repository Context BOM v2 dependency rows add the `shell` analyzer and
   `static-execution` / `static-source` relation enum values. Existing fields and
   analyzers remain compatible; repositories containing newly recognized shell

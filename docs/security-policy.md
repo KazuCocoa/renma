@@ -33,11 +33,13 @@ metadata. It uses bounded structure-aware recognition for selected commands and
 JavaScript environment/file-access forms, not complete language
 interpretation. Separately, the reporting-only Executable Surface Inventory
 collects bounded explicit relative dependency evidence from eligible JS/TS,
-Python, and shell surfaces. That dependency projection does not analyze behavior,
-create security findings, or replace appropriate SAST and dependency-scanning
-tools for executable code. It recognizes only documented static import,
-re-export, shell execution, and shell source relationships; it does not analyze
-general script behavior or asset contents as executable code.
+Python, POSIX shell, PowerShell `.ps1`, and Windows batch `.bat` / `.cmd`
+surfaces. That dependency projection does not analyze behavior, create security
+findings, or replace appropriate SAST and dependency-scanning tools for
+executable code. It recognizes only documented static import, re-export,
+execution, and source relationships; dynamic expressions, environment/PATH
+lookup, arbitrary interpreter semantics, PowerShell module resolution, and
+general script behavior remain outside the boundary.
 Markdown instructions that direct an agent to reference, fetch, trust, execute,
 or invoke a script or asset remain eligible for diagnostics. Analyze the script
 or asset itself independently with project-selected tools such as ShellCheck,
