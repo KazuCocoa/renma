@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -41,10 +42,13 @@ jobs:
       - name: Generate Renma CI report
         id: ci-report
         continue-on-error: true
+        env:
+          FROM_SHA: ${{ github.event.pull_request.base.sha }}
+          TO_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           npx --no-install renma ci-report . \
-            --from origin/${{ github.base_ref }} \
-            --to HEAD \
+            --from "${FROM_SHA}" \
+            --to "${TO_SHA}" \
             --format markdown \
             --fail-on-status warn > renma-reports/ci-report.md
 

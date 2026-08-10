@@ -128,6 +128,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       ],
     ),
     ...topLevelModules("parsing", "source parsing and lexical projection", [
+      "bounded-clause-ranges.ts",
       "context-language-diagnostics.ts",
       "context-language.ts",
       "frontmatter-envelope.ts",
@@ -151,6 +152,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "executable-dependency-analyzer.ts",
         "executable-dependency-js-ts.ts",
         "executable-dependency-python.ts",
+        "executable-dependency-shell.ts",
         "executable-dependency-resolution.ts",
         "executable-surface-inventory.ts",
         "helper-command-evidence.ts",

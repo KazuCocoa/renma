@@ -33,6 +33,7 @@ import {
 } from "./markdown-syntax.js";
 import {
   MarkdownSecurityView,
+  type MarkdownHtmlComment,
   type MarkdownSemanticUnit,
 } from "./markdown-security-view.js";
 import {
@@ -377,6 +378,29 @@ const RULES = {
       "Rewrite this instruction so secret-bearing files are never copied into prompts, logs, uploads, or diagnostics.",
     confidence: "high",
     riskClass: "violation",
+  },
+  hiddenOperationalInstruction: {
+    id: DIAGNOSTIC_IDS.SEC_HIDDEN_OPERATIONAL_INSTRUCTION,
+    category: "safety",
+    title: "HTML comment contains a security-sensitive operational instruction",
+    whyItMatters:
+      "Markdown renderers hide HTML comments, but an agent that consumes the raw artifact can still read and follow security-sensitive instructions inside them.",
+    remediation:
+      "Remove the hidden instruction, or move an intentionally agent-facing instruction into visible Markdown with the applicable policy and safeguards.",
+    constraints: [
+      "Do not treat HTML comments as a place for operational instructions.",
+      "Keep ordinary metadata, formatting, and explanatory comments non-operational.",
+      "Do not weaken the underlying security policy to silence this finding.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the reported HTML comment no longer contains a recognized security-sensitive instruction.",
+      "Confirm any retained operational instruction is visible and governed by the appropriate policy.",
+    ],
+    llmHint:
+      "Inspect only the reported HTML-comment span. Remove hidden operational wording or make the intended instruction visible with explicit policy and safeguards.",
+    confidence: "high",
+    riskClass: "suspicious",
   },
   externalUploadInstruction: {
     id: DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION,
@@ -1020,7 +1044,6 @@ const COMMAND_LIKE_TOOL_RE =
   /\b(npm|pnpm|yarn|pip3?|python(?:\d+(?:\.\d+)*)?|py|uv|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i;
 const COMMAND_LIKE_LEADING_MARKER_RE =
   /^(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?/u;
-
 type SecurityDiagnosticsConfig = {
   security?: SecurityConfig;
 };
@@ -1172,12 +1195,124 @@ function securityFindingsForDocument(
       hasPolicyRelevantInstructionSurface(prepared),
     ),
     ...instructionDetections,
+    ...collectHiddenHtmlCommentDetections(prepared),
     ...policyContradictions(prepared.effectivePolicy),
   ];
 
   return dedupeDetections(detections).map((detection) =>
     findingFromDetection(prepared.artifact, detection),
   );
+}
+
+function collectHiddenHtmlCommentDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  return prepared.markdownView.htmlComments.flatMap((comment, commentIndex) => {
+    const projectedArtifact: Artifact = {
+      ...prepared.artifact,
+      kind: "context",
+      sizeBytes: comment.content.length + 1,
+      content: `\n${comment.content}`,
+      markdownParserEligible: true,
+    };
+    const projected = prepareSecurityDocumentAnalysis(
+      parseDocument(projectedArtifact),
+    );
+    if (projected === undefined) return [];
+
+    const recognizedDetections = dedupeDetections([
+      ...collectSecurityLineDetections(projected),
+      ...collectSemanticInstructionDetections(projected),
+    ]);
+    const underlying =
+      recognizedDetections.length > 0 ||
+      !hasPolicyRelevantInstructionSurface(projected)
+        ? recognizedDetections
+        : [
+            {
+              metadata: RULES.missingPolicyMetadata,
+              severity: "high" as const,
+              startLine: 2,
+              endLine: comment.content.split(/\r?\n/u).length + 1,
+              snippet: comment.content,
+              dedupeKey: "hidden-policy-relevant-instruction-surface",
+            },
+          ];
+    return underlying.map((detection) => {
+      const mappedStartLine = hiddenCommentSourceLine(
+        comment,
+        detection.startLine,
+      );
+      const mappedEndLine = hiddenCommentSourceLine(
+        comment,
+        detection.endLine ?? detection.startLine,
+      );
+      return {
+        metadata: RULES.hiddenOperationalInstruction,
+        severity: detection.severity,
+        startLine: mappedStartLine,
+        ...(mappedEndLine === mappedStartLine
+          ? {}
+          : { endLine: mappedEndLine }),
+        snippet: htmlCommentEvidenceSnippet(
+          prepared.sourceLines,
+          comment,
+          mappedStartLine,
+          mappedEndLine,
+        ),
+        dedupeKey: [
+          RULES.hiddenOperationalInstruction.id,
+          commentIndex,
+          detection.metadata.id,
+          detection.startLine,
+          detection.endLine ?? detection.startLine,
+          detection.snippet,
+        ].join(":"),
+        details: {
+          sourceProjection: "raw-agent-visible-html-comment",
+          matchedDiagnosticId: detection.metadata.id,
+          commentRange: {
+            startLine: comment.startLine,
+            endLine: comment.endLine,
+            startColumn: comment.startColumn,
+            endColumn: comment.endColumn,
+          },
+        },
+      };
+    });
+  });
+}
+
+function hiddenCommentSourceLine(
+  comment: MarkdownHtmlComment,
+  projectedLine: number,
+): number {
+  return Math.max(
+    comment.startLine,
+    Math.min(comment.endLine, comment.startLine + projectedLine - 2),
+  );
+}
+
+function htmlCommentEvidenceSnippet(
+  sourceLines: readonly string[],
+  comment: MarkdownHtmlComment,
+  startLine: number,
+  endLine: number,
+): string {
+  const lines = sourceLines.slice(startLine - 1, endLine);
+  if (lines.length === 0) return comment.content;
+  if (startLine === comment.startLine) {
+    lines[0] = (lines[0] ?? "").slice(comment.startColumn - 1);
+  }
+  if (endLine === comment.endLine) {
+    const endIndex = lines.length - 1;
+    const sourceEndColumn =
+      startLine === endLine
+        ? comment.endColumn - comment.startColumn
+        : comment.endColumn - 1;
+    lines[endIndex] = (lines[endIndex] ?? "").slice(0, sourceEndColumn);
+  }
+  return lines.join("\n");
 }
 
 function prepareSecurityDocumentAnalysis(
@@ -1628,6 +1763,7 @@ function prepareSecurityLineContext(
     prepared;
   const lineNumber = index + 1;
   const line = markdownView.instructionLine(index);
+  if (markdownView.isNonOperationalExampleLine(index)) return undefined;
   if (isShellCommentLine(line, index, markdownView)) {
     return undefined;
   }
@@ -2339,8 +2475,9 @@ function hasPolicyRelevantInstructionSurface(
     lineIndex += 1
   ) {
     if (
-      prepared.markdownView.isBlockQuotedLine(lineIndex) &&
-      !prepared.markdownView.isOperationalBlockQuotedLine(lineIndex)
+      prepared.markdownView.isNonOperationalExampleLine(lineIndex) ||
+      (prepared.markdownView.isBlockQuotedLine(lineIndex) &&
+        !prepared.markdownView.isOperationalBlockQuotedLine(lineIndex))
     ) {
       continue;
     }
@@ -2448,6 +2585,7 @@ function isLogicalShellLineEligible(
     markdownView.isOperationalBlockQuotedLine(lineIndex);
   return (
     (source === visible || operationalBlockQuote) &&
+    !markdownView.isNonOperationalExampleLine(lineIndex) &&
     (!markdownView.isBlockQuotedLine(lineIndex) || operationalBlockQuote) &&
     !isPolicyLine(visible) &&
     !isShellCommentLine(visible, lineIndex, markdownView)

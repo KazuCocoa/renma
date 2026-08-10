@@ -779,7 +779,7 @@
             "additionalProperties": false,
             "required": ["analyzer", "count"],
             "properties": {
-              "analyzer": { "enum": ["js-ts", "python"] },
+              "analyzer": { "enum": ["js-ts", "python", "shell"] },
               "count": { "$ref": "#/$defs/nonNegativeInteger" }
             }
           }
@@ -792,7 +792,12 @@
             "required": ["relation", "count"],
             "properties": {
               "relation": {
-                "enum": ["static-import", "static-reexport"]
+                "enum": [
+                  "static-execution",
+                  "static-import",
+                  "static-reexport",
+                  "static-source"
+                ]
               },
               "count": { "$ref": "#/$defs/nonNegativeInteger" }
             }
@@ -947,11 +952,18 @@
         "occurrenceOrdinal"
       ],
       "properties": {
-        "analyzer": { "enum": ["js-ts", "python"] },
+        "analyzer": { "enum": ["js-ts", "python", "shell"] },
         "sourcePath": { "type": "string" },
         "line": { "type": "integer", "minimum": 1 },
         "snippet": { "type": "string", "maxLength": 240 },
-        "relation": { "enum": ["static-import", "static-reexport"] },
+        "relation": {
+          "enum": [
+            "static-execution",
+            "static-import",
+            "static-reexport",
+            "static-source"
+          ]
+        },
         "rawSpecifier": { "type": "string" },
         "normalizedTargetCandidates": {
           "type": "array",

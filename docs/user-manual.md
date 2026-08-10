@@ -6,6 +6,15 @@ renma scans agent-facing repository assets and turns them into deterministic, ag
 
 Renma is deterministic repository governance for context assets, skills, and agent-facing documentation. It reads local repository files, builds reviewable evidence, and reports what humans or coding agents should inspect.
 
+English is the primary language for canonical governance and security wording,
+and receives Renma's strongest bounded natural-language recognition.
+Multilingual and non-English repository content remains supported; Renma does
+not emit a generic warning merely because prose is non-English. Deterministic
+evidence whose grammar does not depend on prose vocabulary remains active
+across languages, including URLs and hostnames, command syntax, filesystem
+paths, executable references, Markdown structure, and hidden Unicode. Renma
+does not translate security terms or claim general multilingual NLP.
+
 Renma does not call an LLM, conduct an authoring conversation, ask the user
 questions, retain session state, choose runtime context, assemble prompts,
 inject context, execute agents, or collect telemetry.
@@ -138,8 +147,10 @@ Assets or unrelated repository files.
 Only files marked Markdown-parser eligible contribute frontmatter metadata,
 headings, links, code fences, and repeated-context evidence. Text scripts and
 data assets remain raw text for dedicated static path and inventory analysis;
-binary assets remain opaque. Renma does not analyze script or asset contents as
-executable code. Security command analysis applies to eligible agent-facing
+binary assets remain opaque. Security diagnostics do not analyze script or
+asset contents as executable behavior. The Executable Surface Inventory only
+recognizes its documented bounded static dependency relationships in eligible
+text scripts. Security command analysis applies to eligible agent-facing
 Markdown instructions that reference or invoke them. A separate raw
 source-integrity check detects conservative hidden-Unicode signals in every
 already-discovered text artifact without interpreting executable behavior or
@@ -1546,7 +1557,7 @@ and `.jsx` are not executable surfaces in this release. This is static
 repository evidence and does not claim that every Node configuration executes
 TypeScript.
 
-Dependency analysis is deliberately limited to two private built-ins:
+Dependency analysis is deliberately limited to three private built-ins:
 
 - `js-ts` analyzes text `.js`, `.mjs`, `.ts`, `.mts`, and `.cts` surfaces. It
   recognizes static string-literal ESM imports and `export ... from`
@@ -1557,6 +1568,14 @@ Dependency analysis is deliberately limited to two private built-ins:
   `from` imports. A module produces exact `.py` and `/__init__.py` candidates;
   `from . import helper, parser` produces separate candidate sets. Multiple
   parsed candidates are `ambiguous`.
+- `shell` analyzes text `.sh` and `.bash` surfaces. At the beginning of one
+  physical command line, after whitespace, it recognizes only `./helper.sh`,
+  `bash ./helper.sh`, `sh ./helper.sh`, `source ./helper.sh`, and
+  `. ./helper.sh`, plus the corresponding single- or double-quoted relative
+  path and repository-safe `../` form. The target must end in `.sh` or `.bash`.
+  `bash` or `sh` must be followed immediately by the path; launcher options and
+  wrappers are not interpreted. Execution forms emit `static-execution`; source
+  and dot-source forms emit `static-source`.
 
 The JS/TS collector ignores `.cjs` sources, `.jsx`, `.tsx`, dynamic `import()`,
 CommonJS `require`, packages, `node:` built-ins, absolute paths, template
@@ -1569,8 +1588,24 @@ substitution, directory indexes, aliases, package exports, project references,
 and import maps are also excluded. The Python collector ignores `.pyi`, `.pyc`,
 absolute imports, dynamic import helpers, package metadata, virtual
 environments, `PYTHONPATH`, runtime `sys.path` changes, and implicit
-containing-package edges. Neither collector executes code or implements a
-complete parser.
+containing-package edges. The shell collector ignores variables, parameter or
+command substitution, backticks, aliases, environment-assignment or wrapper
+prefixes, launcher options, globs, tilde expansion, concatenated quoted words,
+absolute paths, URLs, bare/PATH-resolved commands, unsupported target
+extensions, and commands that do not begin the physical line. Conservative
+lexical state also excludes recognized heredoc bodies, multiline single- or
+double-quoted literal regions, and physical lines continued from a preceding
+line. An unsupported or dynamic heredoc delimiter stops shell dependency
+collection for the remaining source rather than risking a false topology edge.
+A bounded arithmetic state recognizes obvious `$(( ... ))` and `(( ... ))`
+regions. Shift operators inside them are data for dependency purposes and do
+not enter heredoc state, so collection resumes for later supported commands.
+Bash `<<<` here-string operators are advanced over as complete non-heredoc
+tokens. Their operands do not create dependency evidence, and a later supported
+physical line remains eligible for collection.
+A relative `..` form that would escape the repository is retained only as
+`unsafe` resolution evidence and never becomes a graph edge. No collector
+executes code or implements a complete parser.
 
 Dependency targets resolve only to surfaces already in the inventory.
 `not-inventory` means the exact parsed repository file exists but is outside
@@ -3008,6 +3043,9 @@ npx --no-install renma ci-report . --base origin/main --format markdown --fail-o
 The public
 [GitHub Actions example](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml)
 uses this package-consumer model, checks out full Git history for `ci-report`,
+checks out the pull request's immutable `github.event.pull_request.head.sha`,
+and compares `github.event.pull_request.base.sha` directly with that head SHA
+rather than deriving refs from local branch names,
 and keeps the job that executes repository code read-only while a separate
 same-repository job owns pull-request comment permission.
 

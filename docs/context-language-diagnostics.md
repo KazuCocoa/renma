@@ -2,6 +2,14 @@
 
 Renma checks canonical active shared context assets for small English-only wording patterns that can make reusable context harder for humans and agents to apply safely.
 
+English is primary for these bounded wording recognizers, but multilingual and
+non-English Context content remains supported. Renma does not emit a generic
+language warning, require translation, or treat non-English prose as invalid;
+these diagnostics simply do not claim equivalent natural-language vocabulary
+coverage outside their documented English patterns. Language-independent
+repository and security evidence remains governed by its own deterministic
+recognizers.
+
 These diagnostics are deterministic catalog diagnostics. They do not call an LLM, infer a replacement threshold, infer a date or version, create scan finding IDs, or rewrite context content.
 
 ## Scope

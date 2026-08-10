@@ -120,6 +120,14 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
         evidenceCount: 2,
         expectation: "possible",
       },
+      {
+        from: "tools/shared.sh",
+        to: "tools/transitive.sh",
+        reachability: "transitive",
+        depth: 2,
+        evidenceCount: 1,
+        expectation: "possible",
+      },
     ],
   );
   assert.deepEqual(
@@ -195,9 +203,9 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
   assert.deepEqual(report.analysisBoundary.coverage, {
     reachableRepositoryScriptCount: 3,
     recognizedInvocationEvidenceCount: 4,
-    recognizedDependencyEvidenceCount: 3,
+    recognizedDependencyEvidenceCount: 4,
     topologicalInvocationEvidenceCount: 3,
-    topologicalDependencyEvidenceCount: 2,
+    topologicalDependencyEvidenceCount: 3,
     nonTopologicalEvidenceCount: 2,
   });
   assert.deepEqual(report.analysisBoundary.observations, {
@@ -205,6 +213,159 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
     noUnresolvedStaticEvidenceObserved: false,
     runtimeOrUnsupportedBehaviorAbsenceProven: false,
   });
+});
+
+test("a shell path present only in heredoc data is absent from the execution contract", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-heredoc-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    body: ["# Demo", "", "```bash", "bash tools/entry.sh", "```"].join("\n"),
+  });
+  await fixture.write(
+    "tools/entry.sh",
+    ["#!/bin/sh", "cat <<'EOF'", "./heredoc-only.sh", "EOF", ""].join("\n"),
+  );
+  await fixture.write("tools/heredoc-only.sh", "#!/bin/sh\nexit 0\n");
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  assert.equal(
+    snapshot.executableSurfaceInventory.dependencies.some(
+      (dependency) => dependency.normalizedTarget === "tools/heredoc-only.sh",
+    ),
+    false,
+  );
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.demo",
+  });
+  assert.equal(
+    report.executableEvidence.relationships.some(
+      (relationship) => relationship.to.sourcePath === "tools/heredoc-only.sh",
+    ),
+    false,
+  );
+  assert.equal(
+    formatExecutionContractJson(report).includes("tools/heredoc-only.sh"),
+    false,
+  );
+});
+
+test("arithmetic shifts do not hide later shell execution-contract dependencies", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-arithmetic-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    body: ["# Demo", "", "```bash", "bash tools/entry.sh", "```"].join("\n"),
+  });
+  await fixture.write(
+    "tools/entry.sh",
+    [
+      "#!/bin/sh",
+      "mask=$((1 << 2))",
+      "((mask <<= 1))",
+      "source ./real-worker.sh",
+      "",
+    ].join("\n"),
+  );
+  await fixture.write("tools/real-worker.sh", "#!/bin/sh\nexit 0\n");
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  assert.ok(
+    snapshot.executableSurfaceInventory.dependencies.some(
+      (dependency) =>
+        dependency.relation === "static-source" &&
+        dependency.normalizedTarget === "tools/real-worker.sh",
+    ),
+  );
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.demo",
+  });
+  const relationship = report.executableEvidence.relationships.find(
+    (candidate) => candidate.to.sourcePath === "tools/real-worker.sh",
+  );
+  assert.equal(relationship?.relationship, "invokes");
+  assert.equal(relationship?.reachability, "transitive");
+  assert.equal(relationship?.minimumTargetDepth, 2);
+  assert.equal(
+    formatExecutionContractJson(report).includes("tools/real-worker.sh"),
+    true,
+  );
+});
+
+test("here-strings do not hide later shell execution-contract dependencies", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-here-string-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    body: ["# Demo", "", "```bash", "bash tools/entry.sh", "```"].join("\n"),
+  });
+  await fixture.write(
+    "tools/entry.sh",
+    [
+      "#!/bin/sh",
+      'read -r value <<< "./here-string-only.sh"',
+      "./real-worker.sh",
+      "",
+    ].join("\n"),
+  );
+  await fixture.write("tools/here-string-only.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.write("tools/real-worker.sh", "#!/bin/sh\nexit 0\n");
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  assert.deepEqual(
+    canonicalExecutableDependencyGraphEdges(
+      snapshot.executableSurfaceInventory.dependencies,
+    ),
+    [
+      {
+        sourcePath: "tools/entry.sh",
+        normalizedTarget: "tools/real-worker.sh",
+      },
+    ],
+  );
+  const realWorker = snapshot.executableSurfaceInventory.surfaces.find(
+    (surface) => surface.path === "tools/real-worker.sh",
+  );
+  const hereStringOnly = snapshot.executableSurfaceInventory.surfaces.find(
+    (surface) => surface.path === "tools/here-string-only.sh",
+  );
+  assert.equal(
+    realWorker?.dependencyEvidence.staticInvocationReachability,
+    "transitive",
+  );
+  assert.equal(
+    hereStringOnly?.dependencyEvidence.staticInvocationReachability,
+    "unreached",
+  );
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.demo",
+  });
+  assert.equal(
+    report.executableEvidence.relationships.some(
+      (relationship) => relationship.to.sourcePath === "tools/real-worker.sh",
+    ),
+    true,
+  );
+  assert.equal(
+    report.executableEvidence.relationships.some(
+      (relationship) =>
+        relationship.to.sourcePath === "tools/here-string-only.sh",
+    ),
+    false,
+  );
+  assert.equal(
+    formatExecutionContractJson(report).includes("tools/here-string-only.sh"),
+    false,
+  );
 });
 
 test("execution contract accepts an exact SKILL.md path and omits absent revision provenance", async (t) => {
@@ -775,7 +936,10 @@ async function comprehensiveFixture(
     ].join("\n"),
   );
   await fixture.write("skills/release-prep/scripts/unused.ts", "export {};\n");
-  await fixture.write("tools/shared.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.write(
+    "tools/shared.sh",
+    "#!/bin/sh\nsource ./transitive.sh\nexit 0\n",
+  );
   await fixture.write("tools/transitive.sh", "#!/bin/sh\nexit 0\n");
   return fixture;
 }

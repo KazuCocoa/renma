@@ -102,7 +102,7 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
   );
 });
 
-test("User Manual keeps script and asset contents outside security diagnostics", async () => {
+test("documentation keeps bounded dependency evidence outside security diagnostics", async () => {
   const [manual, guide] = await Promise.all([
     readFile(path.join(process.cwd(), "docs/user-manual.md"), "utf8"),
     readFile(path.join(process.cwd(), "docs/security-policy.md"), "utf8"),
@@ -114,7 +114,7 @@ test("User Manual keeps script and asset contents outside security diagnostics",
   );
   assert.match(
     manual,
-    /Renma does not analyze script or asset contents as\s+executable code\./,
+    /Security diagnostics do not analyze script or\s+asset contents as executable behavior\.[\s\S]*only\s+recognizes its documented bounded static dependency relationships/,
   );
   assert.match(
     manual,
@@ -126,6 +126,6 @@ test("User Manual keeps script and asset contents outside security diagnostics",
   );
   assert.match(
     guide,
-    /It does not analyze script or asset contents as executable\s+code;/,
+    /recognizes only documented static import,[\s\S]*shell execution, and shell source relationships;[\s\S]*does not analyze\s+general script behavior/,
   );
 });

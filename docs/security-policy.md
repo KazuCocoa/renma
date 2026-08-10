@@ -18,15 +18,26 @@ restrictions, and approval controls remain the execution environment's
 responsibility. Renma is one layer in that combined defense, not a complete
 runtime security boundary.
 
+English is Renma's primary language for canonical governance and security
+wording, and its bounded natural-language recognizers have their strongest
+coverage for English instructions. Multilingual and non-English repository
+content remains supported and is not itself a warning or invalid state. Renma
+does not translate security vocabulary or claim multilingual NLP coverage.
+Language-independent deterministic evidence remains active regardless of the
+surrounding prose language where its documented grammar applies, including
+URLs and hostnames, command syntax, filesystem paths, executable references,
+Markdown structure, and raw-source hidden Unicode.
+
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. It uses bounded structure-aware recognition for selected commands and
 JavaScript environment/file-access forms, not complete language
 interpretation. Separately, the reporting-only Executable Surface Inventory
-collects bounded explicit relative static import evidence from eligible JS/TS
-and Python surfaces. That dependency projection does not analyze behavior,
+collects bounded explicit relative dependency evidence from eligible JS/TS,
+Python, and shell surfaces. That dependency projection does not analyze behavior,
 create security findings, or replace appropriate SAST and dependency-scanning
-tools for executable code. It does not analyze script or asset contents as executable
-code; it records only the documented static import relationship.
+tools for executable code. It recognizes only documented static import,
+re-export, shell execution, and shell source relationships; it does not analyze
+general script behavior or asset contents as executable code.
 Markdown instructions that direct an agent to reference, fetch, trust, execute,
 or invoke a script or asset remain eligible for diagnostics. Analyze the script
 or asset itself independently with project-selected tools such as ShellCheck,
@@ -742,6 +753,29 @@ Hard clause terminators end direct prohibition lookup. A new subject plus a
 finite auxiliary or copula also starts a new polarity scope, so a later `to`
 inside that finite clause is not treated as a purpose complement of the earlier
 prohibited action.
+
+HTML comments remain excluded from the rendered-visible semantic projection;
+they are not treated as ordinary operational prose. Because an agent may read
+the raw Markdown source, Renma separately projects each real HTML-comment span
+and applies the existing bounded security-sensitive instruction recognition to
+that isolated content. A recognized network, upload, secret-handling, command,
+or other security-sensitive instruction emits
+`SEC-HIDDEN-OPERATIONAL-INSTRUCTION` with the exact source range and the
+underlying matched diagnostic identity in `details`. Ordinary explanatory,
+metadata, formatting, and documentation comments remain inert. The finding is
+suppressible only through the existing finding-ID plus repository-path
+suppression contract. The raw-comment projection reuses the visible-Markdown
+structural example classification: a same-node marker, a preceding negative-
+example label, or a negative-example heading can bound its example payload.
+For an inline same-node marker, only the punctuation-bounded clause containing
+the marker is masked; a later clause remains operational even on the same
+physical line or after a soft line break in the same paragraph. The structural
+classification does not exempt a later independent workflow instruction, and a
+trailing label cannot hide an earlier instruction. Direct prohibitions remain
+defensive and inert. This comment projection is separate from the raw hidden-
+Unicode pass, which continues to inspect every discovered UTF-8 text artifact
+before Markdown filtering.
+
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding
 prose, an instruction label, or an operational instruction heading explicitly
@@ -1041,6 +1075,7 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` | A canonical Skill routing example contains a concrete high-risk literal.                                                            | Replace it with semantic capability and selection wording, or move necessary exact evidence to a clearly non-operational body section. Do not automatically rewrite owner-authored prose.                                                                                                                                                                                  | Canonical Skill `description`              |
 | `SEC-SUSPICIOUS-BIDI-CONTROL`             | Original source contains a bidi formatting control that can change displayed order.                                                  | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional.                                                                                                                                                                                                                                                  | Any discovered UTF-8 text artifact         |
 | `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, or ASCII-token-internal ZWJ/ZWNJ.              | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
+| `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`      | A raw HTML comment contains a bounded recognized security-sensitive operational instruction even though rendered Markdown hides it. | Remove the hidden instruction, or move intentional agent-facing guidance into visible Markdown with applicable policy and safeguards.                                                                                                                                                                                                                                       | Agent-facing Markdown body                 |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding.                                                        | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value.                                                                                                                                                                                                                                                    | Skill metadata                             |
 | `SEC-MISSING-POLICY-METADATA`             | Sensitive instructions lack a declared policy.                                                                                       | Add local policy fields or select a configured security profile using the syntax for that asset kind.                                                                                                                                                                                                                                                                       | Metadata                                   |
 | `SEC-INSTRUCTION-VIOLATES-POLICY`         | Agent-facing text asks for behavior denied by policy.                                                                                 | Rewrite the instruction or adjust policy only after review.                                                                                                                                                                                                                                                                                                                 | Body, canonical Skill `description`, or metadata |

@@ -376,6 +376,20 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   currentDependencyInventory.dependencies = [schemaDependency()];
   assertValid(validateBom, currentDependencyBom);
 
+  const shellDependencyBom = structuredClone(currentDependencyBom);
+  const shellDependency = (
+    shellDependencyBom.executableSurfaceInventory
+      .dependencies as unknown as Array<Record<string, unknown>>
+  )[0]!;
+  shellDependency.analyzer = "shell";
+  shellDependency.relation = "static-source";
+  shellDependency.sourcePath = "tools/check.sh";
+  shellDependency.snippet = "source ./helper.sh";
+  shellDependency.rawSpecifier = "./helper.sh";
+  shellDependency.normalizedTargetCandidates = ["tools/helper.sh"];
+  shellDependency.normalizedTarget = "tools/helper.sh";
+  assertValid(validateBom, shellDependencyBom);
+
   for (const field of [
     "incomingResolvedDependencyCount",
     "outgoingResolvedDependencyCount",

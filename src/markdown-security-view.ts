@@ -9,6 +9,7 @@ import type {
   ThematicBreak,
 } from "mdast";
 
+import { boundedClauseRanges } from "./bounded-clause-ranges.js";
 import {
   projectVisibleLines,
   type SourceColumnRange,
@@ -30,6 +31,13 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
   kind: "paragraph" | "code";
   lines: string[];
   contentStartLine?: number;
+};
+
+/** Raw source that an agent can read even though Markdown renderers hide it. */
+export type MarkdownHtmlComment = MarkdownSourceRange & {
+  startColumn: number;
+  endColumn: number;
+  content: string;
 };
 
 export type SecurityGuardEvidence = MarkdownSourceRange & {
@@ -86,6 +94,7 @@ const SAFETY_HEADING_RE =
 
 export class MarkdownSecurityView {
   readonly semanticUnits: MarkdownSemanticUnit[];
+  readonly htmlComments: MarkdownHtmlComment[];
 
   private readonly sourceLines: string[];
   readonly bodyStartLine: number;
@@ -95,6 +104,11 @@ export class MarkdownSecurityView {
   private readonly thematicBreaks: MarkdownSourceRange[];
   private readonly blockQuoteLines = new Set<number>();
   private readonly operationalBlockQuoteLines = new Set<number>();
+  private readonly nonOperationalExampleLines = new Set<number>();
+  private readonly nonOperationalExampleRangesByLine = new Map<
+    number,
+    SemanticOffsetRange[]
+  >();
   private readonly codeBlockLines = new Set<number>();
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
@@ -155,12 +169,12 @@ export class MarkdownSecurityView {
     }
     this.headings = headings;
     this.thematicBreaks = thematicBreaks;
-    const commentRanges = htmlRecords.flatMap(({ node }) =>
-      htmlCommentSourceRanges(node, this.bodyStartLine),
+    this.htmlComments = htmlRecords.flatMap(({ node }) =>
+      htmlComments(node, this.bodyStartLine),
     );
     const visibleLineProjections = projectVisibleLines(
       this.sourceLines,
-      commentRanges,
+      this.htmlComments,
     );
     this.visibleLines = visibleLineProjections.map(({ text }) => text);
 
@@ -197,7 +211,7 @@ export class MarkdownSecurityView {
       ...htmlCandidates,
       ...codeBlocks,
     ]
-      .filter((candidate) => candidate.operational)
+      .flatMap((candidate) => this.operationalCandidateSegments(candidate))
       .sort((left, right) => left.unit.startLine - right.unit.startLine);
     this.semanticUnits = semanticCandidates.map((candidate) => candidate.unit);
     for (const candidate of semanticCandidates) {
@@ -225,8 +239,12 @@ export class MarkdownSecurityView {
     return this.operationalBlockQuoteLines.has(lineIndex);
   }
 
+  isNonOperationalExampleLine(lineIndex: number): boolean {
+    return this.nonOperationalExampleLines.has(lineIndex);
+  }
+
   instructionLine(lineIndex: number): string {
-    const line = this.visibleLine(lineIndex);
+    const line = this.nonOperationalExampleProjection(lineIndex);
     if (!this.isOperationalBlockQuotedLine(lineIndex)) return line;
     return line.replace(/^(?:\s{0,3}>[ \t]?)+/u, (prefix) =>
       " ".repeat(prefix.length),
@@ -374,9 +392,17 @@ export class MarkdownSecurityView {
     record: NodeRecord & { node: Paragraph },
   ): SemanticCandidate {
     const range = sourceRange(record.node, this.bodyStartLine);
-    const lines = this.visibleLines
-      .slice(range.startLine - 1, range.endLine)
-      .map((line) => line.trim());
+    const nonOperationalExample = this.classifyNonOperationalExampleLines(
+      record,
+      range,
+    );
+    const lines = Array.from(
+      { length: range.endLine - range.startLine + 1 },
+      (_, index) =>
+        this.nonOperationalExampleProjection(
+          range.startLine - 1 + index,
+        ).trim(),
+    );
     const blockQuoted = record.ancestors.some(
       (ancestor) => ancestor.type === "blockquote",
     );
@@ -390,7 +416,7 @@ export class MarkdownSecurityView {
       operational:
         (!blockQuoted || operationalBlockQuote) &&
         !lines.every((line) => /^\s*\/\//.test(line)) &&
-        !this.isNonOperationalExample(record, range.startLine),
+        !nonOperationalExample,
     };
   }
 
@@ -407,6 +433,10 @@ export class MarkdownSecurityView {
       startLine: block.startLine,
       endLine: block.endLine,
     };
+    const nonOperationalExample = this.classifyNonOperationalExampleLines(
+      record,
+      range,
+    );
     const fenced = block.kind === "fenced";
     const contentStartLine = block.contentStartLine;
     const contentEndLine = block.contentEndLine;
@@ -435,7 +465,7 @@ export class MarkdownSecurityView {
         fenced &&
         semanticLanguage &&
         (!blockQuoted || operationalBlockQuote) &&
-        !this.isNonOperationalExample(record, range.startLine) &&
+        !nonOperationalExample &&
         this.isOperationalFence(record, range.startLine),
     };
   }
@@ -456,8 +486,18 @@ export class MarkdownSecurityView {
     const flush = (): void => {
       if (runStart < 0 || runLines.length === 0) return;
       const startLine = range.startLine + runStart;
-      const lines = runLines.map((line) => line.trim());
-      if (lines.join(" ").trim().length > 0) {
+      const candidateRange = {
+        startLine,
+        endLine: startLine + runLines.length - 1,
+      };
+      const nonOperationalExample = this.classifyNonOperationalExampleLines(
+        record,
+        candidateRange,
+      );
+      const lines = runLines.map((_, index) =>
+        this.nonOperationalExampleProjection(startLine - 1 + index).trim(),
+      );
+      if (runLines.join(" ").trim().length > 0) {
         const blockQuoted = record.ancestors.some(
           (ancestor) => ancestor.type === "blockquote",
         );
@@ -472,13 +512,12 @@ export class MarkdownSecurityView {
         candidates.push({
           unit: {
             kind: "paragraph",
-            startLine,
-            endLine: startLine + lines.length - 1,
+            ...candidateRange,
             lines,
           },
           operational:
             (!blockQuoted || operationalBlockQuote) &&
-            !this.isNonOperationalExample(record, startLine) &&
+            !nonOperationalExample &&
             !lines.every((line) => /^\s*\/\//.test(line)),
           htmlDerived: true,
         });
@@ -539,15 +578,164 @@ export class MarkdownSecurityView {
   }
 
   private isNonOperationalExample(record: NodeRecord, line: number): boolean {
-    if (EXAMPLE_BOUNDARY_RE.test(nodeText(record.node))) return true;
+    const range = sourceRange(record.node, this.bodyStartLine);
+    return this.classifyNonOperationalExampleLines(record, range, line);
+  }
+
+  private classifyNonOperationalExampleLines(
+    record: NodeRecord,
+    range: MarkdownSourceRange,
+    line = range.startLine,
+  ): boolean {
     const container = this.routedContainerRecord(record);
     const previous = container.parent.children[container.index - 1];
-    if (previous !== undefined && EXAMPLE_LABEL_RE.test(nodeText(previous))) {
+    const structuralBoundary =
+      (record.node.type === "code" &&
+        EXAMPLE_BOUNDARY_RE.test(nodeText(record.node))) ||
+      (previous !== undefined && EXAMPLE_LABEL_RE.test(nodeText(previous))) ||
+      this.headingChainAt(line).some((heading) =>
+        EXAMPLE_BOUNDARY_RE.test(heading.text),
+      );
+    const lineIndexes = Array.from(
+      { length: Math.max(0, range.endLine - range.startLine + 1) },
+      (_, index) => range.startLine - 1 + index,
+    );
+    if (structuralBoundary) {
+      for (const lineIndex of lineIndexes) {
+        this.nonOperationalExampleLines.add(lineIndex);
+      }
       return true;
     }
-    return this.headingChainAt(line).some((heading) =>
-      EXAMPLE_BOUNDARY_RE.test(heading.text),
+
+    const lineStarts: number[] = [];
+    let text = "";
+    for (const [index, lineIndex] of lineIndexes.entries()) {
+      if (index > 0) text += "\n";
+      lineStarts.push(text.length);
+      text += this.visibleLine(lineIndex);
+    }
+    const clauses = boundedClauseRanges(text);
+    let classifiedInlineExample = false;
+    for (const marker of text.matchAll(
+      new RegExp(EXAMPLE_BOUNDARY_RE.source, "giu"),
+    )) {
+      if (marker.index === undefined) continue;
+      const markerStart = marker.index;
+      const markerEnd = markerStart + marker[0].length;
+      const clauseIndex = clauses.findIndex(
+        (clause) => clause.start < markerEnd && clause.end > markerStart,
+      );
+      const clause = clauses[clauseIndex];
+      if (clause === undefined) continue;
+      classifiedInlineExample = true;
+      this.addNonOperationalExampleRange(
+        lineIndexes,
+        lineStarts,
+        clause.start,
+        clauses[clauseIndex + 1]?.start ?? text.length,
+      );
+    }
+    for (const lineIndex of lineIndexes) {
+      if (
+        this.nonOperationalExampleRangesByLine.has(lineIndex) &&
+        !/[\p{L}\p{N}]/u.test(this.nonOperationalExampleProjection(lineIndex))
+      ) {
+        this.nonOperationalExampleLines.add(lineIndex);
+      }
+    }
+    return (
+      classifiedInlineExample &&
+      !/[\p{L}\p{N}]/u.test(
+        lineIndexes
+          .map((lineIndex) => this.nonOperationalExampleProjection(lineIndex))
+          .join("\n"),
+      )
     );
+  }
+
+  private addNonOperationalExampleRange(
+    lineIndexes: readonly number[],
+    lineStarts: readonly number[],
+    start: number,
+    end: number,
+  ): void {
+    for (const [index, lineIndex] of lineIndexes.entries()) {
+      const lineStart = lineStarts[index] ?? 0;
+      const lineEnd = lineStart + this.visibleLine(lineIndex).length;
+      const localStart = Math.max(start, lineStart) - lineStart;
+      const localEnd = Math.min(end, lineEnd) - lineStart;
+      if (localStart >= localEnd) continue;
+      const ranges =
+        this.nonOperationalExampleRangesByLine.get(lineIndex) ?? [];
+      if (
+        !ranges.some(
+          (range) => range.start === localStart && range.end === localEnd,
+        )
+      ) {
+        ranges.push({ start: localStart, end: localEnd });
+      }
+      this.nonOperationalExampleRangesByLine.set(lineIndex, ranges);
+    }
+  }
+
+  private nonOperationalExampleProjection(lineIndex: number): string {
+    const line = this.visibleLine(lineIndex);
+    const ranges = this.nonOperationalExampleRangesByLine.get(lineIndex);
+    if (ranges === undefined) {
+      return this.nonOperationalExampleLines.has(lineIndex)
+        ? " ".repeat(line.length)
+        : line;
+    }
+    let projection = line;
+    for (const range of [...ranges].sort(
+      (left, right) => right.start - left.start || right.end - left.end,
+    )) {
+      projection =
+        projection.slice(0, range.start) +
+        " ".repeat(range.end - range.start) +
+        projection.slice(range.end);
+    }
+    return projection;
+  }
+
+  private operationalCandidateSegments(
+    candidate: SemanticCandidate,
+  ): SemanticCandidate[] {
+    if (!candidate.operational) return [];
+    if (candidate.unit.kind !== "paragraph") return [candidate];
+    const { unit } = candidate;
+    if (
+      !unit.lines.some((_, index) =>
+        this.nonOperationalExampleLines.has(unit.startLine - 1 + index),
+      )
+    ) {
+      return [candidate];
+    }
+
+    const segments: SemanticCandidate[] = [];
+    let runStart = -1;
+    const flush = (exclusiveEnd: number): void => {
+      if (runStart < 0) return;
+      segments.push({
+        ...candidate,
+        unit: {
+          kind: "paragraph",
+          startLine: unit.startLine + runStart,
+          endLine: unit.startLine + exclusiveEnd - 1,
+          lines: unit.lines.slice(runStart, exclusiveEnd),
+        },
+      });
+      runStart = -1;
+    };
+    for (const [index] of unit.lines.entries()) {
+      if (this.nonOperationalExampleLines.has(unit.startLine - 1 + index)) {
+        flush(index);
+      } else if (runStart < 0) {
+        runStart = index;
+      }
+    }
+    flush(unit.lines.length);
+    return segments;
   }
 
   private routedContainerRecord(record: NodeRecord): NodeRecord {
@@ -740,16 +928,16 @@ function semanticInlineCodeRanges(
     });
 }
 
-function htmlCommentSourceRanges(
+function htmlComments(
   node: Html,
   bodyStartLine: number,
-): SourceColumnRange[] {
+): MarkdownHtmlComment[] {
   if (/^\s*<(?:script|pre|style|textarea)(?=[\s>])/i.test(node.value)) {
     return [];
   }
   const position = node.position;
   if (position === undefined) return [];
-  const ranges: SourceColumnRange[] = [];
+  const comments: MarkdownHtmlComment[] = [];
   let cursor = 0;
   while (cursor < node.value.length) {
     const start = node.value.indexOf("<!--", cursor);
@@ -768,15 +956,16 @@ function htmlCommentSourceRanges(
       position.start.line + bodyStartLine - 1,
       position.start.column,
     );
-    ranges.push({
+    comments.push({
       startLine: startPoint.line,
       endLine: endPoint.line,
       startColumn: startPoint.column,
       endColumn: endPoint.column,
+      content: node.value.slice(start + 4, markerEnd < 0 ? end : markerEnd),
     });
     cursor = end;
   }
-  return ranges;
+  return comments;
 }
 
 function relativeSourcePoint(
