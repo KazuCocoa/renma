@@ -107,7 +107,7 @@ and `assets/` directories are valid. See the official
 | `contentTokenWarning.profile` | 3,200 | `estimated_tokens`; full file above effective warning | medium | Renma | Profiles should remain reviewable overlays | same | 0.32.0 | `quality.profile_token_warning` plus metadata decision |
 | `contentTokenHigh.profile` | 4,000 | `estimated_tokens`; full file above effective High | high | Renma | Long focused overlays can still be valid | same | 0.32.0 | `quality.profile_token_high` plus metadata decision |
 | `contentTokenWarning.example` | 4,800 | `estimated_tokens`; full file above effective warning | medium | Renma | Complete examples may legitimately be long | same | 0.32.0 | `quality.example_token_warning` plus metadata decision |
-| `contentTokenHigh.example` | 6,000 | `estimated_tokens`; full file above effective High | high | Renma | Complete end-to-end examples may legitimately be long | same | 0.32.0 | `quality.example_token_high` |
+| `contentTokenHigh.example` | 6,000 | `estimated_tokens`; full file above effective High | high | Renma | Complete end-to-end examples may legitimately be long | same | 0.32.0 | `quality.example_token_high` plus metadata decision |
 | `lowHeadingDensityMinTokens` | 400 | body `estimated_tokens`, with fewer than 2 headings | low | Renma | Long prose can still be intentionally linear | `QUAL-LOW-HEADING-DENSITY` | 0.18.0 | possibly |
 | `lowHeadingDensityMinHeadings` | 2 | headings | low | Renma | Navigation heuristic only | same | 0.18.0 | possibly |
 
