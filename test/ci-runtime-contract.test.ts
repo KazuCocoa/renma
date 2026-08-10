@@ -60,8 +60,8 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
     "actions/checkout#v7",
     "actions/setup-node#v7",
     "actions/setup-node#v7",
-    "SocketDev/action#v1",
-    "SocketDev/action#v1",
+    "SocketDev/action#v1.3.2",
+    "SocketDev/action#v1.3.2",
   ],
   ".github/workflows/docs-pages.yml": [
     "actions/checkout#v7",
@@ -362,7 +362,7 @@ test("all external GitHub Actions use expected identities at immutable SHAs", ()
       .filter((line) => /^\s*(?:-\s*)?uses:/u.test(line));
     const actualActions = usesLines.map((line) => {
       const match = line.match(
-        /^\s*(?:-\s*)?uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\d+)\s*$/u,
+        /^\s*(?:-\s*)?uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\d+(?:\.\d+){0,2})\s*$/u,
       );
       assert.ok(
         match,
