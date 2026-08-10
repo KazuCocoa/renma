@@ -8,6 +8,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added bounded static shell executable-dependency analysis for text `.sh` and
+  `.bash` surfaces. Direct relative execution through `./` or `../`, immediate
+  `bash` / `sh` invocation, and `source` / dot-source forms now contribute
+  deterministic `static-execution` or `static-source` evidence to executable
+  graphs, execution contracts, and semantic diff propagation. Dynamic paths,
+  wrappers, launcher options, absolute or external targets, and repository
+  escapes remain outside the analyzer's deliberately narrow grammar.
 - Added the Medium advisory
   `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` for concrete high-risk literals in
   structurally bounded, non-operational routing examples. Skill scaffolds,
@@ -39,6 +46,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Pull-request Renma reporting now checks out the exact event head SHA with full
+  history and passes the exact event base and head SHAs to `ci-report`, avoiding
+  mutable branch-name or synthetic merge-checkout ambiguity while preserving
+  the existing strict current-head scan and report-enforcement policy.
+- Clarified that English is the primary and strongest language for Renma's
+  bounded governance and security wording recognizers while multilingual
+  content remains supported and does not produce a generic warning. Documented
+  language-independent URL, command, path, executable-reference, Markdown
+  structure, and hidden-Unicode evidence remains active across languages.
 - Hardened npm publication so a separate non-OIDC job fetches and verifies the
   exact remote release tag object and `origin/main`, requires an annotated tag
   peeled to the exact main commit, and checks the package version before the
@@ -92,6 +108,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Closed the raw-Markdown HTML-comment security blind spot with the dedicated,
+  suppressible `SEC-HIDDEN-OPERATIONAL-INSTRUCTION` diagnostic. Each real
+  comment is analyzed as an isolated raw-agent-visible span with exact source
+  evidence and the underlying matched diagnostic identity; ordinary formatting,
+  metadata, explanatory, prohibited, and clearly negative-example comments
+  remain inert, and raw hidden-Unicode inspection remains independent.
 - Removed the release-version literal from the CI consumer-workflow contract
   test. The expected exact `npm install --save-dev --save-exact
   renma@<package version>` command is now derived from `package.json`, so a
@@ -110,6 +132,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
+- Repository Context BOM v2 dependency rows add the `shell` analyzer and
+  `static-execution` / `static-source` relation enum values. Existing fields and
+  analyzers remain compatible; repositories containing newly recognized shell
+  edges may now show additive dependency, reachability, execution-contract, and
+  diff evidence. Agent-facing Markdown containing security-sensitive
+  instructions in HTML comments may now produce the new finding at the matched
+  detector's severity, with a High fallback for a policy-relevant instruction
+  surface, and can use the existing narrow ID-and-path suppression contract when
+  independently justified.
 - npm trusted publishing now requires the `npm-publish` GitHub Environment in
   its OIDC identity. Maintainers must separately configure npm's Trusted
   Publisher for the exact `npm-publish.yml` filename and environment, protect
