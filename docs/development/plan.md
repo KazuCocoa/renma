@@ -7,7 +7,7 @@ deterministic Context Repository governance CLI. The 0.25.x line completed the
 precision-first body-policy refactor and dependency-install hardening. Renma
 0.26.0 added raw-source hidden-Unicode evidence, and the 0.27.x–0.28.x line
 added the provider-neutral executable-surface inventory, bounded direct helper
-invocations, static JavaScript/TypeScript and Python dependency evidence,
+invocations, static JavaScript/TypeScript, Python, and shell dependency evidence,
 invocation reachability and governance correlation, semantic-diff and CI
 visibility, and the focused executable graph.
 
@@ -65,7 +65,7 @@ contract review:
 - hard-fail Skill Discovery CI gating after operational experience with the
   existing opt-in warn-only policy;
 - broader executable dependency or source-to-sink analysis beyond the current
-  bounded ESM and Python-relative-import grammar, including any separately
+  bounded ESM, Python-relative-import, and shell execution/source grammar, including any separately
   versioned public evidence contract;
 - observed Skill-reference evidence kept separate from authoritative declared
   continuation routes;

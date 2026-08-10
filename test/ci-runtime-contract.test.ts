@@ -6,6 +6,7 @@ import { parse } from "yaml";
 
 type WorkflowStep = {
   "continue-on-error"?: boolean;
+  env?: Record<string, string>;
   id?: string;
   if?: string;
   name?: string;
@@ -208,7 +209,24 @@ test("dedicated Renma report remains PR-only", () => {
   assert.equal(workflow.on?.push, undefined);
 
   const source = readFileSync(".github/workflows/renma-ci-report.yml", "utf8");
-  assert.match(source, /github\.base_ref/);
+  const generator = workflow.jobs?.["generate-renma-reports"];
+  assert.equal(
+    actionStep(generator, "actions/checkout")?.with?.ref,
+    "${{ github.event.pull_request.head.sha }}",
+  );
+  assert.equal(
+    actionStep(generator, "actions/checkout")?.with?.["fetch-depth"],
+    0,
+  );
+  const ciReport = steps(generator).find((step) => step.id === "ci-report");
+  assert.deepEqual(ciReport?.env, {
+    FROM_SHA: "${{ github.event.pull_request.base.sha }}",
+    TO_SHA: "${{ github.event.pull_request.head.sha }}",
+  });
+  assert.match(ciReport?.run ?? "", /--from "\$\{FROM_SHA\}"/);
+  assert.match(ciReport?.run ?? "", /--to "\$\{TO_SHA\}"/);
+  assert.match(ciReport?.run ?? "", /--fail-on-status warn/);
+  assert.doesNotMatch(source, /github\.base_ref|origin\/\$\{|--to HEAD/);
   assert.match(source, /github\.event\.pull_request/);
   assert.match(source, /node dist\/index\.js ci-report/);
   assert.match(source, /node dist\/index\.js scan \. --fail-on high --strict/);
@@ -247,6 +265,18 @@ test("public Renma report is a portable exact package-consumer workflow", () => 
     actionStep(generator, "actions/checkout")?.with?.["fetch-depth"],
     0,
   );
+  assert.equal(
+    actionStep(generator, "actions/checkout")?.with?.ref,
+    "${{ github.event.pull_request.head.sha }}",
+  );
+  const ciReport = steps(generator).find((step) => step.id === "ci-report");
+  assert.deepEqual(ciReport?.env, {
+    FROM_SHA: "${{ github.event.pull_request.base.sha }}",
+    TO_SHA: "${{ github.event.pull_request.head.sha }}",
+  });
+  assert.match(ciReport?.run ?? "", /--from "\$\{FROM_SHA\}"/);
+  assert.match(ciReport?.run ?? "", /--to "\$\{TO_SHA\}"/);
+  assert.doesNotMatch(source, /github\.base_ref|origin\/\$\{|--to HEAD/);
   assert.deepEqual(generator?.permissions, { contents: "read" });
   assert.equal(commenter?.needs, "generate-renma-reports");
   assert.deepEqual(commenter?.permissions, {

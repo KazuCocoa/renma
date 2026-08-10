@@ -946,7 +946,7 @@ function characterLength(value: string): number {
 }
 
 function usageBoundaryPattern(): RegExp {
-  return /\b(?:use(?: this skill)? (?:when|for|to)|when (?:a|an|the|you|reviewing|working|handling))\b/i;
+  return /[^\p{ASCII}]|\b(?:use(?: this skill)? (?:when|for|to)|when (?:a|an|the|you|reviewing|working|handling))\b/iu;
 }
 
 /**
@@ -963,7 +963,7 @@ function explicitSelectionBoundaryPattern(): RegExp {
 }
 
 function descriptionSelectionBoundaryPattern(): RegExp {
-  return /\b(?:do not use|not for|when not to use|use another skill)\b/i;
+  return /[^\p{ASCII}]|\b(?:do not use|not for|when not to use|use another skill)\b/iu;
 }
 
 function selectionHeadingPattern(): RegExp {

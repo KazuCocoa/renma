@@ -120,6 +120,14 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
         evidenceCount: 2,
         expectation: "possible",
       },
+      {
+        from: "tools/shared.sh",
+        to: "tools/transitive.sh",
+        reachability: "transitive",
+        depth: 2,
+        evidenceCount: 1,
+        expectation: "possible",
+      },
     ],
   );
   assert.deepEqual(
@@ -195,9 +203,9 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
   assert.deepEqual(report.analysisBoundary.coverage, {
     reachableRepositoryScriptCount: 3,
     recognizedInvocationEvidenceCount: 4,
-    recognizedDependencyEvidenceCount: 3,
+    recognizedDependencyEvidenceCount: 4,
     topologicalInvocationEvidenceCount: 3,
-    topologicalDependencyEvidenceCount: 2,
+    topologicalDependencyEvidenceCount: 3,
     nonTopologicalEvidenceCount: 2,
   });
   assert.deepEqual(report.analysisBoundary.observations, {
@@ -775,7 +783,10 @@ async function comprehensiveFixture(
     ].join("\n"),
   );
   await fixture.write("skills/release-prep/scripts/unused.ts", "export {};\n");
-  await fixture.write("tools/shared.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.write(
+    "tools/shared.sh",
+    "#!/bin/sh\nsource ./transitive.sh\nexit 0\n",
+  );
   await fixture.write("tools/transitive.sh", "#!/bin/sh\nexit 0\n");
   return fixture;
 }

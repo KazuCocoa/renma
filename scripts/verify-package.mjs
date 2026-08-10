@@ -106,6 +106,7 @@ const PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS = [
   "renma/dist/executable-dependency-analyzer.js",
   "renma/dist/executable-dependency-js-ts.js",
   "renma/dist/executable-dependency-python.js",
+  "renma/dist/executable-dependency-shell.js",
   "renma/dist/executable-dependency-resolution.js",
   "renma/dist/executable-surface-inventory.js",
   "renma/dist/executable-surface-diff.js",

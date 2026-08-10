@@ -39,6 +39,16 @@ and source authority. The central principle is:
 > Create the smallest non-redundant Renma asset graph that preserves execution
 > clarity and traceability.
 
+Write canonical governance and security wording in English when you need the
+strongest bounded natural-language diagnostics. Multilingual and non-English
+Skill and Context content is supported and is not invalid merely because of
+its language. Renma does not translate security vocabulary or emit a generic
+non-English warning; documented language-independent evidence such as URLs,
+commands, paths, executable references, Markdown structure, and hidden Unicode
+continues to be inspected. Keep operational instructions visible in Markdown.
+HTML comments are hidden by renderers but readable in raw source by an agent,
+so security-sensitive instructions placed there receive a dedicated finding.
+
 ## Interactive Clarification Protocol
 
 `renma guide skill` remains deterministic and non-interactive. It prints the

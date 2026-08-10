@@ -32,6 +32,13 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
   contentStartLine?: number;
 };
 
+/** Raw source that an agent can read even though Markdown renderers hide it. */
+export type MarkdownHtmlComment = MarkdownSourceRange & {
+  startColumn: number;
+  endColumn: number;
+  content: string;
+};
+
 export type SecurityGuardEvidence = MarkdownSourceRange & {
   kind:
     | "same-instruction"
@@ -86,6 +93,7 @@ const SAFETY_HEADING_RE =
 
 export class MarkdownSecurityView {
   readonly semanticUnits: MarkdownSemanticUnit[];
+  readonly htmlComments: MarkdownHtmlComment[];
 
   private readonly sourceLines: string[];
   readonly bodyStartLine: number;
@@ -155,12 +163,12 @@ export class MarkdownSecurityView {
     }
     this.headings = headings;
     this.thematicBreaks = thematicBreaks;
-    const commentRanges = htmlRecords.flatMap(({ node }) =>
-      htmlCommentSourceRanges(node, this.bodyStartLine),
+    this.htmlComments = htmlRecords.flatMap(({ node }) =>
+      htmlComments(node, this.bodyStartLine),
     );
     const visibleLineProjections = projectVisibleLines(
       this.sourceLines,
-      commentRanges,
+      this.htmlComments,
     );
     this.visibleLines = visibleLineProjections.map(({ text }) => text);
 
@@ -740,16 +748,16 @@ function semanticInlineCodeRanges(
     });
 }
 
-function htmlCommentSourceRanges(
+function htmlComments(
   node: Html,
   bodyStartLine: number,
-): SourceColumnRange[] {
+): MarkdownHtmlComment[] {
   if (/^\s*<(?:script|pre|style|textarea)(?=[\s>])/i.test(node.value)) {
     return [];
   }
   const position = node.position;
   if (position === undefined) return [];
-  const ranges: SourceColumnRange[] = [];
+  const comments: MarkdownHtmlComment[] = [];
   let cursor = 0;
   while (cursor < node.value.length) {
     const start = node.value.indexOf("<!--", cursor);
@@ -768,15 +776,16 @@ function htmlCommentSourceRanges(
       position.start.line + bodyStartLine - 1,
       position.start.column,
     );
-    ranges.push({
+    comments.push({
       startLine: startPoint.line,
       endLine: endPoint.line,
       startColumn: startPoint.column,
       endColumn: endPoint.column,
+      content: node.value.slice(start + 4, markerEnd < 0 ? end : markerEnd),
     });
     cursor = end;
   }
-  return ranges;
+  return comments;
 }
 
 function relativeSourcePoint(

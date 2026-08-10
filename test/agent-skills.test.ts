@@ -374,6 +374,36 @@ test("separates clear short capability descriptions from generic selection prose
   );
 });
 
+test("multilingual descriptions are accepted without English-only semantic warnings", () => {
+  const validation = validateAgentSkill(
+    skill(
+      "skills/demo/SKILL.md",
+      `---
+name: demo
+description: 仕様をレビューします。要件の境界を確認するときに使用してください。実装作業には使用しません。
+---
+# デモ
+
+## 適用範囲
+
+仕様の確認に使用します。
+`,
+    ),
+  );
+
+  assert.equal(validation.valid, true);
+  assert.equal(
+    validation.issues.some((issue) =>
+      [
+        "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+        "RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY",
+        "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+      ].includes(issue.code),
+    ),
+    false,
+  );
+});
+
 test("does not turn an execution constraint into a description warning", () => {
   const validation = validateAgentSkill(
     skill(

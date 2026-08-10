@@ -430,6 +430,12 @@ affect structural validity or the existing `--fail-on` threshold.
 
 ### Renma authoring warnings
 
+These bounded natural-language authoring checks use English as their primary
+recognition vocabulary. A non-English or multilingual `description` remains
+supported and is conservatively accepted rather than warned merely because its
+capability, usage, or exclusion phrasing is outside the English word list.
+Renma does not translate the description or claim equivalent multilingual NLP.
+
 | Identifier | Meaning |
 | --- | --- |
 | `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY` | The description does not state when the Skill should be used. |

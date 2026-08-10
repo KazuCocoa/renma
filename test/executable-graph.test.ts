@@ -36,7 +36,11 @@ test("executable graph keeps invocation, containment, shared use, and evidence d
     "skills/release-prep/scripts/prepare-release.ts",
     'import "../../../tools/check-changelog.sh";\n',
   );
-  await fixture.write("tools/check-changelog.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.write(
+    "tools/check-changelog.sh",
+    "#!/bin/sh\nsource ./changelog-lib.sh\nexit 0\n",
+  );
+  await fixture.write("tools/changelog-lib.sh", "#!/bin/sh\nexit 0\n");
 
   const first = await captureGraph([
     "graph",
@@ -114,10 +118,11 @@ test("executable graph keeps invocation, containment, shared use, and evidence d
         "tools/check-changelog.sh",
         1,
       ],
+      ["tools/check-changelog.sh", "invokes", "tools/changelog-lib.sh", 1],
     ],
   );
   assert.equal(report.executable.invocationEvidence.length, 4);
-  assert.equal(report.executable.dependencyEvidence.length, 1);
+  assert.equal(report.executable.dependencyEvidence.length, 2);
 
   const local = report.nodes.find(
     (node) => node.id === "skills/release-prep/scripts/prepare-release.ts",

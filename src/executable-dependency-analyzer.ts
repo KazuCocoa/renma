@@ -4,10 +4,13 @@ import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import { hasSupportedHelperExtension } from "./helper-command-evidence.js";
 import { JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-js-ts.js";
 import { PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-python.js";
+import { SHELL_EXECUTABLE_DEPENDENCY_ANALYZER } from "./executable-dependency-shell.js";
 
-export type BuiltInExecutableDependencyAnalyzerId = "js-ts" | "python";
+export type BuiltInExecutableDependencyAnalyzerId =
+  "js-ts" | "python" | "shell";
 
-export type ExecutableDependencyRelation = "static-import" | "static-reexport";
+export type ExecutableDependencyRelation =
+  "static-execution" | "static-import" | "static-reexport" | "static-source";
 
 export interface ExecutableDependencyCandidate {
   analyzer: BuiltInExecutableDependencyAnalyzerId;
@@ -38,6 +41,7 @@ export const BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS: readonly ExecutableDepend
   Object.freeze([
     JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER,
     PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER,
+    SHELL_EXECUTABLE_DEPENDENCY_ANALYZER,
   ]);
 
 /** Identify the existing inventory surface candidates before path-state resolution. */

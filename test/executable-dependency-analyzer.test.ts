@@ -12,6 +12,7 @@ import {
 } from "../src/executable-dependency-analyzer.js";
 import { JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-js-ts.js";
 import { PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-python.js";
+import { SHELL_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-shell.js";
 import {
   canonicalExecutableDependencyGraphEdges,
   resolveExecutableDependencies,
@@ -30,7 +31,7 @@ import type { Artifact } from "../src/types/artifact.js";
 test("built-in analyzer registry is fixed, ordered, and extension bounded", () => {
   assert.deepEqual(
     BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS.map((analyzer) => analyzer.id),
-    ["js-ts", "python"],
+    ["js-ts", "python", "shell"],
   );
   for (const extension of [".js", ".mjs", ".ts", ".mts", ".cts"]) {
     assert.equal(
@@ -73,6 +74,136 @@ test("built-in analyzer registry is fixed, ordered, and extension bounded", () =
     }),
     false,
   );
+  for (const extension of [".sh", ".bash"]) {
+    assert.equal(
+      SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+        path: `tools/check${extension}`,
+        contentClassification: "text",
+      }),
+      true,
+    );
+  }
+  for (const extension of [".zsh", ".fish", ".command", ".js"]) {
+    assert.equal(
+      SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+        path: `tools/check${extension}`,
+        contentClassification: "text",
+      }),
+      false,
+    );
+  }
+  assert.equal(
+    SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.supports({
+      path: "tools/check.sh",
+      contentClassification: "binary",
+    }),
+    false,
+  );
+});
+
+test("shell collector recognizes only bounded static relative execution and source forms", () => {
+  const content = [
+    "./direct.sh",
+    "bash ./bash-helper.sh",
+    "sh '../shared/sh-helper.sh'",
+    'source "./lib.sh"',
+    ". './dot-lib.bash'",
+    '"./quoted.sh" --check',
+    "./direct.sh",
+    "bash $HELPER",
+    'sh "${HELPER}"',
+    "source $(helper_path)",
+    ". `helper_path`",
+    "bash /opt/vendor/external.sh",
+    "source https://example.com/external.sh",
+    "helper.sh",
+    "bash -e ./option-helper.sh",
+    "env bash ./env-helper.sh",
+    "# ./comment.sh",
+    "echo ./argument.sh",
+    '"./quoted.sh"suffix',
+  ].join("\n");
+  const first = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/sub/check.sh",
+    content,
+  });
+  const second = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/sub/check.sh",
+    content,
+  });
+
+  assert.deepEqual(second, first);
+  assert.deepEqual(
+    first.map((candidate) => ({
+      line: candidate.line,
+      relation: candidate.relation,
+      rawSpecifier: candidate.rawSpecifier,
+      targets: candidate.normalizedTargetCandidates,
+      unsafe: candidate.unsafe,
+    })),
+    [
+      {
+        line: 1,
+        relation: "static-execution",
+        rawSpecifier: "./direct.sh",
+        targets: ["tools/sub/direct.sh"],
+        unsafe: false,
+      },
+      {
+        line: 2,
+        relation: "static-execution",
+        rawSpecifier: "./bash-helper.sh",
+        targets: ["tools/sub/bash-helper.sh"],
+        unsafe: false,
+      },
+      {
+        line: 3,
+        relation: "static-execution",
+        rawSpecifier: "../shared/sh-helper.sh",
+        targets: ["tools/shared/sh-helper.sh"],
+        unsafe: false,
+      },
+      {
+        line: 4,
+        relation: "static-source",
+        rawSpecifier: "./lib.sh",
+        targets: ["tools/sub/lib.sh"],
+        unsafe: false,
+      },
+      {
+        line: 5,
+        relation: "static-source",
+        rawSpecifier: "./dot-lib.bash",
+        targets: ["tools/sub/dot-lib.bash"],
+        unsafe: false,
+      },
+      {
+        line: 6,
+        relation: "static-execution",
+        rawSpecifier: "./quoted.sh",
+        targets: ["tools/sub/quoted.sh"],
+        unsafe: false,
+      },
+      {
+        line: 7,
+        relation: "static-execution",
+        rawSpecifier: "./direct.sh",
+        targets: ["tools/sub/direct.sh"],
+        unsafe: false,
+      },
+    ],
+  );
+  assert.ok(first.every((candidate) => candidate.snippet.length <= 240));
+});
+
+test("shell collector retains repository-escape evidence without inventing a target", () => {
+  const [candidate] = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/check.sh",
+    content: "bash ../../outside.sh\n",
+  });
+
+  assert.equal(candidate?.unsafe, true);
+  assert.deepEqual(candidate?.normalizedTargetCandidates, []);
 });
 
 test("JS and TypeScript collector recognizes only bounded static declarations", () => {
@@ -423,6 +554,109 @@ test("identical same-line JS declarations retain separate public evidence rows",
       ],
     );
   }
+});
+
+test("shell dependency evidence propagates through graph reachability and semantic diff", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-shell-dependency-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await mkdir(path.join(root, "tools"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    [
+      "---",
+      "name: demo",
+      "description: Check shell dependencies. Use when static execution evidence needs review.",
+      "---",
+      "# Demo",
+      "```sh",
+      "bash tools/entry.sh",
+      "```",
+    ].join("\n"),
+  );
+  await writeFile(path.join(root, "tools", "entry.sh"), "#!/bin/sh\n");
+  await writeFile(path.join(root, "tools", "lib.sh"), "#!/bin/sh\n");
+  await writeFile(path.join(root, "tools", "worker.sh"), "#!/bin/sh\n");
+
+  const before = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  await writeFile(
+    path.join(root, "tools", "entry.sh"),
+    [
+      "#!/bin/sh",
+      "source ./lib.sh",
+      '. "./lib.sh"',
+      "bash ./worker.sh",
+      "./worker.sh",
+      "bash $DYNAMIC_HELPER",
+      "bash /opt/vendor/external.sh",
+      "",
+    ].join("\n"),
+  );
+
+  const after = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  assert.deepEqual(
+    after.dependencies.map((dependency) => ({
+      analyzer: dependency.analyzer,
+      relation: dependency.relation,
+      target: dependency.normalizedTarget,
+      ordinal: dependency.occurrenceOrdinal,
+    })),
+    [
+      {
+        analyzer: "shell",
+        relation: "static-source",
+        target: "tools/lib.sh",
+        ordinal: 1,
+      },
+      {
+        analyzer: "shell",
+        relation: "static-source",
+        target: "tools/lib.sh",
+        ordinal: 2,
+      },
+      {
+        analyzer: "shell",
+        relation: "static-execution",
+        target: "tools/worker.sh",
+        ordinal: 1,
+      },
+      {
+        analyzer: "shell",
+        relation: "static-execution",
+        target: "tools/worker.sh",
+        ordinal: 2,
+      },
+    ],
+  );
+  assert.deepEqual(
+    canonicalExecutableDependencyGraphEdges(after.dependencies),
+    [
+      { sourcePath: "tools/entry.sh", normalizedTarget: "tools/lib.sh" },
+      { sourcePath: "tools/entry.sh", normalizedTarget: "tools/worker.sh" },
+    ],
+  );
+  assert.equal(
+    surface(after, "tools/lib.sh").dependencyEvidence
+      .staticInvocationReachability,
+    "transitive",
+  );
+  assert.equal(
+    surface(after, "tools/worker.sh").dependencyEvidence
+      .minimumInvocationDependencyDepth,
+    1,
+  );
+
+  const diff = buildExecutableSurfaceDiff(before, after);
+  assert.equal(diff.addedDependencies.length, 4);
+  assert.ok(
+    diff.changedSurfaces.some(
+      (change) =>
+        change.path === "tools/entry.sh" &&
+        change.reasons.includes("dependency-graph"),
+    ),
+  );
 });
 
 test("pure inline type-only imports do not create transitive reachability", async (t) => {

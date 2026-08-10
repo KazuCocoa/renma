@@ -485,14 +485,15 @@ source or rerunning an analyzer.
 
 `src/executable-dependency-analyzer.ts` owns the private, fixed built-in
 analyzer registry and the language-neutral candidate contract.
-`src/executable-dependency-js-ts.ts` and
-`src/executable-dependency-python.ts` are bounded lexical collectors.
+`src/executable-dependency-js-ts.ts`,
+`src/executable-dependency-python.ts`, and
+`src/executable-dependency-shell.ts` are bounded lexical collectors.
 `src/executable-dependency-resolution.ts` owns the single Renma repository
 resolver. The analyzers interpret supplied text only; repository discovery,
 exclusions, depth, size, symlink safety, path states, surface identity,
 ordering, and graph construction remain Renma responsibilities.
 
-The registry order is `js-ts`, then `python`. It dynamically loads nothing,
+The registry order is `js-ts`, then `python`, then `shell`. It dynamically loads nothing,
 executes no subprocess, has no configuration or package export, and is not a
 public plugin system. The boundary permits a future external provider without
 coupling language syntax to inventory construction, but provider discovery,
@@ -524,6 +525,15 @@ set per imported module. Absolute imports, dynamic import helpers,
 environment/package resolution, `PYTHONPATH`, and implicit `__init__.py` edges
 are excluded. Multiple parsed candidates are `ambiguous`; one parsed candidate
 is selected; repository escape is `unsafe`.
+
+The shell collector supports only `.sh` and `.bash` sources. It recognizes a
+static relative `.sh` or `.bash` command at the start of a physical line,
+optionally launched immediately by `bash` or `sh`, or loaded immediately by
+`source` or dot-source. Single- and double-quoted literals and repository-safe
+`../` paths are accepted. Variables, substitutions, wrappers, options, aliases,
+PATH resolution, absolute or external targets, general control flow, and other
+shell semantics are excluded. Repository escape remains `unsafe` evidence and
+never becomes topology.
 
 `src/helper-command-evidence.ts` owns the bounded helper grammar shared by
 repository path candidate collection, existing path diagnostics, and the

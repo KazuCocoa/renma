@@ -119,6 +119,17 @@ hidden block
         unit.startLine === 4 && unit.lines.join(" ") === "Visible suffix.",
     ),
   );
+  assert.deepEqual(
+    view.htmlComments.map(({ startLine, endLine, content }) => ({
+      startLine,
+      endLine,
+      content,
+    })),
+    [
+      { startLine: 1, endLine: 1, content: " hidden " },
+      { startLine: 2, endLine: 4, content: "\nhidden block\n" },
+    ],
+  );
 });
 
 test("operational routing includes text fences but excludes examples and programs", () => {

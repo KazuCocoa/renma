@@ -735,11 +735,12 @@ repository-wide supply-chain metadata by default.
 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. Separately, the reporting-only Executable Surface Inventory uses
-bounded JS/TS and Python lexical collectors for explicit relative static import
-evidence. Those collectors do not contribute security findings or analyze
-executable behavior; use appropriate SAST and dependency-scanning tools for
-executable code. Markdown instructions that tell an agent to fetch, trust,
-execute, or invoke a script remain within this diagnostic boundary.
+bounded JS/TS, Python, and shell lexical collectors for documented explicit
+relative dependency evidence. Those collectors do not contribute security
+findings or analyze general executable behavior; use appropriate SAST and
+dependency-scanning tools for executable code. Markdown instructions that tell
+an agent to fetch, trust, execute, or invoke a script remain within this
+diagnostic boundary.
 
 These checks inspect repository knowledge and operational instructions.
 Selected command and JavaScript forms use bounded structure-aware recognition,
@@ -799,6 +800,18 @@ path-scoped suppression mechanism with a documented reason; Renma does not add
 a Unicode-specific allowlist.
 
 ### Instruction-integrity boundaries
+
+`SEC-HIDDEN-OPERATIONAL-INSTRUCTION` reports a security-sensitive operational
+instruction found inside a real HTML-comment span in agent-facing Markdown.
+Rendered-visible analysis continues to remove the comment, so ordinary comment
+text is not promoted into operational prose. Renma instead analyzes each
+comment in an isolated raw-agent-visible projection and reports the exact
+source span plus the underlying bounded diagnostic identity. Formatting notes,
+metadata markers, and explanatory documentation comments do not trigger unless
+they independently contain recognized security-sensitive operational evidence.
+Use the existing narrow finding-ID and path-scoped suppression only for a
+reviewed intentional case. Raw hidden-Unicode inspection is independent and
+still includes comments.
 
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
 circumvent security checks, weaken policy to pass diagnostics, suppress
@@ -1179,6 +1192,7 @@ written during scanning.
 | `SEC-DANGEROUS-TOOL-INSTRUCTION`                 | Instructions permit dangerous tool use.              | Content allows destructive or high-risk commands without guardrails.                               | Require review, dry runs, or explicit user approval before execution.                                  |
 | `SEC-EXTERNAL-UPLOAD-INSTRUCTION`                | Instructions allow external upload.                  | Content sends artifacts to external services without controls.                                     | Restrict uploads to approved destinations and document review steps.                                   |
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`                | Instructions request forbidden input.                | Content asks for secrets or other disallowed sensitive values.                                     | Remove the request or replace it with safe placeholder guidance.                                       |
+| `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`             | HTML comment hides an operational instruction.       | Raw agent-visible source contains a bounded recognized security-sensitive instruction that rendered Markdown omits. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |
 | `SEC-INSTRUCTION-VIOLATES-POLICY`                | Instruction conflicts with active policy.            | Asset content violates a configured security profile.                                              | Update the instruction or policy metadata so they agree.                                               |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`          | Canonical Skill security metadata is invalid.        | A recognized `metadata.renma.*` field has an invalid boolean, list, or profile encoding.            | Confirm the intended policy and replace it with the exact documented string encoding; do not guess.    |
 | `SEC-MISSING-HUMAN-APPROVAL-GUARD`               | High-risk operation lacks approval guidance.         | Content describes sensitive actions without human confirmation.                                    | Add explicit approval requirements before the action.                                                  |
