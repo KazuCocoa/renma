@@ -62,6 +62,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Reframed the development roadmap's Current State as a version-independent
+  description of Renma's stable single-repository governance boundary and
+  clarified that stricter organizational metadata requirements are optional
+  repository policy rather than Renma or portable Agent Skills defaults.
 - Pull-request Renma reporting now checks out the exact event head SHA with full
   history and passes the exact event base and head SHAs to `ci-report`, avoiding
   mutable branch-name or synthetic merge-checkout ambiguity while preserving

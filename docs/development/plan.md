@@ -2,25 +2,24 @@
 
 ## Current State
 
-As of Renma 0.28.4, the stable core remains a single-repository,
-deterministic Context Repository governance CLI. The 0.25.x line completed the
-precision-first body-policy refactor and dependency-install hardening. Renma
-0.26.0 added raw-source hidden-Unicode evidence, and the 0.27.x–0.28.x line
-added the provider-neutral executable-surface inventory, bounded direct helper
-invocations, static JavaScript/TypeScript, Python, and shell dependency evidence,
-invocation reachability and governance correlation, semantic-diff and CI
-visibility, and the focused executable graph.
+Renma's stable core is a deterministic, Git-native repository governance CLI
+for a single Context Repository. It discovers Skills, Context Assets, Context
+Lenses, and related support assets; normalizes their metadata, ownership,
+lifecycle, and explicit relationships; evaluates bounded policy and security
+rules; and emits deterministic catalog, graph, composition, impact, Readiness,
+diff, CI, Trust Graph, BOM, and other review evidence from repository state.
 
-These additions remain non-executing static evidence. They do not classify a
-surface as safe, prove runtime execution, propagate caller policy through
-dependencies, or broaden Renma into a runtime, package resolver, or general
-language SAST system.
+Static executable and security evidence remains bounded and non-executing. It
+does not classify a surface as safe, prove runtime execution, or propagate
+caller policy through dependencies. Renma is not an agent runtime: it does not
+interpret live tasks, select, rank, or execute Skills, assemble or inject
+Context, or execute workflows. It is also not a package resolver, general
+language SAST system, or hosted Skill marketplace.
 
-The documentation site, visual identity, and package homepage are now shipped.
-The external-review research sequence is complete at the two-producer concept
-stage. SkillSpector evidence correlation, Cisco Skill Scanner evaluation, and
-the deliberately unstable receipt concept remain isolated experiments. They
-have not added a Renma command, diagnostic, Readiness rule, CI policy, runtime
+External-review research remains at the two-producer concept stage.
+SkillSpector evidence correlation, Cisco Skill Scanner evaluation, and the
+deliberately unstable receipt concept remain isolated experiments. They have
+not added a Renma command, diagnostic, Readiness rule, CI policy, runtime
 dependency, adapter, metadata field, or public receipt schema.
 
 The product boundary remains:
@@ -32,6 +31,13 @@ LLM proposes. Renma verifies. Human approves.
 Current contracts live in [architecture.md](architecture.md),
 [design.md](design.md), and the [documentation index](../README.md).
 Historical release detail belongs only in the [Changelog](../changelog.md).
+
+Repositories used as broadly shared organizational Skill repositories may
+choose stricter local metadata requirements than Renma's defaults, for example
+`owner`, `status`, `last_reviewed_at`, and `review_cycle`, through the existing
+[repository-required metadata policy](../user-manual.md#repository-required-metadata-policy).
+This is optional repository policy, not a Renma default or portable Agent
+Skills requirement, and it does not imply multi-repository federation.
 
 ## Stabilization Priorities
 
