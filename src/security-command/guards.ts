@@ -1,4 +1,5 @@
 import type { SecurityGuardEvidence } from "../markdown-security-view.js";
+import { boundedClauseRanges } from "../bounded-clause-ranges.js";
 
 export type DisclosureActionKind =
   "stdout-or-log" | "prompt-or-context" | "external-upload" | "network";
@@ -26,8 +27,6 @@ const ACTION_NEGATION_RE =
   /\b(?:never|do\s+not|don't|avoid|exclude|skip|omit|must\s+not|may\s+not|without)\b/giu;
 const DISCLOSURE_ACTION_RE =
   /\b(console\.log|print|logger|log|dump|echo|output|cat|attach|include|load|provide|copy|paste|put|upload|send|share|post|publish|curl|wget)\b/giu;
-const CLAUSE_BOUNDARY_RE =
-  /(?:[;!?\n]+|\.(?=\s|$)|\b(?:but|however|yet|then)\b)/giu;
 const DIRECT_NO_DISCLOSURE_RE =
   /\b(never|do\s+not|don't|must\s+not|may\s+not)\b.{0,100}\b(disclose|expose|exfiltrate)\b|\b(without)\b.{0,50}\b(disclos(?:ing|ure)|expos(?:ing|ure))\b/i;
 const LOCAL_ONLY_RE =
@@ -132,20 +131,21 @@ export function disclosureClauseRangesIntersectingRange(
   rangeStart: number,
   rangeEnd: number,
 ): Array<{ start: number; end: number }> {
-  return disclosureClauses(text)
+  return boundedClauseRanges(text)
     .filter(({ start, end }) => start < rangeEnd && end > rangeStart)
     .map(({ start, end }) => ({ start, end }));
 }
 
 function classifyDisclosureActions(text: string): ClassifiedDisclosureAction[] {
   const actions: ClassifiedDisclosureAction[] = [];
-  for (const clause of disclosureClauses(text)) {
-    for (const match of clause.text.matchAll(DISCLOSURE_ACTION_RE)) {
+  for (const clause of boundedClauseRanges(text)) {
+    const clauseText = text.slice(clause.start, clause.end);
+    for (const match of clauseText.matchAll(DISCLOSURE_ACTION_RE)) {
       if (match.index === undefined) continue;
       const raw = match[0];
       const start = clause.start + match.index;
-      const negated = isNegatedDisclosureAction(clause.text, match.index);
-      for (const kind of disclosureActionKinds(raw, clause.text)) {
+      const negated = isNegatedDisclosureAction(clauseText, match.index);
+      for (const kind of disclosureActionKinds(raw, clauseText)) {
         actions.push({
           action: raw,
           kind,
@@ -163,25 +163,6 @@ function classifyDisclosureActions(text: string): ClassifiedDisclosureAction[] {
 
 export function hasPositiveDisclosureAction(text: string): boolean {
   return positiveDisclosureActions(text).length > 0;
-}
-
-function disclosureClauses(
-  text: string,
-): Array<{ text: string; start: number; end: number }> {
-  const clauses: Array<{ text: string; start: number; end: number }> = [];
-  let start = 0;
-  for (const boundary of text.matchAll(CLAUSE_BOUNDARY_RE)) {
-    if (boundary.index === undefined) continue;
-    const end = boundary.index;
-    if (end > start) {
-      clauses.push({ text: text.slice(start, end), start, end });
-    }
-    start = end + boundary[0].length;
-  }
-  if (start < text.length) {
-    clauses.push({ text: text.slice(start), start, end: text.length });
-  }
-  return clauses;
 }
 
 function isNegatedDisclosureAction(

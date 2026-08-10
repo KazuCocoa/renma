@@ -538,8 +538,10 @@ backslash-continued physical lines. Unsupported or dynamic heredoc delimiters
 fail closed for the remainder of that source. Obvious `$(( ... ))` and
 `(( ... ))` arithmetic regions have separate bounded state, preventing `<<` or
 `>>` shifts from being interpreted as heredoc syntax or from hiding a later
-supported dependency. Repository escape remains `unsafe` evidence and never
-becomes topology.
+supported dependency. Bash `<<<` here-string operators are consumed atomically
+as non-heredoc tokens so their overlapping suffix cannot enter heredoc state;
+the operand remains non-topological data. Repository escape remains `unsafe`
+evidence and never becomes topology.
 
 `src/helper-command-evidence.ts` owns the bounded helper grammar shared by
 repository path candidate collection, existing path diagnostics, and the

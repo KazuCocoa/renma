@@ -767,11 +767,14 @@ suppressible only through the existing finding-ID plus repository-path
 suppression contract. The raw-comment projection reuses the visible-Markdown
 structural example classification: a same-node marker, a preceding negative-
 example label, or a negative-example heading can bound its example payload.
-That classification does not exempt a later independent workflow instruction,
-and a trailing label cannot hide an earlier instruction. Direct prohibitions
-remain defensive and inert. This comment projection is separate from the raw
-hidden-Unicode pass, which continues to inspect every discovered UTF-8 text
-artifact before Markdown filtering.
+For an inline same-node marker, only the punctuation-bounded clause containing
+the marker is masked; a later clause remains operational even on the same
+physical line or after a soft line break in the same paragraph. The structural
+classification does not exempt a later independent workflow instruction, and a
+trailing label cannot hide an earlier instruction. Direct prohibitions remain
+defensive and inert. This comment projection is separate from the raw hidden-
+Unicode pass, which continues to inspect every discovered UTF-8 text artifact
+before Markdown filtering.
 
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding

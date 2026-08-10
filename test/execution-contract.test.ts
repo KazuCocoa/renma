@@ -298,6 +298,76 @@ test("arithmetic shifts do not hide later shell execution-contract dependencies"
   );
 });
 
+test("here-strings do not hide later shell execution-contract dependencies", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-here-string-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    body: ["# Demo", "", "```bash", "bash tools/entry.sh", "```"].join("\n"),
+  });
+  await fixture.write(
+    "tools/entry.sh",
+    [
+      "#!/bin/sh",
+      'read -r value <<< "./here-string-only.sh"',
+      "./real-worker.sh",
+      "",
+    ].join("\n"),
+  );
+  await fixture.write("tools/here-string-only.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.write("tools/real-worker.sh", "#!/bin/sh\nexit 0\n");
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  assert.deepEqual(
+    canonicalExecutableDependencyGraphEdges(
+      snapshot.executableSurfaceInventory.dependencies,
+    ),
+    [
+      {
+        sourcePath: "tools/entry.sh",
+        normalizedTarget: "tools/real-worker.sh",
+      },
+    ],
+  );
+  const realWorker = snapshot.executableSurfaceInventory.surfaces.find(
+    (surface) => surface.path === "tools/real-worker.sh",
+  );
+  const hereStringOnly = snapshot.executableSurfaceInventory.surfaces.find(
+    (surface) => surface.path === "tools/here-string-only.sh",
+  );
+  assert.equal(
+    realWorker?.dependencyEvidence.staticInvocationReachability,
+    "transitive",
+  );
+  assert.equal(
+    hereStringOnly?.dependencyEvidence.staticInvocationReachability,
+    "unreached",
+  );
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.demo",
+  });
+  assert.equal(
+    report.executableEvidence.relationships.some(
+      (relationship) => relationship.to.sourcePath === "tools/real-worker.sh",
+    ),
+    true,
+  );
+  assert.equal(
+    report.executableEvidence.relationships.some(
+      (relationship) =>
+        relationship.to.sourcePath === "tools/here-string-only.sh",
+    ),
+    false,
+  );
+  assert.equal(
+    formatExecutionContractJson(report).includes("tools/here-string-only.sh"),
+    false,
+  );
+});
+
 test("execution contract accepts an exact SKILL.md path and omits absent revision provenance", async (t) => {
   const fixture = await RepositoryFixture.create({
     prefix: "renma-execution-contract-path-",

@@ -277,6 +277,39 @@ test("shell collector ignores arithmetic shifts and resumes with later commands"
   );
 });
 
+test("shell collector treats here-strings as non-heredoc data", () => {
+  const content = [
+    'read -r value <<< "./here-string-only.sh"',
+    "./real-worker.sh",
+    "source ./real-lib.sh",
+  ].join("\n");
+
+  const candidates = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/check.sh",
+    content,
+  });
+
+  assert.deepEqual(
+    candidates.map((candidate) => ({
+      line: candidate.line,
+      rawSpecifier: candidate.rawSpecifier,
+      relation: candidate.relation,
+    })),
+    [
+      {
+        line: 2,
+        rawSpecifier: "./real-worker.sh",
+        relation: "static-execution",
+      },
+      {
+        line: 3,
+        rawSpecifier: "./real-lib.sh",
+        relation: "static-source",
+      },
+    ],
+  );
+});
+
 test("an unsupported dynamic heredoc delimiter fails closed for later topology", () => {
   for (const content of [
     "cat <<$DELIMITER\n./not-a-command.sh\n$DELIMITER\n./later.sh\n",
@@ -673,6 +706,10 @@ test("shell dependency evidence propagates through graph reachability and semant
   await writeFile(path.join(root, "tools", "lib.sh"), "#!/bin/sh\n");
   await writeFile(path.join(root, "tools", "worker.sh"), "#!/bin/sh\n");
   await writeFile(path.join(root, "tools", "heredoc-only.sh"), "#!/bin/sh\n");
+  await writeFile(
+    path.join(root, "tools", "here-string-only.sh"),
+    "#!/bin/sh\n",
+  );
 
   const before = (await collectRepositorySnapshot(root))
     .executableSurfaceInventory;
@@ -680,6 +717,7 @@ test("shell dependency evidence propagates through graph reachability and semant
     path.join(root, "tools", "entry.sh"),
     [
       "#!/bin/sh",
+      'read -r value <<< "./here-string-only.sh"',
       "mask=$((1 << 2))",
       "((mask <<= 1))",
       "source ./lib.sh",
@@ -750,6 +788,11 @@ test("shell dependency evidence propagates through graph reachability and semant
   );
   assert.equal(
     surface(after, "tools/heredoc-only.sh").dependencyEvidence
+      .staticInvocationReachability,
+    "unreached",
+  );
+  assert.equal(
+    surface(after, "tools/here-string-only.sh").dependencyEvidence
       .staticInvocationReachability,
     "unreached",
   );

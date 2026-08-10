@@ -812,11 +812,13 @@ they independently contain recognized security-sensitive operational evidence.
 The isolated projection uses the same structural negative-example boundaries as
 visible Markdown. A marker in the same node, a preceding `Unsafe example:` or
 `Negative example:` label, or a negative-example heading can make its bounded
-payload inert. The boundary does not extend to a later independent workflow
-instruction, and a trailing label cannot hide an earlier instruction. Use the
-existing narrow finding-ID and path-scoped suppression only for a reviewed
-intentional case. Raw hidden-Unicode inspection is independent and still
-includes comments.
+payload inert. A same-node inline marker masks only its punctuation-bounded
+clause, even when a later clause shares the physical line or the paragraph
+continues through a soft line break. The boundary does not extend to a later
+independent workflow instruction, and a trailing label cannot hide an earlier
+instruction. Use the existing narrow finding-ID and path-scoped suppression
+only for a reviewed intentional case. Raw hidden-Unicode inspection is
+independent and still includes comments.
 
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
 circumvent security checks, weaken policy to pass diagnostics, suppress

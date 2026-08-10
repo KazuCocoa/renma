@@ -9,6 +9,7 @@ import type {
   ThematicBreak,
 } from "mdast";
 
+import { boundedClauseRanges } from "./bounded-clause-ranges.js";
 import {
   projectVisibleLines,
   type SourceColumnRange,
@@ -104,6 +105,10 @@ export class MarkdownSecurityView {
   private readonly blockQuoteLines = new Set<number>();
   private readonly operationalBlockQuoteLines = new Set<number>();
   private readonly nonOperationalExampleLines = new Set<number>();
+  private readonly nonOperationalExampleRangesByLine = new Map<
+    number,
+    SemanticOffsetRange[]
+  >();
   private readonly codeBlockLines = new Set<number>();
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
@@ -239,7 +244,7 @@ export class MarkdownSecurityView {
   }
 
   instructionLine(lineIndex: number): string {
-    const line = this.visibleLine(lineIndex);
+    const line = this.nonOperationalExampleProjection(lineIndex);
     if (!this.isOperationalBlockQuotedLine(lineIndex)) return line;
     return line.replace(/^(?:\s{0,3}>[ \t]?)+/u, (prefix) =>
       " ".repeat(prefix.length),
@@ -391,9 +396,13 @@ export class MarkdownSecurityView {
       record,
       range,
     );
-    const lines = this.visibleLines
-      .slice(range.startLine - 1, range.endLine)
-      .map((line) => line.trim());
+    const lines = Array.from(
+      { length: range.endLine - range.startLine + 1 },
+      (_, index) =>
+        this.nonOperationalExampleProjection(
+          range.startLine - 1 + index,
+        ).trim(),
+    );
     const blockQuoted = record.ancestors.some(
       (ancestor) => ancestor.type === "blockquote",
     );
@@ -481,12 +490,14 @@ export class MarkdownSecurityView {
         startLine,
         endLine: startLine + runLines.length - 1,
       };
-      const lines = runLines.map((line) => line.trim());
-      if (lines.join(" ").trim().length > 0) {
-        const nonOperationalExample = this.classifyNonOperationalExampleLines(
-          record,
-          candidateRange,
-        );
+      const nonOperationalExample = this.classifyNonOperationalExampleLines(
+        record,
+        candidateRange,
+      );
+      const lines = runLines.map((_, index) =>
+        this.nonOperationalExampleProjection(startLine - 1 + index).trim(),
+      );
+      if (runLines.join(" ").trim().length > 0) {
         const blockQuoted = record.ancestors.some(
           (ancestor) => ancestor.type === "blockquote",
         );
@@ -579,6 +590,8 @@ export class MarkdownSecurityView {
     const container = this.routedContainerRecord(record);
     const previous = container.parent.children[container.index - 1];
     const structuralBoundary =
+      (record.node.type === "code" &&
+        EXAMPLE_BOUNDARY_RE.test(nodeText(record.node))) ||
       (previous !== undefined && EXAMPLE_LABEL_RE.test(nodeText(previous))) ||
       this.headingChainAt(line).some((heading) =>
         EXAMPLE_BOUNDARY_RE.test(heading.text),
@@ -594,23 +607,95 @@ export class MarkdownSecurityView {
       return true;
     }
 
-    const markerOffset = lineIndexes.findIndex((lineIndex) =>
-      EXAMPLE_BOUNDARY_RE.test(this.visibleLine(lineIndex)),
-    );
-    if (markerOffset >= 0) {
-      for (const lineIndex of lineIndexes.slice(markerOffset)) {
+    const lineStarts: number[] = [];
+    let text = "";
+    for (const [index, lineIndex] of lineIndexes.entries()) {
+      if (index > 0) text += "\n";
+      lineStarts.push(text.length);
+      text += this.visibleLine(lineIndex);
+    }
+    const clauses = boundedClauseRanges(text);
+    let classifiedInlineExample = false;
+    for (const marker of text.matchAll(
+      new RegExp(EXAMPLE_BOUNDARY_RE.source, "giu"),
+    )) {
+      if (marker.index === undefined) continue;
+      const markerStart = marker.index;
+      const markerEnd = markerStart + marker[0].length;
+      const clauseIndex = clauses.findIndex(
+        (clause) => clause.start < markerEnd && clause.end > markerStart,
+      );
+      const clause = clauses[clauseIndex];
+      if (clause === undefined) continue;
+      classifiedInlineExample = true;
+      this.addNonOperationalExampleRange(
+        lineIndexes,
+        lineStarts,
+        clause.start,
+        clauses[clauseIndex + 1]?.start ?? text.length,
+      );
+    }
+    for (const lineIndex of lineIndexes) {
+      if (
+        this.nonOperationalExampleRangesByLine.has(lineIndex) &&
+        !/[\p{L}\p{N}]/u.test(this.nonOperationalExampleProjection(lineIndex))
+      ) {
         this.nonOperationalExampleLines.add(lineIndex);
       }
     }
-    const contentLineIndexes = lineIndexes.filter((lineIndex) =>
-      Boolean(this.visibleLine(lineIndex).trim()),
-    );
     return (
-      contentLineIndexes.length > 0 &&
-      contentLineIndexes.every((lineIndex) =>
-        this.nonOperationalExampleLines.has(lineIndex),
+      classifiedInlineExample &&
+      !/[\p{L}\p{N}]/u.test(
+        lineIndexes
+          .map((lineIndex) => this.nonOperationalExampleProjection(lineIndex))
+          .join("\n"),
       )
     );
+  }
+
+  private addNonOperationalExampleRange(
+    lineIndexes: readonly number[],
+    lineStarts: readonly number[],
+    start: number,
+    end: number,
+  ): void {
+    for (const [index, lineIndex] of lineIndexes.entries()) {
+      const lineStart = lineStarts[index] ?? 0;
+      const lineEnd = lineStart + this.visibleLine(lineIndex).length;
+      const localStart = Math.max(start, lineStart) - lineStart;
+      const localEnd = Math.min(end, lineEnd) - lineStart;
+      if (localStart >= localEnd) continue;
+      const ranges =
+        this.nonOperationalExampleRangesByLine.get(lineIndex) ?? [];
+      if (
+        !ranges.some(
+          (range) => range.start === localStart && range.end === localEnd,
+        )
+      ) {
+        ranges.push({ start: localStart, end: localEnd });
+      }
+      this.nonOperationalExampleRangesByLine.set(lineIndex, ranges);
+    }
+  }
+
+  private nonOperationalExampleProjection(lineIndex: number): string {
+    const line = this.visibleLine(lineIndex);
+    const ranges = this.nonOperationalExampleRangesByLine.get(lineIndex);
+    if (ranges === undefined) {
+      return this.nonOperationalExampleLines.has(lineIndex)
+        ? " ".repeat(line.length)
+        : line;
+    }
+    let projection = line;
+    for (const range of [...ranges].sort(
+      (left, right) => right.start - left.start || right.end - left.end,
+    )) {
+      projection =
+        projection.slice(0, range.start) +
+        " ".repeat(range.end - range.start) +
+        projection.slice(range.end);
+    }
+    return projection;
   }
 
   private operationalCandidateSegments(

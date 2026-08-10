@@ -120,7 +120,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Raw comment projections reuse the visible-Markdown structural example
   boundaries: a same-node marker, a preceding negative-example label, or a
   negative-example heading can bound the applicable example payload, while a
-  later independent workflow instruction remains eligible.
+  later independent workflow instruction remains eligible. Inline markers are
+  punctuation-clause-local, including within one physical line or a soft-wrapped
+  paragraph, so only the bounded example clause becomes non-operational.
 - Shell dependency collection now excludes recognized heredoc bodies,
   multiline quoted literal regions, and backslash-continued physical lines.
   Unsupported or dynamic heredoc delimiters fail closed for the rest of the
@@ -128,6 +130,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   reachability, or execution-contract topology. Obvious `$(( ... ))` and
   `(( ... ))` arithmetic regions are tracked separately, so arithmetic shift
   operators cannot start a false heredoc or hide later supported dependencies.
+  Bash `<<<` here-strings are consumed as complete non-heredoc operators, so an
+  overlapping `<<` suffix cannot hide dependencies on later lines.
 - Removed the release-version literal from the CI consumer-workflow contract
   test. The expected exact `npm install --save-dev --save-exact
   renma@<package version>` command is now derived from `package.json`, so a

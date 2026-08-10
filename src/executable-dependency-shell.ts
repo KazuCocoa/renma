@@ -189,6 +189,10 @@ function scanShellLine(
       cursor += 2;
       continue;
     }
+    if (sourceLine.slice(cursor, cursor + 3) === "<<<") {
+      cursor += 3;
+      continue;
+    }
     if (
       character === "<" &&
       sourceLine[cursor + 1] === "<" &&

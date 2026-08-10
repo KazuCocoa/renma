@@ -1600,6 +1600,9 @@ collection for the remaining source rather than risking a false topology edge.
 A bounded arithmetic state recognizes obvious `$(( ... ))` and `(( ... ))`
 regions. Shift operators inside them are data for dependency purposes and do
 not enter heredoc state, so collection resumes for later supported commands.
+Bash `<<<` here-string operators are advanced over as complete non-heredoc
+tokens. Their operands do not create dependency evidence, and a later supported
+physical line remains eligible for collection.
 A relative `..` form that would escape the repository is retained only as
 `unsafe` resolution evidence and never becomes a graph edge. No collector
 executes code or implements a complete parser.
