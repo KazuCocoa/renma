@@ -131,6 +131,26 @@ test("helper script extraction forwards plausible traversal without parsing arbi
   );
 });
 
+test("Windows helper extraction uses explicit launcher grammars", () => {
+  assert.equal(
+    helperScriptPath("pwsh -File tools\\check.ps1"),
+    "tools\\check.ps1",
+  );
+  assert.equal(
+    helperScriptPath('powershell.exe -File "scripts\\check.ps1"'),
+    "scripts\\check.ps1",
+  );
+  assert.equal(helperScriptPath("cmd /c tools\\check.cmd"), "tools\\check.cmd");
+  assert.equal(
+    helperScriptPath('cmd.exe /c "tools\\check.bat"'),
+    "tools\\check.bat",
+  );
+  assert.equal(helperScriptPath("pwsh -Command tools/check.ps1"), undefined);
+  assert.equal(helperScriptPath("cmd /k tools/check.cmd"), undefined);
+  assert.equal(helperScriptPath("cmd /c %COMMAND%"), undefined);
+  assert.equal(helperScriptPath("pwsh -File tools/$HELPER.ps1"), undefined);
+});
+
 function artifactFixture(
   root: string,
   repositoryPath: string,

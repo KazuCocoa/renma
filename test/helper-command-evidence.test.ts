@@ -122,6 +122,12 @@ test("reuses the established launcher, extension, and options grammar", () => {
     "python scripts/check.py",
     "python3 scripts/check.py",
     "node --no-warnings tools/check.mjs",
+    "pwsh -File tools/check.ps1",
+    "pwsh.exe -File tools\\check.ps1",
+    "powershell -File scripts/check.ps1",
+    'powershell.exe -File "tools/check.ps1"',
+    "cmd /c tools\\check.cmd",
+    'cmd.exe /c "tools/check.bat"',
   ];
   const rejected = [
     "npm test",
@@ -131,6 +137,15 @@ test("reuses the established launcher, extension, and options grammar", () => {
     "$ node tools/check.mjs",
     "node -e \"console.log('test')\"",
     "node tools/check.txt",
+    "pwsh -Command tools/check.ps1",
+    "pwsh -File tools/$HELPER.ps1",
+    "powershell tools/check.ps1",
+    "cmd tools/check.cmd",
+    "cmd /k tools/check.cmd",
+    "cmd /c tools/%HELPER%.cmd",
+    "node tools/check.ps1",
+    "pwsh -File tools/check.cmd",
+    "cmd /c tools/check.ps1",
   ];
 
   for (const snippet of recognized) {
@@ -139,6 +154,65 @@ test("reuses the established launcher, extension, and options grammar", () => {
   for (const snippet of rejected) {
     assert.equal(collect(`Run \`${snippet}\`.`).length, 0, snippet);
   }
+});
+
+test("Windows helper launchers preserve exact evidence and normalize separators for resolution", () => {
+  const evidence = collect(
+    [
+      "```powershell",
+      "pwsh -File tools\\check.ps1",
+      "powershell.exe -File scripts\\local.ps1",
+      "cmd /c tools\\check.cmd",
+      'cmd.exe /c "tools\\check.bat"',
+      "```",
+    ].join("\n"),
+  );
+
+  assert.deepEqual(
+    evidence.map(({ launcher, rawTarget, pathResolution }) => ({
+      launcher,
+      rawTarget,
+      pathResolution,
+    })),
+    [
+      {
+        launcher: "pwsh",
+        rawTarget: "tools\\check.ps1",
+        pathResolution: {
+          kind: "candidate",
+          path: "tools/check.ps1",
+          source: "repository-root",
+        },
+      },
+      {
+        launcher: "powershell.exe",
+        rawTarget: "scripts\\local.ps1",
+        pathResolution: {
+          kind: "candidate",
+          path: "skills/demo/scripts/local.ps1",
+          source: "skill-relative",
+        },
+      },
+      {
+        launcher: "cmd",
+        rawTarget: "tools\\check.cmd",
+        pathResolution: {
+          kind: "candidate",
+          path: "tools/check.cmd",
+          source: "repository-root",
+        },
+      },
+      {
+        launcher: "cmd.exe",
+        rawTarget: "tools\\check.bat",
+        pathResolution: {
+          kind: "candidate",
+          path: "tools/check.bat",
+          source: "repository-root",
+        },
+      },
+    ],
+  );
 });
 
 test("rejects prose, structurally ineligible inline code, and hidden examples", () => {

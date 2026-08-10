@@ -930,7 +930,9 @@ function shebangInterpreter(shebang: string): string {
     .split(/\s+/)
     .map((word) => path.posix.basename(word));
   const recognized = words.find((word) =>
-    ["node", "bash", "sh", "python", "python3"].includes(word),
+    ["node", "bash", "sh", "python", "python3", "pwsh", "powershell"].includes(
+      word,
+    ),
   );
   return recognized ?? "unknown";
 }
@@ -950,6 +952,11 @@ function extensionInterpreter(surfacePath: string): string {
       return "sh";
     case ".py":
       return "python";
+    case ".ps1":
+      return "powershell";
+    case ".bat":
+    case ".cmd":
+      return "cmd";
     default:
       return "unknown";
   }

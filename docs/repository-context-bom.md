@@ -149,6 +149,14 @@ per-surface incoming/outgoing and direct/transitive/unreached summaries.
 Surface policy evidence remains separate and is never replaced by caller or
 dependency evidence.
 
+The inventory's closed analyzer enum additively includes `powershell` and
+`batch`, and its launcher enum additively includes `pwsh`, `powershell`, `cmd`,
+and their `.exe` spellings. Existing fields, analyzer values, launcher values,
+relation meanings, and ordering are unchanged. BOM v2 and executable-surface
+inventory v1 identifiers do not change. Consumers that exhaustively switch on
+closed enum values must accept these additions before processing repositories
+with newly recognized Windows evidence.
+
 Invocation governance retains prepared `source-artifact` and `owning-skill`
 policy relationships without merging fields or applying precedence. Its
 effective fingerprints are a sorted set of visible variants, not conflicts or
