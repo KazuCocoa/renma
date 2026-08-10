@@ -1592,10 +1592,14 @@ containing-package edges. The shell collector ignores variables, parameter or
 command substitution, backticks, aliases, environment-assignment or wrapper
 prefixes, launcher options, globs, tilde expansion, concatenated quoted words,
 absolute paths, URLs, bare/PATH-resolved commands, unsupported target
-extensions, and commands that do not begin the physical line. A relative
-`..` form that would escape the repository is retained only as `unsafe`
-resolution evidence and never becomes a graph edge. No collector executes code
-or implements a complete parser.
+extensions, and commands that do not begin the physical line. Conservative
+lexical state also excludes recognized heredoc bodies, multiline single- or
+double-quoted literal regions, and physical lines continued from a preceding
+line. An unsupported or dynamic heredoc delimiter stops shell dependency
+collection for the remaining source rather than risking a false topology edge.
+A relative `..` form that would escape the repository is retained only as
+`unsafe` resolution evidence and never becomes a graph edge. No collector
+executes code or implements a complete parser.
 
 Dependency targets resolve only to surfaces already in the inventory.
 `not-inventory` means the exact parsed repository file exists but is outside

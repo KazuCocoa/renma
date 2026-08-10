@@ -215,6 +215,44 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
   });
 });
 
+test("a shell path present only in heredoc data is absent from the execution contract", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-heredoc-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    body: ["# Demo", "", "```bash", "bash tools/entry.sh", "```"].join("\n"),
+  });
+  await fixture.write(
+    "tools/entry.sh",
+    ["#!/bin/sh", "cat <<'EOF'", "./heredoc-only.sh", "EOF", ""].join("\n"),
+  );
+  await fixture.write("tools/heredoc-only.sh", "#!/bin/sh\nexit 0\n");
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  assert.equal(
+    snapshot.executableSurfaceInventory.dependencies.some(
+      (dependency) => dependency.normalizedTarget === "tools/heredoc-only.sh",
+    ),
+    false,
+  );
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.demo",
+  });
+  assert.equal(
+    report.executableEvidence.relationships.some(
+      (relationship) => relationship.to.sourcePath === "tools/heredoc-only.sh",
+    ),
+    false,
+  );
+  assert.equal(
+    formatExecutionContractJson(report).includes("tools/heredoc-only.sh"),
+    false,
+  );
+});
+
 test("execution contract accepts an exact SKILL.md path and omits absent revision provenance", async (t) => {
   const fixture = await RepositoryFixture.create({
     prefix: "renma-execution-contract-path-",

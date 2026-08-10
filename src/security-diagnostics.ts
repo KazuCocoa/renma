@@ -1211,14 +1211,14 @@ function collectHiddenHtmlCommentDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
   return prepared.markdownView.htmlComments.flatMap((comment, commentIndex) => {
-    if (HIDDEN_COMMENT_NON_OPERATIONAL_EXAMPLE_RE.test(comment.content)) {
-      return [];
-    }
+    const instructionProjection = hiddenCommentInstructionProjection(
+      comment.content,
+    );
     const projectedArtifact: Artifact = {
       ...prepared.artifact,
       kind: "context",
       sizeBytes: comment.content.length + 1,
-      content: `\n${comment.content}`,
+      content: `\n${instructionProjection}`,
       markdownParserEligible: true,
     };
     const projected = prepareSecurityDocumentAnalysis(
@@ -1287,6 +1287,36 @@ function collectHiddenHtmlCommentDetections(
       };
     });
   });
+}
+
+/**
+ * Mask only the punctuation-bounded clause containing a negative-example
+ * marker. Keeping every newline and UTF-16 offset stable preserves source
+ * mapping while preventing one label from exempting independent instructions.
+ */
+function hiddenCommentInstructionProjection(content: string): string {
+  const ranges = overlappingPatternMatches(
+    content,
+    HIDDEN_COMMENT_NON_OPERATIONAL_EXAMPLE_RE,
+  ).flatMap(({ start, text }) =>
+    disclosureClauseRangesIntersectingRange(
+      content,
+      start,
+      start + text.length,
+    ),
+  );
+  if (ranges.length === 0) return content;
+
+  let projection = content;
+  for (const { start, end } of ranges.sort(
+    (left, right) => right.start - left.start || right.end - left.end,
+  )) {
+    const masked = projection
+      .slice(start, end)
+      .replace(/[^\r\n]/gu, (character) => " ".repeat(character.length));
+    projection = `${projection.slice(0, start)}${masked}${projection.slice(end)}`;
+  }
+  return projection;
 }
 
 function hiddenCommentSourceLine(

@@ -435,6 +435,9 @@ recognition vocabulary. A non-English or multilingual `description` remains
 supported and is conservatively accepted rather than warned merely because its
 capability, usage, or exclusion phrasing is outside the English word list.
 Renma does not translate the description or claim equivalent multilingual NLP.
+The conservative multilingual signal requires non-ASCII letter or combining-
+mark evidence; typographic punctuation and emoji in otherwise-English prose do
+not disable the ordinary English-primary authoring warnings.
 
 | Identifier | Meaning |
 | --- | --- |

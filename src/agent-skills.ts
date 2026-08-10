@@ -682,8 +682,13 @@ function authoringIssues(
   const descriptionLine =
     firstField(frontmatter, AGENT_SKILL_TOP_LEVEL_KEYS.description)
       ?.startLine ?? 1;
+  const hasMultilingualLetterEvidence =
+    descriptionHasMultilingualLetterEvidence(description);
 
-  if (!descriptionCapabilityPattern().test(description)) {
+  if (
+    !hasMultilingualLetterEvidence &&
+    !descriptionCapabilityPattern().test(description)
+  ) {
     issues.push(
       createIssue(
         document,
@@ -697,7 +702,10 @@ function authoringIssues(
     );
   }
 
-  if (!usageBoundaryPattern().test(description)) {
+  if (
+    !hasMultilingualLetterEvidence &&
+    !usageBoundaryPattern().test(description)
+  ) {
     issues.push(
       createIssue(
         document,
@@ -718,6 +726,7 @@ function authoringIssues(
   );
   if (
     bodySelectionBoundary &&
+    !hasMultilingualLetterEvidence &&
     !descriptionSelectionBoundaryPattern().test(description)
   ) {
     issues.push(
@@ -946,16 +955,14 @@ function characterLength(value: string): number {
 }
 
 function usageBoundaryPattern(): RegExp {
-  return /[^\p{ASCII}]|\b(?:use(?: this skill)? (?:when|for|to)|when (?:a|an|the|you|reviewing|working|handling))\b/iu;
+  return /\b(?:use(?: this skill)? (?:when|for|to)|when (?:a|an|the|you|reviewing|working|handling))\b/i;
 }
 
 /**
  * Conservative English capability evidence for the Agent Skills "what" clause.
- * Non-ASCII descriptions are accepted because Renma cannot reliably infer
- * capability semantics across languages with a deterministic word list.
  */
 function descriptionCapabilityPattern(): RegExp {
-  return /[^\p{ASCII}]|\b(?:address(?:es|ing)?|analy[sz](?:e|es|ing)|analysis|automat(?:e|es|ing|ion)|build(?:s|ing)?|calculat(?:e|es|ing|ion)|compar(?:e|es|ing|ison)|configur(?:e|es|ing|ation)|convert(?:s|ing)?|creat(?:e|es|ing|ion)|debug(?:s|ging)?|deploy(?:s|ing|ment)?|design(?:s|ing)?|diagnos(?:e|es|ing|is)|document(?:s|ing|ation)?|edit(?:s|ing)?|evaluat(?:e|es|ing|ion)|extract(?:s|ing|ion)?|find(?:s|ing)?|fix(?:es|ing)?|generat(?:e|es|ing|ion)|guid(?:e|es|ing|ance)|implement(?:s|ing|ation)?|inspect(?:s|ing|ion)?|install(?:s|ing|ation)?|manage(?:s|ment|ing)?|migrat(?:e|es|ing|ion)|monitor(?:s|ing)?|organiz(?:e|es|ing|ation)|plan(?:s|ning)?|prepar(?:e|es|ing|ation)|produc(?:e|es|ing|tion)|publish(?:es|ing)?|read(?:s|ing)?|releas(?:e|es|ing)|render(?:s|ing)?|review(?:s|ing)?|rout(?:e|es|ing)|scaffold(?:s|ing)?|search(?:es|ing)?|summari[sz](?:e|es|ing|ation)|test(?:s|ing)?|transform(?:s|ing|ation)?|triag(?:e|es|ing)|updat(?:e|es|ing)|validat(?:e|es|ing|ion)|verif(?:y|ies|ying|ication)|writ(?:e|es|ing))\b/iu;
+  return /\b(?:address(?:es|ing)?|analy[sz](?:e|es|ing)|analysis|automat(?:e|es|ing|ion)|build(?:s|ing)?|calculat(?:e|es|ing|ion)|compar(?:e|es|ing|ison)|configur(?:e|es|ing|ation)|convert(?:s|ing)?|creat(?:e|es|ing|ion)|debug(?:s|ging)?|deploy(?:s|ing|ment)?|design(?:s|ing)?|diagnos(?:e|es|ing|is)|document(?:s|ing|ation)?|edit(?:s|ing)?|evaluat(?:e|es|ing|ion)|extract(?:s|ing|ion)?|find(?:s|ing)?|fix(?:es|ing)?|generat(?:e|es|ing|ion)|guid(?:e|es|ing|ance)|implement(?:s|ing|ation)?|inspect(?:s|ing|ion)?|install(?:s|ing|ation)?|manage(?:s|ment|ing)?|migrat(?:e|es|ing|ion)|monitor(?:s|ing)?|organiz(?:e|es|ing|ation)|plan(?:s|ning)?|prepar(?:e|es|ing|ation)|produc(?:e|es|ing|tion)|publish(?:es|ing)?|read(?:s|ing)?|releas(?:e|es|ing)|render(?:s|ing)?|review(?:s|ing)?|rout(?:e|es|ing)|scaffold(?:s|ing)?|search(?:es|ing)?|summari[sz](?:e|es|ing|ation)|test(?:s|ing)?|transform(?:s|ing|ation)?|triag(?:e|es|ing)|updat(?:e|es|ing)|validat(?:e|es|ing|ion)|verif(?:y|ies|ying|ication)|writ(?:e|es|ing))\b/iu;
 }
 
 function explicitSelectionBoundaryPattern(): RegExp {
@@ -963,7 +970,24 @@ function explicitSelectionBoundaryPattern(): RegExp {
 }
 
 function descriptionSelectionBoundaryPattern(): RegExp {
-  return /[^\p{ASCII}]|\b(?:do not use|not for|when not to use|use another skill)\b/iu;
+  return /\b(?:do not use|not for|when not to use|use another skill)\b/i;
+}
+
+/**
+ * Letter/mark evidence is a conservative reason not to apply English-only
+ * vocabulary warnings. Unicode punctuation and symbols are intentionally not
+ * evidence that otherwise-English prose is multilingual.
+ */
+function descriptionHasMultilingualLetterEvidence(value: string): boolean {
+  let previousWasLetter = false;
+  for (const character of value) {
+    const nonAscii = (character.codePointAt(0) ?? 0) > 0x7f;
+    const letter = /\p{Letter}/u.test(character);
+    const mark = /\p{Mark}/u.test(character);
+    if (nonAscii && (letter || (mark && previousWasLetter))) return true;
+    if (!mark) previousWasLetter = letter;
+  }
+  return false;
 }
 
 function selectionHeadingPattern(): RegExp {

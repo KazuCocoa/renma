@@ -196,6 +196,61 @@ test("shell collector recognizes only bounded static relative execution and sour
   assert.ok(first.every((candidate) => candidate.snippet.length <= 240));
 });
 
+test("shell collector skips heredoc, multiline literal, and continued data regions", () => {
+  const content = [
+    "cat <<'EOF'",
+    "./heredoc-worker.sh",
+    "source ./heredoc-lib.sh",
+    "EOF",
+    "cat <<-TAB_EOF",
+    "\t./tab-heredoc-worker.sh",
+    "\tTAB_EOF",
+    "payload='",
+    "./single-quoted-worker.sh",
+    "'",
+    'payload="',
+    "bash ./double-quoted-worker.sh",
+    '"',
+    "printf '%s\\n' \\",
+    "./continued-argument.sh",
+    "./real-worker.sh",
+  ].join("\n");
+
+  const candidates = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/check.sh",
+    content,
+  });
+
+  assert.deepEqual(
+    candidates.map((candidate) => ({
+      line: candidate.line,
+      rawSpecifier: candidate.rawSpecifier,
+      relation: candidate.relation,
+    })),
+    [
+      {
+        line: 16,
+        rawSpecifier: "./real-worker.sh",
+        relation: "static-execution",
+      },
+    ],
+  );
+});
+
+test("an unsupported dynamic heredoc delimiter fails closed for later topology", () => {
+  for (const content of [
+    "cat <<$DELIMITER\n./not-a-command.sh\n$DELIMITER\n./later.sh\n",
+    "cat <<EOF#suffix\n./not-a-command.sh\nEOF#suffix\n./later.sh\n",
+  ]) {
+    const candidates = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+      path: "tools/check.sh",
+      content,
+    });
+
+    assert.deepEqual(candidates, []);
+  }
+});
+
 test("shell collector retains repository-escape evidence without inventing a target", () => {
   const [candidate] = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
     path: "tools/check.sh",
@@ -577,6 +632,7 @@ test("shell dependency evidence propagates through graph reachability and semant
   await writeFile(path.join(root, "tools", "entry.sh"), "#!/bin/sh\n");
   await writeFile(path.join(root, "tools", "lib.sh"), "#!/bin/sh\n");
   await writeFile(path.join(root, "tools", "worker.sh"), "#!/bin/sh\n");
+  await writeFile(path.join(root, "tools", "heredoc-only.sh"), "#!/bin/sh\n");
 
   const before = (await collectRepositorySnapshot(root))
     .executableSurfaceInventory;
@@ -590,6 +646,9 @@ test("shell dependency evidence propagates through graph reachability and semant
       "./worker.sh",
       "bash $DYNAMIC_HELPER",
       "bash /opt/vendor/external.sh",
+      "cat <<'EOF'",
+      "./heredoc-only.sh",
+      "EOF",
       "",
     ].join("\n"),
   );
@@ -646,6 +705,11 @@ test("shell dependency evidence propagates through graph reachability and semant
     surface(after, "tools/worker.sh").dependencyEvidence
       .minimumInvocationDependencyDepth,
     1,
+  );
+  assert.equal(
+    surface(after, "tools/heredoc-only.sh").dependencyEvidence
+      .staticInvocationReachability,
+    "unreached",
   );
 
   const diff = buildExecutableSurfaceDiff(before, after);

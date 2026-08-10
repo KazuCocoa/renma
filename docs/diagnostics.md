@@ -809,9 +809,11 @@ comment in an isolated raw-agent-visible projection and reports the exact
 source span plus the underlying bounded diagnostic identity. Formatting notes,
 metadata markers, and explanatory documentation comments do not trigger unless
 they independently contain recognized security-sensitive operational evidence.
-Use the existing narrow finding-ID and path-scoped suppression only for a
-reviewed intentional case. Raw hidden-Unicode inspection is independent and
-still includes comments.
+A negative-example label exempts only the punctuation-bounded clause containing
+that label; an earlier or later operational clause in the same comment remains
+eligible. Use the existing narrow finding-ID and path-scoped suppression only
+for a reviewed intentional case. Raw hidden-Unicode inspection is independent
+and still includes comments.
 
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
 circumvent security checks, weaken policy to pass diagnostics, suppress

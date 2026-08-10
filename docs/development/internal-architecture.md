@@ -532,8 +532,11 @@ optionally launched immediately by `bash` or `sh`, or loaded immediately by
 `source` or dot-source. Single- and double-quoted literals and repository-safe
 `../` paths are accepted. Variables, substitutions, wrappers, options, aliases,
 PATH resolution, absolute or external targets, general control flow, and other
-shell semantics are excluded. Repository escape remains `unsafe` evidence and
-never becomes topology.
+shell semantics are excluded. A small lexical state machine suppresses lines
+inside recognized heredoc bodies, multiline quoted literal regions, and
+backslash-continued physical lines. Unsupported or dynamic heredoc delimiters
+fail closed for the remainder of that source. Repository escape remains
+`unsafe` evidence and never becomes topology.
 
 `src/helper-command-evidence.ts` owns the bounded helper grammar shared by
 repository path candidate collection, existing path diagnostics, and the

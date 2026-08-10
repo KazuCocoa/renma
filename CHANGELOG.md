@@ -55,6 +55,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   content remains supported and does not produce a generic warning. Documented
   language-independent URL, command, path, executable-reference, Markdown
   structure, and hidden-Unicode evidence remains active across languages.
+  Multilingual description exemption now requires non-ASCII letter or mark
+  evidence, so typographic punctuation and emoji cannot disable normal
+  English-primary authoring diagnostics.
 - Hardened npm publication so a separate non-OIDC job fetches and verifies the
   exact remote release tag object and `origin/main`, requires an annotated tag
   peeled to the exact main commit, and checks the package version before the
@@ -114,6 +117,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   evidence and the underlying matched diagnostic identity; ordinary formatting,
   metadata, explanatory, prohibited, and clearly negative-example comments
   remain inert, and raw hidden-Unicode inspection remains independent.
+  Negative-example exemption is punctuation-clause-local, so an example label
+  cannot hide an independent instruction elsewhere in the same comment.
+- Shell dependency collection now excludes recognized heredoc bodies,
+  multiline quoted literal regions, and backslash-continued physical lines.
+  Unsupported or dynamic heredoc delimiters fail closed for the rest of the
+  source, preventing data-only shell text from becoming dependency, graph,
+  reachability, or execution-contract topology.
 - Removed the release-version literal from the CI consumer-workflow contract
   test. The expected exact `npm install --save-dev --save-exact
   renma@<package version>` command is now derived from `package.json`, so a

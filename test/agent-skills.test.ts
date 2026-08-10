@@ -374,6 +374,49 @@ test("separates clear short capability descriptions from generic selection prose
   );
 });
 
+test("Unicode punctuation and emoji do not disable English-primary description diagnostics", () => {
+  const descriptions = [
+    "Review specifications — carefully.",
+    "Review users’ specifications.",
+    "Review specifications 🚀",
+    "Review specifications ✈️",
+  ];
+
+  for (const description of descriptions) {
+    const validation = validateAgentSkill(
+      skill(
+        "skills/demo/SKILL.md",
+        `---
+name: demo
+description: ${description}
+---
+# Demo
+
+## When not to use
+
+- Do not use this skill for implementation work.
+`,
+      ),
+    );
+    const codes = validation.issues.map((issue) => issue.code);
+
+    assert.equal(validation.valid, true, description);
+    assert.ok(
+      codes.includes("RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY"),
+      description,
+    );
+    assert.ok(
+      codes.includes("RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY"),
+      description,
+    );
+    assert.equal(
+      codes.includes("RN-SKILL-DESCRIPTION-MISSING-CAPABILITY"),
+      false,
+      description,
+    );
+  }
+});
+
 test("multilingual descriptions are accepted without English-only semantic warnings", () => {
   const validation = validateAgentSkill(
     skill(

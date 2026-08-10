@@ -764,9 +764,11 @@ or other security-sensitive instruction emits
 underlying matched diagnostic identity in `details`. Ordinary explanatory,
 metadata, formatting, and documentation comments remain inert. The finding is
 suppressible only through the existing finding-ID plus repository-path
-suppression contract. This comment projection is separate from the raw
-hidden-Unicode pass, which continues to inspect every discovered UTF-8 text
-artifact before Markdown filtering.
+suppression contract. Negative-example wording masks only its own
+punctuation-bounded clause in this raw-comment projection; it does not exempt an
+independent clause or line elsewhere in the comment. This comment projection is
+separate from the raw hidden-Unicode pass, which continues to inspect every
+discovered UTF-8 text artifact before Markdown filtering.
 
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding
