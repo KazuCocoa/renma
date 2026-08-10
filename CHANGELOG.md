@@ -62,6 +62,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Added a concise product-boundary diagram to the development design, showing
+  current single-repository identity, governance, and review capabilities while
+  keeping organizational federation and owner-authority enforcement separate.
 - Reframed the development roadmap's Current State as a version-independent
   description of Renma's stable single-repository governance boundary and
   clarified that stricter organizational metadata requirements are optional

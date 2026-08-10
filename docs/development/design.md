@@ -83,6 +83,41 @@ External agents and runtimes decide how to consume repository assets. Passing
 Renma checks means the enabled deterministic governance checks passed; it does
 not prove that a workflow is safe, correct, or effective at runtime.
 
+The lists above remain authoritative; this diagram summarizes the current
+single-repository boundary and adjacent repository-governance concerns.
+
+```mermaid
+flowchart LR
+  subgraph Renma["Current Renma — single-repository boundary"]
+    direction TB
+    Identity["`Identity of assets
+stable IDs / paths
+relationships
+composition`"]
+    Governance["`Governance metadata
+owner / lifecycle
+freshness / policy
+suspension`"]
+    Evidence["`Review evidence
+diff / CI
+Readiness
+BOM / graphs`"]
+  end
+  Repository["Shared Git repository"]
+  subgraph External["Separate architectural concerns"]
+    direction TB
+    Federation["`Organization federation
+requires separate federation design`"]
+    Authority["`Owner ↔ actual authority
+enforced by Git host / repository controls`"]
+  end
+  Identity --> Repository
+  Governance --> Repository
+  Evidence --> Repository
+  Repository -.-> Federation
+  Repository -.-> Authority
+```
+
 ## Focused Skills and Progressive Disclosure
 
 A Skill should remain complete enough to own its workflow without becoming the
