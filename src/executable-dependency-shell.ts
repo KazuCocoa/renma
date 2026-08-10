@@ -25,6 +25,7 @@ interface ShellHeredoc {
 
 interface ShellLexicalState {
   quote: ShellQuote | undefined;
+  arithmeticDepth: number;
   continued: boolean;
   heredocs: ShellHeredoc[];
   opaqueHeredoc: boolean;
@@ -32,6 +33,7 @@ interface ShellLexicalState {
 
 interface ShellLineTransition {
   quote: ShellQuote | undefined;
+  arithmeticDepth: number;
   continued: boolean;
   heredocs: ShellHeredoc[];
   opaqueHeredoc: boolean;
@@ -61,6 +63,7 @@ function collectShellDependencies(
   const candidates: ExecutableDependencyCandidate[] = [];
   const lexicalState: ShellLexicalState = {
     quote: undefined,
+    arithmeticDepth: 0,
     continued: false,
     heredocs: [],
     opaqueHeredoc: false,
@@ -78,8 +81,14 @@ function collectShellDependencies(
       consumeHeredocBodyLine(sourceLine, lexicalState.heredocs);
     } else {
       const commandLineEligible =
-        lexicalState.quote === undefined && !lexicalState.continued;
-      const transition = scanShellLine(sourceLine, lexicalState.quote);
+        lexicalState.quote === undefined &&
+        lexicalState.arithmeticDepth === 0 &&
+        !lexicalState.continued;
+      const transition = scanShellLine(
+        sourceLine,
+        lexicalState.quote,
+        lexicalState.arithmeticDepth,
+      );
       if (commandLineEligible) {
         const candidate = shellDependencyCandidate(
           sourcePath,
@@ -91,6 +100,7 @@ function collectShellDependencies(
         if (candidate !== undefined) candidates.push(candidate);
       }
       lexicalState.quote = transition.quote;
+      lexicalState.arithmeticDepth = transition.arithmeticDepth;
       lexicalState.continued = transition.continued;
       lexicalState.heredocs.push(...transition.heredocs);
       lexicalState.opaqueHeredoc = transition.opaqueHeredoc;
@@ -117,15 +127,31 @@ function consumeHeredocBodyLine(
 function scanShellLine(
   sourceLine: string,
   initialQuote: ShellQuote | undefined,
+  initialArithmeticDepth: number,
 ): ShellLineTransition {
   const heredocs: ShellHeredoc[] = [];
   let quote = initialQuote;
+  let arithmeticDepth = initialArithmeticDepth;
   let continued = false;
   let opaqueHeredoc = false;
   let cursor = 0;
 
   while (cursor < sourceLine.length) {
     const character = sourceLine[cursor]!;
+    if (arithmeticDepth > 0) {
+      if (sourceLine.slice(cursor, cursor + 2) === "((") {
+        arithmeticDepth += 1;
+        cursor += 2;
+        continue;
+      }
+      if (sourceLine.slice(cursor, cursor + 2) === "))") {
+        arithmeticDepth -= 1;
+        cursor += 2;
+        continue;
+      }
+      cursor += 1;
+      continue;
+    }
     if (quote !== undefined) {
       if (quote === '"' && character === "\\") {
         cursor += cursor + 1 < sourceLine.length ? 2 : 1;
@@ -150,6 +176,19 @@ function scanShellLine(
       cursor += 1;
       continue;
     }
+    if (sourceLine.slice(cursor, cursor + 3) === "$((") {
+      arithmeticDepth = 1;
+      cursor += 3;
+      continue;
+    }
+    if (
+      sourceLine.slice(cursor, cursor + 2) === "((" &&
+      shellArithmeticCommandStartsAt(sourceLine, cursor)
+    ) {
+      arithmeticDepth = 1;
+      cursor += 2;
+      continue;
+    }
     if (
       character === "<" &&
       sourceLine[cursor + 1] === "<" &&
@@ -169,10 +208,19 @@ function scanShellLine(
 
   return {
     quote,
+    arithmeticDepth,
     continued,
     heredocs,
     opaqueHeredoc: opaqueHeredoc || (continued && heredocs.length > 0),
   };
+}
+
+function shellArithmeticCommandStartsAt(
+  sourceLine: string,
+  offset: number,
+): boolean {
+  if (offset === 0) return true;
+  return /[\s;&|()]/u.test(sourceLine[offset - 1]!);
 }
 
 function shellCommentStartsAt(sourceLine: string, offset: number): boolean {

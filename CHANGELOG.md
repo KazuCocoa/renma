@@ -117,13 +117,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   evidence and the underlying matched diagnostic identity; ordinary formatting,
   metadata, explanatory, prohibited, and clearly negative-example comments
   remain inert, and raw hidden-Unicode inspection remains independent.
-  Negative-example exemption is punctuation-clause-local, so an example label
-  cannot hide an independent instruction elsewhere in the same comment.
+  Raw comment projections reuse the visible-Markdown structural example
+  boundaries: a same-node marker, a preceding negative-example label, or a
+  negative-example heading can bound the applicable example payload, while a
+  later independent workflow instruction remains eligible.
 - Shell dependency collection now excludes recognized heredoc bodies,
   multiline quoted literal regions, and backslash-continued physical lines.
   Unsupported or dynamic heredoc delimiters fail closed for the rest of the
   source, preventing data-only shell text from becoming dependency, graph,
-  reachability, or execution-contract topology.
+  reachability, or execution-contract topology. Obvious `$(( ... ))` and
+  `(( ... ))` arithmetic regions are tracked separately, so arithmetic shift
+  operators cannot start a false heredoc or hide later supported dependencies.
 - Removed the release-version literal from the CI consumer-workflow contract
   test. The expected exact `npm install --save-dev --save-exact
   renma@<package version>` command is now derived from `package.json`, so a

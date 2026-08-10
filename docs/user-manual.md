@@ -1597,6 +1597,9 @@ lexical state also excludes recognized heredoc bodies, multiline single- or
 double-quoted literal regions, and physical lines continued from a preceding
 line. An unsupported or dynamic heredoc delimiter stops shell dependency
 collection for the remaining source rather than risking a false topology edge.
+A bounded arithmetic state recognizes obvious `$(( ... ))` and `(( ... ))`
+regions. Shift operators inside them are data for dependency purposes and do
+not enter heredoc state, so collection resumes for later supported commands.
 A relative `..` form that would escape the repository is retained only as
 `unsafe` resolution evidence and never becomes a graph edge. No collector
 executes code or implements a complete parser.

@@ -1044,9 +1044,6 @@ const COMMAND_LIKE_TOOL_RE =
   /\b(npm|pnpm|yarn|pip3?|python(?:\d+(?:\.\d+)*)?|py|uv|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i;
 const COMMAND_LIKE_LEADING_MARKER_RE =
   /^(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?/u;
-const HIDDEN_COMMENT_NON_OPERATIONAL_EXAMPLE_RE =
-  /\b(?:unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+(?:example|pattern)s?\b|\bwhat not to do\b/iu;
-
 type SecurityDiagnosticsConfig = {
   security?: SecurityConfig;
 };
@@ -1211,14 +1208,11 @@ function collectHiddenHtmlCommentDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
   return prepared.markdownView.htmlComments.flatMap((comment, commentIndex) => {
-    const instructionProjection = hiddenCommentInstructionProjection(
-      comment.content,
-    );
     const projectedArtifact: Artifact = {
       ...prepared.artifact,
       kind: "context",
       sizeBytes: comment.content.length + 1,
-      content: `\n${instructionProjection}`,
+      content: `\n${comment.content}`,
       markdownParserEligible: true,
     };
     const projected = prepareSecurityDocumentAnalysis(
@@ -1287,36 +1281,6 @@ function collectHiddenHtmlCommentDetections(
       };
     });
   });
-}
-
-/**
- * Mask only the punctuation-bounded clause containing a negative-example
- * marker. Keeping every newline and UTF-16 offset stable preserves source
- * mapping while preventing one label from exempting independent instructions.
- */
-function hiddenCommentInstructionProjection(content: string): string {
-  const ranges = overlappingPatternMatches(
-    content,
-    HIDDEN_COMMENT_NON_OPERATIONAL_EXAMPLE_RE,
-  ).flatMap(({ start, text }) =>
-    disclosureClauseRangesIntersectingRange(
-      content,
-      start,
-      start + text.length,
-    ),
-  );
-  if (ranges.length === 0) return content;
-
-  let projection = content;
-  for (const { start, end } of ranges.sort(
-    (left, right) => right.start - left.start || right.end - left.end,
-  )) {
-    const masked = projection
-      .slice(start, end)
-      .replace(/[^\r\n]/gu, (character) => " ".repeat(character.length));
-    projection = `${projection.slice(0, start)}${masked}${projection.slice(end)}`;
-  }
-  return projection;
 }
 
 function hiddenCommentSourceLine(
@@ -1799,6 +1763,7 @@ function prepareSecurityLineContext(
     prepared;
   const lineNumber = index + 1;
   const line = markdownView.instructionLine(index);
+  if (markdownView.isNonOperationalExampleLine(index)) return undefined;
   if (isShellCommentLine(line, index, markdownView)) {
     return undefined;
   }
@@ -2510,8 +2475,9 @@ function hasPolicyRelevantInstructionSurface(
     lineIndex += 1
   ) {
     if (
-      prepared.markdownView.isBlockQuotedLine(lineIndex) &&
-      !prepared.markdownView.isOperationalBlockQuotedLine(lineIndex)
+      prepared.markdownView.isNonOperationalExampleLine(lineIndex) ||
+      (prepared.markdownView.isBlockQuotedLine(lineIndex) &&
+        !prepared.markdownView.isOperationalBlockQuotedLine(lineIndex))
     ) {
       continue;
     }
@@ -2619,6 +2585,7 @@ function isLogicalShellLineEligible(
     markdownView.isOperationalBlockQuotedLine(lineIndex);
   return (
     (source === visible || operationalBlockQuote) &&
+    !markdownView.isNonOperationalExampleLine(lineIndex) &&
     (!markdownView.isBlockQuotedLine(lineIndex) || operationalBlockQuote) &&
     !isPolicyLine(visible) &&
     !isShellCommentLine(visible, lineIndex, markdownView)

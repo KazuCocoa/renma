@@ -103,6 +103,7 @@ export class MarkdownSecurityView {
   private readonly thematicBreaks: MarkdownSourceRange[];
   private readonly blockQuoteLines = new Set<number>();
   private readonly operationalBlockQuoteLines = new Set<number>();
+  private readonly nonOperationalExampleLines = new Set<number>();
   private readonly codeBlockLines = new Set<number>();
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
@@ -205,7 +206,7 @@ export class MarkdownSecurityView {
       ...htmlCandidates,
       ...codeBlocks,
     ]
-      .filter((candidate) => candidate.operational)
+      .flatMap((candidate) => this.operationalCandidateSegments(candidate))
       .sort((left, right) => left.unit.startLine - right.unit.startLine);
     this.semanticUnits = semanticCandidates.map((candidate) => candidate.unit);
     for (const candidate of semanticCandidates) {
@@ -231,6 +232,10 @@ export class MarkdownSecurityView {
 
   isOperationalBlockQuotedLine(lineIndex: number): boolean {
     return this.operationalBlockQuoteLines.has(lineIndex);
+  }
+
+  isNonOperationalExampleLine(lineIndex: number): boolean {
+    return this.nonOperationalExampleLines.has(lineIndex);
   }
 
   instructionLine(lineIndex: number): string {
@@ -382,6 +387,10 @@ export class MarkdownSecurityView {
     record: NodeRecord & { node: Paragraph },
   ): SemanticCandidate {
     const range = sourceRange(record.node, this.bodyStartLine);
+    const nonOperationalExample = this.classifyNonOperationalExampleLines(
+      record,
+      range,
+    );
     const lines = this.visibleLines
       .slice(range.startLine - 1, range.endLine)
       .map((line) => line.trim());
@@ -398,7 +407,7 @@ export class MarkdownSecurityView {
       operational:
         (!blockQuoted || operationalBlockQuote) &&
         !lines.every((line) => /^\s*\/\//.test(line)) &&
-        !this.isNonOperationalExample(record, range.startLine),
+        !nonOperationalExample,
     };
   }
 
@@ -415,6 +424,10 @@ export class MarkdownSecurityView {
       startLine: block.startLine,
       endLine: block.endLine,
     };
+    const nonOperationalExample = this.classifyNonOperationalExampleLines(
+      record,
+      range,
+    );
     const fenced = block.kind === "fenced";
     const contentStartLine = block.contentStartLine;
     const contentEndLine = block.contentEndLine;
@@ -443,7 +456,7 @@ export class MarkdownSecurityView {
         fenced &&
         semanticLanguage &&
         (!blockQuoted || operationalBlockQuote) &&
-        !this.isNonOperationalExample(record, range.startLine) &&
+        !nonOperationalExample &&
         this.isOperationalFence(record, range.startLine),
     };
   }
@@ -464,8 +477,16 @@ export class MarkdownSecurityView {
     const flush = (): void => {
       if (runStart < 0 || runLines.length === 0) return;
       const startLine = range.startLine + runStart;
+      const candidateRange = {
+        startLine,
+        endLine: startLine + runLines.length - 1,
+      };
       const lines = runLines.map((line) => line.trim());
       if (lines.join(" ").trim().length > 0) {
+        const nonOperationalExample = this.classifyNonOperationalExampleLines(
+          record,
+          candidateRange,
+        );
         const blockQuoted = record.ancestors.some(
           (ancestor) => ancestor.type === "blockquote",
         );
@@ -480,13 +501,12 @@ export class MarkdownSecurityView {
         candidates.push({
           unit: {
             kind: "paragraph",
-            startLine,
-            endLine: startLine + lines.length - 1,
+            ...candidateRange,
             lines,
           },
           operational:
             (!blockQuoted || operationalBlockQuote) &&
-            !this.isNonOperationalExample(record, startLine) &&
+            !nonOperationalExample &&
             !lines.every((line) => /^\s*\/\//.test(line)),
           htmlDerived: true,
         });
@@ -547,15 +567,90 @@ export class MarkdownSecurityView {
   }
 
   private isNonOperationalExample(record: NodeRecord, line: number): boolean {
-    if (EXAMPLE_BOUNDARY_RE.test(nodeText(record.node))) return true;
+    const range = sourceRange(record.node, this.bodyStartLine);
+    return this.classifyNonOperationalExampleLines(record, range, line);
+  }
+
+  private classifyNonOperationalExampleLines(
+    record: NodeRecord,
+    range: MarkdownSourceRange,
+    line = range.startLine,
+  ): boolean {
     const container = this.routedContainerRecord(record);
     const previous = container.parent.children[container.index - 1];
-    if (previous !== undefined && EXAMPLE_LABEL_RE.test(nodeText(previous))) {
+    const structuralBoundary =
+      (previous !== undefined && EXAMPLE_LABEL_RE.test(nodeText(previous))) ||
+      this.headingChainAt(line).some((heading) =>
+        EXAMPLE_BOUNDARY_RE.test(heading.text),
+      );
+    const lineIndexes = Array.from(
+      { length: Math.max(0, range.endLine - range.startLine + 1) },
+      (_, index) => range.startLine - 1 + index,
+    );
+    if (structuralBoundary) {
+      for (const lineIndex of lineIndexes) {
+        this.nonOperationalExampleLines.add(lineIndex);
+      }
       return true;
     }
-    return this.headingChainAt(line).some((heading) =>
-      EXAMPLE_BOUNDARY_RE.test(heading.text),
+
+    const markerOffset = lineIndexes.findIndex((lineIndex) =>
+      EXAMPLE_BOUNDARY_RE.test(this.visibleLine(lineIndex)),
     );
+    if (markerOffset >= 0) {
+      for (const lineIndex of lineIndexes.slice(markerOffset)) {
+        this.nonOperationalExampleLines.add(lineIndex);
+      }
+    }
+    const contentLineIndexes = lineIndexes.filter((lineIndex) =>
+      Boolean(this.visibleLine(lineIndex).trim()),
+    );
+    return (
+      contentLineIndexes.length > 0 &&
+      contentLineIndexes.every((lineIndex) =>
+        this.nonOperationalExampleLines.has(lineIndex),
+      )
+    );
+  }
+
+  private operationalCandidateSegments(
+    candidate: SemanticCandidate,
+  ): SemanticCandidate[] {
+    if (!candidate.operational) return [];
+    if (candidate.unit.kind !== "paragraph") return [candidate];
+    const { unit } = candidate;
+    if (
+      !unit.lines.some((_, index) =>
+        this.nonOperationalExampleLines.has(unit.startLine - 1 + index),
+      )
+    ) {
+      return [candidate];
+    }
+
+    const segments: SemanticCandidate[] = [];
+    let runStart = -1;
+    const flush = (exclusiveEnd: number): void => {
+      if (runStart < 0) return;
+      segments.push({
+        ...candidate,
+        unit: {
+          kind: "paragraph",
+          startLine: unit.startLine + runStart,
+          endLine: unit.startLine + exclusiveEnd - 1,
+          lines: unit.lines.slice(runStart, exclusiveEnd),
+        },
+      });
+      runStart = -1;
+    };
+    for (const [index] of unit.lines.entries()) {
+      if (this.nonOperationalExampleLines.has(unit.startLine - 1 + index)) {
+        flush(index);
+      } else if (runStart < 0) {
+        runStart = index;
+      }
+    }
+    flush(unit.lines.length);
+    return segments;
   }
 
   private routedContainerRecord(record: NodeRecord): NodeRecord {

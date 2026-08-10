@@ -764,11 +764,14 @@ or other security-sensitive instruction emits
 underlying matched diagnostic identity in `details`. Ordinary explanatory,
 metadata, formatting, and documentation comments remain inert. The finding is
 suppressible only through the existing finding-ID plus repository-path
-suppression contract. Negative-example wording masks only its own
-punctuation-bounded clause in this raw-comment projection; it does not exempt an
-independent clause or line elsewhere in the comment. This comment projection is
-separate from the raw hidden-Unicode pass, which continues to inspect every
-discovered UTF-8 text artifact before Markdown filtering.
+suppression contract. The raw-comment projection reuses the visible-Markdown
+structural example classification: a same-node marker, a preceding negative-
+example label, or a negative-example heading can bound its example payload.
+That classification does not exempt a later independent workflow instruction,
+and a trailing label cannot hide an earlier instruction. Direct prohibitions
+remain defensive and inert. This comment projection is separate from the raw
+hidden-Unicode pass, which continues to inspect every discovered UTF-8 text
+artifact before Markdown filtering.
 
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding

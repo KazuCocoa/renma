@@ -809,11 +809,14 @@ comment in an isolated raw-agent-visible projection and reports the exact
 source span plus the underlying bounded diagnostic identity. Formatting notes,
 metadata markers, and explanatory documentation comments do not trigger unless
 they independently contain recognized security-sensitive operational evidence.
-A negative-example label exempts only the punctuation-bounded clause containing
-that label; an earlier or later operational clause in the same comment remains
-eligible. Use the existing narrow finding-ID and path-scoped suppression only
-for a reviewed intentional case. Raw hidden-Unicode inspection is independent
-and still includes comments.
+The isolated projection uses the same structural negative-example boundaries as
+visible Markdown. A marker in the same node, a preceding `Unsafe example:` or
+`Negative example:` label, or a negative-example heading can make its bounded
+payload inert. The boundary does not extend to a later independent workflow
+instruction, and a trailing label cannot hide an earlier instruction. Use the
+existing narrow finding-ID and path-scoped suppression only for a reviewed
+intentional case. Raw hidden-Unicode inspection is independent and still
+includes comments.
 
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
 circumvent security checks, weaken policy to pass diagnostics, suppress

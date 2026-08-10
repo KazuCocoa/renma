@@ -237,6 +237,46 @@ test("shell collector skips heredoc, multiline literal, and continued data regio
   );
 });
 
+test("shell collector ignores arithmetic shifts and resumes with later commands", () => {
+  const content = [
+    "mask=$((1 << 2))",
+    "((mask <<= 1))",
+    "multiline=$((",
+    "1 << ./arithmetic-data.sh",
+    "))",
+    "./real-worker.sh",
+    "source ./real-lib.sh",
+    "cat <<'EOF'",
+    "./heredoc-only.sh",
+    "EOF",
+  ].join("\n");
+
+  const candidates = SHELL_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/check.sh",
+    content,
+  });
+
+  assert.deepEqual(
+    candidates.map((candidate) => ({
+      line: candidate.line,
+      rawSpecifier: candidate.rawSpecifier,
+      relation: candidate.relation,
+    })),
+    [
+      {
+        line: 6,
+        rawSpecifier: "./real-worker.sh",
+        relation: "static-execution",
+      },
+      {
+        line: 7,
+        rawSpecifier: "./real-lib.sh",
+        relation: "static-source",
+      },
+    ],
+  );
+});
+
 test("an unsupported dynamic heredoc delimiter fails closed for later topology", () => {
   for (const content of [
     "cat <<$DELIMITER\n./not-a-command.sh\n$DELIMITER\n./later.sh\n",
@@ -640,6 +680,8 @@ test("shell dependency evidence propagates through graph reachability and semant
     path.join(root, "tools", "entry.sh"),
     [
       "#!/bin/sh",
+      "mask=$((1 << 2))",
+      "((mask <<= 1))",
       "source ./lib.sh",
       '. "./lib.sh"',
       "bash ./worker.sh",

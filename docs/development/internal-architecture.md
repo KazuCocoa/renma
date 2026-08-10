@@ -535,8 +535,11 @@ PATH resolution, absolute or external targets, general control flow, and other
 shell semantics are excluded. A small lexical state machine suppresses lines
 inside recognized heredoc bodies, multiline quoted literal regions, and
 backslash-continued physical lines. Unsupported or dynamic heredoc delimiters
-fail closed for the remainder of that source. Repository escape remains
-`unsafe` evidence and never becomes topology.
+fail closed for the remainder of that source. Obvious `$(( ... ))` and
+`(( ... ))` arithmetic regions have separate bounded state, preventing `<<` or
+`>>` shifts from being interpreted as heredoc syntax or from hiding a later
+supported dependency. Repository escape remains `unsafe` evidence and never
+becomes topology.
 
 `src/helper-command-evidence.ts` owns the bounded helper grammar shared by
 repository path candidate collection, existing path diagnostics, and the

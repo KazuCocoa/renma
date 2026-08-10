@@ -253,6 +253,51 @@ test("a shell path present only in heredoc data is absent from the execution con
   );
 });
 
+test("arithmetic shifts do not hide later shell execution-contract dependencies", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-arithmetic-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    body: ["# Demo", "", "```bash", "bash tools/entry.sh", "```"].join("\n"),
+  });
+  await fixture.write(
+    "tools/entry.sh",
+    [
+      "#!/bin/sh",
+      "mask=$((1 << 2))",
+      "((mask <<= 1))",
+      "source ./real-worker.sh",
+      "",
+    ].join("\n"),
+  );
+  await fixture.write("tools/real-worker.sh", "#!/bin/sh\nexit 0\n");
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  assert.ok(
+    snapshot.executableSurfaceInventory.dependencies.some(
+      (dependency) =>
+        dependency.relation === "static-source" &&
+        dependency.normalizedTarget === "tools/real-worker.sh",
+    ),
+  );
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.demo",
+  });
+  const relationship = report.executableEvidence.relationships.find(
+    (candidate) => candidate.to.sourcePath === "tools/real-worker.sh",
+  );
+  assert.equal(relationship?.relationship, "invokes");
+  assert.equal(relationship?.reachability, "transitive");
+  assert.equal(relationship?.minimumTargetDepth, 2);
+  assert.equal(
+    formatExecutionContractJson(report).includes("tools/real-worker.sh"),
+    true,
+  );
+});
+
 test("execution contract accepts an exact SKILL.md path and omits absent revision provenance", async (t) => {
   const fixture = await RepositoryFixture.create({
     prefix: "renma-execution-contract-path-",
