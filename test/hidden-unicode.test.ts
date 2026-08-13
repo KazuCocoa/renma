@@ -20,6 +20,11 @@ const ZWSP = String.fromCodePoint(0x200b);
 const ZWNJ = String.fromCodePoint(0x200c);
 const ZWJ = String.fromCodePoint(0x200d);
 const BOM = String.fromCodePoint(0xfeff);
+const MONGOLIAN_FVS1 = String.fromCodePoint(0x180b);
+const MONGOLIAN_FVS4 = String.fromCodePoint(0x180f);
+const MONGOLIAN_VOWEL_SEPARATOR = String.fromCodePoint(0x180e);
+const VS16 = String.fromCodePoint(0xfe0f);
+const VS17 = String.fromCodePoint(0xe0100);
 const PROPERTY_PARAMETERS = { seed: 0x260730, numRuns: 80 };
 
 test("detects bidi controls in prose, fenced commands, and frontmatter", () => {
@@ -207,6 +212,214 @@ test("reports ZWJ and ZWNJ only inside an ASCII-like token", () => {
   assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
 });
 
+test("detects an encoded-looking sequence of consecutive variation selectors", () => {
+  const hiddenPayload = String.fromCodePoint(
+    0xfe00,
+    0xfe03,
+    0xfe07,
+    0xfe0b,
+    0xfe02,
+    0xfe0f,
+  );
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`# Review\ncarrier${hiddenPayload}\n`),
+  );
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.equal(finding.evidence.startLine, 2);
+  assert.equal(finding.details?.totalCount, 6);
+  assert.match(
+    finding.evidence.snippet,
+    /carrier<U\+FE00 VARIATION SELECTOR-1>/u,
+  );
+  assert.match(finding.evidence.snippet, /<U\+FE0F VARIATION SELECTOR-16>/u);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 1,
+    longestSequenceLength: 6,
+    reportedRanges: [
+      {
+        name: "Variation Selectors",
+        startCodePoint: "U+FE00",
+        endCodePoint: "U+FE0F",
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(finding).includes(hiddenPayload), false);
+});
+
+test("detects exactly two consecutive variation selectors at the minimum boundary", () => {
+  const selectorPair = String.fromCodePoint(0xfe00, 0xfe01);
+  const [finding] = hiddenUnicodeFindings(artifact(`carrier${selectorPair}`));
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.equal(finding.details?.totalCount, 2);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 1,
+    longestSequenceLength: 2,
+    reportedRanges: [
+      {
+        name: "Variation Selectors",
+        startCodePoint: "U+FE00",
+        endCodePoint: "U+FE0F",
+      },
+    ],
+  });
+});
+
+test("aggregates multiple suspicious variation selector runs on one line", () => {
+  const firstRun = String.fromCodePoint(0xfe02, 0xfe03);
+  const secondRun = String.fromCodePoint(0xe0100, 0xe0101);
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`${firstRun} visible-text ${secondRun}`),
+  );
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.equal(finding.details?.totalCount, 4);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 2,
+    longestSequenceLength: 2,
+    reportedRanges: [
+      {
+        name: "Variation Selectors",
+        startCodePoint: "U+FE00",
+        endCodePoint: "U+FE0F",
+      },
+      {
+        name: "Variation Selectors Supplement",
+        startCodePoint: "U+E0100",
+        endCodePoint: "U+E01EF",
+      },
+    ],
+  });
+  assert.match(finding.evidence.snippet, /visible-text/u);
+  assert.match(finding.evidence.snippet, /U\+FE02/u);
+  assert.match(finding.evidence.snippet, /U\+E0101/u);
+});
+
+test("detects consecutive supplementary variation selectors with exact evidence", () => {
+  const supplementarySequence = String.fromCodePoint(0xe0100, 0xe0101, 0xe01ef);
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`variant: 葛${supplementarySequence}`),
+  );
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.deepEqual(finding.details?.characters, [
+    { codePoint: "U+E0100", name: "VARIATION SELECTOR-17", count: 1 },
+    { codePoint: "U+E0101", name: "VARIATION SELECTOR-18", count: 1 },
+    { codePoint: "U+E01EF", name: "VARIATION SELECTOR-256", count: 1 },
+  ]);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 1,
+    longestSequenceLength: 3,
+    reportedRanges: [
+      {
+        name: "Variation Selectors Supplement",
+        startCodePoint: "U+E0100",
+        endCodePoint: "U+E01EF",
+      },
+    ],
+  });
+  assert.match(finding.evidence.snippet, /U\+E01EF VARIATION SELECTOR-256/u);
+});
+
+test("allows ordinary emoji presentation and isolated variation selectors", () => {
+  const ideographicVariation = `葛${VS17}`;
+  const isolatedTextVariation = `A${String.fromCodePoint(0xfe00)}`;
+  const legitimate = [
+    `©${VS16} ✈${VS16} ❤${VS16} ☀${VS16}`,
+    ideographicVariation,
+    isolatedTextVariation,
+  ].join("\n");
+
+  assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
+});
+
+test("allows isolated Mongolian FVS usage and reports selector-only runs", () => {
+  assert.deepEqual(hiddenUnicodeFindings(artifact(`ᠠ${MONGOLIAN_FVS4}`)), []);
+
+  const selectorRun = `${MONGOLIAN_FVS1}${MONGOLIAN_FVS4}`;
+  const [finding] = hiddenUnicodeFindings(artifact(`ᠠ${selectorRun}`));
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.deepEqual(finding.details?.characters, [
+    {
+      codePoint: "U+180B",
+      name: "MONGOLIAN FREE VARIATION SELECTOR ONE",
+      count: 1,
+    },
+    {
+      codePoint: "U+180F",
+      name: "MONGOLIAN FREE VARIATION SELECTOR FOUR",
+      count: 1,
+    },
+  ]);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 1,
+    longestSequenceLength: 2,
+    reportedRanges: [
+      {
+        name: "Mongolian Free Variation Selectors",
+        startCodePoint: "U+180B",
+        endCodePoint: "U+180D",
+      },
+      {
+        name: "Mongolian Free Variation Selectors",
+        startCodePoint: "U+180F",
+        endCodePoint: "U+180F",
+      },
+    ],
+  });
+  assert.match(
+    finding.evidence.snippet,
+    /U\+180B MONGOLIAN FREE VARIATION SELECTOR ONE/u,
+  );
+  assert.match(
+    finding.evidence.snippet,
+    /U\+180F MONGOLIAN FREE VARIATION SELECTOR FOUR/u,
+  );
+  assert.equal(JSON.stringify(finding).includes(selectorRun), false);
+});
+
+test("allows legitimate Mongolian text containing an isolated vowel separator", () => {
+  const legitimate = `ᠮᠣᠩᠭᠣᠯ${MONGOLIAN_VOWEL_SEPARATOR}ᠠ`;
+
+  assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
+});
+
+test("variation selector analysis runs on original text before Markdown visibility filtering", () => {
+  const hiddenPayload = String.fromCodePoint(0xfe01, 0xe0100, 0xfe0a);
+  const findings = securityDiagnosticFindings([
+    artifact(`# Visible\n\n<!-- raw payload: ${hiddenPayload} -->\n`),
+  ]);
+  const variationFinding = findings.find(({ id }) => id === INVISIBLE_ID);
+
+  assert.ok(variationFinding);
+  assert.equal(variationFinding.evidence.startLine, 3);
+  assert.match(variationFinding.evidence.snippet, /U\+FE01/u);
+  assert.match(variationFinding.evidence.snippet, /U\+E0100/u);
+  assert.equal(
+    findings.some(
+      ({ id }) => id === DIAGNOSTIC_IDS.SEC_HIDDEN_OPERATIONAL_INSTRUCTION,
+    ),
+    false,
+  );
+});
+
 test("scans raw text scripts, config artifacts, and assets but excludes binary", () => {
   const inputs = [
     artifact(`ec${ZWSP}ho safe`, {
@@ -370,7 +583,6 @@ test("always-detected code points and safe multilingual text obey bounded proper
     ...codePointRange(0x007f, 0x009f),
     0x00ad,
     0x034f,
-    0x180e,
     0x200b,
     0x2060,
     ...codePointRange(0x206a, 0x206f),

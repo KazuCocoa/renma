@@ -56,23 +56,35 @@ repository discovery.
 `suspicious`) covers `U+202A`–`U+202E` and `U+2066`–`U+2069`.
 `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` (`medium` severity, `high` confidence,
 `suspicious`) covers `U+0000`–`U+0008`, `U+000B`–`U+000C`,
-`U+000E`–`U+001F`, `U+007F`–`U+009F`, `U+00AD`, `U+034F`, `U+180E`,
-`U+200B`, `U+2060`, `U+206A`–`U+206F`, `U+FFF9`–`U+FFFB`, and
+`U+000E`–`U+001F`, `U+007F`–`U+009F`, `U+00AD`, `U+034F`, `U+200B`,
+`U+2060`, `U+206A`–`U+206F`, `U+FFF9`–`U+FFFB`, and
 `U+E0000`–`U+E007F`. One leading `U+FEFF` is allowed; it is reported anywhere
 else. `U+200C` and `U+200D` are reported only with immediate ASCII-like token
 characters on both sides: letters, digits, `_`, `-`, `.`, `/`, `:`, `@`, `%`,
-`+`, or `=`.
+`+`, or `=`. Mongolian Free Variation Selectors `U+180B`–`U+180D` and `U+180F`,
+Variation Selectors `U+FE00`–`U+FE0F`, and Variation Selectors Supplement
+`U+E0100`–`U+E01EF` are reported only in consecutive runs of two or more
+selectors. `U+180E` is MONGOLIAN VOWEL SEPARATOR, not a Variation Selector, and
+is not reported merely because it appears in legitimate Mongolian text.
+Evidence escapes each selector and structured details identify the
+consecutive-run heuristic, run sizes, and represented ranges.
 
 This is not a general non-ASCII check. Renma does not report Japanese or other
-multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, emoji
-variation selectors or ordinary ZWJ sequences, combining marks in general,
-non-breaking spaces, narrow non-breaking spaces, ideographic spaces, full-width
-characters, Unicode normalization differences, or confusable characters solely
-because they exist. Inspect the escaped code point and change only the
-suspicious character while preserving legitimate multilingual content.
-Intentional cases use the existing narrowly path-scoped suppression with a
-documented reason, and intentional bidirectional formatting requires human
-confirmation.
+multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, isolated
+Mongolian, emoji/text-presentation, or ideographic Variation Selectors, ordinary
+ZWJ sequences, combining marks in general, non-breaking spaces, narrow
+non-breaking spaces, ideographic spaces, full-width characters, Unicode
+normalization differences, or confusable characters solely because they exist.
+Selectors separated by base characters are not reported solely because they
+repeat or make a line selector-heavy; this preserves legitimate multilingual
+Unicode content while leaving non-consecutive encoding forms outside current
+coverage. The selector list is intentionally not exhaustive: future candidates
+require deterministic, high-signal composition or context evidence rather than
+Unicode-property membership alone. Inspect the escaped code point and change
+only the suspicious character while preserving legitimate multilingual
+content. Intentional cases use the existing narrowly path-scoped suppression
+with a documented reason, and intentional bidirectional formatting requires
+human confirmation.
 
 Specialized scanners can complement this bounded policy and instruction
 analysis without becoming Renma dependencies or Renma findings. Renma does not
@@ -1076,7 +1088,7 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | --- | --- | --- | --- |
 | `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` | A canonical Skill routing example contains a concrete high-risk literal.                                                            | Replace it with semantic capability and selection wording, or move necessary exact evidence to a clearly non-operational body section. Do not automatically rewrite owner-authored prose.                                                                                                                                                                                  | Canonical Skill `description`              |
 | `SEC-SUSPICIOUS-BIDI-CONTROL`             | Original source contains a bidi formatting control that can change displayed order.                                                  | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional.                                                                                                                                                                                                                                                  | Any discovered UTF-8 text artifact         |
-| `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, or ASCII-token-internal ZWJ/ZWNJ.              | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
+| `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, ASCII-token-internal ZWJ/ZWNJ, or consecutive Variation Selector run. | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
 | `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`      | A raw HTML comment contains a bounded recognized security-sensitive operational instruction even though rendered Markdown hides it. | Remove the hidden instruction, or move intentional agent-facing guidance into visible Markdown with applicable policy and safeguards.                                                                                                                                                                                                                                       | Agent-facing Markdown body                 |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding.                                                        | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value.                                                                                                                                                                                                                                                    | Skill metadata                             |
 | `SEC-MISSING-POLICY-METADATA`             | Sensitive instructions lack a declared policy.                                                                                       | Add local policy fields or select a configured security profile using the syntax for that asset kind.                                                                                                                                                                                                                                                                       | Metadata                                   |

@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed a hidden-Unicode detection gap for suspicious consecutive runs of
+  Mongolian Free Variation Selectors (`U+180B`–`U+180D`, `U+180F`), Variation
+  Selectors (`U+FE00`–`U+FE0F`), and Variation Selectors Supplement
+  (`U+E0100`–`U+E01EF`). The existing
+  `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` diagnostic now includes escaped
+  code-point and range/run evidence while isolated legitimate selectors remain
+  allowed. `U+180E` MONGOLIAN VOWEL SEPARATOR is also no longer reported solely
+  for appearing in legitimate Mongolian text.
+
 ## [0.32.0] - 2026-08-10
 
 ### Added
