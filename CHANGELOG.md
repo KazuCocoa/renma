@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Fixed false-positive-prone Unicode tag handling by allowing the three exact
+  RGI subdivision flag sequences for England, Scotland, and Wales. Standalone,
+  malformed, token-embedded, missing-terminator, non-RGI, and encoded-looking
+  tag usage remains covered by `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`, with every
+  tag code point escaped in reported evidence.
 - Fixed a hidden-Unicode detection gap for suspicious consecutive runs of
   Mongolian Free Variation Selectors (`U+180B`–`U+180D`, `U+180F`), Variation
   Selectors (`U+FE00`–`U+FE0F`), and Variation Selectors Supplement

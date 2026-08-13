@@ -775,8 +775,7 @@ and `suspicious` risk class. It always reports:
   `U+007F`–`U+009F`;
 - `U+00AD`, `U+034F`, `U+200B`, and `U+2060`;
 - deprecated directional formatting controls `U+206A`–`U+206F`;
-- interlinear annotation controls `U+FFF9`–`U+FFFB`; and
-- Unicode tag characters `U+E0000`–`U+E007F`.
+- interlinear annotation controls `U+FFF9`–`U+FFFB`.
 
 A single `U+FEFF` is allowed only at the beginning of the file; every other
 occurrence is reported. `U+200C` ZERO WIDTH NON-JOINER and `U+200D` ZERO WIDTH
@@ -801,6 +800,18 @@ minimum run length, sequence count, longest run, and exact represented ranges
 on that line. Consecutive selector-only runs are high-signal encoded-looking
 hidden text because ordinary presentation, ideographic variation, and Mongolian
 variation attach one selector to a base character.
+
+Unicode tag characters `U+E0000`–`U+E007F` use a separate bounded emoji
+sequence rule. Renma allows the three exact RGI subdivision flag sequences from
+the reviewed Unicode Emoji data: `U+1F3F4` BLACK FLAG, followed by the tag
+encoding of `gbeng`, `gbsct`, or `gbwls`, and terminated by `U+E007F` CANCEL
+TAG. An otherwise valid sequence embedded between ASCII-like token characters
+is still reported. Renma also continues to report standalone tags, tag runs
+without the black-flag base, missing terminators, non-RGI or non-permitted
+payloads, and all other malformed or encoded-looking tag usage. Evidence names
+and escapes every tag code point on a reported line rather than emitting the
+invisible payload. This is an exact structural exception, not general emoji or
+CLDR subdivision validation.
 
 The detector is not a general non-ASCII, normalization, or confusable-character
 rule. Japanese and other multilingual text, ordinary RTL text, `U+200E`,

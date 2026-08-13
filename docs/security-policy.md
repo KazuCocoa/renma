@@ -57,17 +57,26 @@ repository discovery.
 `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` (`medium` severity, `high` confidence,
 `suspicious`) covers `U+0000`–`U+0008`, `U+000B`–`U+000C`,
 `U+000E`–`U+001F`, `U+007F`–`U+009F`, `U+00AD`, `U+034F`, `U+200B`,
-`U+2060`, `U+206A`–`U+206F`, `U+FFF9`–`U+FFFB`, and
-`U+E0000`–`U+E007F`. One leading `U+FEFF` is allowed; it is reported anywhere
-else. `U+200C` and `U+200D` are reported only with immediate ASCII-like token
-characters on both sides: letters, digits, `_`, `-`, `.`, `/`, `:`, `@`, `%`,
-`+`, or `=`. Mongolian Free Variation Selectors `U+180B`–`U+180D` and `U+180F`,
-Variation Selectors `U+FE00`–`U+FE0F`, and Variation Selectors Supplement
-`U+E0100`–`U+E01EF` are reported only in consecutive runs of two or more
-selectors. `U+180E` is MONGOLIAN VOWEL SEPARATOR, not a Variation Selector, and
-is not reported merely because it appears in legitimate Mongolian text.
-Evidence escapes each selector and structured details identify the
-consecutive-run heuristic, run sizes, and represented ranges.
+`U+2060`, `U+206A`–`U+206F`, and `U+FFF9`–`U+FFFB`. One leading `U+FEFF` is
+allowed; it is reported anywhere else. `U+200C` and `U+200D` are reported only
+with immediate ASCII-like token characters on both sides: letters, digits, `_`,
+`-`, `.`, `/`, `:`, `@`, `%`, `+`, or `=`. Mongolian Free Variation Selectors
+`U+180B`–`U+180D` and `U+180F`, Variation Selectors `U+FE00`–`U+FE0F`, and
+Variation Selectors Supplement `U+E0100`–`U+E01EF` are reported only in
+consecutive runs of two or more selectors. `U+180E` is MONGOLIAN VOWEL
+SEPARATOR, not a Variation Selector, and is not reported merely because it
+appears in legitimate Mongolian text. Evidence escapes each selector and
+structured details identify the consecutive-run heuristic, run sizes, and
+represented ranges.
+
+Tag characters `U+E0000`–`U+E007F` are reported unless they belong to one of
+the three exact RGI subdivision flag sequences: `U+1F3F4` BLACK FLAG, the tag
+encoding of `gbeng`, `gbsct`, or `gbwls`, then `U+E007F` CANCEL TAG. A sequence
+embedded between ASCII-like token characters is not exempt. Standalone tags,
+encoded-looking runs, absent or incorrect bases, missing terminators, and
+non-RGI or non-permitted payloads remain suspicious. Renma uses this bounded
+structural exception instead of general emoji or CLDR interpretation, and
+reported evidence escapes all tag code points on the affected line.
 
 This is not a general non-ASCII check. Renma does not report Japanese or other
 multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, isolated

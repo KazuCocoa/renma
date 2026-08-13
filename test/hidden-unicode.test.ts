@@ -25,6 +25,7 @@ const MONGOLIAN_FVS4 = String.fromCodePoint(0x180f);
 const MONGOLIAN_VOWEL_SEPARATOR = String.fromCodePoint(0x180e);
 const VS16 = String.fromCodePoint(0xfe0f);
 const VS17 = String.fromCodePoint(0xe0100);
+const RGI_EMOJI_TAG_PAYLOADS = ["gbeng", "gbsct", "gbwls"] as const;
 const PROPERTY_PARAMETERS = { seed: 0x260730, numRuns: 80 };
 
 test("detects bidi controls in prose, fenced commands, and frontmatter", () => {
@@ -85,6 +86,95 @@ test("detects conservative invisible character ranges and non-leading BOM", () =
     findings[3]?.evidence.snippet ?? "",
     /U\+E0061 TAG LATIN SMALL LETTER A/,
   );
+});
+
+test("allows exact RGI subdivision flag emoji tag sequences", () => {
+  for (const payload of RGI_EMOJI_TAG_PAYLOADS) {
+    const sequence = emojiTagSequence(payload);
+    assert.deepEqual(
+      hiddenUnicodeFindings(artifact(`Subdivision flag: ${sequence}.`)),
+      [],
+    );
+  }
+});
+
+test("reports standalone and encoded-looking tag characters with escaped evidence", () => {
+  const standalone = tagPayload("a");
+  const encodedRun = tagPayload("hidden");
+  const findings = hiddenUnicodeFindings(
+    artifact(`standalone:${standalone}\nencoded:${encodedRun}`),
+  );
+
+  assert.deepEqual(
+    findings.map(({ id, evidence, details }) => ({
+      id,
+      line: evidence.startLine,
+      totalCount: details?.totalCount,
+    })),
+    [
+      { id: INVISIBLE_ID, line: 1, totalCount: 1 },
+      { id: INVISIBLE_ID, line: 2, totalCount: 6 },
+    ],
+  );
+  assert.match(
+    findings[0]?.evidence.snippet ?? "",
+    /U\+E0061 TAG LATIN SMALL LETTER A/u,
+  );
+  assert.match(
+    findings[1]?.evidence.snippet ?? "",
+    /U\+E0068 TAG LATIN SMALL LETTER H/u,
+  );
+  assert.equal(JSON.stringify(findings).includes(standalone), false);
+  assert.equal(JSON.stringify(findings).includes(encodedRun), false);
+  for (const { evidence } of findings) {
+    assertCompleteEscapedMarkers(evidence.snippet);
+  }
+});
+
+test("reports a black-flag tag sequence missing its cancel-tag terminator", () => {
+  const malformed = emojiTagSequence("gbeng", { terminated: false });
+  const [finding] = hiddenUnicodeFindings(artifact(`flag:${malformed}`));
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.equal(finding.details?.totalCount, 5);
+  assert.match(finding.evidence.snippet, /U\+E0067 TAG LATIN SMALL LETTER G/u);
+  assert.match(finding.evidence.snippet, /U\+E006E TAG LATIN SMALL LETTER N/u);
+  assert.equal(JSON.stringify(finding).includes(tagPayload("gbeng")), false);
+});
+
+test("reports invalid tag payloads even with the black-flag base and terminator", () => {
+  const nonRgiSubdivision = emojiTagSequence("gbzzz");
+  const nonPermittedPayload = emojiTagSequence("gb-sct");
+
+  for (const content of [nonRgiSubdivision, nonPermittedPayload]) {
+    const [finding] = hiddenUnicodeFindings(artifact(`flag:${content}`));
+    assert.ok(finding);
+    assert.equal(finding.id, INVISIBLE_ID);
+    assert.ok((finding.details?.totalCount as number) >= 6);
+    assert.match(finding.evidence.snippet, /U\+E007F CANCEL TAG/u);
+    assert.equal(JSON.stringify(finding).includes(content.slice(2)), false);
+  }
+
+  const [punctuationFinding] = hiddenUnicodeFindings(
+    artifact(nonPermittedPayload),
+  );
+  assert.match(
+    punctuationFinding?.evidence.snippet ?? "",
+    /U\+E002D TAG HYPHEN-MINUS/u,
+  );
+});
+
+test("reports an otherwise valid tag sequence embedded inside an ASCII-like token", () => {
+  const sequence = emojiTagSequence("gbeng");
+  const [finding] = hiddenUnicodeFindings(artifact(`prefix${sequence}suffix`));
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.equal(finding.details?.totalCount, 6);
+  assert.match(finding.evidence.snippet, /prefix🏴<U\+E0067/u);
+  assert.match(finding.evidence.snippet, /U\+E007F CANCEL TAG>suffix/u);
+  assert.equal(JSON.stringify(finding).includes(sequence.slice(2)), false);
 });
 
 test("allows exactly one BOM at the beginning of a text artifact", () => {
@@ -572,7 +662,7 @@ test("scan covers an explicitly discovered text configuration file", async () =>
   assert.equal(findings[0]?.id, INVISIBLE_ID);
 });
 
-test("always-detected code points and safe multilingual text obey bounded properties", () => {
+test("always-detected code points, standalone tags, and safe multilingual text obey bounded properties", () => {
   const alwaysDetected: Array<{
     codePoint: number;
     id: typeof BIDI_ID | typeof INVISIBLE_ID;
@@ -587,7 +677,6 @@ test("always-detected code points and safe multilingual text obey bounded proper
     0x2060,
     ...codePointRange(0x206a, 0x206f),
     ...codePointRange(0xfff9, 0xfffb),
-    ...codePointRange(0xe0000, 0xe007f),
   ].map((codePoint) => ({ codePoint, id: INVISIBLE_ID }));
   alwaysDetected.push(
     ...[
@@ -603,6 +692,22 @@ test("always-detected code points and safe multilingual text obey bounded proper
     .array(fc.constantFrom(...safeCharacters), { maxLength: 120 })
     .map((characters) => characters.join(""));
 
+  fc.assert(
+    fc.property(
+      fc.constantFrom(...codePointRange(0xe0000, 0xe007f)),
+      safeText,
+      safeText,
+      (codePoint, prefix, suffix) => {
+        const content = `${prefix}${String.fromCodePoint(codePoint)}${suffix}`;
+        assert.ok(
+          hiddenUnicodeFindings(artifact(content)).some(
+            (finding) => finding.id === INVISIBLE_ID,
+          ),
+        );
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
   fc.assert(
     fc.property(
       fc.constantFrom(...alwaysDetected),
@@ -638,6 +743,23 @@ function hiddenFindings(findings: Finding[]): Finding[] {
 
 function codePointRange(start: number, end: number): number[] {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function emojiTagSequence(
+  payload: string,
+  options: { terminated?: boolean } = {},
+): string {
+  return String.fromCodePoint(
+    0x1f3f4,
+    ...[...payload].map((character) => 0xe0000 + character.charCodeAt(0)),
+    ...(options.terminated === false ? [] : [0xe007f]),
+  );
+}
+
+function tagPayload(payload: string): string {
+  return String.fromCodePoint(
+    ...[...payload].map((character) => 0xe0000 + character.charCodeAt(0)),
+  );
 }
 
 function assertCompleteEscapedMarkers(snippet: string): void {
