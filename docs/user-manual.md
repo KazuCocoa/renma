@@ -158,7 +158,10 @@ widening discovery. This includes encoded-looking runs of consecutive Unicode
 Variation Selectors from the standard, supplementary, and Mongolian Free
 Variation Selector families while allowing ordinary isolated selectors. The
 covered families are intentionally conservative rather than an exhaustive
-Unicode-property policy.
+Unicode-property policy. The same check allows only the three exact RGI emoji
+tag sequences for the England, Scotland, and Wales subdivision flags;
+standalone, malformed, token-embedded, and other encoded-looking tag usage
+remains suspicious.
 
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,

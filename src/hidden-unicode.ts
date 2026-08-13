@@ -37,6 +37,14 @@ const MAX_SNIPPET_LENGTH = 240;
 const ASCII_TOKEN_CHARACTER = /^[A-Za-z0-9_.\-/:@%+=]$/u;
 
 const MIN_CONSECUTIVE_VARIATION_SELECTORS = 2;
+const BLACK_FLAG = 0x1f3f4;
+const TAG_CODE_POINT_OFFSET = 0xe0000;
+const CANCEL_TAG = 0xe007f;
+
+// Unicode Emoji currently defines these three exact sequences as the RGI
+// subdivision flags. Keep this bounded to reviewed data instead of accepting
+// arbitrary tag payloads or implementing general emoji/CLDR validation.
+const RGI_EMOJI_TAG_PAYLOADS = ["gbeng", "gbsct", "gbwls"] as const;
 
 // Unicode hidden-text techniques evolve; this candidate list is intentionally
 // not exhaustive. Security properties such as Default_Ignorable_Code_Point can
@@ -289,6 +297,7 @@ function suspiciousOccurrences(
   const occurrences: Occurrence[] = [];
   const suspiciousVariationSelectorIndexes =
     consecutiveVariationSelectorIndexes(scalars);
+  const allowedEmojiTagIndexes = allowedEmojiTagSequenceIndexes(scalars);
   for (const [scalarIndex, scalar] of scalars.entries()) {
     const codePoint = scalar.codePointAt(0);
     if (codePoint === undefined) continue;
@@ -298,6 +307,7 @@ function suspiciousOccurrences(
       scalarIndex,
       lineIndex,
       suspiciousVariationSelectorIndexes,
+      allowedEmojiTagIndexes,
     );
     if (character) occurrences.push({ character, scalarIndex });
   }
@@ -310,6 +320,7 @@ function suspiciousCharacter(
   scalarIndex: number,
   lineIndex: number,
   suspiciousVariationSelectorIndexes: ReadonlySet<number>,
+  allowedEmojiTagIndexes: ReadonlySet<number>,
 ): SuspiciousCharacter | undefined {
   const bidiName = BIDI_CONTROLS.get(codePoint);
   if (bidiName) {
@@ -328,6 +339,8 @@ function suspiciousCharacter(
       category: "invisible-character",
     };
   }
+
+  if (allowedEmojiTagIndexes.has(scalarIndex)) return undefined;
 
   if (codePoint === 0x200c || codePoint === 0x200d) {
     if (!insideAsciiLikeToken(scalars, scalarIndex)) return undefined;
@@ -416,6 +429,59 @@ function variationSelectorRange(
   );
 }
 
+function allowedEmojiTagSequenceIndexes(
+  scalars: string[],
+): ReadonlySet<number> {
+  const indexes = new Set<number>();
+
+  for (const [baseIndex, scalar] of scalars.entries()) {
+    if (scalar.codePointAt(0) !== BLACK_FLAG) continue;
+
+    for (const payload of RGI_EMOJI_TAG_PAYLOADS) {
+      const terminatorIndex = baseIndex + payload.length + 1;
+      if (
+        !emojiTagPayloadMatches(scalars, baseIndex + 1, payload) ||
+        scalars[terminatorIndex]?.codePointAt(0) !== CANCEL_TAG ||
+        embeddedInsideAsciiLikeToken(scalars, baseIndex, terminatorIndex)
+      ) {
+        continue;
+      }
+      for (let index = baseIndex + 1; index <= terminatorIndex; index += 1) {
+        indexes.add(index);
+      }
+    }
+  }
+
+  return indexes;
+}
+
+function emojiTagPayloadMatches(
+  scalars: string[],
+  payloadStartIndex: number,
+  payload: string,
+): boolean {
+  return [...payload].every(
+    (character, offset) =>
+      scalars[payloadStartIndex + offset]?.codePointAt(0) ===
+      TAG_CODE_POINT_OFFSET + character.charCodeAt(0),
+  );
+}
+
+function embeddedInsideAsciiLikeToken(
+  scalars: string[],
+  sequenceStartIndex: number,
+  sequenceEndIndex: number,
+): boolean {
+  const previous = scalars[sequenceStartIndex - 1];
+  const next = scalars[sequenceEndIndex + 1];
+  return (
+    previous !== undefined &&
+    next !== undefined &&
+    ASCII_TOKEN_CHARACTER.test(previous) &&
+    ASCII_TOKEN_CHARACTER.test(next)
+  );
+}
+
 function alwaysDetectedInvisibleName(codePoint: number): string | undefined {
   if (
     (codePoint >= 0x0000 && codePoint <= 0x0008) ||
@@ -428,7 +494,7 @@ function alwaysDetectedInvisibleName(codePoint: number): string | undefined {
     if (codePoint === 0x007f) return "DELETE";
     return C1_CONTROL_NAMES[codePoint - 0x0080];
   }
-  if (codePoint >= 0xe0000 && codePoint <= 0xe007f) {
+  if (isTagCharacter(codePoint)) {
     return tagCharacterName(codePoint);
   }
   return NAMED_INVISIBLE_CHARACTERS.get(codePoint);
@@ -596,9 +662,22 @@ function escapedEvidenceSnippet(
   allOccurrences: Occurrence[],
   categoryOccurrences: Occurrence[],
 ): string {
-  const byIndex = new Map(
+  const byIndex = new Map<number, Occurrence>(
     allOccurrences.map((occurrence) => [occurrence.scalarIndex, occurrence]),
   );
+  for (const [scalarIndex, scalar] of scalars.entries()) {
+    if (byIndex.has(scalarIndex)) continue;
+    const codePoint = scalar.codePointAt(0);
+    if (codePoint === undefined || !isTagCharacter(codePoint)) continue;
+    byIndex.set(scalarIndex, {
+      scalarIndex,
+      character: {
+        codePoint,
+        name: tagCharacterName(codePoint),
+        category: "invisible-character",
+      },
+    });
+  }
   const tokens = evidenceTokens(scalars, byIndex);
   const escapedLine = tokens.map(({ text }) => text).join("");
   if (escapedLine.length <= MAX_SNIPPET_LENGTH) return escapedLine;
@@ -718,4 +797,8 @@ function escapedCharacter(character: SuspiciousCharacter): string {
 
 function formattedCodePoint(codePoint: number): string {
   return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
+}
+
+function isTagCharacter(codePoint: number): boolean {
+  return codePoint >= 0xe0000 && codePoint <= 0xe007f;
 }
