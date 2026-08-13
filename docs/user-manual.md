@@ -154,7 +154,9 @@ text scripts. Security command analysis applies to eligible agent-facing
 Markdown instructions that reference or invoke them. A separate raw
 source-integrity check detects conservative hidden-Unicode signals in every
 already-discovered text artifact without interpreting executable behavior or
-widening discovery.
+widening discovery. This includes encoded-looking runs of consecutive Unicode
+Variation Selectors while allowing ordinary isolated emoji/text-presentation
+and ideographic selectors.
 
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,

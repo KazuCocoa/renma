@@ -26,8 +26,36 @@ interface EvidenceToken {
   readonly text: string;
 }
 
+interface UnicodeRange {
+  readonly name: string;
+  readonly startCodePoint: number;
+  readonly endCodePoint: number;
+  readonly firstSelectorNumber: number;
+}
+
 const MAX_SNIPPET_LENGTH = 240;
 const ASCII_TOKEN_CHARACTER = /^[A-Za-z0-9_.\-/:@%+=]$/u;
+
+const MIN_CONSECUTIVE_VARIATION_SELECTORS = 2;
+
+// These ranges and this adjacency heuristic are intentionally not assumed to
+// be exhaustive. Unicode-based invisible-text techniques evolve; add new
+// code points, ranges, or composition patterns only when high-signal evidence
+// supports doing so, without broadly flagging legitimate Unicode content.
+const VARIATION_SELECTOR_RANGES: readonly UnicodeRange[] = [
+  {
+    name: "Variation Selectors",
+    startCodePoint: 0xfe00,
+    endCodePoint: 0xfe0f,
+    firstSelectorNumber: 1,
+  },
+  {
+    name: "Variation Selectors Supplement",
+    startCodePoint: 0xe0100,
+    endCodePoint: 0xe01ef,
+    firstSelectorNumber: 17,
+  },
+];
 
 const BIDI_CONTROLS = new Map<number, string>([
   [0x202a, "LEFT-TO-RIGHT EMBEDDING"],
@@ -244,6 +272,8 @@ function suspiciousOccurrences(
   lineIndex: number,
 ): Occurrence[] {
   const occurrences: Occurrence[] = [];
+  const suspiciousVariationSelectorIndexes =
+    consecutiveVariationSelectorIndexes(scalars);
   for (const [scalarIndex, scalar] of scalars.entries()) {
     const codePoint = scalar.codePointAt(0);
     if (codePoint === undefined) continue;
@@ -252,6 +282,7 @@ function suspiciousOccurrences(
       scalars,
       scalarIndex,
       lineIndex,
+      suspiciousVariationSelectorIndexes,
     );
     if (character) occurrences.push({ character, scalarIndex });
   }
@@ -263,10 +294,24 @@ function suspiciousCharacter(
   scalars: string[],
   scalarIndex: number,
   lineIndex: number,
+  suspiciousVariationSelectorIndexes: ReadonlySet<number>,
 ): SuspiciousCharacter | undefined {
   const bidiName = BIDI_CONTROLS.get(codePoint);
   if (bidiName) {
     return { codePoint, name: bidiName, category: "bidi-control" };
+  }
+
+  const variationSelectorName = suspiciousVariationSelectorIndexes.has(
+    scalarIndex,
+  )
+    ? variationSelectorNameForCodePoint(codePoint)
+    : undefined;
+  if (variationSelectorName) {
+    return {
+      codePoint,
+      name: variationSelectorName,
+      category: "invisible-character",
+    };
   }
 
   if (codePoint === 0x200c || codePoint === 0x200d) {
@@ -291,6 +336,56 @@ function suspiciousCharacter(
   return name
     ? { codePoint, name, category: "invisible-character" }
     : undefined;
+}
+
+function variationSelectorNameForCodePoint(
+  codePoint: number,
+): string | undefined {
+  const range = variationSelectorRange(codePoint);
+  if (range === undefined) return undefined;
+
+  const selectorNumber =
+    codePoint - range.startCodePoint + range.firstSelectorNumber;
+  return `VARIATION SELECTOR-${selectorNumber}`;
+}
+
+function consecutiveVariationSelectorIndexes(
+  scalars: string[],
+): ReadonlySet<number> {
+  const indexes = new Set<number>();
+  let runStart: number | undefined;
+
+  for (let scalarIndex = 0; scalarIndex <= scalars.length; scalarIndex += 1) {
+    const codePoint = scalars[scalarIndex]?.codePointAt(0);
+    if (isVariationSelector(codePoint)) {
+      runStart ??= scalarIndex;
+      continue;
+    }
+    if (
+      runStart !== undefined &&
+      scalarIndex - runStart >= MIN_CONSECUTIVE_VARIATION_SELECTORS
+    ) {
+      for (let index = runStart; index < scalarIndex; index += 1) {
+        indexes.add(index);
+      }
+    }
+    runStart = undefined;
+  }
+
+  return indexes;
+}
+
+function isVariationSelector(codePoint: number | undefined): boolean {
+  return (
+    codePoint !== undefined && variationSelectorRange(codePoint) !== undefined
+  );
+}
+
+function variationSelectorRange(codePoint: number): UnicodeRange | undefined {
+  return VARIATION_SELECTOR_RANGES.find(
+    ({ startCodePoint, endCodePoint }) =>
+      codePoint >= startCodePoint && codePoint <= endCodePoint,
+  );
 }
 
 function alwaysDetectedInvisibleName(codePoint: number): string | undefined {
@@ -393,6 +488,59 @@ function findingForLine(
       unicodeCategory: category,
       totalCount: categoryOccurrences.length,
       characters: characterDetails(categoryOccurrences),
+      ...variationSelectorDetails(categoryOccurrences),
+    },
+  };
+}
+
+function variationSelectorDetails(
+  occurrences: Occurrence[],
+): Record<string, unknown> {
+  const variationOccurrences = occurrences.filter(({ character }) =>
+    isVariationSelector(character.codePoint),
+  );
+  if (variationOccurrences.length === 0) return {};
+
+  let sequenceCount = 0;
+  let longestSequenceLength = 0;
+  let currentSequenceLength = 0;
+  let previousScalarIndex: number | undefined;
+  for (const { scalarIndex } of variationOccurrences) {
+    if (
+      previousScalarIndex === undefined ||
+      scalarIndex !== previousScalarIndex + 1
+    ) {
+      sequenceCount += 1;
+      currentSequenceLength = 1;
+    } else {
+      currentSequenceLength += 1;
+    }
+    longestSequenceLength = Math.max(
+      longestSequenceLength,
+      currentSequenceLength,
+    );
+    previousScalarIndex = scalarIndex;
+  }
+
+  const reportedRanges = VARIATION_SELECTOR_RANGES.filter((range) =>
+    variationOccurrences.some(
+      ({ character }) =>
+        character.codePoint >= range.startCodePoint &&
+        character.codePoint <= range.endCodePoint,
+    ),
+  ).map(({ name, startCodePoint, endCodePoint }) => ({
+    name,
+    startCodePoint: formattedCodePoint(startCodePoint),
+    endCodePoint: formattedCodePoint(endCodePoint),
+  }));
+
+  return {
+    variationSelectorAnalysis: {
+      heuristic: "consecutive-run",
+      minimumConsecutiveCount: MIN_CONSECUTIVE_VARIATION_SELECTORS,
+      suspiciousSequenceCount: sequenceCount,
+      longestSequenceLength,
+      reportedRanges,
     },
   };
 }

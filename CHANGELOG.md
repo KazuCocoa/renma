@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Extended raw hidden-Unicode source-integrity analysis to report consecutive
+  runs from `U+FE00`–`U+FE0F` and `U+E0100`–`U+E01EF` through the existing
+  `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` diagnostic. Findings include escaped
+  code-point evidence and selector-specific range/run details, while isolated
+  emoji/text-presentation and ideographic Variation Selectors remain allowed.
+
 ## [0.32.0] - 2026-08-10
 
 ### Added

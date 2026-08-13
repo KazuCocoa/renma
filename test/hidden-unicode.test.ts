@@ -20,6 +20,8 @@ const ZWSP = String.fromCodePoint(0x200b);
 const ZWNJ = String.fromCodePoint(0x200c);
 const ZWJ = String.fromCodePoint(0x200d);
 const BOM = String.fromCodePoint(0xfeff);
+const VS16 = String.fromCodePoint(0xfe0f);
+const VS17 = String.fromCodePoint(0xe0100);
 const PROPERTY_PARAMETERS = { seed: 0x260730, numRuns: 80 };
 
 test("detects bidi controls in prose, fenced commands, and frontmatter", () => {
@@ -205,6 +207,104 @@ test("reports ZWJ and ZWNJ only inside an ASCII-like token", () => {
     String.fromCodePoint(0x00a0, 0x202f, 0x3000),
   ].join("\n");
   assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
+});
+
+test("detects an encoded-looking sequence of consecutive variation selectors", () => {
+  const hiddenPayload = String.fromCodePoint(
+    0xfe00,
+    0xfe03,
+    0xfe07,
+    0xfe0b,
+    0xfe02,
+    0xfe0f,
+  );
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`# Review\ncarrier${hiddenPayload}\n`),
+  );
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.equal(finding.evidence.startLine, 2);
+  assert.equal(finding.details?.totalCount, 6);
+  assert.match(
+    finding.evidence.snippet,
+    /carrier<U\+FE00 VARIATION SELECTOR-1>/u,
+  );
+  assert.match(finding.evidence.snippet, /<U\+FE0F VARIATION SELECTOR-16>/u);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 1,
+    longestSequenceLength: 6,
+    reportedRanges: [
+      {
+        name: "Variation Selectors",
+        startCodePoint: "U+FE00",
+        endCodePoint: "U+FE0F",
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(finding).includes(hiddenPayload), false);
+});
+
+test("detects consecutive supplementary variation selectors with exact evidence", () => {
+  const supplementarySequence = String.fromCodePoint(0xe0100, 0xe0101, 0xe01ef);
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`variant: 葛${supplementarySequence}`),
+  );
+
+  assert.ok(finding);
+  assert.equal(finding.id, INVISIBLE_ID);
+  assert.deepEqual(finding.details?.characters, [
+    { codePoint: "U+E0100", name: "VARIATION SELECTOR-17", count: 1 },
+    { codePoint: "U+E0101", name: "VARIATION SELECTOR-18", count: 1 },
+    { codePoint: "U+E01EF", name: "VARIATION SELECTOR-256", count: 1 },
+  ]);
+  assert.deepEqual(finding.details?.variationSelectorAnalysis, {
+    heuristic: "consecutive-run",
+    minimumConsecutiveCount: 2,
+    suspiciousSequenceCount: 1,
+    longestSequenceLength: 3,
+    reportedRanges: [
+      {
+        name: "Variation Selectors Supplement",
+        startCodePoint: "U+E0100",
+        endCodePoint: "U+E01EF",
+      },
+    ],
+  });
+  assert.match(finding.evidence.snippet, /U\+E01EF VARIATION SELECTOR-256/u);
+});
+
+test("allows ordinary emoji presentation and isolated variation selectors", () => {
+  const ideographicVariation = `葛${VS17}`;
+  const isolatedTextVariation = `A${String.fromCodePoint(0xfe00)}`;
+  const legitimate = [
+    `©${VS16} ✈${VS16} ❤${VS16} ☀${VS16}`,
+    ideographicVariation,
+    isolatedTextVariation,
+  ].join("\n");
+
+  assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
+});
+
+test("variation selector analysis runs on original text before Markdown visibility filtering", () => {
+  const hiddenPayload = String.fromCodePoint(0xfe01, 0xe0100, 0xfe0a);
+  const findings = securityDiagnosticFindings([
+    artifact(`# Visible\n\n<!-- raw payload: ${hiddenPayload} -->\n`),
+  ]);
+  const variationFinding = findings.find(({ id }) => id === INVISIBLE_ID);
+
+  assert.ok(variationFinding);
+  assert.equal(variationFinding.evidence.startLine, 3);
+  assert.match(variationFinding.evidence.snippet, /U\+FE01/u);
+  assert.match(variationFinding.evidence.snippet, /U\+E0100/u);
+  assert.equal(
+    findings.some(
+      ({ id }) => id === DIAGNOSTIC_IDS.SEC_HIDDEN_OPERATIONAL_INSTRUCTION,
+    ),
+    false,
+  );
 });
 
 test("scans raw text scripts, config artifacts, and assets but excludes binary", () => {
