@@ -163,10 +163,13 @@ already-discovered Artifact.content
 `src/hidden-unicode.ts` owns the isolated raw-source check. It accepts one
 already-classified `Artifact`, returns no findings for binary content, and
 inspects text without Markdown parsing, visibility projection, normalization,
-or command analysis. `securityDiagnosticFindings()` appends those raw findings
-before entering the existing Markdown-specific pipeline. Discovery scope,
-artifact classification, suppression, Diagnostics v2, review bundles,
-ordering, and reporting remain owned by their existing layers.
+or command analysis. `analyzeSecurityDiagnostics()` appends those raw findings
+before entering the existing Markdown-specific pipeline and derives
+`renma.security-analysis-coverage.v1` from the same prepared analysis objects.
+The established `securityDiagnosticFindings()` API remains a findings-only
+projection of that pass. Discovery scope, artifact classification,
+suppression, Diagnostics v2, review bundles, ordering, and reporting remain
+owned by their existing layers.
 
 `src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
 guard application, fallback selection, evidence projection, ordering,

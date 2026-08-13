@@ -1532,11 +1532,39 @@ unsupported repository subtrees such as `tools/vendor-cache` do not turn
 strict scan into a requirement to parse every file. Renma never follows a
 blocked subtree or repository symlink.
 
+Every scan also includes `renma.security-analysis-coverage.v1` target-state
+JSON evidence. This is separate from repository inspection coverage: it records
+which existing security-analysis layers actually ran for each artifact Renma
+already discovered and scanned. The current layers are raw hidden Unicode,
+Markdown semantic instructions, canonical Skill description, and Skill YAML
+frontmatter comments. Renma does not walk additional files or infer runtime
+agent reachability to build this evidence.
+
+Each layer reports `analyzed`, `not-applicable`, `unsupported`, `blocked`, or
+`not-analyzable`. `unsupported` makes current format limitations explicit; for
+example, a discovered UTF-8 `references/runtime.txt` artifact receives raw
+hidden-Unicode analysis but not Markdown semantic instruction analysis. A
+malformed, duplicate, or non-string canonical Skill description is
+`not-analyzable`, never `analyzed`. YAML comment coverage includes a separate
+surface count, so a valid Skill with zero comments still reports the comment
+analysis capability as `analyzed` with a count of zero. Coverage entries exist
+only for scanned artifacts. Repository paths that could not be read or
+traversed remain blocking evidence in `inspectionCoverage`; Renma does not
+invent an artifact row merely to duplicate that evidence.
+
 Human-readable output states whether inspection was complete, so zero findings
 with blocking coverage issues is not described as a complete result. The JSON
 output includes findings, evidence, diagnostics, `diagnosticsV2`,
 `reviewBundles`, `trustGraph`, `executableSurfaceInventory`, inspection
-coverage, and summary data that other tools can consume.
+coverage, security-analysis coverage, and summary data that other tools can
+consume.
+
+These three facts are intentionally independent: a repository path may be
+successfully inspected, one or more security-analysis layers may still be
+unsupported for its format, and the supported layers may produce zero
+findings. Security-analysis coverage says what Renma analyzed. It does not say
+that an artifact is safe, secure, fully analyzed, or safe for an LLM, and it
+does not affect normal scan thresholds, `--strict`, or CI policy.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 

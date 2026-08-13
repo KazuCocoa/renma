@@ -411,6 +411,10 @@ function scanResult(
       inspectedPaths: [],
       blockingIssues: [],
     },
+    securityAnalysisCoverage: {
+      schemaVersion: "renma.security-analysis-coverage.v1",
+      artifacts: [],
+    },
     scannedFileCount: 13,
     format: "text",
     agentSkills: {
