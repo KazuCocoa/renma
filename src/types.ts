@@ -10,3 +10,4 @@ export * from "./types/diagnostics.js";
 export * from "./types/governance.js";
 export * from "./types/metadata.js";
 export * from "./types/scan-result.js";
+export * from "./types/security-analysis-coverage.js";

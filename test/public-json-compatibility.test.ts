@@ -84,6 +84,12 @@ test("representative public JSON matches fixed compatibility baselines", async (
   assert.ok(catalogDiagnostics.every((diagnostic) => !("code" in diagnostic)));
 
   const scanOutput = parseOutput(outputs, "scan");
+  const securityAnalysisCoverage = record(scanOutput.securityAnalysisCoverage);
+  assert.equal(
+    securityAnalysisCoverage.schemaVersion,
+    "renma.security-analysis-coverage.v1",
+  );
+  assert.equal(arrayOfRecords(securityAnalysisCoverage.artifacts).length, 7);
   const findingIds = arrayOfRecords(scanOutput.findings).map(
     (finding) => finding.id,
   );

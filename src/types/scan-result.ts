@@ -5,6 +5,7 @@ import type { SecurityPolicyInventorySummary } from "../security-policy-inventor
 import type { TrustGraph } from "../trust-graph.js";
 import type { EffectiveScanBoundaryEvidence } from "../scan-boundary.js";
 import type { InspectionCoverage } from "../inspection-coverage.js";
+import type { SecurityAnalysisCoverage } from "./security-analysis-coverage.js";
 import type {
   Diagnostic,
   DiagnosticV2,
@@ -20,6 +21,7 @@ export interface ScanResult {
   configPath?: string;
   scanBoundary: EffectiveScanBoundaryEvidence;
   inspectionCoverage: InspectionCoverage;
+  securityAnalysisCoverage: SecurityAnalysisCoverage;
   scannedFileCount: number;
   format: "text" | "json";
   agentSkills: AgentSkillsValidationSummary;

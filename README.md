@@ -61,7 +61,9 @@ repository assets. It does not:
 Security analysis is bounded to supported forms in agent-facing instructions
 and metadata. Unsupported or ambiguous syntax follows conservative fallback.
 Use language-specific SAST, dependency, and secret-scanning tools for executable
-code. A clean Renma scan is repository evidence, not a security proof.
+code. Scan JSON reports per-artifact security-analysis coverage separately from
+repository inspection coverage, including unsupported semantic formats. A
+clean Renma scan is repository evidence, not a security proof.
 
 The review boundary is:
 

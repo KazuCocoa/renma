@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added versioned `renma.security-analysis-coverage.v1` scan JSON evidence for
+  every discovered and scanned artifact. The target-state rows distinguish
+  executed, unsupported, inapplicable, and non-analyzable hidden-Unicode,
+  Markdown semantic instruction, canonical Skill description, and YAML
+  frontmatter comment layers without changing findings, strict scan, or CI
+  policy.
+
 ## [0.32.1] - 2026-08-13
 
 ### Fixed

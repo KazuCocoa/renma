@@ -54,6 +54,91 @@
     ],
     "blockingIssues": []
   },
+  "securityAnalysisCoverage": {
+    "schemaVersion": "renma.security-analysis-coverage.v1",
+    "artifacts": [
+      {
+        "path": "contexts/inactive.md",
+        "kind": "context",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "not-applicable",
+          "yamlFrontmatterComments": "not-applicable"
+        }
+      },
+      {
+        "path": "contexts/invalid-status.md",
+        "kind": "context",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "not-applicable",
+          "yamlFrontmatterComments": "not-applicable"
+        }
+      },
+      {
+        "path": "contexts/missing-boundary.md",
+        "kind": "context",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "not-applicable",
+          "yamlFrontmatterComments": "not-applicable"
+        }
+      },
+      {
+        "path": "contexts/missing-owner.md",
+        "kind": "context",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "not-applicable",
+          "yamlFrontmatterComments": "not-applicable"
+        }
+      },
+      {
+        "path": "contexts/placeholder.md",
+        "kind": "context",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "not-applicable",
+          "yamlFrontmatterComments": "not-applicable"
+        }
+      },
+      {
+        "path": "contexts/valid.md",
+        "kind": "context",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "not-applicable",
+          "yamlFrontmatterComments": "not-applicable"
+        }
+      },
+      {
+        "path": "skills/review/SKILL.md",
+        "kind": "skill",
+        "contentClassification": "text",
+        "analyses": {
+          "hiddenUnicode": "analyzed",
+          "semanticInstructions": "analyzed",
+          "canonicalDescription": "analyzed",
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
+        }
+      }
+    ]
+  },
   "scannedFileCount": 7,
   "format": "json",
   "agentSkills": {

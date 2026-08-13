@@ -1,6 +1,9 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
-import { hiddenUnicodeFindings } from "./hidden-unicode.js";
+import {
+  hiddenUnicodeAnalysisApplies,
+  hiddenUnicodeFindings,
+} from "./hidden-unicode.js";
 import {
   classifyNpmSelector,
   classifyPythonSelector,
@@ -21,6 +24,12 @@ import {
 import type { Artifact } from "./types/artifact.js";
 import type { Finding, RiskClass } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
+import {
+  SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION,
+  type SecurityAnalysisCoverage,
+  type SecurityAnalysisCoverageArtifact,
+  type SecurityAnalysisCoverageState,
+} from "./types/security-analysis-coverage.js";
 import type { SecurityConfig } from "./types/configuration.js";
 import type {
   ParsedYamlFrontmatter,
@@ -1109,7 +1118,8 @@ interface PreparedSecurityDocumentAnalysis {
   readonly visibleLines: readonly string[];
   readonly markdownView: MarkdownSecurityView;
   readonly canonicalDescription: CanonicalDescriptionSecurityUnit | undefined;
-  readonly yamlFrontmatterComments: readonly YamlFrontmatterComment[];
+  readonly yamlFrontmatterCommentAnalysis:
+    Pick<ParsedYamlFrontmatter, "commentsAnalyzable" | "comments"> | undefined;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
@@ -1205,24 +1215,49 @@ export function securityDiagnosticFindings(
   inputs: Array<Artifact | ParsedDocument>,
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
-  return inputs.flatMap((input) => {
+  return analyzeSecurityDiagnostics(inputs, config).findings;
+}
+
+/** Findings and target-state coverage derived from one shared analysis pass. */
+export interface SecurityDiagnosticsAnalysis {
+  findings: Finding[];
+  coverage: SecurityAnalysisCoverage;
+}
+
+/** Run existing security analyses and record exactly which layers executed. */
+export function analyzeSecurityDiagnostics(
+  inputs: Array<Artifact | ParsedDocument>,
+  config: SecurityDiagnosticsConfig = {},
+): SecurityDiagnosticsAnalysis {
+  const analyses = inputs.map((input) => {
     const artifact = "artifact" in input ? input.artifact : input;
     const rawFindings = hiddenUnicodeFindings(artifact);
     const document = "artifact" in input ? input : parseDocument(input);
-    return [
-      ...rawFindings,
-      ...securityFindingsForDocument(document, config.security),
-    ];
+    const prepared = prepareSecurityDocumentAnalysis(document, config.security);
+    return {
+      findings: [
+        ...rawFindings,
+        ...(prepared === undefined
+          ? []
+          : securityFindingsForPreparedDocument(prepared)),
+      ],
+      coverage: securityAnalysisCoverageArtifact(artifact, prepared),
+    };
   });
+  return {
+    findings: analyses.flatMap((analysis) => analysis.findings),
+    coverage: {
+      schemaVersion: SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION,
+      artifacts: analyses
+        .map((analysis) => analysis.coverage)
+        .sort((left, right) => left.path.localeCompare(right.path)),
+    },
+  };
 }
 
-function securityFindingsForDocument(
-  document: ParsedDocument,
-  securityConfig?: SecurityConfig,
+function securityFindingsForPreparedDocument(
+  prepared: PreparedSecurityDocumentAnalysis,
 ): Finding[] {
-  const prepared = prepareSecurityDocumentAnalysis(document, securityConfig);
-  if (prepared === undefined) return [];
-
   const instructionDetections = [
     ...collectCanonicalDescriptionDetections(prepared),
     ...collectSecurityLineDetections(prepared),
@@ -1242,6 +1277,78 @@ function securityFindingsForDocument(
   return dedupeDetections(detections).map((detection) =>
     findingFromDetection(prepared.artifact, detection),
   );
+}
+
+function securityAnalysisCoverageArtifact(
+  artifact: Artifact,
+  prepared: PreparedSecurityDocumentAnalysis | undefined,
+): SecurityAnalysisCoverageArtifact {
+  const hiddenUnicode = hiddenUnicodeAnalysisApplies(artifact)
+    ? "analyzed"
+    : "not-applicable";
+  const semanticInstructions = semanticInstructionCoverageState(
+    artifact,
+    prepared,
+  );
+  const canonicalDescription = canonicalDescriptionCoverageState(
+    artifact,
+    prepared,
+  );
+  const yamlFrontmatterComments = yamlFrontmatterCommentCoverageState(
+    artifact,
+    prepared,
+  );
+  return {
+    path: artifact.path,
+    kind: artifact.kind,
+    contentClassification: artifact.contentClassification,
+    analyses: {
+      hiddenUnicode,
+      semanticInstructions,
+      canonicalDescription,
+      yamlFrontmatterComments,
+    },
+    ...(yamlFrontmatterComments === "analyzed"
+      ? {
+          surfaceCounts: {
+            yamlFrontmatterComments:
+              prepared?.yamlFrontmatterCommentAnalysis?.comments.length ?? 0,
+          },
+        }
+      : {}),
+  };
+}
+
+function semanticInstructionCoverageState(
+  artifact: Artifact,
+  prepared: PreparedSecurityDocumentAnalysis | undefined,
+): SecurityAnalysisCoverageState {
+  if (prepared !== undefined) return "analyzed";
+  if (!hiddenUnicodeAnalysisApplies(artifact)) return "not-applicable";
+  if (artifact.kind === "script") return "not-applicable";
+  return "unsupported";
+}
+
+function canonicalDescriptionCoverageState(
+  artifact: Artifact,
+  prepared: PreparedSecurityDocumentAnalysis | undefined,
+): SecurityAnalysisCoverageState {
+  if (artifact.kind !== "skill") return "not-applicable";
+  if (prepared === undefined) return "unsupported";
+  return prepared.canonicalDescription === undefined
+    ? "not-analyzable"
+    : "analyzed";
+}
+
+function yamlFrontmatterCommentCoverageState(
+  artifact: Artifact,
+  prepared: PreparedSecurityDocumentAnalysis | undefined,
+): SecurityAnalysisCoverageState {
+  if (artifact.kind !== "skill") return "not-applicable";
+  if (prepared === undefined) return "unsupported";
+  return prepared.yamlFrontmatterCommentAnalysis?.commentsAnalyzable === true
+    ? "analyzed"
+    : "not-analyzable";
 }
 
 function collectHiddenHtmlCommentDetections(
@@ -1300,7 +1407,8 @@ function collectHiddenHtmlCommentDetections(
 function collectHiddenYamlFrontmatterCommentDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
-  return prepared.yamlFrontmatterComments.flatMap((comment, commentIndex) => {
+  const comments = prepared.yamlFrontmatterCommentAnalysis?.comments ?? [];
+  return comments.flatMap((comment, commentIndex) => {
     const underlying = hiddenInstructionProjectionDetections(
       prepared,
       comment.content,
@@ -1523,7 +1631,7 @@ function prepareSecurityDocumentAnalysis(
     visibleLines,
     markdownView,
     canonicalDescription,
-    yamlFrontmatterComments: frontmatter?.comments ?? [],
+    yamlFrontmatterCommentAnalysis: frontmatter,
     scanStart,
     logicalCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,

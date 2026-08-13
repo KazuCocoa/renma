@@ -10,7 +10,7 @@ import {
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { buildInspectionCoverage } from "./inspection-coverage.js";
 import { runRules } from "./rules.js";
-import { securityDiagnosticFindings } from "./security-diagnostics.js";
+import { analyzeSecurityDiagnostics } from "./security-diagnostics.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
 import {
@@ -77,6 +77,10 @@ export function scanFromRepositorySnapshot(
           repositoryPathStates: snapshot.repositoryPathStates,
         };
   const classifications = snapshot.classifications;
+  const securityAnalysis = analyzeSecurityDiagnostics(
+    snapshot.documents,
+    snapshot.config,
+  );
   const rawFindings = [
     ...runRules(
       snapshot.documents,
@@ -86,7 +90,7 @@ export function scanFromRepositorySnapshot(
     ),
     ...detectRepeatedContextPatterns(snapshot.documents),
     ...catalogDiagnosticFindings(snapshot.catalogDiagnostics),
-    ...securityDiagnosticFindings(snapshot.documents, snapshot.config),
+    ...securityAnalysis.findings,
   ]
     .map((finding) => attachFindingClassification(finding, classifications))
     .sort((a, b) => {
@@ -154,6 +158,7 @@ export function scanFromRepositorySnapshot(
       snapshot.core.repositoryPathConfig,
       snapshot.core.blockedTraversalPaths,
     ),
+    securityAnalysisCoverage: securityAnalysis.coverage,
     scannedFileCount: snapshot.scannedFileCount,
     format: snapshot.config.format,
     agentSkills: snapshot.agentSkills,

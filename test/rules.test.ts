@@ -3538,6 +3538,10 @@ test("text report calls out clean scans", () => {
       inspectedPaths: [],
       blockingIssues: [],
     },
+    securityAnalysisCoverage: {
+      schemaVersion: "renma.security-analysis-coverage.v1",
+      artifacts: [],
+    },
     scannedFileCount: 1,
     format: "text",
     agentSkills: {

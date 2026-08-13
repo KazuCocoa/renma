@@ -752,6 +752,27 @@ permission enforcement, or telemetry collection. A scan with no findings means
 only that the enabled deterministic checks found no matching evidence; it does
 not establish that an agent workflow is safe.
 
+`scan --format json` exposes this boundary as
+`renma.security-analysis-coverage.v1`. Its per-artifact rows are distinct from
+`renma.inspection-coverage.v1`: inspection coverage answers whether expected
+repository paths were inspectable, while security-analysis coverage answers
+which supported layers actually executed on artifacts that were scanned.
+`analyzed` records execution, not a match and not a safety verdict;
+`not-applicable` means the layer does not conceptually apply; `unsupported`
+makes a current format limitation visible; and `not-analyzable` means a
+conceptually applicable source surface was ambiguous or malformed. The schema
+also reserves `blocked`, while current read and traversal blockers remain in
+repository inspection coverage rather than creating synthetic artifact rows.
+
+In particular, discovered UTF-8 non-Markdown support text receives raw
+hidden-Unicode analysis and reports semantic instruction analysis as
+`unsupported`. Renma does not add `.txt`, JSON, YAML, TOML, or source-code
+semantic scanning through this reporting model. A valid Skill frontmatter with
+no YAML comments reports comment analysis as `analyzed` and a zero surface
+count; malformed frontmatter does not claim that the comment or canonical
+description surface was successfully analyzed. Absence of findings must not be
+interpreted as complete security-analysis coverage.
+
 ### Hidden Unicode source-integrity boundaries
 
 Hidden-Unicode checks inspect original `artifact.content` before Markdown

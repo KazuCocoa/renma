@@ -259,7 +259,7 @@ const LLM_HINT =
  * visibility filtering, normalization, or command analysis.
  */
 export function hiddenUnicodeFindings(artifact: Artifact): Finding[] {
-  if (artifact.contentClassification !== "text") return [];
+  if (!hiddenUnicodeAnalysisApplies(artifact)) return [];
 
   const findings: Finding[] = [];
   const lines = artifact.content.split(/\r\n|\n|\r/u);
@@ -288,6 +288,11 @@ export function hiddenUnicodeFindings(artifact: Artifact): Finding[] {
   }
 
   return findings;
+}
+
+/** Shared eligibility predicate for raw hidden-Unicode analysis and coverage. */
+export function hiddenUnicodeAnalysisApplies(artifact: Artifact): boolean {
+  return artifact.contentClassification === "text";
 }
 
 function suspiciousOccurrences(
