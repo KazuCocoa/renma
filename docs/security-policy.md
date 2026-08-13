@@ -56,17 +56,18 @@ repository discovery.
 `suspicious`) covers `U+202A`–`U+202E` and `U+2066`–`U+2069`.
 `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` (`medium` severity, `high` confidence,
 `suspicious`) covers `U+0000`–`U+0008`, `U+000B`–`U+000C`,
-`U+000E`–`U+001F`, `U+007F`–`U+009F`, `U+00AD`, `U+034F`, `U+180E`,
-`U+200B`, `U+2060`, `U+206A`–`U+206F`, `U+FFF9`–`U+FFFB`, and
+`U+000E`–`U+001F`, `U+007F`–`U+009F`, `U+00AD`, `U+034F`, `U+200B`,
+`U+2060`, `U+206A`–`U+206F`, `U+FFF9`–`U+FFFB`, and
 `U+E0000`–`U+E007F`. One leading `U+FEFF` is allowed; it is reported anywhere
 else. `U+200C` and `U+200D` are reported only with immediate ASCII-like token
 characters on both sides: letters, digits, `_`, `-`, `.`, `/`, `:`, `@`, `%`,
 `+`, or `=`. Mongolian Free Variation Selectors `U+180B`–`U+180D` and `U+180F`,
 Variation Selectors `U+FE00`–`U+FE0F`, and Variation Selectors Supplement
 `U+E0100`–`U+E01EF` are reported only in consecutive runs of two or more
-selectors. `U+180E` remains the separately handled MONGOLIAN VOWEL SEPARATOR,
-not a Variation Selector. Evidence escapes each selector and structured details
-identify the consecutive-run heuristic, run sizes, and represented ranges.
+selectors. `U+180E` is MONGOLIAN VOWEL SEPARATOR, not a Variation Selector, and
+is not reported merely because it appears in legitimate Mongolian text.
+Evidence escapes each selector and structured details identify the
+consecutive-run heuristic, run sizes, and represented ranges.
 
 This is not a general non-ASCII check. Renma does not report Japanese or other
 multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, isolated

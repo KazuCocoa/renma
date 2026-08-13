@@ -22,6 +22,7 @@ const ZWJ = String.fromCodePoint(0x200d);
 const BOM = String.fromCodePoint(0xfeff);
 const MONGOLIAN_FVS1 = String.fromCodePoint(0x180b);
 const MONGOLIAN_FVS4 = String.fromCodePoint(0x180f);
+const MONGOLIAN_VOWEL_SEPARATOR = String.fromCodePoint(0x180e);
 const VS16 = String.fromCodePoint(0xfe0f);
 const VS17 = String.fromCodePoint(0xe0100);
 const PROPERTY_PARAMETERS = { seed: 0x260730, numRuns: 80 };
@@ -394,6 +395,12 @@ test("allows isolated Mongolian FVS usage and reports selector-only runs", () =>
   assert.equal(JSON.stringify(finding).includes(selectorRun), false);
 });
 
+test("allows legitimate Mongolian text containing an isolated vowel separator", () => {
+  const legitimate = `ᠮᠣᠩᠭᠣᠯ${MONGOLIAN_VOWEL_SEPARATOR}ᠠ`;
+
+  assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
+});
+
 test("variation selector analysis runs on original text before Markdown visibility filtering", () => {
   const hiddenPayload = String.fromCodePoint(0xfe01, 0xe0100, 0xfe0a);
   const findings = securityDiagnosticFindings([
@@ -576,7 +583,6 @@ test("always-detected code points and safe multilingual text obey bounded proper
     ...codePointRange(0x007f, 0x009f),
     0x00ad,
     0x034f,
-    0x180e,
     0x200b,
     0x2060,
     ...codePointRange(0x206a, 0x206f),

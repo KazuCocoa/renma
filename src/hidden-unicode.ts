@@ -88,7 +88,6 @@ const BIDI_CONTROLS = new Map<number, string>([
 const NAMED_INVISIBLE_CHARACTERS = new Map<number, string>([
   [0x00ad, "SOFT HYPHEN"],
   [0x034f, "COMBINING GRAPHEME JOINER"],
-  [0x180e, "MONGOLIAN VOWEL SEPARATOR"],
   [0x200b, "ZERO WIDTH SPACE"],
   [0x200c, "ZERO WIDTH NON-JOINER"],
   [0x200d, "ZERO WIDTH JOINER"],

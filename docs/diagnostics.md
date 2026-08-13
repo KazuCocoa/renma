@@ -773,7 +773,7 @@ and `suspicious` risk class. It always reports:
 
 - `U+0000`–`U+0008`, `U+000B`–`U+000C`, `U+000E`–`U+001F`, and
   `U+007F`–`U+009F`;
-- `U+00AD`, `U+034F`, `U+180E`, `U+200B`, and `U+2060`;
+- `U+00AD`, `U+034F`, `U+200B`, and `U+2060`;
 - deprecated directional formatting controls `U+206A`–`U+206F`;
 - interlinear annotation controls `U+FFF9`–`U+FFFB`; and
 - Unicode tag characters `U+E0000`–`U+E007F`.
@@ -792,15 +792,15 @@ Three selector families use a separate conservative composition heuristic:
 - Variation Selectors `U+FE00`–`U+FE0F`; and
 - Variation Selectors Supplement `U+E0100`–`U+E01EF`.
 
-`U+180E` remains the separately handled MONGOLIAN VOWEL SEPARATOR; it is not a
-Variation Selector. Renma reports a covered selector only when it belongs to a
-run of two or more consecutive selectors. A finding's escaped evidence names
-each reported selector, and `details.variationSelectorAnalysis` records the
-`consecutive-run` heuristic, minimum run length, sequence count, longest run,
-and exact represented ranges on that line. Consecutive selector-only runs are
-high-signal encoded-looking hidden text because ordinary presentation,
-ideographic variation, and Mongolian variation attach one selector to a base
-character.
+`U+180E` MONGOLIAN VOWEL SEPARATOR is not a Variation Selector and is not
+reported merely because it appears in legitimate Mongolian text. Renma reports
+a covered selector only when it belongs to a run of two or more consecutive
+selectors. A finding's escaped evidence names each reported selector, and
+`details.variationSelectorAnalysis` records the `consecutive-run` heuristic,
+minimum run length, sequence count, longest run, and exact represented ranges
+on that line. Consecutive selector-only runs are high-signal encoded-looking
+hidden text because ordinary presentation, ideographic variation, and Mongolian
+variation attach one selector to a base character.
 
 The detector is not a general non-ASCII, normalization, or confusable-character
 rule. Japanese and other multilingual text, ordinary RTL text, `U+200E`,
