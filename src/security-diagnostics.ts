@@ -1,4 +1,3 @@
-import path from "node:path";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
 import { hiddenUnicodeFindings } from "./hidden-unicode.js";
@@ -1383,19 +1382,11 @@ function canonicalSkillDescriptionSecurityUnit(
   document: ParsedDocument,
   sourceLines: readonly string[],
 ): CanonicalDescriptionSecurityUnit | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  const { frontmatter } = inspectAgentSkill(document);
+  // Eligibility depends only on trustworthy parsed description evidence, not
+  // independent Agent Skills identity or filename validation.
   if (
-    document.artifact.kind !== "skill" ||
-    path.posix.basename(document.artifact.path) !== "SKILL.md"
-  ) {
-    return undefined;
-  }
-  const inspection = inspectAgentSkill(document);
-  const { frontmatter } = inspection;
-  // A known pre-0.16 description is not the canonical Agent Skills field.
-  // Every remaining gate depends on parsed description evidence, not whether
-  // independent Agent Skills validation checks passed.
-  if (
-    inspection.validation.format === "renma-legacy" ||
     !frontmatter.present ||
     !frontmatter.closed ||
     !frontmatter.mapping ||
