@@ -864,8 +864,11 @@ one deterministic projection for existing semantic correlation. Malformed or
 unclosed frontmatter produces no guessed YAML-comment evidence. Once the YAML
 parser identifies a comment, inner Markdown blockquotes, HTML-comment syntax,
 code presentation, and example labels cannot make its raw agent-visible text
-ineligible. This projection-specific rule does not change ordinary Markdown
-quotation or example handling. It also does not broaden security analysis to
+ineligible. The projected comment also has no policy authority over itself:
+policy-looking lines remain eligible evidence and logical-command input, but
+cannot grant permissions or allowlist a later line in the same projection.
+This projection-specific rule does not change ordinary Markdown quotation,
+example, or policy handling. It also does not broaden security analysis to
 `compatibility`, `license`, `allowed-tools`, arbitrary `metadata` or
 `metadata.renma.*` values, or any other scalar beyond the already-supported
 canonical `description`; deciding which of those raw-agent-visible scalar

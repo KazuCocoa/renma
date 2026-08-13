@@ -8,6 +8,7 @@ import {
 } from "./dependency-selectors.js";
 import {
   applySecurityConfig,
+  emptySecurityPolicy,
   effectiveAllowedDataClass,
   effectiveAllowedDataList,
   isSecurityPolicyLine,
@@ -1078,6 +1079,13 @@ type SecurityDiagnosticsConfig = {
   security?: SecurityConfig;
 };
 
+type SecurityPolicyAuthority = "artifact" | "none";
+
+interface SecurityDocumentAnalysisOptions {
+  readonly eligibility?: MarkdownSecurityEligibility;
+  readonly policyAuthority?: SecurityPolicyAuthority;
+}
+
 interface PreparedLogicalCommandAnalysis {
   readonly commands: readonly LogicalShellCommand[];
   readonly commandByLine: ReadonlyMap<number, LogicalShellCommand>;
@@ -1296,7 +1304,10 @@ function collectHiddenYamlFrontmatterCommentDetections(
     const underlying = hiddenInstructionProjectionDetections(
       prepared,
       comment.content,
-      "raw-agent-visible",
+      {
+        eligibility: "raw-agent-visible",
+        policyAuthority: "none",
+      },
     );
     return underlying.map((detection) => {
       const mappedStartLine = yamlCommentSourceLine(
@@ -1346,7 +1357,7 @@ function collectHiddenYamlFrontmatterCommentDetections(
 function hiddenInstructionProjectionDetections(
   prepared: PreparedSecurityDocumentAnalysis,
   content: string,
-  eligibility: MarkdownSecurityEligibility = "markdown-structured",
+  options: SecurityDocumentAnalysisOptions = {},
 ): Detection[] {
   const projectedArtifact: Artifact = {
     ...prepared.artifact,
@@ -1358,7 +1369,7 @@ function hiddenInstructionProjectionDetections(
   const projected = prepareSecurityDocumentAnalysis(
     parseDocument(projectedArtifact),
     undefined,
-    eligibility,
+    options,
   );
   if (projected === undefined) return [];
 
@@ -1444,7 +1455,7 @@ function yamlCommentEvidenceSnippet(
 function prepareSecurityDocumentAnalysis(
   document: ParsedDocument,
   securityConfig?: SecurityConfig,
-  eligibility: MarkdownSecurityEligibility = "markdown-structured",
+  options: SecurityDocumentAnalysisOptions = {},
 ): PreparedSecurityDocumentAnalysis | undefined {
   const artifact = document.artifact;
   if (
@@ -1455,9 +1466,16 @@ function prepareSecurityDocumentAnalysis(
   )
     return undefined;
 
-  const policyResolution = resolveOperationalSecurityPolicy(document);
+  const policyAuthority = options.policyAuthority ?? "artifact";
+  const policyResolution =
+    policyAuthority === "none"
+      ? { policy: emptySecurityPolicy(), issues: [] }
+      : resolveOperationalSecurityPolicy(document);
   const parsedPolicy = policyResolution.policy;
-  const effectivePolicy = applySecurityConfig(parsedPolicy, securityConfig);
+  const effectivePolicy =
+    policyAuthority === "none"
+      ? parsedPolicy
+      : applySecurityConfig(parsedPolicy, securityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);
   const syntax = ensureMarkdownSyntaxForDocument(document);
   if (syntax === undefined) {
@@ -1465,7 +1483,10 @@ function prepareSecurityDocumentAnalysis(
       "Eligible Markdown document is missing its primary syntax parse",
     );
   }
-  const markdownView = new MarkdownSecurityView(syntax, eligibility);
+  const markdownView = new MarkdownSecurityView(
+    syntax,
+    options.eligibility ?? "markdown-structured",
+  );
   const frontmatter =
     artifact.kind === "skill"
       ? inspectAgentSkill(document).frontmatter
@@ -1496,7 +1517,7 @@ function prepareSecurityDocumentAnalysis(
     artifact,
     parsedPolicy,
     effectivePolicy,
-    securityConfig,
+    securityConfig: policyAuthority === "none" ? undefined : securityConfig,
     policyIssues: policyResolution.issues,
     sourceLines,
     visibleLines,
@@ -1921,7 +1942,11 @@ function prepareSecurityLineContext(
   ) {
     return undefined;
   }
-  if (artifact.markdownParserEligible && isPolicyLine(line)) {
+  if (
+    !markdownView.usesRawAgentVisibleEligibility() &&
+    artifact.markdownParserEligible &&
+    isPolicyLine(line)
+  ) {
     return undefined;
   }
 
@@ -2637,8 +2662,8 @@ function hasPolicyRelevantInstructionSurface(
     }
     const line = prepared.markdownView.instructionLine(lineIndex);
     if (
-      isPolicyLine(line) ||
-      (!prepared.markdownView.usesRawAgentVisibleEligibility() &&
+      !prepared.markdownView.usesRawAgentVisibleEligibility() &&
+      (isPolicyLine(line) ||
         isShellCommentLine(line, lineIndex, prepared.markdownView))
     ) {
       continue;
@@ -2742,9 +2767,9 @@ function isLogicalShellLineEligible(
     (source === visible || operationalBlockQuote) &&
     !markdownView.isNonOperationalExampleLine(lineIndex) &&
     (!markdownView.isBlockQuotedLine(lineIndex) || operationalBlockQuote) &&
-    !isPolicyLine(visible) &&
     (markdownView.usesRawAgentVisibleEligibility() ||
-      !isShellCommentLine(visible, lineIndex, markdownView))
+      (!isPolicyLine(visible) &&
+        !isShellCommentLine(visible, lineIndex, markdownView)))
   );
 }
 
