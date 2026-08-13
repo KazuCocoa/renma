@@ -24,6 +24,7 @@ import type { SecurityConfig } from "./types/configuration.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
 import { inspectAgentSkill } from "./agent-skills.js";
+import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownSourceRange,
@@ -1382,20 +1383,37 @@ function canonicalSkillDescriptionSecurityUnit(
   sourceLines: readonly string[],
 ): CanonicalDescriptionSecurityUnit | undefined {
   if (document.artifact.kind !== "skill") return undefined;
-  const inspection = inspectAgentSkill(document);
+  const { frontmatter } = inspectAgentSkill(document);
+  // Eligibility depends only on trustworthy parsed description evidence, not
+  // independent Agent Skills identity or filename validation.
   if (
-    inspection.validation.format !== "agent-skills" ||
-    !inspection.validation.valid ||
-    inspection.validation.description === undefined
+    !frontmatter.present ||
+    !frontmatter.closed ||
+    !frontmatter.mapping ||
+    frontmatter.errors.length > 0
   ) {
     return undefined;
   }
-  const field = inspection.frontmatter.fields.find(
-    (candidate) => candidate.key === "description",
+
+  const descriptionFields = frontmatter.fields.filter(
+    (candidate) => candidate.key === AGENT_SKILL_TOP_LEVEL_KEYS.description,
   );
-  if (field === undefined) return undefined;
+  if (descriptionFields.length !== 1) return undefined;
+  const field = descriptionFields[0]!;
+  if (
+    typeof field.value !== "string" ||
+    !Number.isSafeInteger(field.startLine) ||
+    !Number.isSafeInteger(field.endLine) ||
+    field.startLine < 2 ||
+    field.endLine < field.startLine ||
+    field.endLine >= frontmatter.bodyStartLine - 1 ||
+    field.endLine > sourceLines.length
+  ) {
+    return undefined;
+  }
+
   return {
-    text: inspection.validation.description,
+    text: field.value,
     evidence: {
       startLine: field.startLine,
       endLine: field.endLine,
