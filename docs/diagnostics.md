@@ -786,26 +786,35 @@ the exact ASCII-like token set `A-Z`, `a-z`, `0-9`, `_`, `-`, `.`, `/`, `:`,
 metadata keys, and dependency names without reporting ordinary emoji joining or
 complex-script shaping.
 
-Variation Selectors `U+FE00`–`U+FE0F` and Variation Selectors Supplement
-`U+E0100`–`U+E01EF` use a separate conservative composition heuristic. Renma
-reports a selector only when it belongs to a run of two or more consecutive
-Variation Selectors. A finding's escaped evidence names each reported selector,
-and `details.variationSelectorAnalysis` records the `consecutive-run` heuristic,
-minimum run length, sequence count, longest run, and exact Unicode block ranges
-represented on that line. Consecutive selectors are high-signal encoded-looking
-composition because ordinary presentation and ideographic variation attach one
-selector to a base character.
+Three selector families use a separate conservative composition heuristic:
+
+- Mongolian Free Variation Selectors `U+180B`–`U+180D` and `U+180F`;
+- Variation Selectors `U+FE00`–`U+FE0F`; and
+- Variation Selectors Supplement `U+E0100`–`U+E01EF`.
+
+`U+180E` remains the separately handled MONGOLIAN VOWEL SEPARATOR; it is not a
+Variation Selector. Renma reports a covered selector only when it belongs to a
+run of two or more consecutive selectors. A finding's escaped evidence names
+each reported selector, and `details.variationSelectorAnalysis` records the
+`consecutive-run` heuristic, minimum run length, sequence count, longest run,
+and exact represented ranges on that line. Consecutive selector-only runs are
+high-signal encoded-looking hidden text because ordinary presentation,
+ideographic variation, and Mongolian variation attach one selector to a base
+character.
 
 The detector is not a general non-ASCII, normalization, or confusable-character
 rule. Japanese and other multilingual text, ordinary RTL text, `U+200E`,
-`U+200F`, `U+061C`, isolated emoji/text or ideographic Variation Selectors,
-ordinary ZWJ sequences, combining marks in general, non-breaking and narrow
-non-breaking spaces, ideographic spaces, full-width characters, normalization
-differences, and homoglyphs are not reported solely because they exist. Normal
-tab, LF, and CR characters are also allowed. Repeated selectors separated by
-base characters are not reported solely by count or line density; this avoids
-broad findings on emoji-heavy or ideographic-variation text, but means encoded
-forms that never place selectors consecutively remain outside current coverage.
+`U+200F`, `U+061C`, isolated Mongolian, emoji/text, or ideographic Variation
+Selectors, ordinary ZWJ sequences, combining marks in general, non-breaking and
+narrow non-breaking spaces, ideographic spaces, full-width characters,
+normalization differences, and homoglyphs are not reported solely because they
+exist. Normal tab, LF, and CR characters are also allowed. Repeated selectors
+separated by base characters are not reported solely by count or line density;
+this avoids broad findings on legitimate Unicode text, but means encoded forms
+that never place selectors consecutively remain outside current coverage. The
+covered candidates are intentionally not exhaustive and may gain additional
+deterministic, high-signal composition rules as Unicode hidden-text techniques
+evolve; Unicode-property membership alone does not produce a finding.
 
 Repair only the exact reported code point or replace it with the intended
 visible text; do not normalize or rewrite the file or remove legitimate

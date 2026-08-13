@@ -26,11 +26,11 @@ interface EvidenceToken {
   readonly text: string;
 }
 
-interface UnicodeRange {
+interface VariationSelectorRange {
   readonly name: string;
   readonly startCodePoint: number;
   readonly endCodePoint: number;
-  readonly firstSelectorNumber: number;
+  readonly characterName: (codePoint: number) => string;
 }
 
 const MAX_SNIPPET_LENGTH = 240;
@@ -38,22 +38,38 @@ const ASCII_TOKEN_CHARACTER = /^[A-Za-z0-9_.\-/:@%+=]$/u;
 
 const MIN_CONSECUTIVE_VARIATION_SELECTORS = 2;
 
-// These ranges and this adjacency heuristic are intentionally not assumed to
-// be exhaustive. Unicode-based invisible-text techniques evolve; add new
-// code points, ranges, or composition patterns only when high-signal evidence
-// supports doing so, without broadly flagging legitimate Unicode content.
-const VARIATION_SELECTOR_RANGES: readonly UnicodeRange[] = [
+// Unicode hidden-text techniques evolve; this candidate list is intentionally
+// not exhaustive. Security properties such as Default_Ignorable_Code_Point can
+// guide future review, but membership alone is not evidence: legitimate
+// language, mathematical, emoji, and formatting uses exist. Add only
+// deterministic, high-signal composition or context rules that preserve
+// legitimate multilingual Unicode content.
+const VARIATION_SELECTOR_RANGES: readonly VariationSelectorRange[] = [
+  {
+    name: "Mongolian Free Variation Selectors",
+    startCodePoint: 0x180b,
+    endCodePoint: 0x180d,
+    characterName: mongolianVariationSelectorName,
+  },
+  {
+    name: "Mongolian Free Variation Selectors",
+    startCodePoint: 0x180f,
+    endCodePoint: 0x180f,
+    characterName: mongolianVariationSelectorName,
+  },
   {
     name: "Variation Selectors",
     startCodePoint: 0xfe00,
     endCodePoint: 0xfe0f,
-    firstSelectorNumber: 1,
+    characterName: (codePoint) =>
+      `VARIATION SELECTOR-${codePoint - 0xfe00 + 1}`,
   },
   {
     name: "Variation Selectors Supplement",
     startCodePoint: 0xe0100,
     endCodePoint: 0xe01ef,
-    firstSelectorNumber: 17,
+    characterName: (codePoint) =>
+      `VARIATION SELECTOR-${codePoint - 0xe0100 + 17}`,
   },
 ];
 
@@ -342,11 +358,22 @@ function variationSelectorNameForCodePoint(
   codePoint: number,
 ): string | undefined {
   const range = variationSelectorRange(codePoint);
-  if (range === undefined) return undefined;
+  return range?.characterName(codePoint);
+}
 
-  const selectorNumber =
-    codePoint - range.startCodePoint + range.firstSelectorNumber;
-  return `VARIATION SELECTOR-${selectorNumber}`;
+function mongolianVariationSelectorName(codePoint: number): string {
+  switch (codePoint) {
+    case 0x180b:
+      return "MONGOLIAN FREE VARIATION SELECTOR ONE";
+    case 0x180c:
+      return "MONGOLIAN FREE VARIATION SELECTOR TWO";
+    case 0x180d:
+      return "MONGOLIAN FREE VARIATION SELECTOR THREE";
+    case 0x180f:
+      return "MONGOLIAN FREE VARIATION SELECTOR FOUR";
+    default:
+      return "MONGOLIAN FREE VARIATION SELECTOR";
+  }
 }
 
 function consecutiveVariationSelectorIndexes(
@@ -381,7 +408,9 @@ function isVariationSelector(codePoint: number | undefined): boolean {
   );
 }
 
-function variationSelectorRange(codePoint: number): UnicodeRange | undefined {
+function variationSelectorRange(
+  codePoint: number,
+): VariationSelectorRange | undefined {
   return VARIATION_SELECTOR_RANGES.find(
     ({ startCodePoint, endCodePoint }) =>
       codePoint >= startCodePoint && codePoint <= endCodePoint,

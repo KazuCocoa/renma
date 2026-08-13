@@ -155,8 +155,10 @@ Markdown instructions that reference or invoke them. A separate raw
 source-integrity check detects conservative hidden-Unicode signals in every
 already-discovered text artifact without interpreting executable behavior or
 widening discovery. This includes encoded-looking runs of consecutive Unicode
-Variation Selectors while allowing ordinary isolated emoji/text-presentation
-and ideographic selectors.
+Variation Selectors from the standard, supplementary, and Mongolian Free
+Variation Selector families while allowing ordinary isolated selectors. The
+covered families are intentionally conservative rather than an exhaustive
+Unicode-property policy.
 
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,

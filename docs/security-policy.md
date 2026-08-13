@@ -61,24 +61,29 @@ repository discovery.
 `U+E0000`–`U+E007F`. One leading `U+FEFF` is allowed; it is reported anywhere
 else. `U+200C` and `U+200D` are reported only with immediate ASCII-like token
 characters on both sides: letters, digits, `_`, `-`, `.`, `/`, `:`, `@`, `%`,
-`+`, or `=`. Variation Selectors `U+FE00`–`U+FE0F` and Variation Selectors
-Supplement `U+E0100`–`U+E01EF` are reported only in consecutive runs of two or
-more selectors. Evidence escapes each selector and structured details identify
-the consecutive-run heuristic, run sizes, and represented Unicode ranges.
+`+`, or `=`. Mongolian Free Variation Selectors `U+180B`–`U+180D` and `U+180F`,
+Variation Selectors `U+FE00`–`U+FE0F`, and Variation Selectors Supplement
+`U+E0100`–`U+E01EF` are reported only in consecutive runs of two or more
+selectors. `U+180E` remains the separately handled MONGOLIAN VOWEL SEPARATOR,
+not a Variation Selector. Evidence escapes each selector and structured details
+identify the consecutive-run heuristic, run sizes, and represented ranges.
 
 This is not a general non-ASCII check. Renma does not report Japanese or other
-multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, emoji
-presentation or isolated ideographic Variation Selectors, ordinary ZWJ
-sequences, combining marks in general, non-breaking spaces, narrow non-breaking
-spaces, ideographic spaces, full-width characters, Unicode normalization
-differences, or confusable characters solely because they exist. Selectors
-separated by base characters are not reported solely because they repeat or
-make a line selector-heavy; this preserves legitimate emoji and ideographic
-variation content, while leaving non-consecutive encoding forms outside current
-coverage. Inspect the escaped code point and change only the suspicious
-character while preserving legitimate multilingual content. Intentional cases
-use the existing narrowly path-scoped suppression with a documented reason, and
-intentional bidirectional formatting requires human confirmation.
+multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, isolated
+Mongolian, emoji/text-presentation, or ideographic Variation Selectors, ordinary
+ZWJ sequences, combining marks in general, non-breaking spaces, narrow
+non-breaking spaces, ideographic spaces, full-width characters, Unicode
+normalization differences, or confusable characters solely because they exist.
+Selectors separated by base characters are not reported solely because they
+repeat or make a line selector-heavy; this preserves legitimate multilingual
+Unicode content while leaving non-consecutive encoding forms outside current
+coverage. The selector list is intentionally not exhaustive: future candidates
+require deterministic, high-signal composition or context evidence rather than
+Unicode-property membership alone. Inspect the escaped code point and change
+only the suspicious character while preserving legitimate multilingual
+content. Intentional cases use the existing narrowly path-scoped suppression
+with a documented reason, and intentional bidirectional formatting requires
+human confirmation.
 
 Specialized scanners can complement this bounded policy and instruction
 analysis without becoming Renma dependencies or Renma findings. Renma does not

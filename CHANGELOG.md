@@ -6,13 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-- Extended raw hidden-Unicode source-integrity analysis to report consecutive
-  runs from `U+FE00`–`U+FE0F` and `U+E0100`–`U+E01EF` through the existing
-  `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` diagnostic. Findings include escaped
-  code-point evidence and selector-specific range/run details, while isolated
-  emoji/text-presentation and ideographic Variation Selectors remain allowed.
+- Fixed a hidden-Unicode detection gap for suspicious consecutive runs of
+  Mongolian Free Variation Selectors (`U+180B`–`U+180D`, `U+180F`), Variation
+  Selectors (`U+FE00`–`U+FE0F`), and Variation Selectors Supplement
+  (`U+E0100`–`U+E01EF`). The existing
+  `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` diagnostic now includes escaped
+  code-point and range/run evidence while isolated legitimate selectors remain
+  allowed.
 
 ## [0.32.0] - 2026-08-10
 
