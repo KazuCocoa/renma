@@ -1575,7 +1575,7 @@ rm -rf /tmp/commented-body
   );
 });
 
-test("only a valid canonical description becomes frontmatter security evidence", () => {
+test("a valid canonical description preserves exact frontmatter security evidence", () => {
   const content = `---
 name: security
 description: |

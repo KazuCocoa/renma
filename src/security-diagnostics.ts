@@ -1,3 +1,4 @@
+import path from "node:path";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
 import { hiddenUnicodeFindings } from "./hidden-unicode.js";
@@ -24,6 +25,7 @@ import type { SecurityConfig } from "./types/configuration.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
 import { inspectAgentSkill } from "./agent-skills.js";
+import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownSourceRange,
@@ -1381,21 +1383,46 @@ function canonicalSkillDescriptionSecurityUnit(
   document: ParsedDocument,
   sourceLines: readonly string[],
 ): CanonicalDescriptionSecurityUnit | undefined {
-  if (document.artifact.kind !== "skill") return undefined;
-  const inspection = inspectAgentSkill(document);
   if (
-    inspection.validation.format !== "agent-skills" ||
-    !inspection.validation.valid ||
-    inspection.validation.description === undefined
+    document.artifact.kind !== "skill" ||
+    path.posix.basename(document.artifact.path) !== "SKILL.md"
   ) {
     return undefined;
   }
-  const field = inspection.frontmatter.fields.find(
-    (candidate) => candidate.key === "description",
+  const inspection = inspectAgentSkill(document);
+  const { frontmatter } = inspection;
+  // A known pre-0.16 description is not the canonical Agent Skills field.
+  // Every remaining gate depends on parsed description evidence, not whether
+  // independent Agent Skills validation checks passed.
+  if (
+    inspection.validation.format === "renma-legacy" ||
+    !frontmatter.present ||
+    !frontmatter.closed ||
+    !frontmatter.mapping ||
+    frontmatter.errors.length > 0
+  ) {
+    return undefined;
+  }
+
+  const descriptionFields = frontmatter.fields.filter(
+    (candidate) => candidate.key === AGENT_SKILL_TOP_LEVEL_KEYS.description,
   );
-  if (field === undefined) return undefined;
+  if (descriptionFields.length !== 1) return undefined;
+  const field = descriptionFields[0]!;
+  if (
+    typeof field.value !== "string" ||
+    !Number.isSafeInteger(field.startLine) ||
+    !Number.isSafeInteger(field.endLine) ||
+    field.startLine < 2 ||
+    field.endLine < field.startLine ||
+    field.endLine >= frontmatter.bodyStartLine - 1 ||
+    field.endLine > sourceLines.length
+  ) {
+    return undefined;
+  }
+
   return {
-    text: inspection.validation.description,
+    text: field.value,
     evidence: {
       startLine: field.startLine,
       endLine: field.endLine,
