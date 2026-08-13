@@ -33,6 +33,9 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
   contentStartLine?: number;
 };
 
+export type MarkdownSecurityEligibility =
+  "markdown-structured" | "raw-agent-visible";
+
 /** Raw source that an agent can read even though Markdown renderers hide it. */
 export type MarkdownHtmlComment = MarkdownSourceRange & {
   startColumn: number;
@@ -113,19 +116,45 @@ export class MarkdownSecurityView {
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
   private readonly codeBlocks: readonly MarkdownCodeBlockRecord[];
+  private readonly eligibility: MarkdownSecurityEligibility;
   private readonly inlineCodeByUnit = new WeakMap<
     MarkdownSemanticUnit,
     SemanticOffsetRange[]
   >();
 
-  constructor(syntax: MarkdownSyntax) {
+  constructor(
+    syntax: MarkdownSyntax,
+    eligibility: MarkdownSecurityEligibility = "markdown-structured",
+  ) {
     this.sourceLines = syntax.sourceLines;
     this.bodyStartLine = syntax.bodyStartLine;
-    this.codeBlocks = syntax.codeBlocks;
+    this.eligibility = eligibility;
+    this.codeBlocks =
+      eligibility === "raw-agent-visible" ? [] : syntax.codeBlocks;
     this.codeBlocksByNode = new Map(
-      syntax.codeBlocks.map((block) => [block.node, block]),
+      this.codeBlocks.map((block) => [block.node, block]),
     );
-    this.records = syntax.records.filter(isSecurityRecord);
+    this.records =
+      eligibility === "raw-agent-visible"
+        ? []
+        : syntax.records.filter(isSecurityRecord);
+    if (eligibility === "raw-agent-visible") {
+      this.headings = [];
+      this.thematicBreaks = [];
+      this.htmlComments = [];
+      this.visibleLines = [...this.sourceLines];
+      this.semanticUnits = this.sourceLines.some((line) => line.trim())
+        ? [
+            {
+              kind: "paragraph",
+              startLine: this.bodyStartLine,
+              endLine: this.sourceLines.length,
+              lines: this.sourceLines.slice(this.bodyStartLine - 1),
+            },
+          ]
+        : [];
+      return;
+    }
     const headings: HeadingRecord[] = [];
     const thematicBreaks: MarkdownSourceRange[] = [];
     const inlineCodeRanges: SourceColumnRange[] = [];
@@ -231,6 +260,10 @@ export class MarkdownSecurityView {
     return this.visibleLines[lineIndex] ?? "";
   }
 
+  usesRawAgentVisibleEligibility(): boolean {
+    return this.eligibility === "raw-agent-visible";
+  }
+
   isBlockQuotedLine(lineIndex: number): boolean {
     return this.blockQuoteLines.has(lineIndex);
   }
@@ -267,6 +300,13 @@ export class MarkdownSecurityView {
   }
 
   sameMarkdownBlock(firstLineIndex: number, lastLineIndex: number): boolean {
+    if (this.usesRawAgentVisibleEligibility()) {
+      return (
+        firstLineIndex >= this.bodyStartLine - 1 &&
+        lastLineIndex >= firstLineIndex &&
+        lastLineIndex < this.sourceLines.length
+      );
+    }
     const first = this.smallestBlockRecordAtLine(firstLineIndex + 1);
     const last = this.smallestBlockRecordAtLine(lastLineIndex + 1);
     return first !== undefined && first === last;
@@ -289,6 +329,7 @@ export class MarkdownSecurityView {
     firstLineIndex: number,
     lastLineIndex: number,
   ): boolean {
+    if (this.usesRawAgentVisibleEligibility()) return true;
     if (
       this.isBlockQuotedLine(firstLineIndex) !==
       this.isBlockQuotedLine(lastLineIndex)
@@ -311,6 +352,7 @@ export class MarkdownSecurityView {
   }
 
   associatedGuardEvidence(lineIndex: number): SecurityGuardEvidence[] {
+    if (this.usesRawAgentVisibleEligibility()) return [];
     const line = lineIndex + 1;
     const record = this.smallestBlockRecordAtLine(line);
     if (record === undefined) return [];

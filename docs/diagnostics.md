@@ -861,12 +861,15 @@ Renma uses the YAML parser's concrete-syntax tokens, so a `#` inside a quoted
 value or block scalar is not a comment. Full-line and inline comments retain
 their original line and column evidence, and adjacent full-line comments form
 one deterministic projection for existing semantic correlation. Malformed or
-unclosed frontmatter produces no guessed YAML-comment evidence. This diagnostic
-does not broaden security analysis to `compatibility`, `license`,
-`allowed-tools`, arbitrary `metadata` or `metadata.renma.*` values, or any
-other scalar beyond the already-supported canonical `description`; deciding
-which of those raw-agent-visible scalar surfaces warrant high-signal analysis
-remains a follow-up.
+unclosed frontmatter produces no guessed YAML-comment evidence. Once the YAML
+parser identifies a comment, inner Markdown blockquotes, HTML-comment syntax,
+code presentation, and example labels cannot make its raw agent-visible text
+ineligible. This projection-specific rule does not change ordinary Markdown
+quotation or example handling. It also does not broaden security analysis to
+`compatibility`, `license`, `allowed-tools`, arbitrary `metadata` or
+`metadata.renma.*` values, or any other scalar beyond the already-supported
+canonical `description`; deciding which of those raw-agent-visible scalar
+surfaces warrant high-signal analysis remains a follow-up.
 
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
 circumvent security checks, weaken policy to pass diagnostics, suppress

@@ -807,7 +807,11 @@ tokens come from the YAML parser's concrete syntax tree: quoted `#` text and
 block-scalar content are not comments, while malformed or unclosed frontmatter
 is not heuristically recovered. Adjacent full-line comments are projected as a
 single deterministic block so the existing bounded semantic rules can
-correlate their text.
+correlate their text. The outer YAML comment is the eligibility boundary:
+inner Markdown blockquotes, HTML-comment syntax, code presentation, and example
+labels cannot hide its raw text from this projection. Ordinary Markdown body
+analysis and HTML-comment projection retain their existing structural
+false-positive protections.
 
 This scope is comments only. It does not newly security-scan `compatibility`,
 `license`, `allowed-tools`, arbitrary `metadata` or `metadata.renma.*` values,
