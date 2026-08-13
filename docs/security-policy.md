@@ -799,6 +799,30 @@ defensive and inert. This comment projection is separate from the raw hidden-
 Unicode pass, which continues to inspect every discovered UTF-8 text artifact
 before Markdown filtering.
 
+Closed, successfully parsed Skill frontmatter receives a parallel, additive
+projection for syntactic YAML comments. A recognized instruction emits
+`SEC-HIDDEN-FRONTMATTER-INSTRUCTION`, preserves the underlying diagnostic ID,
+and maps evidence back to the exact full-line or inline comment span. Comment
+tokens come from the YAML parser's concrete syntax tree: quoted `#` text and
+block-scalar content are not comments, while malformed or unclosed frontmatter
+is not heuristically recovered. Adjacent full-line comments are projected as a
+single deterministic block so the existing bounded semantic rules can
+correlate their text. The outer YAML comment is the eligibility boundary:
+inner Markdown blockquotes, HTML-comment syntax, code presentation, and example
+labels cannot hide its raw text from this projection. The comment projection
+also accepts no policy authority from its own text: a policy-looking prefix is
+still analyzed as raw evidence and cannot authorize or allowlist another
+comment line. Ordinary Markdown body analysis and HTML-comment projection
+retain their existing policy and structural false-positive protections;
+whether HTML comments should adopt the no-policy-authority rule is a separate
+follow-up.
+
+This scope is comments only. It does not newly security-scan `compatibility`,
+`license`, `allowed-tools`, arbitrary `metadata` or `metadata.renma.*` values,
+or other YAML scalars beyond the canonical `description` already supported.
+Whether selected non-description scalar surfaces should receive similarly
+high-signal analysis is a separate follow-up decision.
+
 Visible text outside an HTML comment span is still scanned. Fenced `text` or
 `markdown` payloads and blockquotes become operational when local surrounding
 prose, an instruction label, or an operational instruction heading explicitly
@@ -1098,6 +1122,7 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `QUAL-SKILL-DESCRIPTION-HIGH-RISK-LITERAL` | A canonical Skill routing example contains a concrete high-risk literal.                                                            | Replace it with semantic capability and selection wording, or move necessary exact evidence to a clearly non-operational body section. Do not automatically rewrite owner-authored prose.                                                                                                                                                                                  | Canonical Skill `description`              |
 | `SEC-SUSPICIOUS-BIDI-CONTROL`             | Original source contains a bidi formatting control that can change displayed order.                                                  | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional.                                                                                                                                                                                                                                                  | Any discovered UTF-8 text artifact         |
 | `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, ASCII-token-internal ZWJ/ZWNJ, or consecutive Variation Selector run. | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
+| `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`      | A syntactic YAML frontmatter comment contains a bounded recognized security-sensitive operational instruction even though metadata consumers ignore it. | Remove the hidden instruction, or move intentional agent-facing guidance into visible Markdown with applicable policy and safeguards.                                                                                                                                                                                                                                       | Skill YAML frontmatter comment             |
 | `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`      | A raw HTML comment contains a bounded recognized security-sensitive operational instruction even though rendered Markdown hides it. | Remove the hidden instruction, or move intentional agent-facing guidance into visible Markdown with applicable policy and safeguards.                                                                                                                                                                                                                                       | Agent-facing Markdown body                 |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding.                                                        | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value.                                                                                                                                                                                                                                                    | Skill metadata                             |
 | `SEC-MISSING-POLICY-METADATA`             | Sensitive instructions lack a declared policy.                                                                                       | Add local policy fields or select a configured security profile using the syntax for that asset kind.                                                                                                                                                                                                                                                                       | Metadata                                   |

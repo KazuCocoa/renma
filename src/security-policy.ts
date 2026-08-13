@@ -534,7 +534,7 @@ function orderedPolicySources(
   );
 }
 
-function emptySecurityPolicy(): SecurityPolicy {
+export function emptySecurityPolicy(): SecurityPolicy {
   return {
     allowedData: [],
     forbiddenInputs: [],
