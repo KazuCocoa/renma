@@ -21,6 +21,10 @@ import type { Artifact } from "./types/artifact.js";
 import type { Finding, RiskClass } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
+import type {
+  ParsedYamlFrontmatter,
+  YamlFrontmatterComment,
+} from "./yaml-frontmatter.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
 import { inspectAgentSkill } from "./agent-skills.js";
@@ -400,6 +404,30 @@ const RULES = {
     ],
     llmHint:
       "Inspect only the reported HTML-comment span. Remove hidden operational wording or make the intended instruction visible with explicit policy and safeguards.",
+    confidence: "high",
+    riskClass: "suspicious",
+  },
+  hiddenFrontmatterInstruction: {
+    id: DIAGNOSTIC_IDS.SEC_HIDDEN_FRONTMATTER_INSTRUCTION,
+    category: "safety",
+    title:
+      "YAML frontmatter comment contains a security-sensitive operational instruction",
+    whyItMatters:
+      "Metadata consumers ignore YAML comments, but an agent that consumes the raw Skill can still read and follow security-sensitive instructions inside them.",
+    remediation:
+      "Remove the hidden instruction, or move an intentionally agent-facing instruction into visible Markdown with the applicable policy and safeguards.",
+    constraints: [
+      "Do not treat YAML frontmatter comments as a place for operational instructions.",
+      "Keep ordinary metadata, formatting, and explanatory comments non-operational.",
+      "Do not weaken the underlying security policy to silence this finding.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the reported YAML frontmatter comment no longer contains a recognized security-sensitive instruction.",
+      "Confirm any retained operational instruction is visible and governed by the appropriate policy.",
+    ],
+    llmHint:
+      "Inspect only the reported YAML-comment span. Remove hidden operational wording or make the intended instruction visible with explicit policy and safeguards.",
     confidence: "high",
     riskClass: "suspicious",
   },
@@ -1072,6 +1100,7 @@ interface PreparedSecurityDocumentAnalysis {
   readonly visibleLines: readonly string[];
   readonly markdownView: MarkdownSecurityView;
   readonly canonicalDescription: CanonicalDescriptionSecurityUnit | undefined;
+  readonly yamlFrontmatterComments: readonly YamlFrontmatterComment[];
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
@@ -1197,6 +1226,7 @@ function securityFindingsForDocument(
     ),
     ...instructionDetections,
     ...collectHiddenHtmlCommentDetections(prepared),
+    ...collectHiddenYamlFrontmatterCommentDetections(prepared),
     ...policyContradictions(prepared.effectivePolicy),
   ];
 
@@ -1209,36 +1239,10 @@ function collectHiddenHtmlCommentDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
   return prepared.markdownView.htmlComments.flatMap((comment, commentIndex) => {
-    const projectedArtifact: Artifact = {
-      ...prepared.artifact,
-      kind: "context",
-      sizeBytes: comment.content.length + 1,
-      content: `\n${comment.content}`,
-      markdownParserEligible: true,
-    };
-    const projected = prepareSecurityDocumentAnalysis(
-      parseDocument(projectedArtifact),
+    const underlying = hiddenInstructionProjectionDetections(
+      prepared,
+      comment.content,
     );
-    if (projected === undefined) return [];
-
-    const recognizedDetections = dedupeDetections([
-      ...collectSecurityLineDetections(projected),
-      ...collectSemanticInstructionDetections(projected),
-    ]);
-    const underlying =
-      recognizedDetections.length > 0 ||
-      !hasPolicyRelevantInstructionSurface(projected)
-        ? recognizedDetections
-        : [
-            {
-              metadata: RULES.missingPolicyMetadata,
-              severity: "high" as const,
-              startLine: 2,
-              endLine: comment.content.split(/\r?\n/u).length + 1,
-              snippet: comment.content,
-              dedupeKey: "hidden-policy-relevant-instruction-surface",
-            },
-          ];
     return underlying.map((detection) => {
       const mappedStartLine = hiddenCommentSourceLine(
         comment,
@@ -1284,6 +1288,94 @@ function collectHiddenHtmlCommentDetections(
   });
 }
 
+function collectHiddenYamlFrontmatterCommentDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  return prepared.yamlFrontmatterComments.flatMap((comment, commentIndex) => {
+    const underlying = hiddenInstructionProjectionDetections(
+      prepared,
+      comment.content,
+    );
+    return underlying.map((detection) => {
+      const mappedStartLine = yamlCommentSourceLine(
+        comment,
+        detection.startLine,
+      );
+      const mappedEndLine = yamlCommentSourceLine(
+        comment,
+        detection.endLine ?? detection.startLine,
+      );
+      return {
+        metadata: RULES.hiddenFrontmatterInstruction,
+        severity: detection.severity,
+        startLine: mappedStartLine,
+        ...(mappedEndLine === mappedStartLine
+          ? {}
+          : { endLine: mappedEndLine }),
+        snippet: yamlCommentEvidenceSnippet(
+          prepared.sourceLines,
+          comment,
+          mappedStartLine,
+          mappedEndLine,
+        ),
+        dedupeKey: [
+          RULES.hiddenFrontmatterInstruction.id,
+          commentIndex,
+          detection.metadata.id,
+          detection.startLine,
+          detection.endLine ?? detection.startLine,
+          detection.snippet,
+        ].join(":"),
+        details: {
+          sourceProjection: "raw-agent-visible-yaml-frontmatter-comment",
+          matchedDiagnosticId: detection.metadata.id,
+          commentRange: {
+            startLine: comment.startLine,
+            endLine: comment.endLine,
+            startColumn: comment.startColumn,
+            endColumn: comment.endColumn,
+          },
+        },
+      };
+    });
+  });
+}
+
+function hiddenInstructionProjectionDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+  content: string,
+): Detection[] {
+  const projectedArtifact: Artifact = {
+    ...prepared.artifact,
+    kind: "context",
+    sizeBytes: content.length + 1,
+    content: `\n${content}`,
+    markdownParserEligible: true,
+  };
+  const projected = prepareSecurityDocumentAnalysis(
+    parseDocument(projectedArtifact),
+  );
+  if (projected === undefined) return [];
+
+  const recognizedDetections = dedupeDetections([
+    ...collectSecurityLineDetections(projected),
+    ...collectSemanticInstructionDetections(projected),
+  ]);
+  return recognizedDetections.length > 0 ||
+    !hasPolicyRelevantInstructionSurface(projected)
+    ? recognizedDetections
+    : [
+        {
+          metadata: RULES.missingPolicyMetadata,
+          severity: "high" as const,
+          startLine: 2,
+          endLine: content.split(/\r?\n/u).length + 1,
+          snippet: content,
+          dedupeKey: "hidden-policy-relevant-instruction-surface",
+        },
+      ];
+}
+
 function hiddenCommentSourceLine(
   comment: MarkdownHtmlComment,
   projectedLine: number,
@@ -1316,6 +1408,34 @@ function htmlCommentEvidenceSnippet(
   return lines.join("\n");
 }
 
+function yamlCommentSourceLine(
+  comment: YamlFrontmatterComment,
+  projectedLine: number,
+): number {
+  const lineIndex = Math.max(
+    0,
+    Math.min(comment.lines.length - 1, projectedLine - 2),
+  );
+  return comment.lines[lineIndex]?.line ?? comment.startLine;
+}
+
+function yamlCommentEvidenceSnippet(
+  sourceLines: readonly string[],
+  comment: YamlFrontmatterComment,
+  startLine: number,
+  endLine: number,
+): string {
+  const lines = comment.lines
+    .filter((line) => line.line >= startLine && line.line <= endLine)
+    .map((line) =>
+      (sourceLines[line.line - 1] ?? "").slice(
+        line.startColumn - 1,
+        line.endColumn - 1,
+      ),
+    );
+  return lines.length > 0 ? lines.join("\n") : comment.content;
+}
+
 function prepareSecurityDocumentAnalysis(
   document: ParsedDocument,
   securityConfig?: SecurityConfig,
@@ -1340,9 +1460,14 @@ function prepareSecurityDocumentAnalysis(
     );
   }
   const markdownView = new MarkdownSecurityView(syntax);
+  const frontmatter =
+    artifact.kind === "skill"
+      ? inspectAgentSkill(document).frontmatter
+      : undefined;
   const canonicalDescription = canonicalSkillDescriptionSecurityUnit(
     document,
     sourceLines,
+    frontmatter,
   );
   const scanStart = syntax.bodyStartLine - 1;
   const visibleLines = sourceLines.map((_, index) =>
@@ -1371,6 +1496,7 @@ function prepareSecurityDocumentAnalysis(
     visibleLines,
     markdownView,
     canonicalDescription,
+    yamlFrontmatterComments: frontmatter?.comments ?? [],
     scanStart,
     logicalCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,
@@ -1381,9 +1507,10 @@ function prepareSecurityDocumentAnalysis(
 function canonicalSkillDescriptionSecurityUnit(
   document: ParsedDocument,
   sourceLines: readonly string[],
+  frontmatter: ParsedYamlFrontmatter | undefined,
 ): CanonicalDescriptionSecurityUnit | undefined {
-  if (document.artifact.kind !== "skill") return undefined;
-  const { frontmatter } = inspectAgentSkill(document);
+  if (document.artifact.kind !== "skill" || frontmatter === undefined)
+    return undefined;
   // Eligibility depends only on trustworthy parsed description evidence, not
   // independent Agent Skills identity or filename validation.
   if (

@@ -3,6 +3,7 @@ import {
   isNode,
   isScalar,
   LineCounter,
+  Parser,
   parseDocument as parseYamlDocument,
   type Document,
   type Node,
@@ -23,6 +24,23 @@ export interface YamlFrontmatterField {
   endLine: number;
 }
 
+export interface YamlFrontmatterCommentLine {
+  content: string;
+  line: number;
+  startColumn: number;
+  endColumn: number;
+}
+
+/** Syntactic YAML comment text with exact original frontmatter evidence. */
+export interface YamlFrontmatterComment {
+  content: string;
+  startLine: number;
+  endLine: number;
+  startColumn: number;
+  endColumn: number;
+  lines: YamlFrontmatterCommentLine[];
+}
+
 export interface ParsedYamlFrontmatter {
   present: boolean;
   closed: boolean;
@@ -31,6 +49,7 @@ export interface ParsedYamlFrontmatter {
   values: Record<string, unknown>;
   fields: YamlFrontmatterField[];
   metadataFields: YamlFrontmatterField[];
+  comments: YamlFrontmatterComment[];
   duplicateFields: YamlFrontmatterField[];
   duplicateMetadataKeys: YamlFrontmatterField[];
   errors: YamlFrontmatterError[];
@@ -94,10 +113,16 @@ export function parseAgentSkillFrontmatter(
     line:
       (error.linePos?.[0].line ?? lineCounter.linePos(error.pos[0]).line) + 1,
   }));
+  // The same YAML library's CST distinguishes syntactic comments from hashes
+  // inside quoted and block scalar content. Only expose comment evidence after
+  // the semantic parse succeeds; malformed YAML must not produce guessed text.
+  const comments =
+    errors.length === 0 ? yamlFrontmatterComments(source, lineCounter) : [];
 
   if (!isMap(yaml.contents)) {
     return {
       ...emptyResult(true, true, closingIndex + 2),
+      comments,
       errors,
     };
   }
@@ -123,6 +148,7 @@ export function parseAgentSkillFrontmatter(
     values: Object.fromEntries(fields.map((field) => [field.key, field.value])),
     fields,
     metadataFields,
+    comments,
     duplicateFields: findDuplicates(fields),
     duplicateMetadataKeys: findDuplicates(metadataFields),
     errors,
@@ -142,10 +168,118 @@ function emptyResult(
     values: {},
     fields: [],
     metadataFields: [],
+    comments: [],
     duplicateFields: [],
     duplicateMetadataKeys: [],
     errors: [],
   };
+}
+
+type CstCommentLine = YamlFrontmatterCommentLine & {
+  offset: number;
+  fullLine: boolean;
+};
+
+function yamlFrontmatterComments(
+  source: string,
+  lineCounter: LineCounter,
+): YamlFrontmatterComment[] {
+  const tokens = [...new Parser().parse(source)];
+  if (containsCstErrorToken(tokens)) return [];
+  const comments: Array<{ offset: number; source: string }> = [];
+  collectCstCommentTokens(tokens, comments);
+  const sourceLines = source.split("\n");
+  const commentLines = comments
+    .sort((left, right) => left.offset - right.offset)
+    .filter(
+      (comment, index, sorted) =>
+        index === 0 || comment.offset !== sorted[index - 1]?.offset,
+    )
+    .map((comment): CstCommentLine => {
+      const position = lineCounter.linePos(comment.offset);
+      const sourceLine = sourceLines[position.line - 1] ?? "";
+      return {
+        offset: comment.offset,
+        content: comment.source.slice(1),
+        line: position.line + 1,
+        startColumn: position.col,
+        endColumn: position.col + comment.source.length,
+        fullLine: sourceLine.slice(0, position.col - 1).trim().length === 0,
+      };
+    });
+
+  const blocks: CstCommentLine[][] = [];
+  for (const line of commentLines) {
+    const previousBlock = blocks.at(-1);
+    const previousLine = previousBlock?.at(-1);
+    if (
+      line.fullLine &&
+      previousLine?.fullLine &&
+      line.line === previousLine.line + 1
+    ) {
+      previousBlock!.push(line);
+    } else {
+      blocks.push([line]);
+    }
+  }
+
+  return blocks.map((block) => {
+    const first = block[0]!;
+    const last = block.at(-1)!;
+    return {
+      content: block.map((line) => line.content).join("\n"),
+      startLine: first.line,
+      endLine: last.line,
+      startColumn: first.startColumn,
+      endColumn: last.endColumn,
+      lines: block.map(
+        ({
+          content,
+          line,
+          startColumn,
+          endColumn,
+        }): YamlFrontmatterCommentLine => ({
+          content,
+          line,
+          startColumn,
+          endColumn,
+        }),
+      ),
+    };
+  });
+}
+
+function containsCstErrorToken(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsCstErrorToken);
+  if (!isRecord(value)) return false;
+  if (value.type === "error") return true;
+  return Object.values(value).some(containsCstErrorToken);
+}
+
+function collectCstCommentTokens(
+  value: unknown,
+  comments: Array<{ offset: number; source: string }>,
+): void {
+  if (Array.isArray(value)) {
+    for (const item of value) collectCstCommentTokens(item, comments);
+    return;
+  }
+  if (!isRecord(value)) return;
+  if (
+    value.type === "comment" &&
+    typeof value.offset === "number" &&
+    typeof value.source === "string"
+  ) {
+    comments.push({ offset: value.offset, source: value.source });
+    return;
+  }
+  for (const child of Object.values(value)) {
+    collectCstCommentTokens(child, comments);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function mapFields(
