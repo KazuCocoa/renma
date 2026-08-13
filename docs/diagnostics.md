@@ -764,14 +764,20 @@ conceptually applicable source surface was ambiguous or malformed. The schema
 also reserves `blocked`, while current read and traversal blockers remain in
 repository inspection coverage rather than creating synthetic artifact rows.
 
-In particular, discovered UTF-8 non-Markdown support text receives raw
-hidden-Unicode analysis and reports semantic instruction analysis as
-`unsupported`. Renma does not add `.txt`, JSON, YAML, TOML, or source-code
-semantic scanning through this reporting model. A valid Skill frontmatter with
-no YAML comments reports comment analysis as `analyzed` and a zero surface
-count; malformed frontmatter does not claim that the comment or canonical
-description surface was successfully analyzed. Absence of findings must not be
-interpreted as complete security-analysis coverage.
+In particular, discovered UTF-8 `.txt` Skill support receives semantic
+instruction analysis only when the existing repository-local static-reference
+graph proves it reachable from exactly one owning Skill. This eligibility
+supports direct and deterministically transitive references; it does not arise
+from directory placement, discovery, proximity, basename ambiguity, external
+URLs, absolute or escaping paths, unresolved targets, or symlinks. The
+plain-text file has no policy authority, and findings retain its original path,
+line, and snippet. Otherwise identical unreachable `.txt` remains
+`unsupported`. JSON, YAML, TOML, source code, executable support, and binary
+assets do not enter this semantic path. A valid Skill frontmatter with no YAML
+comments reports comment analysis as `analyzed` and a zero surface count;
+malformed frontmatter does not claim that the comment or canonical description
+surface was successfully analyzed. Absence of findings must not be interpreted
+as complete security-analysis coverage.
 
 ### Hidden Unicode source-integrity boundaries
 

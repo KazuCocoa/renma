@@ -23,6 +23,11 @@ export interface StaticSupportReference {
   raw: string;
 }
 
+export interface PlainTextSupportSecurityReachability {
+  owningSkillPath: string;
+  depth: number;
+}
+
 /** Parse exact, repository-local support references once for rules and graphs. */
 export function staticSupportReferences(
   document: ParsedDocument,
@@ -150,6 +155,73 @@ export function localSupportReachabilityDepth(
   }
 
   return reachable;
+}
+
+/**
+ * Select only statically reachable UTF-8 plain-text support owned by one Skill.
+ * Security orchestration consumes this repository-owned evidence without
+ * reparsing references or independently reconstructing reachability.
+ */
+export function plainTextSupportSecurityReachability(
+  documents: ParsedDocument[],
+  repositoryPaths: ReadonlySet<string>,
+): ReadonlyMap<string, PlainTextSupportSecurityReachability> {
+  const skillsByDirectory = new Map<string, ParsedDocument[]>();
+  for (const document of documents) {
+    if (document.artifact.kind !== "skill") continue;
+    const classified = classifyRepositorySkillPath(document.artifact.path);
+    if (classified?.kind !== "entrypoint") continue;
+    const skills = skillsByDirectory.get(classified.skillDirectory) ?? [];
+    skills.push(document);
+    skillsByDirectory.set(classified.skillDirectory, skills);
+  }
+
+  const eligible: Array<[string, PlainTextSupportSecurityReachability]> = [];
+  for (const [skillDirectory, skills] of skillsByDirectory) {
+    if (skills.length !== 1) continue;
+    const skill = skills[0]!;
+    const localSupportDocs = documents.filter((document) => {
+      const classified = classifyRepositorySkillPath(document.artifact.path);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
+    const candidatePaths = [...repositoryPaths].filter((candidate) => {
+      const classified = classifyRepositorySkillPath(candidate);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
+    const reachability = localSupportReachabilityDepth(
+      skill,
+      skillDirectory,
+      localSupportDocs,
+      candidatePaths,
+    );
+
+    for (const document of localSupportDocs) {
+      const classified = classifyRepositorySkillPath(document.artifact.path);
+      const depth = reachability.get(document.artifact.path);
+      if (
+        classified?.kind !== "support" ||
+        classified.supportDirectory === "scripts" ||
+        document.artifact.kind === "script" ||
+        document.artifact.contentClassification !== "text" ||
+        path.posix.extname(document.artifact.path).toLowerCase() !== ".txt" ||
+        depth === undefined
+      ) {
+        continue;
+      }
+      eligible.push([
+        document.artifact.path,
+        { owningSkillPath: skill.artifact.path, depth },
+      ]);
+    }
+  }
+
+  return new Map(eligible.sort(([left], [right]) => left.localeCompare(right)));
 }
 
 function maskRawMatches(line: string, matches: string[]): string {
