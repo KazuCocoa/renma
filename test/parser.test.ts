@@ -394,6 +394,7 @@ license: "Use # only as a literal marker"
 # Body
 `);
 
+  assert.equal(frontmatter.commentsAnalyzable, true);
   assert.deepEqual(frontmatter.comments, [
     {
       content: " Full-line note",
@@ -449,6 +450,25 @@ license: "Use # only as a literal marker"
   ]);
 });
 
+test("Agent Skill frontmatter distinguishes successful zero-comment extraction", () => {
+  const withoutComments = parseAgentSkillFrontmatter(`---
+name: demo
+description: Review demo input. Use when deterministic evidence is required.
+compatibility: "Use # only as a literal marker"
+license: |
+  # Block-scalar content
+---
+# Body
+`);
+  const absent = parseAgentSkillFrontmatter("# Body\n");
+
+  assert.equal(withoutComments.commentsAnalyzable, true);
+  assert.deepEqual(withoutComments.comments, []);
+  assert.equal(absent.present, false);
+  assert.equal(absent.commentsAnalyzable, false);
+  assert.deepEqual(absent.comments, []);
+});
+
 test("malformed and unclosed Agent Skill frontmatter expose no guessed YAML comments", () => {
   const malformed = parseAgentSkillFrontmatter(`---
 name: demo
@@ -464,9 +484,27 @@ name: demo
 `);
 
   assert.ok(malformed.errors.length > 0);
+  assert.equal(malformed.commentsAnalyzable, false);
   assert.deepEqual(malformed.comments, []);
   assert.equal(unclosed.closed, false);
+  assert.equal(unclosed.commentsAnalyzable, false);
   assert.deepEqual(unclosed.comments, []);
+});
+
+test("Agent Skill frontmatter exposes CST rejection independently from semantic YAML errors", () => {
+  // yaml@2.9.0 accepts this as an explicit empty key with no semantic error,
+  // while its CST parser emits an error token for the malformed block-scalar
+  // header suffix. Keep the parser-owned extraction outcome fail closed even
+  // if those two parser layers change independently.
+  const frontmatter = parseAgentSkillFrontmatter(`---
+? ""| },
+---
+# Body
+`);
+
+  assert.deepEqual(frontmatter.errors, []);
+  assert.equal(frontmatter.commentsAnalyzable, false);
+  assert.deepEqual(frontmatter.comments, []);
 });
 
 test("historical Skill entrypoints retain Agent Skills body boundaries", () => {

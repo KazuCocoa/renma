@@ -49,6 +49,8 @@ export interface ParsedYamlFrontmatter {
   values: Record<string, unknown>;
   fields: YamlFrontmatterField[];
   metadataFields: YamlFrontmatterField[];
+  /** True only when syntactic YAML-comment extraction completed successfully. */
+  commentsAnalyzable: boolean;
   comments: YamlFrontmatterComment[];
   duplicateFields: YamlFrontmatterField[];
   duplicateMetadataKeys: YamlFrontmatterField[];
@@ -116,13 +118,15 @@ export function parseAgentSkillFrontmatter(
   // The same YAML library's CST distinguishes syntactic comments from hashes
   // inside quoted and block scalar content. Only expose comment evidence after
   // the semantic parse succeeds; malformed YAML must not produce guessed text.
-  const comments =
-    errors.length === 0 ? yamlFrontmatterComments(source, lineCounter) : [];
+  const commentAnalysis =
+    errors.length === 0
+      ? analyzeYamlFrontmatterComments(source, lineCounter)
+      : { commentsAnalyzable: false as const, comments: [] };
 
   if (!isMap(yaml.contents)) {
     return {
       ...emptyResult(true, true, closingIndex + 2),
-      comments,
+      ...commentAnalysis,
       errors,
     };
   }
@@ -148,7 +152,7 @@ export function parseAgentSkillFrontmatter(
     values: Object.fromEntries(fields.map((field) => [field.key, field.value])),
     fields,
     metadataFields,
-    comments,
+    ...commentAnalysis,
     duplicateFields: findDuplicates(fields),
     duplicateMetadataKeys: findDuplicates(metadataFields),
     errors,
@@ -168,6 +172,7 @@ function emptyResult(
     values: {},
     fields: [],
     metadataFields: [],
+    commentsAnalyzable: false,
     comments: [],
     duplicateFields: [],
     duplicateMetadataKeys: [],
@@ -180,12 +185,14 @@ type CstCommentLine = YamlFrontmatterCommentLine & {
   fullLine: boolean;
 };
 
-function yamlFrontmatterComments(
+function analyzeYamlFrontmatterComments(
   source: string,
   lineCounter: LineCounter,
-): YamlFrontmatterComment[] {
+): Pick<ParsedYamlFrontmatter, "commentsAnalyzable" | "comments"> {
   const tokens = [...new Parser().parse(source)];
-  if (containsCstErrorToken(tokens)) return [];
+  if (containsCstErrorToken(tokens)) {
+    return { commentsAnalyzable: false, comments: [] };
+  }
   const comments: Array<{ offset: number; source: string }> = [];
   collectCstCommentTokens(tokens, comments);
   const sourceLines = source.split("\n");
@@ -223,30 +230,33 @@ function yamlFrontmatterComments(
     }
   }
 
-  return blocks.map((block) => {
-    const first = block[0]!;
-    const last = block.at(-1)!;
-    return {
-      content: block.map((line) => line.content).join("\n"),
-      startLine: first.line,
-      endLine: last.line,
-      startColumn: first.startColumn,
-      endColumn: last.endColumn,
-      lines: block.map(
-        ({
-          content,
-          line,
-          startColumn,
-          endColumn,
-        }): YamlFrontmatterCommentLine => ({
-          content,
-          line,
-          startColumn,
-          endColumn,
-        }),
-      ),
-    };
-  });
+  return {
+    commentsAnalyzable: true,
+    comments: blocks.map((block) => {
+      const first = block[0]!;
+      const last = block.at(-1)!;
+      return {
+        content: block.map((line) => line.content).join("\n"),
+        startLine: first.line,
+        endLine: last.line,
+        startColumn: first.startColumn,
+        endColumn: last.endColumn,
+        lines: block.map(
+          ({
+            content,
+            line,
+            startColumn,
+            endColumn,
+          }): YamlFrontmatterCommentLine => ({
+            content,
+            line,
+            startColumn,
+            endColumn,
+          }),
+        ),
+      };
+    }),
+  };
 }
 
 function containsCstErrorToken(value: unknown): boolean {

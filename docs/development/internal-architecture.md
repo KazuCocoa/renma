@@ -171,6 +171,13 @@ projection of that pass. Discovery scope, artifact classification,
 suppression, Diagnostics v2, review bundles, ordering, and reporting remain
 owned by their existing layers.
 
+`parseAgentSkillFrontmatter()` owns YAML-comment extraction eligibility as
+well as the extracted comment surfaces. Its `commentsAnalyzable` evidence is
+true only after both semantic YAML parsing and CST token extraction complete
+without errors. Security coverage consumes that parser-owned state directly,
+so zero comments can mean `analyzed` only when the extractor actually ran
+successfully.
+
 `src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
 guard application, fallback selection, evidence projection, ordering,
 deduplication, and conversion into the existing public Finding model. Its

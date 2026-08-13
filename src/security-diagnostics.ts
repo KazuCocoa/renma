@@ -1118,8 +1118,8 @@ interface PreparedSecurityDocumentAnalysis {
   readonly visibleLines: readonly string[];
   readonly markdownView: MarkdownSecurityView;
   readonly canonicalDescription: CanonicalDescriptionSecurityUnit | undefined;
-  readonly yamlFrontmatterCommentsAnalyzable: boolean;
-  readonly yamlFrontmatterComments: readonly YamlFrontmatterComment[];
+  readonly yamlFrontmatterCommentAnalysis:
+    Pick<ParsedYamlFrontmatter, "commentsAnalyzable" | "comments"> | undefined;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
@@ -1312,7 +1312,7 @@ function securityAnalysisCoverageArtifact(
       ? {
           surfaceCounts: {
             yamlFrontmatterComments:
-              prepared?.yamlFrontmatterComments.length ?? 0,
+              prepared?.yamlFrontmatterCommentAnalysis?.comments.length ?? 0,
           },
         }
       : {}),
@@ -1346,7 +1346,7 @@ function yamlFrontmatterCommentCoverageState(
 ): SecurityAnalysisCoverageState {
   if (artifact.kind !== "skill") return "not-applicable";
   if (prepared === undefined) return "unsupported";
-  return prepared.yamlFrontmatterCommentsAnalyzable
+  return prepared.yamlFrontmatterCommentAnalysis?.commentsAnalyzable === true
     ? "analyzed"
     : "not-analyzable";
 }
@@ -1407,7 +1407,8 @@ function collectHiddenHtmlCommentDetections(
 function collectHiddenYamlFrontmatterCommentDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
-  return prepared.yamlFrontmatterComments.flatMap((comment, commentIndex) => {
+  const comments = prepared.yamlFrontmatterCommentAnalysis?.comments ?? [];
+  return comments.flatMap((comment, commentIndex) => {
     const underlying = hiddenInstructionProjectionDetections(
       prepared,
       comment.content,
@@ -1630,12 +1631,7 @@ function prepareSecurityDocumentAnalysis(
     visibleLines,
     markdownView,
     canonicalDescription,
-    yamlFrontmatterCommentsAnalyzable:
-      frontmatter !== undefined &&
-      frontmatter.present &&
-      frontmatter.closed &&
-      frontmatter.errors.length === 0,
-    yamlFrontmatterComments: frontmatter?.comments ?? [],
+    yamlFrontmatterCommentAnalysis: frontmatter,
     scanStart,
     logicalCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,
