@@ -372,7 +372,8 @@ test("policy-looking plain-text continuation cannot break logical command analys
     result.findings.some(
       (finding) =>
         finding.id === "SEC-UNPINNED-REMOTE-SCRIPT" &&
-        finding.evidence.path === "skills/plain-command/references/runtime.txt" &&
+        finding.evidence.path ===
+          "skills/plain-command/references/runtime.txt" &&
         finding.evidence.startLine === 1,
     ),
   );
