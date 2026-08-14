@@ -34,7 +34,7 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
 };
 
 export type MarkdownSecurityEligibility =
-  "markdown-structured" | "raw-agent-visible";
+  "markdown-structured" | "plain-text-structured" | "raw-agent-visible";
 
 /** Raw source that an agent can read even though Markdown renderers hide it. */
 export type MarkdownHtmlComment = MarkdownSourceRange & {
@@ -198,9 +198,12 @@ export class MarkdownSecurityView {
     }
     this.headings = headings;
     this.thematicBreaks = thematicBreaks;
-    this.htmlComments = htmlRecords.flatMap(({ node }) =>
-      htmlComments(node, this.bodyStartLine),
-    );
+    this.htmlComments =
+      eligibility === "plain-text-structured"
+        ? []
+        : htmlRecords.flatMap(({ node }) =>
+            htmlComments(node, this.bodyStartLine),
+          );
     const visibleLineProjections = projectVisibleLines(
       this.sourceLines,
       this.htmlComments,

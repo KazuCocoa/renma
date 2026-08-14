@@ -40,6 +40,7 @@ import { parseDocument } from "./markdown.js";
 import { inspectAgentSkill } from "./agent-skills.js";
 import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
 import {
+  attachMarkdownSyntax,
   ensureMarkdownSyntaxForDocument,
   markdownSourceRange,
   parseMarkdownSyntax,
@@ -88,6 +89,7 @@ import {
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
 import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "./types/skill-description.js";
+import type { PlainTextSupportSecurityReachability } from "./static-support.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -1093,6 +1095,7 @@ type SecurityPolicyAuthority = "artifact" | "none";
 interface SecurityDocumentAnalysisOptions {
   readonly eligibility?: MarkdownSecurityEligibility;
   readonly policyAuthority?: SecurityPolicyAuthority;
+  readonly surface?: "markdown" | "plain-text-support";
 }
 
 interface PreparedLogicalCommandAnalysis {
@@ -1127,6 +1130,7 @@ interface PreparedSecurityDocumentAnalysis {
     number,
     SecurityParagraphLineContext
   >;
+  readonly surface: "markdown" | "plain-text-support";
 }
 
 interface CanonicalDescriptionSecurityUnit {
@@ -1224,16 +1228,30 @@ export interface SecurityDiagnosticsAnalysis {
   coverage: SecurityAnalysisCoverage;
 }
 
+export interface SecurityDiagnosticsAnalysisOptions {
+  plainTextSupportReachability?: ReadonlyMap<
+    string,
+    PlainTextSupportSecurityReachability
+  >;
+}
+
 /** Run existing security analyses and record exactly which layers executed. */
 export function analyzeSecurityDiagnostics(
   inputs: Array<Artifact | ParsedDocument>,
   config: SecurityDiagnosticsConfig = {},
+  options: SecurityDiagnosticsAnalysisOptions = {},
 ): SecurityDiagnosticsAnalysis {
   const analyses = inputs.map((input) => {
     const artifact = "artifact" in input ? input.artifact : input;
     const rawFindings = hiddenUnicodeFindings(artifact);
     const document = "artifact" in input ? input : parseDocument(input);
-    const prepared = prepareSecurityDocumentAnalysis(document, config.security);
+    const plainTextReachability = options.plainTextSupportReachability?.get(
+      artifact.path,
+    );
+    const prepared =
+      plainTextReachability === undefined
+        ? prepareSecurityDocumentAnalysis(document, config.security)
+        : preparePlainTextSupportSecurityAnalysis(document);
     return {
       findings: [
         ...rawFindings,
@@ -1269,8 +1287,12 @@ function securityFindingsForPreparedDocument(
       hasPolicyRelevantInstructionSurface(prepared),
     ),
     ...instructionDetections,
-    ...collectHiddenHtmlCommentDetections(prepared),
-    ...collectHiddenYamlFrontmatterCommentDetections(prepared),
+    ...(prepared.surface === "markdown"
+      ? collectHiddenHtmlCommentDetections(prepared)
+      : []),
+    ...(prepared.surface === "markdown"
+      ? collectHiddenYamlFrontmatterCommentDetections(prepared)
+      : []),
     ...policyContradictions(prepared.effectivePolicy),
   ];
 
@@ -1566,11 +1588,12 @@ function prepareSecurityDocumentAnalysis(
   options: SecurityDocumentAnalysisOptions = {},
 ): PreparedSecurityDocumentAnalysis | undefined {
   const artifact = document.artifact;
+  const plainTextSupport = options.surface === "plain-text-support";
   if (
     artifact.kind === "script" ||
-    artifact.kind === "asset" ||
+    (artifact.kind === "asset" && !plainTextSupport) ||
     artifact.contentClassification === "binary" ||
-    !artifact.markdownParserEligible
+    (!artifact.markdownParserEligible && !plainTextSupport)
   )
     return undefined;
 
@@ -1596,7 +1619,7 @@ function prepareSecurityDocumentAnalysis(
     options.eligibility ?? "markdown-structured",
   );
   const frontmatter =
-    artifact.kind === "skill"
+    !plainTextSupport && artifact.kind === "skill"
       ? inspectAgentSkill(document).frontmatter
       : undefined;
   const canonicalDescription = canonicalSkillDescriptionSecurityUnit(
@@ -1636,7 +1659,27 @@ function prepareSecurityDocumentAnalysis(
     logicalCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,
     securityParagraphContextByLine: securityParagraphAnalysis.contextByLine,
+    surface: options.surface ?? "markdown",
   };
+}
+
+function preparePlainTextSupportSecurityAnalysis(
+  document: ParsedDocument,
+): PreparedSecurityDocumentAnalysis | undefined {
+  const syntax = parseMarkdownSyntax(document.artifact.content, 1);
+  const projectedDocument: ParsedDocument = {
+    ...document,
+    lines: syntax.sourceLines,
+    metadata: {},
+    metadataFields: {},
+    metadataListItems: {},
+  };
+  attachMarkdownSyntax(projectedDocument, syntax);
+  return prepareSecurityDocumentAnalysis(projectedDocument, undefined, {
+    eligibility: "plain-text-structured",
+    policyAuthority: "none",
+    surface: "plain-text-support",
+  });
 }
 
 function canonicalSkillDescriptionSecurityUnit(

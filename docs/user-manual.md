@@ -1536,14 +1536,18 @@ Every scan also includes `renma.security-analysis-coverage.v1` target-state
 JSON evidence. This is separate from repository inspection coverage: it records
 which existing security-analysis layers actually ran for each artifact Renma
 already discovered and scanned. The current layers are raw hidden Unicode,
-Markdown semantic instructions, canonical Skill description, and Skill YAML
-frontmatter comments. Renma does not walk additional files or infer runtime
-agent reachability to build this evidence.
+semantic instructions for Markdown and proven reachable plain-text Skill
+support, canonical Skill description, and Skill YAML frontmatter comments.
+Renma does not walk additional files or infer runtime agent reachability to
+build this evidence.
 
 Each layer reports `analyzed`, `not-applicable`, `unsupported`, `blocked`, or
-`not-analyzable`. `unsupported` makes current format limitations explicit; for
-example, a discovered UTF-8 `references/runtime.txt` artifact receives raw
-hidden-Unicode analysis but not Markdown semantic instruction analysis. A
+`not-analyzable`. `unsupported` makes current format limitations explicit. A
+discovered UTF-8 `references/runtime.txt` receives semantic instruction
+analysis only when existing static-support evidence proves it reachable from
+exactly one owning Skill; an otherwise identical unreferenced file remains
+`unsupported`. Plain text cannot declare Renma policy, and JSON, YAML, TOML,
+source code, executable support, and binary assets remain outside this path. A
 malformed, duplicate, or non-string canonical Skill description is
 `not-analyzable`, never `analyzed`. YAML comment coverage includes a separate
 surface count, so a valid Skill with zero comments still reports the comment

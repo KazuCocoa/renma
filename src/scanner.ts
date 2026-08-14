@@ -11,6 +11,7 @@ import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { buildInspectionCoverage } from "./inspection-coverage.js";
 import { runRules } from "./rules.js";
 import { analyzeSecurityDiagnostics } from "./security-diagnostics.js";
+import { plainTextSupportSecurityReachability } from "./static-support.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
 import {
@@ -77,9 +78,14 @@ export function scanFromRepositorySnapshot(
           repositoryPathStates: snapshot.repositoryPathStates,
         };
   const classifications = snapshot.classifications;
+  const plainTextSupportReachability = plainTextSupportSecurityReachability(
+    snapshot.documents,
+    snapshot.repositoryPaths,
+  );
   const securityAnalysis = analyzeSecurityDiagnostics(
     snapshot.documents,
     snapshot.config,
+    { plainTextSupportReachability },
   );
   const rawFindings = [
     ...runRules(

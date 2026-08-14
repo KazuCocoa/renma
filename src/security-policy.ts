@@ -767,6 +767,9 @@ export function effectiveAllowedDataList(policy: SecurityPolicy): string[] {
 }
 
 export function isSecurityPolicyLine(line: string): boolean {
+  // A shell continuation cannot be standalone policy metadata. Treat it as
+  // instruction text so downstream logical-command analysis can remain intact.
+  if (/\\\s*$/u.test(line)) return false;
   const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_.-]*):/)?.[1];
   return (
     key !== undefined &&

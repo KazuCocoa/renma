@@ -164,12 +164,23 @@ already-discovered Artifact.content
 already-classified `Artifact`, returns no findings for binary content, and
 inspects text without Markdown parsing, visibility projection, normalization,
 or command analysis. `analyzeSecurityDiagnostics()` appends those raw findings
-before entering the existing Markdown-specific pipeline and derives
+before entering the eligible semantic pipeline and derives
 `renma.security-analysis-coverage.v1` from the same prepared analysis objects.
 The established `securityDiagnosticFindings()` API remains a findings-only
 projection of that pass. Discovery scope, artifact classification,
 suppression, Diagnostics v2, review bundles, ordering, and reporting remain
 owned by their existing layers.
+
+`src/static-support.ts` derives the one bounded non-Markdown eligibility map.
+It reuses `localSupportReachabilityDepth()` and the existing repository Skill
+path classification, requires exactly one owning Skill, and selects only
+discovered UTF-8 `.txt` support outside `scripts/`. Security orchestration
+consumes that map without reparsing references. Eligible plain-text support is
+prepared with body line 1, no local metadata, no policy authority, and the
+existing false-positive-aware structural instruction projection. The same
+prepared object drives findings and `semanticInstructions: "analyzed"`;
+unreachable `.txt`, structured text, source code, executables, and binary
+support never receive a prepared semantic analysis through this path.
 
 `parseAgentSkillFrontmatter()` owns YAML-comment extraction eligibility as
 well as the extracted comment surfaces. Its `commentsAnalyzable` evidence is
@@ -178,8 +189,8 @@ without errors. Security coverage consumes that parser-owned state directly,
 so zero comments can mean `analyzed` only when the extractor actually ran
 successfully.
 
-`src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
-guard application, fallback selection, evidence projection, ordering,
+`src/security-diagnostics.ts` owns semantic-surface eligibility, effective
+policy, guard application, fallback selection, evidence projection, ordering,
 deduplication, and conversion into the existing public Finding model. Its
 private orchestration has explicit document preparation, policy-prelude,
 physical-line, semantic-unit, policy-contradiction, and final projection

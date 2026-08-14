@@ -8,6 +8,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added semantic security analysis for discovered UTF-8 `.txt` Skill support
+  files only when the existing repository-local static-reference graph proves
+  them reachable from exactly one owning Skill. Reachable plain-text support
+  now reports `semanticInstructions: "analyzed"`; otherwise identical
+  unreferenced text remains `unsupported`, and structured, executable, binary,
+  external, escaping, symlinked, and unresolved targets remain outside this
+  capability.
 - Added versioned `renma.security-analysis-coverage.v1` scan JSON evidence for
   every discovered and scanned artifact. The target-state rows distinguish
   executed, unsupported, inapplicable, and non-analyzable hidden-Unicode,
