@@ -1380,6 +1380,10 @@ function collectHiddenHtmlCommentDetections(
     const underlying = hiddenInstructionProjectionDetections(
       prepared,
       comment.content,
+      {
+        eligibility: "raw-agent-visible",
+        policyAuthority: "none",
+      },
     );
     return underlying.map((detection) => {
       const mappedStartLine = hiddenCommentSourceLine(
