@@ -34,9 +34,12 @@ import type { SecurityConfig } from "./types/configuration.js";
 import type {
   ParsedYamlFrontmatter,
   YamlFrontmatterComment,
+  YamlFrontmatterCommentAnalysis,
 } from "./yaml-frontmatter.js";
+import { parseYamlFrontmatterComments } from "./yaml-frontmatter.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
+import { frontmatterEnvelopeForArtifact } from "./frontmatter-envelope.js";
 import { inspectAgentSkill } from "./agent-skills.js";
 import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
 import {
@@ -1122,7 +1125,7 @@ interface PreparedSecurityDocumentAnalysis {
   readonly markdownView: MarkdownSecurityView;
   readonly canonicalDescription: CanonicalDescriptionSecurityUnit | undefined;
   readonly yamlFrontmatterCommentAnalysis:
-    Pick<ParsedYamlFrontmatter, "commentsAnalyzable" | "comments"> | undefined;
+    YamlFrontmatterCommentAnalysis | undefined;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
@@ -1366,8 +1369,9 @@ function yamlFrontmatterCommentCoverageState(
   artifact: Artifact,
   prepared: PreparedSecurityDocumentAnalysis | undefined,
 ): SecurityAnalysisCoverageState {
-  if (artifact.kind !== "skill") return "not-applicable";
-  if (prepared === undefined) return "unsupported";
+  if (artifact.kind === "skill" && prepared === undefined) return "unsupported";
+  if (prepared?.yamlFrontmatterCommentAnalysis === undefined)
+    return "not-applicable";
   return prepared.yamlFrontmatterCommentAnalysis?.commentsAnalyzable === true
     ? "analyzed"
     : "not-analyzable";
@@ -1622,14 +1626,20 @@ function prepareSecurityDocumentAnalysis(
     syntax,
     options.eligibility ?? "markdown-structured",
   );
-  const frontmatter =
+  const skillFrontmatter =
     !plainTextSupport && artifact.kind === "skill"
       ? inspectAgentSkill(document).frontmatter
       : undefined;
+  const frontmatter = frontmatterCommentAnalysisForDocument(
+    document,
+    sourceLines,
+    plainTextSupport,
+    skillFrontmatter,
+  );
   const canonicalDescription = canonicalSkillDescriptionSecurityUnit(
     document,
     sourceLines,
-    frontmatter,
+    skillFrontmatter,
   );
   const scanStart = syntax.bodyStartLine - 1;
   const visibleLines = sourceLines.map((_, index) =>
@@ -1665,6 +1675,34 @@ function prepareSecurityDocumentAnalysis(
     securityParagraphContextByLine: securityParagraphAnalysis.contextByLine,
     surface: options.surface ?? "markdown",
   };
+}
+
+function frontmatterCommentAnalysisForDocument(
+  document: ParsedDocument,
+  sourceLines: readonly string[],
+  plainTextSupport: boolean,
+  skillFrontmatter: ParsedYamlFrontmatter | undefined,
+): YamlFrontmatterCommentAnalysis | undefined {
+  if (plainTextSupport) return undefined;
+  if (document.artifact.kind === "skill") {
+    return skillFrontmatter;
+  }
+  // Unknown repository Markdown has semantic analysis for visible text, but
+  // does not gain a new hidden-frontmatter surface merely from a delimiter.
+  if (document.artifact.kind === "unknown") return undefined;
+
+  const envelope = frontmatterEnvelopeForArtifact(
+    document.artifact,
+    sourceLines,
+  );
+  if (!envelope.present) return undefined;
+  if (envelope.closingIndex === undefined) {
+    return { commentsAnalyzable: false, comments: [] };
+  }
+  return parseYamlFrontmatterComments(
+    document.artifact.content,
+    envelope.closingIndex,
+  );
 }
 
 function preparePlainTextSupportSecurityAnalysis(

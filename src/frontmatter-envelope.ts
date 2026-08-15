@@ -7,7 +7,9 @@ export interface FrontmatterEnvelope {
 }
 
 /** Locate the exact delimiter contract used by general Renma metadata. */
-export function renmaFrontmatterEnvelope(lines: string[]): FrontmatterEnvelope {
+export function renmaFrontmatterEnvelope(
+  lines: readonly string[],
+): FrontmatterEnvelope {
   if (lines[0] !== "---") {
     return { present: false, closingIndex: undefined };
   }
@@ -24,7 +26,7 @@ export function renmaFrontmatterEnvelope(lines: string[]): FrontmatterEnvelope {
 /** Select the frontmatter contract from the artifact's discovered role. */
 export function frontmatterEnvelopeForArtifact(
   artifact: Pick<Artifact, "kind">,
-  lines: string[],
+  lines: readonly string[],
 ): FrontmatterEnvelope {
   return artifact.kind === "skill"
     ? agentSkillFrontmatterEnvelope(lines)
@@ -34,7 +36,7 @@ export function frontmatterEnvelopeForArtifact(
 /** Return the Markdown body start while preserving unclosed-envelope behavior. */
 export function markdownBodyStartLineForArtifact(
   artifact: Pick<Artifact, "kind">,
-  lines: string[],
+  lines: readonly string[],
 ): number {
   const envelope = frontmatterEnvelopeForArtifact(artifact, lines);
   return envelope.closingIndex === undefined ? 1 : envelope.closingIndex + 2;
@@ -43,7 +45,7 @@ export function markdownBodyStartLineForArtifact(
 /** Return a closed frontmatter range under the artifact-selected contract. */
 export function frontmatterRangeForArtifact(
   artifact: Pick<Artifact, "kind">,
-  lines: string[],
+  lines: readonly string[],
 ): { startLine: number; endLine: number } | undefined {
   const envelope = frontmatterEnvelopeForArtifact(artifact, lines);
   return envelope.closingIndex === undefined

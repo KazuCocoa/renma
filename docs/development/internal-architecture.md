@@ -182,11 +182,14 @@ prepared object drives findings and `semanticInstructions: "analyzed"`;
 unreachable `.txt`, structured text, source code, executables, and binary
 support never receive a prepared semantic analysis through this path.
 
-`parseAgentSkillFrontmatter()` owns YAML-comment extraction eligibility as
-well as the extracted comment surfaces. Its `commentsAnalyzable` evidence is
-true only after both semantic YAML parsing and CST token extraction complete
-without errors. Security coverage consumes that parser-owned state directly,
-so zero comments can mean `analyzed` only when the extractor actually ran
+`src/yaml-frontmatter.ts` owns YAML-comment extraction eligibility as well as
+the extracted comment surfaces. `parseAgentSkillFrontmatter()` retains Agent
+Skills envelope semantics, while eligible known non-Skill Markdown supplies a
+closed envelope from the existing Renma delimiter contract to the same
+parser-owned extraction. Its `commentsAnalyzable` evidence is true only after
+both semantic YAML parsing and CST token extraction complete without errors.
+Security coverage consumes that exact extraction state directly, so zero
+comments can mean `analyzed` only when the extractor actually ran
 successfully.
 
 `src/security-diagnostics.ts` owns semantic-surface eligibility, effective

@@ -773,11 +773,12 @@ URLs, absolute or escaping paths, unresolved targets, or symlinks. The
 plain-text file has no policy authority, and findings retain its original path,
 line, and snippet. Otherwise identical unreachable `.txt` remains
 `unsupported`. JSON, YAML, TOML, source code, executable support, and binary
-assets do not enter this semantic path. A valid Skill frontmatter with no YAML
-comments reports comment analysis as `analyzed` and a zero surface count;
-malformed frontmatter does not claim that the comment or canonical description
-surface was successfully analyzed. Absence of findings must not be interpreted
-as complete security-analysis coverage.
+assets do not enter this semantic path. Successfully parsed closed frontmatter
+with no YAML comments reports comment analysis as `analyzed` and a zero surface
+count for Skills and eligible known non-Skill Markdown. Malformed frontmatter
+does not claim successful comment analysis, and arbitrary `unknown` Markdown
+does not gain this surface merely from containing delimiters. Absence of
+findings must not be interpreted as complete security-analysis coverage.
 
 ### Hidden Unicode source-integrity boundaries
 
@@ -883,11 +884,13 @@ only for a reviewed intentional case. Raw hidden-Unicode inspection is
 independent and still includes comments.
 
 `SEC-HIDDEN-FRONTMATTER-INSTRUCTION` applies the same bounded projection to
-syntactic YAML comments in a Skill's closed, successfully parsed frontmatter.
-Renma uses the YAML parser's concrete-syntax tokens, so a `#` inside a quoted
-value or block scalar is not a comment. Full-line and inline comments retain
-their original line and column evidence, and adjacent full-line comments form
-one deterministic projection for existing semantic correlation. Malformed or
+syntactic YAML comments in closed, successfully parsed Skill frontmatter and
+eligible known non-Skill Markdown frontmatter. Skills retain the Agent Skills
+envelope rules; non-Skills retain the exact Renma `---` envelope rules. Renma
+uses the YAML parser's concrete-syntax tokens, so a `#` inside a quoted value or
+block scalar is not a comment. Full-line and inline comments retain their
+original line and column evidence, and adjacent full-line comments form one
+deterministic projection for existing semantic correlation. Malformed or
 unclosed frontmatter produces no guessed YAML-comment evidence. Once the YAML
 parser identifies a comment, inner Markdown blockquotes, HTML-comment syntax,
 code presentation, and example labels cannot make its raw agent-visible text
@@ -898,7 +901,7 @@ This projection-specific rule does not change ordinary Markdown quotation,
 example, or policy handling. It also does not broaden security analysis to
 `compatibility`, `license`, `allowed-tools`, arbitrary `metadata` or
 `metadata.renma.*` values, or any other scalar beyond the already-supported
-canonical `description`; deciding which of those raw-agent-visible scalar
+canonical Skill `description`; deciding which of those raw-agent-visible scalar
 surfaces warrant high-signal analysis remains a follow-up.
 
 `SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
@@ -1280,7 +1283,7 @@ written during scanning.
 | `SEC-DANGEROUS-TOOL-INSTRUCTION`                 | Instructions permit dangerous tool use.              | Content allows destructive or high-risk commands without guardrails.                               | Require review, dry runs, or explicit user approval before execution.                                  |
 | `SEC-EXTERNAL-UPLOAD-INSTRUCTION`                | Instructions allow external upload.                  | Content sends artifacts to external services without controls.                                     | Restrict uploads to approved destinations and document review steps.                                   |
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`                | Instructions request forbidden input.                | Content asks for secrets or other disallowed sensitive values.                                     | Remove the request or replace it with safe placeholder guidance.                                       |
-| `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`             | YAML frontmatter comment hides an operational instruction. | Raw Skill source contains a bounded recognized security-sensitive instruction that metadata consumers ignore. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |
+| `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`             | YAML frontmatter comment hides an operational instruction. | Raw eligible agent-facing Markdown contains a bounded recognized security-sensitive instruction that metadata consumers ignore. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |
 | `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`             | HTML comment hides an operational instruction.       | Raw agent-visible source contains a bounded recognized security-sensitive instruction that rendered Markdown omits. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |
 | `SEC-INSTRUCTION-VIOLATES-POLICY`                | Instruction conflicts with active policy.            | Asset content violates a configured security profile.                                              | Update the instruction or policy metadata so they agree.                                               |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`          | Canonical Skill security metadata is invalid.        | A recognized `metadata.renma.*` field has an invalid boolean, list, or profile encoding.            | Confirm the intended policy and replace it with the exact documented string encoding; do not guess.    |
