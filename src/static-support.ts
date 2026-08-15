@@ -4,6 +4,7 @@ import {
   classifyRepositorySkillPath,
   logicalSkillDirectory,
 } from "./discovery.js";
+import type { SkillParentIndex } from "./catalog.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
@@ -25,6 +26,15 @@ export interface StaticSupportReference {
 
 export interface PlainTextSupportSecurityReachability {
   owningSkillPath: string;
+  depth: number;
+}
+
+export interface StaticSupportReachabilityEvidence {
+  targetPath: string;
+  owningSkillPath: string;
+  sourcePath: string;
+  sourceLine: number;
+  sourceRaw: string;
   depth: number;
 }
 
@@ -112,49 +122,72 @@ export function localSupportReachabilityDepth(
   localSupportDocs: ParsedDocument[],
   candidatePaths: string[],
 ): Map<string, number> {
-  const reachable = new Map<string, number>();
-  const references = new Map(
-    [skill, ...localSupportDocs].map((document) => [
-      document.artifact.path,
-      new Set(
-        staticSupportReferences(document, skillDirectory, candidatePaths).map(
-          (reference) => reference.targetPath,
-        ),
-      ),
-    ]),
+  const reachable = localSupportReferenceReachability(
+    skill,
+    skillDirectory,
+    localSupportDocs,
+    candidatePaths,
   );
-  let changed = true;
+  return new Map(
+    localSupportDocs.flatMap((document): Array<[string, number]> => {
+      const evidence = reachable.get(document.artifact.path);
+      return evidence ? [[document.artifact.path, evidence.depth]] : [];
+    }),
+  );
+}
 
-  while (changed) {
-    changed = false;
-    for (const document of localSupportDocs) {
-      if (reachable.has(document.artifact.path)) continue;
-      if (references.get(skill.artifact.path)?.has(document.artifact.path)) {
-        reachable.set(document.artifact.path, 1);
-        changed = true;
-        continue;
-      }
-      const parent = localSupportDocs
-        .filter((candidate) => reachable.has(candidate.artifact.path))
-        .sort(
-          (left, right) =>
-            (reachable.get(left.artifact.path) ?? 0) -
-            (reachable.get(right.artifact.path) ?? 0),
-        )
-        .find((candidate) =>
-          references.get(candidate.artifact.path)?.has(document.artifact.path),
-        );
-      if (parent) {
-        reachable.set(
-          document.artifact.path,
-          (reachable.get(parent.artifact.path) ?? 0) + 1,
-        );
-        changed = true;
+/**
+ * Prove expected Skill-local targets from parsed reference sources, including
+ * targets that discovery could not turn into ParsedDocument evidence.
+ */
+export function staticallyExpectedSupportPaths(
+  documents: ParsedDocument[],
+  candidatePaths: readonly string[],
+  skillParents: SkillParentIndex,
+): StaticSupportReachabilityEvidence[] {
+  const documentsByPath = new Map(
+    documents.map((document) => [document.artifact.path, document]),
+  );
+  const expected = new Map<string, StaticSupportReachabilityEvidence>();
+
+  for (const [skillDirectory, parents] of [...skillParents].sort(
+    ([left], [right]) => left.localeCompare(right),
+  )) {
+    if (parents.length !== 1) continue;
+    const skill = documentsByPath.get(parents[0]!.sourcePath);
+    if (!skill) continue;
+    const localSupportDocs = documents.filter((document) => {
+      const classified = classifyRepositorySkillPath(document.artifact.path);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
+    const localCandidatePaths = candidatePaths.filter((candidate) => {
+      const classified = classifyRepositorySkillPath(candidate);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
+    for (const evidence of localSupportReferenceReachability(
+      skill,
+      skillDirectory,
+      localSupportDocs,
+      localCandidatePaths,
+    ).values()) {
+      const previous = expected.get(evidence.targetPath);
+      if (!previous || compareReachabilityEvidence(evidence, previous) < 0) {
+        expected.set(evidence.targetPath, evidence);
       }
     }
   }
 
-  return reachable;
+  return [...expected.values()].sort(
+    (left, right) =>
+      left.targetPath.localeCompare(right.targetPath) ||
+      compareReachabilityEvidence(left, right),
+  );
 }
 
 /**
@@ -222,6 +255,65 @@ export function plainTextSupportSecurityReachability(
   }
 
   return new Map(eligible.sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function localSupportReferenceReachability(
+  skill: ParsedDocument,
+  skillDirectory: string,
+  localSupportDocs: ParsedDocument[],
+  candidatePaths: readonly string[],
+): Map<string, StaticSupportReachabilityEvidence> {
+  const sources = [skill, ...localSupportDocs].sort((left, right) =>
+    left.artifact.path.localeCompare(right.artifact.path),
+  );
+  const references = new Map(
+    sources.map((document) => [
+      document.artifact.path,
+      staticSupportReferences(document, skillDirectory, [...candidatePaths]),
+    ]),
+  );
+  const reachable = new Map<string, StaticSupportReachabilityEvidence>();
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const source of sources) {
+      const sourceDepth =
+        source.artifact.path === skill.artifact.path
+          ? 0
+          : reachable.get(source.artifact.path)?.depth;
+      if (sourceDepth === undefined) continue;
+      for (const reference of references.get(source.artifact.path) ?? []) {
+        const evidence: StaticSupportReachabilityEvidence = {
+          targetPath: reference.targetPath,
+          owningSkillPath: skill.artifact.path,
+          sourcePath: reference.sourcePath,
+          sourceLine: reference.line,
+          sourceRaw: reference.raw,
+          depth: sourceDepth + 1,
+        };
+        const previous = reachable.get(reference.targetPath);
+        if (!previous || compareReachabilityEvidence(evidence, previous) < 0) {
+          reachable.set(reference.targetPath, evidence);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return reachable;
+}
+
+function compareReachabilityEvidence(
+  left: StaticSupportReachabilityEvidence,
+  right: StaticSupportReachabilityEvidence,
+): number {
+  return (
+    left.depth - right.depth ||
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.sourceLine - right.sourceLine ||
+    left.sourceRaw.localeCompare(right.sourceRaw)
+  );
 }
 
 function maskRawMatches(line: string, matches: string[]): string {

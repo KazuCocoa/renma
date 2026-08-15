@@ -1513,12 +1513,18 @@ warnings generally fatal, and active suppressions keep their existing meaning.
 A below-threshold finding remains below threshold in strict mode.
 
 Every scan includes `renma.inspection-coverage.v1` JSON evidence. It counts
-expected first-class agent-facing paths, paths actually represented in parsed
-semantic evidence, and blocking issues. Canonical Skill entrypoints and other
+expected first-class agent-facing paths plus statically proven Skill-support
+targets, paths actually represented in the inspection evidence appropriate to
+their surface, and blocking issues. Canonical Skill entrypoints and other
 deterministically classified first-class agent-facing assets are blocking when
 they are symlinks, unreadable, oversized, depth-limited, or otherwise present
-but unavailable to semantic inspection. Blocking issues distinguish `exact`
-expected artifacts from `subtree` traversal boundaries. A symlinked,
+but unavailable to semantic inspection. A Skill-support target is expected
+only when one unambiguous owning Skill reaches it through references emitted by
+parsed sources. Each transitive edge therefore requires its own parsed source;
+Renma does not guess children hidden behind an unparsed parent. Blocking issues
+distinguish `exact` expected artifacts from `subtree` traversal boundaries and
+retain the owning Skill, reference source, source line, reachability depth, and
+required inspection kind for statically expected support. A symlinked,
 unreadable, or depth-limited directory under `skills`, `.agents/skills`,
 `contexts`, `context`, `lenses`, or `.agents` is a subtree issue when the
 configured globs can select first-class descendants there; the evidence names
@@ -1527,10 +1533,15 @@ decided conservatively from the glob's literal prefix before its first magic
 segment: a provably disjoint prefix is ignored, while character classes,
 extglobs, braces, and other magic remain potentially overlapping. Exact
 non-glob paths use precise descendant and classification checks. Explicit
-scan-boundary exclusion is not a single-revision coverage failure. Ordinary
-unsupported repository subtrees such as `tools/vendor-cache` do not turn
-strict scan into a requirement to parse every file. Renma never follows a
-blocked subtree or repository symlink.
+scan-boundary exclusion is not a single-revision coverage failure for an
+otherwise inferred first-class path, but explicitly excluding a statically
+expected support target is blocking because the Skill still directs the agent
+to consume it. Unreferenced support and ordinary unsupported repository
+subtrees such as `tools/vendor-cache` do not turn strict scan into a requirement
+to parse every file. Opaque assets and executable scripts retain their own
+resource or executable-surface inspection semantics rather than being forced
+through plain-text semantic analysis. Renma never follows a blocked subtree or
+repository symlink.
 
 Every scan also includes `renma.security-analysis-coverage.v1` target-state
 JSON evidence. This is separate from repository inspection coverage: it records
@@ -1553,9 +1564,10 @@ malformed, duplicate, or non-string canonical Skill description is
 `not-analyzable`, never `analyzed`. YAML comment coverage includes a separate
 surface count, so a valid Skill with zero comments still reports the comment
 analysis capability as `analyzed` with a count of zero. Coverage entries exist
-only for scanned artifacts. Repository paths that could not be read or
-traversed remain blocking evidence in `inspectionCoverage`; Renma does not
-invent an artifact row merely to duplicate that evidence.
+only for scanned artifacts. Statically expected support paths that could not be
+read, selected, or traversed remain exact blocking evidence in
+`inspectionCoverage`; Renma does not invent an artifact row merely to duplicate
+that evidence.
 
 Human-readable output states whether inspection was complete, so zero findings
 with blocking coverage issues is not described as a complete result. The JSON

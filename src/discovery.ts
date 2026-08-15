@@ -993,12 +993,16 @@ const OPAQUE_EXTENSIONS = new Set([
   ".zip",
 ]);
 
+/** Return whether a path has an intentionally opaque built-in asset type. */
+export function isOpaqueArtifactPath(relativePath: string): boolean {
+  return OPAQUE_EXTENSIONS.has(path.posix.extname(relativePath).toLowerCase());
+}
+
 function classifyContent(
   bytes: Uint8Array,
   relativePath: string,
 ): "text" | "binary" {
-  if (OPAQUE_EXTENSIONS.has(path.posix.extname(relativePath).toLowerCase()))
-    return "binary";
+  if (isOpaqueArtifactPath(relativePath)) return "binary";
   if (bytes.includes(0)) return "binary";
   try {
     new TextDecoder("utf-8", { fatal: true }).decode(bytes);
