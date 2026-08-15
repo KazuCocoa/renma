@@ -2,10 +2,15 @@ import path from "node:path";
 
 import {
   classifyAssetPath,
+  classifyRepositorySkillPath,
   isExcluded,
+  isOpaqueArtifactPath,
+  repositoryPathDepth,
   RESERVED_SKILL_SUPPORT_DIRS,
 } from "./discovery.js";
 import type { RepositoryPathState } from "./repository-paths.js";
+import type { StaticSupportReachabilityEvidence } from "./static-support.js";
+import type { Artifact } from "./types/artifact.js";
 import type { AssetClassificationEvidence } from "./types/classification.js";
 import type { ScanConfig } from "./types/configuration.js";
 
@@ -15,12 +20,35 @@ export const INSPECTION_COVERAGE_DIFF_SCHEMA_VERSION =
   "renma.inspection-coverage-diff.v1" as const;
 
 export type InspectionCoverageState =
-  "parsed" | "symlink" | "unreadable" | "oversize" | "deep" | "unsupported";
+  | "parsed"
+  | "excluded"
+  | "symlink"
+  | "unreadable"
+  | "oversize"
+  | "deep"
+  | "unsupported";
 
 export type InspectionCoverageScope = "exact" | "subtree";
 
 export type InspectionCoverageBoundary =
   "skills" | ".agents/skills" | "contexts" | "context" | "lenses" | ".agents";
+
+export type SupportInspectionKind =
+  | "semantic-plain-text"
+  | "semantic-markdown"
+  | "executable-surface"
+  | "opaque-resource"
+  | "repository-resource";
+
+export interface StaticSupportInspectionDetails {
+  expectationSource: "static-support-reference";
+  owningSkillPath: string;
+  sourcePath: string;
+  sourceLine: number;
+  reachabilityDepth: number;
+  inspectionKind: SupportInspectionKind;
+  scanBoundaryDisposition?: "explicitly-excluded";
+}
 
 export interface InspectionCoveragePathEvidence {
   path: string;
@@ -30,6 +58,7 @@ export interface InspectionCoveragePathEvidence {
   reason: string;
   classification: AssetClassificationEvidence;
   strictBlocking: boolean;
+  details?: StaticSupportInspectionDetails;
 }
 
 export type InspectionCoverageIssue = InspectionCoveragePathEvidence & {
@@ -59,6 +88,7 @@ export interface InspectionCoverageChange {
   previouslyInspectedPaths: string[];
   classification: AssetClassificationEvidence;
   strictBlocking: boolean;
+  details?: StaticSupportInspectionDetails;
 }
 
 export interface InspectionCoverageDiff {
@@ -88,6 +118,7 @@ const EXPECTED_AGENT_FACING_RULES = new Set<
 ]);
 
 const BLOCKING_STATES = new Set<RepositoryPathState>([
+  "excluded",
   "symlink",
   "unreadable",
   "oversize",
@@ -106,9 +137,15 @@ export function buildInspectionCoverage(
   pathStates: ReadonlyMap<string, RepositoryPathState>,
   config: Pick<ScanConfig, "globs" | "exclude">,
   blockedTraversalPaths: ReadonlySet<string> = new Set(),
+  expectedSupportPaths: readonly StaticSupportReachabilityEvidence[] = [],
+  artifacts: readonly Artifact[] = [],
+  supportBoundaryConfig?: Pick<
+    ScanConfig,
+    "globs" | "exclude" | "maxDepth" | "maxFileSizeBytes"
+  >,
 ): InspectionCoverage {
-  const pathEvidence = [...pathStates]
-    .flatMap(([candidate, state]): InspectionCoveragePathEvidence[] => {
+  const firstClassPathEvidence = [...pathStates].flatMap(
+    ([candidate, state]): InspectionCoveragePathEvidence[] => {
       if (state !== "parsed" && !BLOCKING_STATES.has(state)) return [];
       if (isExcluded(candidate, config.exclude)) return [];
       const classification = classifyAssetPath(candidate);
@@ -164,8 +201,64 @@ export function buildInspectionCoverage(
           strictBlocking: true,
         },
       ];
-    })
-    .sort((left, right) => left.path.localeCompare(right.path));
+    },
+  );
+  const artifactsByPath = new Map(
+    artifacts.map((artifact) => [artifact.path, artifact]),
+  );
+  const supportPathEvidence = expectedSupportPaths.flatMap(
+    (expectation): InspectionCoveragePathEvidence[] => {
+      const observedRepositoryState = pathStates.get(expectation.targetPath);
+      if (
+        observedRepositoryState === undefined ||
+        observedRepositoryState === "absent"
+      ) {
+        return [];
+      }
+      const artifact = artifactsByPath.get(expectation.targetPath);
+      const repositoryState = expectedSupportRepositoryState(
+        expectation.targetPath,
+        observedRepositoryState,
+        artifact,
+        supportBoundaryConfig,
+      );
+      const inspectionKind = supportInspectionKind(expectation.targetPath);
+      const coverageState = supportCoverageState(
+        repositoryState,
+        inspectionKind,
+        artifact,
+      );
+      const details: StaticSupportInspectionDetails = {
+        expectationSource: "static-support-reference",
+        owningSkillPath: expectation.owningSkillPath,
+        sourcePath: expectation.sourcePath,
+        sourceLine: expectation.sourceLine,
+        reachabilityDepth: expectation.depth,
+        inspectionKind,
+        ...(repositoryState === "excluded"
+          ? { scanBoundaryDisposition: "explicitly-excluded" as const }
+          : {}),
+      };
+      return [
+        {
+          path: expectation.targetPath,
+          state: coverageState,
+          scope: "exact",
+          reason: supportInspectionCoverageReason(
+            coverageState,
+            inspectionKind,
+          ),
+          classification: classifyAssetPath(expectation.targetPath),
+          strictBlocking: coverageState !== "parsed",
+          details,
+        },
+      ];
+    },
+  );
+  const pathEvidence = dedupeCoverageEvidence([
+    ...firstClassPathEvidence,
+    ...supportPathEvidence,
+  ]).sort((left, right) => left.path.localeCompare(right.path));
   const blockingIssues = pathEvidence.filter(
     (evidence): evidence is InspectionCoverageIssue =>
       evidence.strictBlocking && evidence.state !== "parsed",
@@ -275,6 +368,7 @@ function coverageChange(
     ),
     classification: evidence.classification,
     strictBlocking: to?.strictBlocking ?? false,
+    ...(evidence.details ? { details: evidence.details } : {}),
   };
 }
 
@@ -303,6 +397,115 @@ function coverageCounts(coverage: InspectionCoverage): {
   };
 }
 
+function dedupeCoverageEvidence(
+  evidence: InspectionCoveragePathEvidence[],
+): InspectionCoveragePathEvidence[] {
+  const byPathAndScope = new Map<string, InspectionCoveragePathEvidence>();
+  for (const item of evidence) {
+    byPathAndScope.set(`${item.scope}\0${item.path}`, item);
+  }
+  return [...byPathAndScope.values()];
+}
+
+function supportInspectionKind(candidate: string): SupportInspectionKind {
+  const classified = classifyRepositorySkillPath(candidate);
+  if (
+    classified?.kind === "support" &&
+    classified.supportDirectory === "scripts"
+  ) {
+    return "executable-surface";
+  }
+  const extension = path.posix.extname(candidate).toLowerCase();
+  if (extension === ".txt") return "semantic-plain-text";
+  if (extension === ".md" || extension === ".mdx") {
+    return "semantic-markdown";
+  }
+  if (isOpaqueArtifactPath(candidate)) return "opaque-resource";
+  return "repository-resource";
+}
+
+function expectedSupportRepositoryState(
+  candidate: string,
+  observedState: Exclude<RepositoryPathState, "absent">,
+  artifact: Artifact | undefined,
+  config:
+    | Pick<ScanConfig, "globs" | "exclude" | "maxDepth" | "maxFileSizeBytes">
+    | undefined,
+): Exclude<RepositoryPathState, "absent"> {
+  if (
+    observedState === "symlink" ||
+    observedState === "unreadable" ||
+    config === undefined
+  ) {
+    return observedState;
+  }
+  if (isExcluded(candidate, config.exclude)) return "excluded";
+  if (repositoryPathDepth(candidate) > config.maxDepth) return "deep";
+  if (artifact && artifact.sizeBytes > config.maxFileSizeBytes) {
+    return "oversize";
+  }
+  if (!config.globs.some((pattern) => path.matchesGlob(candidate, pattern))) {
+    return "unsupported";
+  }
+  return observedState;
+}
+
+function supportCoverageState(
+  repositoryState: Exclude<RepositoryPathState, "absent">,
+  inspectionKind: SupportInspectionKind,
+  artifact: Artifact | undefined,
+): InspectionCoverageState {
+  if (repositoryState !== "parsed") return repositoryState;
+  if (
+    (inspectionKind === "semantic-plain-text" ||
+      inspectionKind === "semantic-markdown") &&
+    artifact?.contentClassification !== "text"
+  ) {
+    return "unsupported";
+  }
+  return "parsed";
+}
+
+function supportInspectionCoverageReason(
+  state: InspectionCoverageState,
+  inspectionKind: SupportInspectionKind,
+): string {
+  const expectedSurface = supportInspectionSurfaceName(inspectionKind);
+  switch (state) {
+    case "parsed":
+      return `The statically expected Skill support resource was read and represented as ${expectedSurface}.`;
+    case "excluded":
+      return `The statically expected Skill support resource is explicitly excluded by the scan boundary, so Renma could not inspect it as ${expectedSurface}.`;
+    case "symlink":
+      return `The statically expected Skill support resource is a symbolic link; Renma does not follow repository symlinks and could not inspect it as ${expectedSurface}.`;
+    case "unreadable":
+      return `The statically expected Skill support resource could not be read safely as ${expectedSurface}.`;
+    case "oversize":
+      return `The statically expected Skill support resource exceeds max_file_size_bytes and was skipped before inspection as ${expectedSurface}.`;
+    case "deep":
+      return `The statically expected Skill support resource exceeds max_depth and was skipped before inspection as ${expectedSurface}.`;
+    case "unsupported":
+      return `The statically expected Skill support resource was present but could not be represented as ${expectedSurface}.`;
+  }
+}
+
+function supportInspectionSurfaceName(
+  inspectionKind: SupportInspectionKind,
+): string {
+  switch (inspectionKind) {
+    case "semantic-plain-text":
+      return "UTF-8 plain-text semantic evidence";
+    case "semantic-markdown":
+      return "Markdown semantic evidence";
+    case "executable-surface":
+      return "executable-surface inventory evidence";
+    case "opaque-resource":
+      return "opaque repository-resource evidence";
+    case "repository-resource":
+      return "repository-resource evidence";
+  }
+}
+
 function inspectionCoverageReason(
   state: InspectionCoverageState,
   scope: InspectionCoverageScope,
@@ -314,6 +517,8 @@ function inspectionCoverageReason(
   switch (state) {
     case "parsed":
       return "The expected agent-facing artifact was read and represented in semantic scan evidence.";
+    case "excluded":
+      return "The expected agent-facing artifact was explicitly excluded from semantic inspection.";
     case "symlink":
       return "The expected agent-facing artifact is a symbolic link; Renma does not follow repository symlinks.";
     case "unreadable":

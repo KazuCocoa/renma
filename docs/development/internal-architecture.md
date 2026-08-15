@@ -171,16 +171,27 @@ projection of that pass. Discovery scope, artifact classification,
 suppression, Diagnostics v2, review bundles, ordering, and reporting remain
 owned by their existing layers.
 
-`src/static-support.ts` derives the one bounded non-Markdown eligibility map.
-It reuses `localSupportReachabilityDepth()` and the existing repository Skill
-path classification, requires exactly one owning Skill, and selects only
-discovered UTF-8 `.txt` support outside `scripts/`. Security orchestration
-consumes that map without reparsing references. Eligible plain-text support is
-prepared with body line 1, no local metadata, no policy authority, and the
-existing false-positive-aware structural instruction projection. The same
-prepared object drives findings and `semanticInstructions: "analyzed"`;
-unreachable `.txt`, structured text, source code, executables, and binary
-support never receive a prepared semantic analysis through this path.
+`src/static-support.ts` derives both the bounded non-Markdown eligibility map
+and the repository-evidence expectation graph. Both projections reuse
+`staticSupportReferences()` and the same minimum-depth reachability algorithm,
+require exactly one owning Skill, and traverse a support edge only when its
+source is a ParsedDocument. The expectation graph may therefore name an
+unparsed target proven by a parsed source, but it never guesses references
+behind that target. `src/inspection-coverage.ts` joins those expectations to
+canonical repository path states and emits exact blocking evidence with source
+provenance. Parsed-to-blocked support transitions consequently use the existing
+inspection-coverage diff and strict-scan paths.
+
+The security eligibility projection selects only discovered UTF-8 `.txt`
+support outside `scripts/`. Security orchestration consumes that map without
+reparsing references. Eligible plain-text support is prepared with body line
+1, no local metadata, no policy authority, and the existing
+false-positive-aware structural instruction projection. The same prepared
+object drives findings and `semanticInstructions: "analyzed"`; unreachable
+`.txt`, structured text, source code, executables, and binary support never
+receive a prepared semantic analysis through this path. An expected target
+that was not parsed remains inspection evidence only and never gains a
+synthetic `renma.security-analysis-coverage.v1` artifact row.
 
 `src/yaml-frontmatter.ts` owns YAML-comment extraction eligibility as well as
 the extracted comment surfaces. `parseAgentSkillFrontmatter()` retains Agent

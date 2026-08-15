@@ -8,6 +8,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Extended `renma.inspection-coverage.v1` to close statically proven
+  Skill-support inspection gaps. A reachable local support target that becomes
+  excluded, oversized, unreadable, depth-limited, symlinked, or otherwise
+  uninspectable now contributes exact blocking evidence with static-reference
+  provenance, so `--strict` continues to fail through
+  `strict_scan.incomplete_inspection` and inspection-coverage diffs expose
+  parsed-to-blocked regressions. Authority still requires one unambiguous
+  owning Skill and a fully parsed source chain; unreferenced support and
+  unknown transitive children remain outside this boundary, and unparsed
+  targets do not receive synthetic security-analysis coverage rows.
 - Extended CST-backed YAML frontmatter-comment security analysis from Skills
   to eligible, known non-Skill Markdown artifacts with a closed Renma
   frontmatter envelope. Comments retain the raw-agent-visible,

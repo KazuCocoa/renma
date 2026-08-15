@@ -11,7 +11,10 @@ import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { buildInspectionCoverage } from "./inspection-coverage.js";
 import { runRules } from "./rules.js";
 import { analyzeSecurityDiagnostics } from "./security-diagnostics.js";
-import { plainTextSupportSecurityReachability } from "./static-support.js";
+import {
+  plainTextSupportSecurityReachability,
+  staticallyExpectedSupportPaths,
+} from "./static-support.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
 import {
@@ -81,6 +84,16 @@ export function scanFromRepositorySnapshot(
   const plainTextSupportReachability = plainTextSupportSecurityReachability(
     snapshot.documents,
     snapshot.repositoryPaths,
+  );
+  const expectedSupportPaths = staticallyExpectedSupportPaths(
+    snapshot.documents,
+    [
+      ...new Set([
+        ...snapshot.repositoryPaths,
+        ...snapshot.repositoryPathStates.keys(),
+      ]),
+    ],
+    snapshot.skillParents,
   );
   const securityAnalysis = analyzeSecurityDiagnostics(
     snapshot.documents,
@@ -163,6 +176,9 @@ export function scanFromRepositorySnapshot(
       snapshot.repositoryPathStates,
       snapshot.core.repositoryPathConfig,
       snapshot.core.blockedTraversalPaths,
+      expectedSupportPaths,
+      snapshot.artifacts,
+      snapshot.config,
     ),
     securityAnalysisCoverage: securityAnalysis.coverage,
     scannedFileCount: snapshot.scannedFileCount,
