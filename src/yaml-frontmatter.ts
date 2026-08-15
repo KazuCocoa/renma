@@ -57,6 +57,11 @@ export interface ParsedYamlFrontmatter {
   errors: YamlFrontmatterError[];
 }
 
+export type YamlFrontmatterCommentAnalysis = Pick<
+  ParsedYamlFrontmatter,
+  "commentsAnalyzable" | "comments"
+>;
+
 export interface AgentSkillFrontmatterEnvelope {
   present: boolean;
   closingIndex: number | undefined;
@@ -71,7 +76,7 @@ export interface AgentSkillFrontmatterEnvelope {
  * content, including inside block scalars.
  */
 export function agentSkillFrontmatterEnvelope(
-  lines: string[],
+  lines: readonly string[],
 ): AgentSkillFrontmatterEnvelope {
   const firstLine = lines[0]?.replace(/^\uFEFF/, "").trim();
   if (firstLine !== "---") {
@@ -100,28 +105,8 @@ export function parseAgentSkillFrontmatter(
   const closingIndex = envelope.closingIndex;
 
   const source = lines.slice(1, closingIndex).join("\n");
-  const lineCounter = new LineCounter();
-  const yaml = parseYamlDocument(source, {
-    lineCounter,
-    prettyErrors: false,
-    strict: true,
-    stringKeys: true,
-    uniqueKeys: false,
-    version: "1.2",
-  });
-  const errors = yaml.errors.map((error) => ({
-    code: error.code,
-    message: error.message,
-    line:
-      (error.linePos?.[0].line ?? lineCounter.linePos(error.pos[0]).line) + 1,
-  }));
-  // The same YAML library's CST distinguishes syntactic comments from hashes
-  // inside quoted and block scalar content. Only expose comment evidence after
-  // the semantic parse succeeds; malformed YAML must not produce guessed text.
-  const commentAnalysis =
-    errors.length === 0
-      ? analyzeYamlFrontmatterComments(source, lineCounter)
-      : { commentsAnalyzable: false as const, comments: [] };
+  const { yaml, lineCounter, errors, commentAnalysis } =
+    parseYamlFrontmatterSource(source);
 
   if (!isMap(yaml.contents)) {
     return {
@@ -159,6 +144,52 @@ export function parseAgentSkillFrontmatter(
   };
 }
 
+/**
+ * Extract comments from a frontmatter envelope already proven closed by its
+ * artifact-specific delimiter contract. The closing index is zero-based.
+ */
+export function parseYamlFrontmatterComments(
+  content: string,
+  closingIndex: number,
+): YamlFrontmatterCommentAnalysis {
+  const lines = content.split(/\r?\n/);
+  if (
+    !Number.isSafeInteger(closingIndex) ||
+    closingIndex <= 0 ||
+    closingIndex >= lines.length
+  ) {
+    return { commentsAnalyzable: false, comments: [] };
+  }
+  return parseYamlFrontmatterSource(lines.slice(1, closingIndex).join("\n"))
+    .commentAnalysis;
+}
+
+function parseYamlFrontmatterSource(source: string) {
+  const lineCounter = new LineCounter();
+  const yaml = parseYamlDocument(source, {
+    lineCounter,
+    prettyErrors: false,
+    strict: true,
+    stringKeys: true,
+    uniqueKeys: false,
+    version: "1.2",
+  });
+  const errors = yaml.errors.map((error) => ({
+    code: error.code,
+    message: error.message,
+    line:
+      (error.linePos?.[0].line ?? lineCounter.linePos(error.pos[0]).line) + 1,
+  }));
+  // The same YAML library's CST distinguishes syntactic comments from hashes
+  // inside quoted and block scalar content. Only expose comment evidence after
+  // the semantic parse succeeds; malformed YAML must not produce guessed text.
+  const commentAnalysis =
+    errors.length === 0
+      ? analyzeYamlFrontmatterComments(source, lineCounter)
+      : { commentsAnalyzable: false as const, comments: [] };
+  return { yaml, lineCounter, errors, commentAnalysis };
+}
+
 function emptyResult(
   present: boolean,
   closed: boolean,
@@ -188,7 +219,7 @@ type CstCommentLine = YamlFrontmatterCommentLine & {
 function analyzeYamlFrontmatterComments(
   source: string,
   lineCounter: LineCounter,
-): Pick<ParsedYamlFrontmatter, "commentsAnalyzable" | "comments"> {
+): YamlFrontmatterCommentAnalysis {
   const tokens = [...new Parser().parse(source)];
   if (containsCstErrorToken(tokens)) {
     return { commentsAnalyzable: false, comments: [] };

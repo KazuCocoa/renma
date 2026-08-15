@@ -1537,7 +1537,8 @@ JSON evidence. This is separate from repository inspection coverage: it records
 which existing security-analysis layers actually ran for each artifact Renma
 already discovered and scanned. The current layers are raw hidden Unicode,
 semantic instructions for Markdown and proven reachable plain-text Skill
-support, canonical Skill description, and Skill YAML frontmatter comments.
+support, canonical Skill description, and eligible Skill or non-Skill YAML
+frontmatter comments.
 Renma does not walk additional files or infer runtime agent reachability to
 build this evidence.
 

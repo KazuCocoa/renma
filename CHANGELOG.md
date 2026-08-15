@@ -8,6 +8,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Extended CST-backed YAML frontmatter-comment security analysis from Skills
+  to eligible, known non-Skill Markdown artifacts with a closed Renma
+  frontmatter envelope. Comments retain the raw-agent-visible,
+  no-policy-authority boundary and exact source evidence; successful
+  zero-comment extraction reports `yamlFrontmatterComments: "analyzed"`,
+  while malformed input remains non-analyzable and arbitrary `unknown`
+  Markdown remains out of scope.
 - Hardened HTML-comment security projection to use the same raw-agent-visible,
   no-policy-authority trust boundary as YAML frontmatter comments. Inner
   Markdown presentation and negative-example labels can no longer opt hidden

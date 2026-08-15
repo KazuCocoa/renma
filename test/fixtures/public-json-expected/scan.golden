@@ -65,7 +65,10 @@
           "hiddenUnicode": "analyzed",
           "semanticInstructions": "analyzed",
           "canonicalDescription": "not-applicable",
-          "yamlFrontmatterComments": "not-applicable"
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
         }
       },
       {
@@ -76,7 +79,10 @@
           "hiddenUnicode": "analyzed",
           "semanticInstructions": "analyzed",
           "canonicalDescription": "not-applicable",
-          "yamlFrontmatterComments": "not-applicable"
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
         }
       },
       {
@@ -87,7 +93,10 @@
           "hiddenUnicode": "analyzed",
           "semanticInstructions": "analyzed",
           "canonicalDescription": "not-applicable",
-          "yamlFrontmatterComments": "not-applicable"
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
         }
       },
       {
@@ -98,7 +107,10 @@
           "hiddenUnicode": "analyzed",
           "semanticInstructions": "analyzed",
           "canonicalDescription": "not-applicable",
-          "yamlFrontmatterComments": "not-applicable"
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
         }
       },
       {
@@ -109,7 +121,10 @@
           "hiddenUnicode": "analyzed",
           "semanticInstructions": "analyzed",
           "canonicalDescription": "not-applicable",
-          "yamlFrontmatterComments": "not-applicable"
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
         }
       },
       {
@@ -120,7 +135,10 @@
           "hiddenUnicode": "analyzed",
           "semanticInstructions": "analyzed",
           "canonicalDescription": "not-applicable",
-          "yamlFrontmatterComments": "not-applicable"
+          "yamlFrontmatterComments": "analyzed"
+        },
+        "surfaceCounts": {
+          "yamlFrontmatterComments": 0
         }
       },
       {
