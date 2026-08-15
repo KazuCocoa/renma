@@ -2488,7 +2488,7 @@ function skillLocalSupportReachabilityFindings(
             DIAGNOSTIC_IDS.SUPPORT_MISSING_PATH,
             "Skill-local resource path does not exist",
             "structure",
-            "medium",
+            "high",
             reference.line,
             reference.raw,
             `Create ${reference.relative} under the Skill root or correct the relative path.`,

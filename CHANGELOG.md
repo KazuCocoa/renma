@@ -44,6 +44,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   frontmatter comment layers without changing findings, strict scan, or CI
   policy.
 
+### Changed
+
+- Raised `SUPPORT-MISSING-PATH` from Medium to High because a statically
+  referenced local resource that does not exist is a broken declared
+  relationship. Missing targets remain structural findings rather than
+  inspection-coverage issues.
+
 ## [0.32.1] - 2026-08-13
 
 ### Fixed
