@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Hardened HTML-comment security projection to use the same raw-agent-visible,
+  no-policy-authority trust boundary as YAML frontmatter comments. Inner
+  Markdown presentation and negative-example labels can no longer opt hidden
+  security-sensitive text out of analysis, and policy-looking comment text
+  cannot authorize or allowlist its own projection.
 - Added semantic security analysis for discovered UTF-8 `.txt` Skill support
   files only when the existing repository-local static-reference graph proves
   them reachable from exactly one owning Skill. Reachable plain-text support

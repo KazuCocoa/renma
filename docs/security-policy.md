@@ -787,17 +787,15 @@ or other security-sensitive instruction emits
 underlying matched diagnostic identity in `details`. Ordinary explanatory,
 metadata, formatting, and documentation comments remain inert. The finding is
 suppressible only through the existing finding-ID plus repository-path
-suppression contract. The raw-comment projection reuses the visible-Markdown
-structural example classification: a same-node marker, a preceding negative-
-example label, or a negative-example heading can bound its example payload.
-For an inline same-node marker, only the punctuation-bounded clause containing
-the marker is masked; a later clause remains operational even on the same
-physical line or after a soft line break in the same paragraph. The structural
-classification does not exempt a later independent workflow instruction, and a
-trailing label cannot hide an earlier instruction. Direct prohibitions remain
-defensive and inert. This comment projection is separate from the raw hidden-
-Unicode pass, which continues to inspect every discovered UTF-8 text artifact
-before Markdown filtering.
+suppression contract. The outer HTML comment is the eligibility boundary. Inner Markdown
+blockquotes, code presentation, HTML-like syntax, and unsafe- or negative-
+example labels cannot hide security-sensitive raw text from this projection.
+The projection also accepts no policy authority from its own text: policy-
+looking fields remain raw evidence and cannot authorize, allowlist, or suppress
+another instruction in the same comment. Direct prohibitions remain defensive
+and inert. This comment projection is separate from the raw hidden-Unicode
+pass, which continues to inspect every discovered UTF-8 text artifact before
+Markdown filtering.
 
 Closed, successfully parsed Skill frontmatter receives a parallel, additive
 projection for syntactic YAML comments. A recognized instruction emits
@@ -812,10 +810,13 @@ inner Markdown blockquotes, HTML-comment syntax, code presentation, and example
 labels cannot hide its raw text from this projection. The comment projection
 also accepts no policy authority from its own text: a policy-looking prefix is
 still analyzed as raw evidence and cannot authorize or allowlist another
-comment line. Ordinary Markdown body analysis and HTML-comment projection
-retain their existing policy and structural false-positive protections;
-whether HTML comments should adopt the no-policy-authority rule is a separate
-follow-up.
+comment line.
+
+For both HTML comments and YAML frontmatter comments, hidden raw-comment text is
+evidence to inspect, never structural or policy authority for its own
+inspection. Ordinary visible Markdown keeps its existing quotation, example,
+policy, and structural false-positive protections; this raw-comment rule does
+not broaden those semantics.
 
 This scope is comments only. It does not newly security-scan `compatibility`,
 `license`, `allowed-tools`, arbitrary `metadata` or `metadata.renma.*` values,
