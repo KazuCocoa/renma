@@ -204,13 +204,44 @@ test("missing referenced support remains a missing-path finding without duplicat
   const fixture = await referencedSupportFixture(t);
 
   const result = await scan(fixture.root, { failOn: "high" });
+  const missing = result.findings.find(
+    (finding) => finding.id === "SUPPORT-MISSING-PATH",
+  );
+  const strict = evaluateStrictScan(result);
+
+  assert.equal(missing?.severity, "high");
+  assert.deepEqual(missing?.evidence, {
+    path: "skills/demo/SKILL.md",
+    startLine: 9,
+    endLine: 9,
+    snippet: "`references/runtime.txt`",
+  });
+  assert.equal(missing?.details?.target, SUPPORT_PATH);
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+  assert.equal(strict.outcome, "fail");
+  assert.ok(
+    strict.matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.FINDING_THRESHOLD,
+    ),
+  );
+  assert.ok(
+    !strict.matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+  );
+});
+
+test("an unreferenced absent support path remains irrelevant", async (t) => {
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Review the repository and report completion.",
+  );
+
+  const result = await scan(fixture.root, { failOn: "high" });
 
   assert.ok(
-    result.findings.some(
-      (finding) =>
-        finding.id === "SUPPORT-MISSING-PATH" &&
-        finding.details?.target === SUPPORT_PATH,
-    ),
+    !result.findings.some((finding) => finding.id === "SUPPORT-MISSING-PATH"),
   );
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
@@ -263,20 +294,22 @@ test("duplicate basename ambiguity does not select an oversized target", async (
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
-test("external, absolute, and escaping references do not create support expectations", async (t) => {
+test("external, absolute, and escaping references do not create support findings or expectations", async (t) => {
   const fixture = await referencedSupportFixture(
     t,
-    { max_file_size_bytes: 1_000 },
+    undefined,
     [
       "Read [external](https://example.test/references/runtime.txt).",
       "Read `/references/runtime.txt`.",
       "Read `../references/runtime.txt`.",
     ].join("\n"),
   );
-  await fixture.write(SUPPORT_PATH, "x".repeat(1_100));
 
   const result = await scan(fixture.root, { failOn: "high" });
 
+  assert.ok(
+    !result.findings.some((finding) => finding.id === "SUPPORT-MISSING-PATH"),
+  );
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
