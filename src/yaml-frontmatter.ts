@@ -34,6 +34,12 @@ export interface YamlFrontmatterField {
   sequenceItems?: YamlFrontmatterSequenceItem[];
 }
 
+export interface YamlTopLevelKeyEvidence {
+  key: string;
+  startLine: number;
+  endLine: number;
+}
+
 export interface YamlFrontmatterSequenceItem {
   value: unknown;
   startLine: number;
@@ -134,6 +140,57 @@ export function ensureYamlFrontmatterForDocument(
   return frontmatter;
 }
 
+/**
+ * Retain declaration identity for malformed Renma frontmatter without
+ * recovering any operational value. Parser-owned root fields take priority;
+ * the lexical fallback accepts only column-zero mapping keys, so nested
+ * mappings, sequence items, comments, and scalar contents cannot gain
+ * top-level authority.
+ */
+export function recognizedMalformedTopLevelKeys(
+  content: string,
+  frontmatter: ParsedYamlFrontmatter,
+  knownKeys: ReadonlySet<string>,
+): YamlTopLevelKeyEvidence[] {
+  if (
+    !frontmatter.present ||
+    (frontmatter.closed &&
+      frontmatter.mapping &&
+      frontmatter.errors.length === 0)
+  ) {
+    return [];
+  }
+
+  const declarations = new Map<string, YamlTopLevelKeyEvidence>();
+  for (const field of frontmatter.fields) {
+    if (knownKeys.has(field.key) && !declarations.has(field.key)) {
+      declarations.set(field.key, {
+        key: field.key,
+        startLine: field.startLine,
+        endLine: field.endLine,
+      });
+    }
+  }
+
+  const lines = content.split(/\r?\n/);
+  const endIndex = frontmatter.closed
+    ? frontmatter.bodyStartLine - 2
+    : lines.length;
+  for (let index = 1; index < endIndex; index += 1) {
+    const key = rootMappingKey(lines[index] ?? "");
+    if (key === undefined || !knownKeys.has(key) || declarations.has(key)) {
+      continue;
+    }
+    declarations.set(key, {
+      key,
+      startLine: index + 1,
+      endLine: index + 1,
+    });
+  }
+
+  return [...declarations.values()];
+}
+
 function parseFrontmatterEnvelope(
   lines: string[],
   envelope: FrontmatterEnvelope,
@@ -182,6 +239,13 @@ function parseFrontmatterEnvelope(
     duplicateMetadataKeys: findDuplicates(metadataFields),
     errors,
   };
+}
+
+function rootMappingKey(line: string): string | undefined {
+  const match = line.match(
+    /^(?:"([A-Za-z_][A-Za-z0-9_]*)"|'([A-Za-z_][A-Za-z0-9_]*)'|([A-Za-z_][A-Za-z0-9_]*))\s*:/,
+  );
+  return match?.[1] ?? match?.[2] ?? match?.[3];
 }
 
 function parseYamlFrontmatterSource(source: string) {

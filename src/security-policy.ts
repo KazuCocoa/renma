@@ -10,6 +10,7 @@ import type { SecurityConfig } from "./types/configuration.js";
 import {
   ensureYamlFrontmatterForDocument,
   parseRenmaFrontmatter,
+  recognizedMalformedTopLevelKeys,
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
@@ -130,12 +131,17 @@ function parseRenmaSecurityMetadata(
 ): CanonicalSecurityMetadataResult {
   const policy = emptySecurityPolicy();
   const issues: CanonicalSecurityMetadataIssue[] = [];
-  if (!frontmatter.present || !frontmatter.closed) return { policy, issues };
+  if (!frontmatter.present) return { policy, issues };
 
   const lines = content.split(/\r?\n/);
-  if (!frontmatter.mapping || frontmatter.errors.length > 0) {
-    const reason =
-      frontmatter.errors[0] === undefined
+  if (
+    !frontmatter.closed ||
+    !frontmatter.mapping ||
+    frontmatter.errors.length > 0
+  ) {
+    const reason = !frontmatter.closed
+      ? "frontmatter envelope is not closed"
+      : frontmatter.errors[0] === undefined
         ? "frontmatter root must be a YAML mapping"
         : `frontmatter YAML is invalid (${frontmatter.errors[0].code})`;
     for (const declaration of recognizedRenmaSecurityDeclarations(
@@ -262,32 +268,23 @@ function recognizedRenmaSecurityDeclarations(
     ]),
   );
 
-  for (const field of frontmatter.fields) {
-    const definition = definitions.get(field.key);
-    if (definition !== undefined && !declarations.has(field.key)) {
-      declarations.set(field.key, {
-        definition,
-        evidence: yamlSecurityFieldEvidence(lines, field),
-      });
-    }
-  }
-
-  const closingIndex = frontmatter.bodyStartLine - 2;
-  for (let index = 1; index < closingIndex; index += 1) {
-    const keyMatch = lines[index]?.match(
-      /^\s*(?:"([A-Za-z_][A-Za-z0-9_]*)"|'([A-Za-z_][A-Za-z0-9_]*)'|([A-Za-z_][A-Za-z0-9_]*))\s*:/,
-    );
-    const key = keyMatch?.[1] ?? keyMatch?.[2] ?? keyMatch?.[3];
-    const definition = key === undefined ? undefined : definitions.get(key);
+  for (const declaration of recognizedMalformedTopLevelKeys(
+    lines.join("\n"),
+    frontmatter,
+    new Set(definitions.keys()),
+  )) {
+    const definition = definitions.get(declaration.key);
     if (definition === undefined || declarations.has(definition.nonSkillKey)) {
       continue;
     }
     declarations.set(definition.nonSkillKey, {
       definition,
       evidence: {
-        startLine: index + 1,
-        endLine: index + 1,
-        snippet: lines[index] ?? "",
+        startLine: declaration.startLine,
+        endLine: declaration.endLine,
+        snippet: lines
+          .slice(declaration.startLine - 1, declaration.endLine)
+          .join("\n"),
       },
     });
   }

@@ -28,6 +28,7 @@ import {
 } from "./metadata-definitions.js";
 import {
   ensureYamlFrontmatterForDocument,
+  recognizedMalformedTopLevelKeys,
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
@@ -132,6 +133,9 @@ const NON_SKILL_OPERATIONAL_METADATA_KEY_SET = new Set<string>([
 
 const SUPPORT_ASSET_TOKEN_BUDGET_KIND_SET = new Set<string>(
   SUPPORT_ASSET_TOKEN_BUDGET_KINDS,
+);
+const SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEY_SET = new Set<string>(
+  SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS,
 );
 
 type SupportAssetTokenBudgetKind =
@@ -375,21 +379,14 @@ function rawTokenBudgetFields(
   key: TokenBudgetKey;
   evidence: Evidence;
 }> {
-  if (!frontmatter.present || !frontmatter.closed) return [];
-  const fields: Array<{ key: TokenBudgetKey; evidence: Evidence }> = [];
-  const closingIndex = frontmatter.bodyStartLine - 2;
-  for (let index = 1; index < closingIndex; index += 1) {
-    const line = document.lines[index] ?? "";
-    const match = line.match(
-      /^(token_budget_override|token_budget_rationale|token_budget_reviewed_at)\s*:/,
-    );
-    if (!match) continue;
-    fields.push({
-      key: match[1] as TokenBudgetKey,
-      evidence: documentLineEvidence(document, index + 1),
-    });
-  }
-  return fields;
+  return recognizedMalformedTopLevelKeys(
+    document.artifact.content,
+    frontmatter,
+    SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEY_SET,
+  ).map((field) => ({
+    key: field.key as TokenBudgetKey,
+    evidence: documentLineEvidence(document, field.startLine),
+  }));
 }
 
 function fieldEvidence(
@@ -992,16 +989,18 @@ function renmaMetadataSource(
   const frontmatter = ensureYamlFrontmatterForDocument(document);
   const malformed =
     frontmatter.present &&
-    frontmatter.closed &&
-    (!frontmatter.mapping || frontmatter.errors.length > 0);
+    (!frontmatter.closed ||
+      !frontmatter.mapping ||
+      frontmatter.errors.length > 0);
   if (malformed) {
     const error = frontmatter.errors[0];
     diagnostics.push(
       withDiagnosticId(DIAGNOSTIC_IDS.META_INVALID_RENMA_FRONTMATTER, {
         severity: "error",
         path: document.artifact.path,
-        message:
-          error === undefined
+        message: !frontmatter.closed
+          ? "Non-Skill Renma frontmatter is not closed. No operational metadata was selected."
+          : error === undefined
             ? "Non-Skill Renma frontmatter must be a YAML mapping. No operational metadata was selected."
             : `Non-Skill Renma frontmatter contains invalid YAML (${error.code}). No operational metadata was selected.`,
         evidence: documentLineEvidence(document, error?.line ?? 1),

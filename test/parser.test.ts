@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { markdownBodyStartLineForArtifact } from "../src/frontmatter-envelope.js";
 import { parseDocument } from "../src/markdown.js";
-import { parseAssetMetadata } from "../src/metadata.js";
+import {
+  parseAssetMetadata,
+  parseSupportAssetTokenBudgetDecision,
+} from "../src/metadata.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownBodyStartLine,
@@ -433,6 +436,79 @@ status: stable
         diagnostic.evidence?.startLine === 4,
     ),
   );
+});
+
+test("an unclosed exact Renma envelope is invalid without selecting metadata", () => {
+  const document = parseDocument(
+    markdownArtifact(
+      `---
+id: context.example
+owner: qa
+# no closing delimiter
+`,
+      "contexts/unclosed.md",
+      "context",
+    ),
+  );
+  const parsed = parseAssetMetadata(document);
+  const invalid = parsed.diagnostics.find(
+    (diagnostic) => diagnostic.code === "META-INVALID-RENMA-FRONTMATTER",
+  );
+
+  assert.deepEqual(document.metadata, {});
+  assert.equal(parsed.metadata.id, undefined);
+  assert.equal(parsed.metadata.owner, undefined);
+  assert.equal(invalid?.evidence?.startLine, 1);
+  assert.equal(invalid?.evidence?.snippet, "---");
+
+  for (const opener of [" ---", "--- ", "\uFEFF---"]) {
+    const nonCanonical = parseAssetMetadata(
+      parseDocument(
+        markdownArtifact(
+          `${opener}\nid: context.noncanonical\nowner: qa\n`,
+          "contexts/noncanonical.md",
+          "context",
+        ),
+      ),
+    );
+    assert.equal(nonCanonical.metadata.id, undefined, JSON.stringify(opener));
+    assert.equal(
+      nonCanonical.diagnostics.some(
+        (diagnostic) => diagnostic.code === "META-INVALID-RENMA-FRONTMATTER",
+      ),
+      false,
+      JSON.stringify(opener),
+    );
+  }
+});
+
+test("an unclosed token-budget declaration remains invalid at the default limit", () => {
+  const decision = parseSupportAssetTokenBudgetDecision(
+    parseDocument(
+      markdownArtifact(
+        `---
+token_budget_override: 12000
+token_budget_rationale: Keep this ordered reference intact.
+# no closing delimiter
+`,
+        "skills/demo/references/unclosed.md",
+        "reference",
+      ),
+    ),
+  );
+
+  assert.equal(decision.status, "invalid");
+  assert.equal(decision.defaultLimit, 7200);
+  assert.equal(decision.effectiveLimit, 7200);
+  assert.equal(decision.overrideLimit, undefined);
+  assert.equal(decision.declaredOverrideLimit, undefined);
+  assert.ok(
+    decision.invalidReasons.includes(
+      "token-budget decision frontmatter must be closed",
+    ),
+  );
+  assert.equal(decision.evidence?.startLine, 2);
+  assert.equal(decision.evidence?.snippet, "token_budget_override: 12000");
 });
 
 test("unsupported non-Skill YAML shapes do not become guessed strings", () => {

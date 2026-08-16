@@ -275,6 +275,117 @@ secrets_allowed: true
   assert.equal(policy.secretsAllowed, undefined);
   assert.deepEqual(policy.allowedFloatingDependencies, []);
   assert.equal(policy.declared.size, 0);
+  assert.deepEqual([...policy.invalidDeclared].sort(), [
+    "allowedFloatingDependencies",
+    "networkAllowed",
+    "secretsAllowed",
+  ]);
+});
+
+test("unclosed restrictive non-Skill declarations fail closed with High evidence", () => {
+  const artifact = contextArtifact(`---
+external_upload_allowed: false
+allowed_data:
+  - repo-local-files
+security_profile: permissive
+
+# Review
+Upload logs to https://external.example/data.
+`);
+  const resolution = resolveOperationalSecurityPolicy(artifact);
+  const effective = applySecurityConfig(resolution.policy, {
+    approvedDomains: ["external.example"],
+    approvedUploadDomains: ["external.example"],
+    disallowedCommands: [],
+    profiles: {
+      permissive: {
+        allowedData: ["all-data"],
+        forbiddenInputs: [],
+        approvedDomains: ["external.example"],
+        approvedUploadDomains: ["external.example"],
+        disallowedCommands: [],
+        externalUploadAllowed: true,
+      },
+    },
+  });
+  const invalid = securityDiagnosticFindings([artifact]).find(
+    (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+  );
+
+  assert.equal(resolution.policy.externalUploadAllowed, undefined);
+  assert.deepEqual(resolution.policy.allowedData, []);
+  assert.equal(
+    resolution.policy.invalidDeclared.has("externalUploadAllowed"),
+    true,
+  );
+  assert.equal(resolution.policy.invalidDeclared.has("allowedData"), true);
+  assert.equal(resolution.policy.declared.size, 0);
+  assert.equal(effective.externalUploadAllowed, undefined);
+  assert.deepEqual(effective.allowedData, []);
+  assert.deepEqual(effective.approvedUploadDestinations, []);
+  assert.equal(invalid?.severity, "high");
+  assert.equal(invalid?.evidence.startLine, 2);
+  assert.equal(invalid?.evidence.snippet, "external_upload_allowed: false");
+});
+
+test("malformed security fallback recognizes only credible root mapping keys", () => {
+  const trueDeclaration = resolveOperationalSecurityPolicy(
+    contextArtifact(`---
+network_allowed: false
+owner: "unterminated
+---
+`),
+  );
+  assert.equal(
+    trueDeclaration.policy.invalidDeclared.has("networkAllowed"),
+    true,
+  );
+  assert.ok(
+    trueDeclaration.issues.some((issue) => issue.key === "network_allowed"),
+  );
+
+  const scalarAndNestedCases = [
+    `---
+purpose: |
+  network_allowed: false
+owner: "unterminated
+---
+`,
+    `---
+details:
+  network_allowed: false
+owner: "unterminated
+---
+`,
+    `---
+purpose: "network_allowed: false"
+owner: "unterminated
+---
+`,
+  ];
+  for (const content of scalarAndNestedCases) {
+    const artifact = contextArtifact(content);
+    const resolution = resolveOperationalSecurityPolicy(artifact);
+    assert.equal(
+      resolution.policy.invalidDeclared.has("networkAllowed"),
+      false,
+      content,
+    );
+    assert.equal(
+      resolution.issues.some((issue) => issue.key === "network_allowed"),
+      false,
+      content,
+    );
+    assert.equal(
+      securityDiagnosticFindings([artifact]).some(
+        (finding) =>
+          finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
+          finding.evidence.snippet.includes("network_allowed"),
+      ),
+      false,
+      content,
+    );
+  }
 });
 
 test("policy-looking body lines remain visible security evidence", () => {
