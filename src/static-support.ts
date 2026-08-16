@@ -4,6 +4,7 @@ import {
   classifyRepositorySkillPath,
   logicalSkillDirectory,
 } from "./discovery.js";
+import { markdownBodyStartLineForArtifact } from "./frontmatter-envelope.js";
 import type { SkillParentIndex } from "./catalog.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -99,7 +100,8 @@ function analyzeStaticSupportReferences(
   const seenReferences = new Set<string>();
   const seenIncomplete = new Set<string>();
   const candidateSetIncomplete = incompleteCandidateDirectories.length > 0;
-  const bodyStartIndex = markdownBodyStartIndex(document.lines);
+  const bodyStartIndex =
+    markdownBodyStartLineForArtifact(document.artifact, document.lines) - 1;
   for (let index = 0; index < document.lines.length; index += 1) {
     const line = document.lines[index] ?? "";
     const explicitValues: Array<{ raw: string; value: string }> = [];
@@ -145,7 +147,9 @@ function analyzeStaticSupportReferences(
       matchedCandidateBasenames.add(basename);
       if (paths.length !== 1 || explicitBasenames.has(basename)) continue;
       if (candidateSetIncomplete) {
-        addIncompleteBasename(basename, index + 1);
+        if (index >= bodyStartIndex) {
+          addIncompleteBasename(basename, index + 1);
+        }
         continue;
       }
       const normalized = normalizeStaticSupportReference(
@@ -209,14 +213,6 @@ function analyzeStaticSupportReferences(
         left.line - right.line || left.basename.localeCompare(right.basename),
     ),
   };
-}
-
-function markdownBodyStartIndex(lines: readonly string[]): number {
-  if (lines[0]?.trim() !== "---") return 0;
-  const frontmatterEnd = lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return frontmatterEnd >= 0 ? frontmatterEnd + 1 : lines.length;
 }
 
 /**
@@ -744,44 +740,48 @@ function containsExactBasename(content: string, basename: string): boolean {
 }
 
 /**
- * Extract only basename-shaped forms already accepted by the exact-token
- * matcher. This is used solely when an excluded support subtree makes the
- * candidate inventory incomplete; it never manufactures a target path.
+ * Extract syntactically explicit basename forms accepted by the same
+ * exact-token matcher as candidate-backed resolution. This is used solely
+ * when an excluded support subtree makes the candidate inventory incomplete;
+ * it never manufactures a target path.
  */
 function potentialBasenameReferenceTokens(line: string): string[] {
   const tokens = new Set<string>();
 
   for (const link of markdownLinkDestinations(line)) {
-    const candidate = normalizePotentialBasename(link.value);
-    if (candidate) tokens.add(candidate);
+    addExactBasenameToken(tokens, line, link.value, false);
   }
 
   for (const match of line.matchAll(/([`'"])(.*?)\1/g)) {
-    const candidate = normalizePotentialBasename(match[2] ?? "");
-    if (candidate && looksLikeFilenameBasename(candidate)) {
-      tokens.add(candidate);
-    }
-  }
-
-  for (const match of line.matchAll(/[^\s`'"()[\]{},;:!?/\\]+/g)) {
-    const raw = match[0];
-    const candidate = normalizePotentialBasename(
-      raw.endsWith(".") ? raw.slice(0, -1) : raw,
-    );
-    if (
-      candidate &&
-      looksLikeFilenameBasename(candidate) &&
-      containsExactBasename(line, candidate)
-    ) {
-      tokens.add(candidate);
-    }
+    addExactBasenameToken(tokens, line, match[2] ?? "", true);
   }
 
   return [...tokens].sort((left, right) => left.localeCompare(right));
 }
 
-function looksLikeFilenameBasename(value: string): boolean {
-  return /\.[\p{L}][\p{L}\p{N}_-]*$/u.test(value);
+function addExactBasenameToken(
+  tokens: Set<string>,
+  line: string,
+  value: string,
+  requireFilenameShape: boolean,
+): void {
+  const candidate = normalizePotentialBasename(value);
+  if (
+    candidate &&
+    (!requireFilenameShape ||
+      hasCandidateIndependentFilenameShape(candidate)) &&
+    containsExactBasename(line, candidate)
+  ) {
+    tokens.add(candidate);
+  }
+}
+
+/**
+ * Keep candidate-independent quoted tokens bounded to filename-like syntax
+ * without requiring an extension. Known candidates do not need this guard.
+ */
+function hasCandidateIndependentFilenameShape(value: string): boolean {
+  return /[._-]/u.test(value) || /^\p{Lu}/u.test(value);
 }
 
 function normalizePotentialBasename(value: string): string | undefined {
