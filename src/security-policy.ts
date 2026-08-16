@@ -3,6 +3,7 @@ import {
   parseFloatingDependencyAllowance,
   type FloatingDependencyAllowance,
 } from "./dependency-selectors.js";
+import { renmaFrontmatterEnvelope } from "./frontmatter-envelope.js";
 import { parseDocument } from "./markdown.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -123,14 +124,11 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
   const policy = emptySecurityPolicy();
 
   const lines = content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanEnd =
-    frontmatterEnd > 0 ? frontmatterEnd : Math.min(lines.length, 80);
+  const envelope = renmaFrontmatterEnvelope(lines);
+  if (envelope.closingIndex === undefined) return policy;
+  const scanEnd = envelope.closingIndex;
 
-  for (let index = 0; index < scanEnd; index += 1) {
+  for (let index = 1; index < scanEnd; index += 1) {
     const line = lines[index] ?? "";
     const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/);
     if (!match) {

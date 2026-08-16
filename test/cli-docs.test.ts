@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { COMMAND_HELP } from "../src/cli-help.js";
+import { COMMAND_HELP, renderCommandHelp } from "../src/cli-help.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
 
 const COMMANDS = [
@@ -123,6 +123,47 @@ test("User Manual mentions every CLI option exposed by command help", async () =
       `docs/user-manual.md does not mention the '--${optionName}' option exposed by src/cli-help.ts.`,
     );
   }
+});
+
+test("scan help and the User Manual document the narrow strict security-analysis boundary", async () => {
+  const manual = await readRepoFile("docs/user-manual.md");
+  const scanHelp = COMMAND_HELP.find((command) => command.name === "scan");
+  assert.ok(scanHelp);
+  const renderedScanHelp = renderCommandHelp("scan", "test");
+  assert.match(renderedScanHelp, /incomplete applicable security analysis/);
+  assert.match(
+    scanHelp.interpretation.join(" "),
+    /applicable YAML frontmatter-comment analysis that could not be completed safely/,
+  );
+  assert.match(
+    scanHelp.interpretation.join(" "),
+    /other unsupported or non-analyzable security-analysis states fatal/,
+  );
+
+  assert.match(
+    manual,
+    /applicable YAML\s+frontmatter-comment security analysis that is `not-analyzable`/,
+  );
+  assert.match(
+    manual,
+    /`inspectionCoverage` says whether expected repository evidence could\s+be inspected; `securityAnalysisCoverage` records supported security layers and\s+their parser-owned execution states/,
+  );
+  assert.match(
+    manual,
+    /Most `unsupported`\s+or `not-analyzable` layer states are informational coverage evidence/,
+  );
+  assert.match(
+    manual,
+    /only when the applicable YAML frontmatter-comment\s+layer reports `yamlFrontmatterComments: "not-analyzable"`/,
+  );
+  assert.match(
+    manual,
+    /does not change normal scan finding thresholds or CI policy/,
+  );
+  assert.doesNotMatch(
+    manual,
+    /security-analysis coverage[\s\S]{0,120}does not affect[\s\S]{0,80}`--strict`/i,
+  );
 });
 
 test("User Manual documents the authoritative CLI exit-code contract", async () => {

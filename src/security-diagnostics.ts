@@ -2000,6 +2000,7 @@ function prepareLogicalCommandAnalysis(
           sourceLines,
           visibleLines,
           lineIndex,
+          scanStart,
           markdownView,
         ),
       sameBlock: (firstLineIndex, secondLineIndex) =>
@@ -2124,8 +2125,7 @@ function prepareSecurityLineContext(
   guardHistory: SecurityGuardHistory,
   index: number,
 ): SecurityLineContext | undefined {
-  const { artifact, sourceLines, visibleLines, markdownView, logicalCommands } =
-    prepared;
+  const { sourceLines, visibleLines, markdownView, logicalCommands } = prepared;
   const lineNumber = index + 1;
   const line = markdownView.instructionLine(index);
   if (markdownView.isNonOperationalExampleLine(index)) return undefined;
@@ -2137,8 +2137,7 @@ function prepareSecurityLineContext(
   }
   if (
     !markdownView.usesRawAgentVisibleEligibility() &&
-    artifact.markdownParserEligible &&
-    isPolicyLine(line)
+    isFrontmatterPolicyLine(line, index, prepared.scanStart)
   ) {
     return undefined;
   }
@@ -2856,7 +2855,7 @@ function hasPolicyRelevantInstructionSurface(
     const line = prepared.markdownView.instructionLine(lineIndex);
     if (
       !prepared.markdownView.usesRawAgentVisibleEligibility() &&
-      (isPolicyLine(line) ||
+      (isFrontmatterPolicyLine(line, lineIndex, prepared.scanStart) ||
         isShellCommentLine(line, lineIndex, prepared.markdownView))
     ) {
       continue;
@@ -2950,6 +2949,7 @@ function isLogicalShellLineEligible(
   sourceLines: string[],
   visibleLines: string[],
   lineIndex: number,
+  scanStart: number,
   markdownView: MarkdownSecurityView,
 ): boolean {
   const source = sourceLines[lineIndex] ?? "";
@@ -2961,7 +2961,7 @@ function isLogicalShellLineEligible(
     !markdownView.isNonOperationalExampleLine(lineIndex) &&
     (!markdownView.isBlockQuotedLine(lineIndex) || operationalBlockQuote) &&
     (markdownView.usesRawAgentVisibleEligibility() ||
-      (!isPolicyLine(visible) &&
+      (!isFrontmatterPolicyLine(visible, lineIndex, scanStart) &&
         !isShellCommentLine(visible, lineIndex, markdownView)))
   );
 }
@@ -3142,7 +3142,7 @@ function bodyPolicyContradictionDetections(
     const line = prepared.visibleLines[lineIndex] ?? "";
     if (
       prepared.markdownView.isCodeBlockLine(lineIndex) ||
-      isPolicyLine(line)
+      isFrontmatterPolicyLine(line, lineIndex, prepared.scanStart)
     ) {
       continue;
     }
@@ -4816,6 +4816,14 @@ function escapeRegExp(value: string): string {
 
 function isPolicyLine(line: string): boolean {
   return isSecurityPolicyLine(line);
+}
+
+function isFrontmatterPolicyLine(
+  line: string,
+  lineIndex: number,
+  bodyStartIndex: number,
+): boolean {
+  return lineIndex < bodyStartIndex && isPolicyLine(line);
 }
 
 function isShellCommentLine(

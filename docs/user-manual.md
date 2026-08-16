@@ -1508,9 +1508,14 @@ renma scan . --fail-on high --strict
 Without `--strict`, `scan` retains its finding-threshold contract: active
 findings at or above `--fail-on` fail the command. Strict scan supplements that
 threshold and also fails for a specification-invalid Agent Skill, any Renma
-`error` diagnostic, or a blocking inspection-coverage issue. It does not make
-warnings generally fatal, and active suppressions keep their existing meaning.
-A below-threshold finding remains below threshold in strict mode.
+`error` diagnostic, a blocking `inspectionCoverage` issue, or applicable YAML
+frontmatter-comment security analysis that is `not-analyzable` because the
+parser-owned extractor could not complete that analysis safely. It does not
+make warnings, active suppressions, or other unsupported or non-analyzable
+security-analysis states generally fatal. A below-threshold finding remains
+below threshold in strict mode. The narrow security-analysis failure is exposed
+as `strict_scan.incomplete_security_analysis`; repository inspection failures
+remain `strict_scan.incomplete_inspection`.
 
 Every scan includes `renma.inspection-coverage.v1` JSON evidence. It counts
 expected first-class agent-facing paths plus statically proven Skill-support
@@ -1579,9 +1584,15 @@ consume.
 These three facts are intentionally independent: a repository path may be
 successfully inspected, one or more security-analysis layers may still be
 unsupported for its format, and the supported layers may produce zero
-findings. Security-analysis coverage says what Renma analyzed. It does not say
+findings. `inspectionCoverage` says whether expected repository evidence could
+be inspected; `securityAnalysisCoverage` records supported security layers and
+their parser-owned execution states. Security-analysis coverage does not say
 that an artifact is safe, secure, fully analyzed, or safe for an LLM, and it
-does not affect normal scan thresholds, `--strict`, or CI policy.
+does not change normal scan finding thresholds or CI policy. Most `unsupported`
+or `not-analyzable` layer states are informational coverage evidence. Strict
+mode additionally fails only when the applicable YAML frontmatter-comment
+layer reports `yamlFrontmatterComments: "not-analyzable"`, because that is a
+security surface Renma expected to inspect but could not safely parse.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 
