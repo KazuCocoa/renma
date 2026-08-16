@@ -110,15 +110,14 @@ The same reviewed vocabulary protects the parser boundary that makes those
 registered declarations authoritative. An otherwise exact security-bearing
 frontmatter opener, or the canonical Skill `metadata` container, is rejected
 with High source-integrity evidence when removing only reviewed characters
-would restore its accepted spelling. Renma does not accept the corrupted
+would restore its accepted spelling. Renma does not accept a corrupted
 delimiter or container, parse through its sanitized form, or recover any value.
-The existing non-Skill exact-delimiter contract remains unchanged: indentation,
-trailing whitespace, and a leading BOM do not gain frontmatter authority.
-Indentation and trailing whitespace do not receive a new High finding solely
-for that visible whitespace. A leading BOM immediately before an otherwise
-exact opener does receive the bounded High security-boundary evidence described
-above; an ordinary leading BOM elsewhere remains allowed by the generic
-hidden-Unicode policy.
+One absolute leading `U+FEFF` is treated as an encoding BOM and consumed before
+the non-Skill opener comparison, so `U+FEFF` followed by exact `---` has the
+same frontmatter meaning as `---`. The delimiter remains exact after that one
+encoding prefix is consumed: indentation and trailing whitespace remain
+noncanonical, while a second or non-leading BOM and other reviewed invisible
+characters remain content and can produce the bounded integrity evidence above.
 
 Specialized scanners can complement this bounded policy and instruction
 analysis without becoming Renma dependencies or Renma findings. Renma does not
@@ -212,12 +211,13 @@ top-level Skill security fields are accepted only by `suggest-metadata` as
 one-way migration input; normal scan consumers do not use them as Skill policy.
 
 Non-Skill policy values come from one YAML 1.2 parse of the exact Renma
-frontmatter envelope. Inline comments are comments, quoted scalars lose their
-quotes, and block and flow sequences have the same list semantics. The
-documented comma-separated scalar compatibility is applied only after YAML
-parsing. Malformed YAML, unsupported mappings, and duplicate recognized policy
-keys provide no local value; Renma records fail-closed evidence and does not
-choose a first or last declaration.
+frontmatter envelope after an optional absolute leading encoding BOM is
+consumed. Inline comments are comments, quoted scalars lose their quotes, and
+block and flow sequences have the same list semantics. The documented
+comma-separated scalar compatibility is applied only after YAML parsing.
+Malformed YAML, unsupported mappings, and duplicate recognized policy keys
+provide no local value; Renma records fail-closed evidence and does not choose a
+first or last declaration.
 
 ### Allowed data vocabulary
 
@@ -848,27 +848,26 @@ Markdown filtering.
 Closed, successfully parsed Skill frontmatter and eligible non-Skill Markdown
 frontmatter receive a parallel, additive projection for syntactic YAML comments.
 Skills retain the Agent Skills envelope rules; non-Skills retain the exact
-Renma `---` envelope rules. This includes `unknown` Markdown only when that same
-exact non-Skill parser recognizes the envelope; this comment eligibility does
-not grant new metadata or security-policy authority to the artifact. A
-recognized instruction emits
-`SEC-HIDDEN-FRONTMATTER-INSTRUCTION`, preserves the underlying diagnostic ID,
-and maps evidence back to the exact full-line or inline comment span. Comment
-tokens come from the YAML parser's concrete syntax tree: quoted `#` text and
-block-scalar content are not comments, while malformed or unclosed frontmatter
-is not heuristically recovered. If the exact envelope is present but cannot be
-safely analyzed, coverage is `not-analyzable`, including for `unknown`
-Markdown; delimiter-looking noncanonical text remains `not-applicable`.
-Adjacent full-line comments are projected as a single deterministic block so
-the existing bounded semantic rules can correlate their text. In short, if
-Renma excludes an exact parser-owned frontmatter envelope from Markdown body
-analysis, YAML comments in that envelope remain accountable to security
-coverage. The outer YAML comment is the eligibility boundary: inner Markdown
-blockquotes, HTML-comment syntax, code
-presentation, and example labels cannot hide its raw text from this
-projection. The comment projection also accepts no policy authority from its
-own text: a policy-looking prefix is still analyzed as raw evidence and cannot
-authorize or allowlist another comment line.
+Renma `---` envelope rules after consuming one optional absolute leading
+encoding BOM. This includes `unknown` Markdown only when that same non-Skill
+parser recognizes the envelope; this comment eligibility does not grant new
+metadata or security-policy authority to the artifact. A recognized instruction
+emits `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`, preserves the underlying diagnostic
+ID, and maps evidence back to the exact full-line or inline comment span.
+Comment tokens come from the YAML parser's concrete syntax tree: quoted `#` text
+and block-scalar content are not comments, while malformed or unclosed
+frontmatter is not heuristically recovered. If the recognized envelope is
+present but cannot be safely analyzed, coverage is `not-analyzable`, including
+for `unknown` Markdown; delimiter-looking noncanonical text remains
+`not-applicable`. Adjacent full-line comments are projected as a single
+deterministic block so the existing bounded semantic rules can correlate their
+text. In short, if Renma excludes a parser-owned frontmatter envelope from
+Markdown body analysis, YAML comments in that envelope remain accountable to
+security coverage. The outer YAML comment is the eligibility boundary: inner
+Markdown blockquotes, HTML-comment syntax, code presentation, and example labels
+cannot hide its raw text from this projection. The comment projection also
+accepts no policy authority from its own text: a policy-looking prefix is still
+analyzed as raw evidence and cannot authorize or allowlist another comment line.
 
 For both HTML comments and YAML frontmatter comments, hidden raw-comment text is
 evidence to inspect, never structural or policy authority for its own
@@ -963,7 +962,7 @@ repositories, and credential directories are bulk-sharing evidence at those
 sinks. Prefer the minimum task-relevant snippets and require sanitization or
 redaction before any permitted disclosure.
 
-`process.env.NAME` is an environment API access and is not a `.env` file path.
+`process.env.NAME` is an environment API access and is not an `.env` file path.
 An actual `.env` reference remains sensitive-file evidence. A local sensitive
 file read does not by itself become secret disclosure; copying, printing,
 logging, prompt attachment, sharing, or upload remains disclosure evidence.
@@ -1106,7 +1105,7 @@ Relaxation follows effective diagnostic semantics:
 | `approvedUploadDestinations`  | values outside the approved set          | approved value added                      |
 | `allowedData`                 | values outside the allowed data boundary | allowed value added                       |
 | `forbiddenInputs`             | values in the forbidden set              | forbidden value removed                   |
-| `disallowedCommands`          | values in the disallowed set             | disallowed value removed                  |
+| `disallowedCommands`          | values in the disallowed set              | disallowed value removed                   |
 
 For permission fields, only effective `false` prohibits matching instructions;
 `true` and `unspecified` are therefore in the same non-restrictive tier for
@@ -1193,9 +1192,9 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`         | The asset asks for data listed in its forbidden-input policy.                                                                        | Remove the request or replace it with redaction and placeholder guidance.                                                                                                                                                                                                                                                                                                   | Body, canonical Skill `description`, or metadata |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body or canonical Skill `description`      |
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text or canonical Skill `description` |
-| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body or canonical Skill `description`      |
+| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body text or canonical Skill `description` |
 | `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary.                                                      | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section.                                                                                                                                                                                                                                                                  | Body or canonical Skill `description`      |
 | `SEC-DESTRUCTIVE-COMMAND`                 | A destructive command appears without enough local safety context.                                                                   | Remove it, scope it tightly, or add explicit approval and recovery guidance.                                                                                                                                                                                                                                                                                                | Body text                                  |
-| `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`    | `sudo` or similar privileged action lacks guardrails.                                                                                | Add prerequisites, confirmation, rollback, and verification guidance.                                                                                                                                                                                                                                                                                                       | Body text                                  |
+| `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`    | `sudo` or similar privileged action lacks guardrails.                                                                                 | Add prerequisites, confirmation, rollback, and verification guidance.                                                                                                                                                                                                                                                                                                       | Body text                                  |
 | `SEC-UNPINNED-REMOTE-SCRIPT`              | A remote script is executed without an immutable source or verification.                                                             | Pin and verify the source, or avoid remote execution.                                                                                                                                                                                                                                                                                                                       | Body text                                  |
 | `SEC-UNPINNED-DEPENDENCY-INSTALL`         | A structured npm/PyPI install or compatibility-fallback Homebrew/Docker command contains floating or unresolved dependency evidence. | Use repository evidence and established conventions for a reviewed exact package selector, supported versioned formula, or explicit non-floating image tag/digest. Fail-closed variables apply only where structurally supported, and asset-local allowances apply only to exact `npm:`/`pypi:` selectors. Never invent a value or claim uninspected sources were verified. | Body text or npm/PyPI asset-local metadata |
