@@ -533,7 +533,44 @@ external_upload_allowed: false
   assert.equal(clean.policy.externalUploadAllowed, false);
   assert.equal(clean.issues.length, 0);
 
-  for (const firstLine of [" ---", "--- ", "\uFEFF---"]) {
+  const bomOpener = "\uFEFF---";
+  const bomArtifact = contextArtifact(`${bomOpener}
+external_upload_allowed: false
+security_profile: permissive
+---
+# Review
+`);
+  const bomResolution = resolveOperationalSecurityPolicy(bomArtifact);
+  const bomEffective = applySecurityConfig(bomResolution.policy, {
+    approvedDomains: [],
+    approvedUploadDomains: [],
+    disallowedCommands: [],
+    profiles: {
+      permissive: {
+        allowedData: [],
+        forbiddenInputs: [],
+        approvedDomains: [],
+        approvedUploadDomains: [],
+        disallowedCommands: [],
+        externalUploadAllowed: true,
+      },
+    },
+  });
+  const bomInvalid = securityDiagnosticFindings([bomArtifact]).find(
+    (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+  );
+
+  assert.equal(bomResolution.policy.externalUploadAllowed, undefined);
+  assert.equal(bomResolution.policy.securityProfile, undefined);
+  assert.equal(bomResolution.policy.declared.size, 0);
+  assert.ok(bomResolution.policy.invalidDeclared.has("externalUploadAllowed"));
+  assert.ok(bomResolution.policy.invalidDeclared.has("securityProfile"));
+  assert.equal(bomEffective.externalUploadAllowed, undefined);
+  assert.equal(bomInvalid?.severity, "high");
+  assert.equal(bomResolution.issues[0]?.snippet, bomOpener);
+  assert.equal(bomInvalid?.evidence.snippet, "---");
+
+  for (const firstLine of [" ---", "--- "]) {
     const artifact = contextArtifact(`${firstLine}
 external_upload_allowed: false
 ---
@@ -552,6 +589,32 @@ external_upload_allowed: false
       firstLine,
     );
   }
+
+  const ordinaryBomArtifact = contextArtifact("\uFEFF# Review\n");
+  assert.equal(
+    securityDiagnosticFindings([ordinaryBomArtifact]).some(
+      (finding) =>
+        finding.id === "SEC-SUSPICIOUS-INVISIBLE-CHARACTER" ||
+        finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+    ),
+    false,
+  );
+
+  const skillBomArtifact = artifactFor(
+    "skills/demo/SKILL.md",
+    "skill",
+    `\uFEFF---
+name: demo
+description: Review local evidence. Use when deterministic security review is requested.
+metadata:
+  renma.external-upload-allowed: "false"
+---
+# Demo
+`,
+  );
+  const skillBomResolution = resolveOperationalSecurityPolicy(skillBomArtifact);
+  assert.equal(skillBomResolution.policy.externalUploadAllowed, false);
+  assert.equal(skillBomResolution.issues.length, 0);
 });
 
 test("canonical Skill authority boundaries reject invisible corruption", () => {
@@ -639,6 +702,14 @@ external_upload_allowed: false
     );
   }
   await fixture.write(
+    "contexts/corrupted-opener-bom.md",
+    `\uFEFF---
+external_upload_allowed: false
+---
+# Corrupted
+`,
+  );
+  await fixture.write(
     "skills/corrupted/SKILL.md",
     `---
 name: corrupted
@@ -663,6 +734,14 @@ metad\u200eata:
       String(index),
     );
   }
+  assert.ok(
+    result.findings.some(
+      (finding) =>
+        finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
+        finding.severity === "high" &&
+        finding.evidence.path === "contexts/corrupted-opener-bom.md",
+    ),
+  );
   assert.ok(
     result.findings.some(
       (finding) =>

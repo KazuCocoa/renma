@@ -113,8 +113,12 @@ with High source-integrity evidence when removing only reviewed characters
 would restore its accepted spelling. Renma does not accept the corrupted
 delimiter or container, parse through its sanitized form, or recover any value.
 The existing non-Skill exact-delimiter contract remains unchanged: indentation,
-trailing whitespace, and a leading BOM do not gain frontmatter authority or a
-new High finding solely from their established noncanonical form.
+trailing whitespace, and a leading BOM do not gain frontmatter authority.
+Indentation and trailing whitespace do not receive a new High finding solely
+for that visible whitespace. A leading BOM immediately before an otherwise
+exact opener does receive the bounded High security-boundary evidence described
+above; an ordinary leading BOM elsewhere remains allowed by the generic
+hidden-Unicode policy.
 
 Specialized scanners can complement this bounded policy and instruction
 analysis without becoming Renma dependencies or Renma findings. Renma does not
