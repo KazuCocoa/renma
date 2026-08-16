@@ -468,7 +468,7 @@ owner: qa
   assert.equal(invalid?.evidence?.startLine, 1);
   assert.equal(invalid?.evidence?.snippet, "---");
 
-  for (const opener of [" ---", "--- ", "\uFEFF---"]) {
+  for (const opener of [" ---", "--- "]) {
     const nonCanonical = parseAssetMetadata(
       parseDocument(
         markdownArtifact(
@@ -487,6 +487,22 @@ owner: qa
       JSON.stringify(opener),
     );
   }
+
+  const bomUnclosed = parseAssetMetadata(
+    parseDocument(
+      markdownArtifact(
+        "\uFEFF---\nid: context.bom-unclosed\nowner: qa\n",
+        "contexts/bom-unclosed.md",
+        "context",
+      ),
+    ),
+  );
+  assert.equal(bomUnclosed.metadata.id, undefined);
+  assert.ok(
+    bomUnclosed.diagnostics.some(
+      (diagnostic) => diagnostic.code === "META-INVALID-RENMA-FRONTMATTER",
+    ),
+  );
 });
 
 test("an unclosed token-budget declaration remains invalid at the default limit", () => {
@@ -840,7 +856,6 @@ test("non-Skill metadata authority requires exact opening and closing delimiters
   const fixtures = [
     " ---\nid: context.indented\n---\n# Visible",
     "--- \nid: context.trailing-open\n---\n# Visible",
-    "\uFEFF---\nid: context.bom\n---\n# Visible",
     "---\nid: context.trailing-close\n--- \n# Visible",
   ];
 
@@ -855,6 +870,15 @@ test("non-Skill metadata authority requires exact opening and closing delimiters
       JSON.stringify(content),
     );
   }
+
+  const bomDocument = parseDocument(
+    markdownArtifact(
+      "\uFEFF---\nid: context.bom\n---\n# Visible",
+      "contexts/bom.md",
+      "context",
+    ),
+  );
+  assert.equal(parseAssetMetadata(bomDocument).metadata.id, "context.bom");
 });
 
 test("binary artifacts preserve fail-closed empty projections", () => {
