@@ -147,7 +147,12 @@ function projectResolvedDestinationEvidence(
       "Resolved destination evidence is absent from destination projection",
     );
   }
-  return { target: evidence.target, startOffset, endOffset };
+  return {
+    target: evidence.target,
+    text: evidence.text,
+    startOffset,
+    endOffset,
+  };
 }
 
 function validateShellProjection(
@@ -392,6 +397,7 @@ function isDestinationListContinuation(
   previous: DestinationCandidate,
   candidate: DestinationCandidate,
 ): boolean {
+  if (candidate.start < previous.end) return false;
   const trailingPunctuation = previous.raw.match(/[),.;:!?]+$/u)?.[0] ?? "";
   if (/[.;:!?]/u.test(trailingPunctuation)) return false;
   const trailingComma = previous.raw.match(/,+$/u)?.[0] ?? "";

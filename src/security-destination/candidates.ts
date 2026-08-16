@@ -23,8 +23,8 @@ export function classifyDestinationCandidates(
   line: string,
   resolvedDestinations: readonly ResolvedDestinationEvidence[] = [],
 ): DestinationCandidate[] {
-  const resolvedCandidates = resolvedDestinations.map((evidence) =>
-    resolvedDestinationCandidate(line, evidence),
+  const resolvedCandidates = resolvedDestinations.flatMap((evidence) =>
+    resolvedDestinationCandidates(line, evidence),
   );
   const candidates: DestinationCandidate[] = [];
 
@@ -132,10 +132,10 @@ export function classifyDestinationCandidates(
   );
 }
 
-function resolvedDestinationCandidate(
+function resolvedDestinationCandidates(
   input: string,
   evidence: ResolvedDestinationEvidence,
-): DestinationCandidate {
+): DestinationCandidate[] {
   if (
     !Number.isSafeInteger(evidence.startOffset) ||
     !Number.isSafeInteger(evidence.endOffset) ||
@@ -147,26 +147,59 @@ function resolvedDestinationCandidate(
       "Resolved destination evidence falls outside analyzed input",
     );
   }
-  const semantic = classifyDestinationCandidates(evidence.target).find(
-    (candidate) =>
-      candidate.start === 0 && candidate.end === evidence.target.length,
-  );
-  if (semantic !== undefined) {
-    return {
-      ...semantic,
-      raw: input.slice(evidence.startOffset, evidence.endOffset),
-      start: evidence.startOffset,
-      end: evidence.endOffset,
-    };
-  }
-  const destination = normalizeNetworkDestination(evidence.target);
-  return {
+  const targetCandidate = semanticDestinationCandidate(evidence.target);
+  const semanticCandidates = dedupeDestinationCandidates([
+    targetCandidate,
+    ...classifyDestinationCandidates(evidence.text),
+  ]);
+  return semanticCandidates.map((candidate) => ({
+    ...candidate,
     raw: input.slice(evidence.startOffset, evidence.endOffset),
     start: evidence.startOffset,
     end: evidence.endOffset,
+  }));
+}
+
+function semanticDestinationCandidate(target: string): DestinationCandidate {
+  const semantic = classifyDestinationCandidates(target).find(
+    (candidate) => candidate.start === 0 && candidate.end === target.length,
+  );
+  if (semantic !== undefined) return semantic;
+  const destination = normalizeNetworkDestination(target);
+  return {
+    raw: target,
+    start: 0,
+    end: target.length,
     kind: destination === undefined ? "local-path" : "bare-host",
     ...(destination === undefined ? {} : { destination }),
   };
+}
+
+function dedupeDestinationCandidates(
+  candidates: readonly DestinationCandidate[],
+): DestinationCandidate[] {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const identity = destinationCandidateIdentity(candidate);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
+function destinationCandidateIdentity(candidate: DestinationCandidate): string {
+  if (candidate.destination !== undefined) {
+    return [
+      candidate.explicitTransport ?? "",
+      candidate.destination.host,
+      candidate.destination.path,
+    ].join("\u0000");
+  }
+  return [
+    candidate.kind,
+    candidate.explicitTransport ?? "",
+    candidate.raw.toLowerCase(),
+  ].join("\u0000");
 }
 
 function overlapsResolvedDestination(

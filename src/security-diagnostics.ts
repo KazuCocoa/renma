@@ -1894,7 +1894,14 @@ function paragraphResolvedDestinationEvidence(
       if (endOffset <= startOffset || endOffset > paragraph.text.length) {
         return [];
       }
-      return [{ target: destination.target, startOffset, endOffset }];
+      return [
+        {
+          target: destination.target,
+          text: destination.text,
+          startOffset,
+          endOffset,
+        },
+      ];
     },
   );
 }
@@ -1970,6 +1977,7 @@ function cachedParagraphClauseDestinationAnalysis(
       )
       .map((destination) => ({
         target: destination.target,
+        text: destination.text,
         startOffset: destination.startOffset - clause.startOffset,
         endOffset: destination.endOffset - clause.startOffset,
       }));
@@ -2370,7 +2378,14 @@ function lineResolvedDestinationEvidence(
       ) {
         return [];
       }
-      return [{ target: destination.target, startOffset, endOffset }];
+      return [
+        {
+          target: destination.target,
+          text: destination.text,
+          startOffset,
+          endOffset,
+        },
+      ];
     },
   );
 }

@@ -213,6 +213,14 @@ Security coverage consumes that exact extraction state directly, so zero
 comments can mean `analyzed` only when the extractor actually ran
 successfully.
 
+`src/security-identifier-integrity.ts` owns the single reviewed
+default-ignorable vocabulary used at registered security-authority boundaries.
+Policy resolution compares parser-owned keys and artifact-selected opener
+syntax only against exact trusted spellings after that bounded projection. A
+matching corrupted opener or canonical `metadata` container produces invalid
+declaration evidence for every potentially hidden security field, but the
+projected delimiter, container, contents, and values never gain authority.
+
 `src/security-diagnostics.ts` owns semantic-surface eligibility, effective
 policy, guard application, fallback selection, evidence projection, ordering,
 deduplication, and conversion into the existing public Finding model. Its
@@ -394,8 +402,11 @@ When the primary Markdown parse resolves a link or reference target,
 `MarkdownSecurityView` maps that positioned target into the governing line or
 paragraph clause. Destination classification uses the parsed target identity
 while action association masks the original Markdown use span, so evidence
-remains the original source rather than synthetic Markdown. Definition lines
-are non-operational and unresolved references supply no target.
+remains the original source rather than synthetic Markdown. The parser-visible
+label text is classified separately by the established destination grammar: a
+distinct destination-shaped label is additive evidence, while an identical
+normalized label/target pair is deduplicated before association. Definition
+lines are non-operational and unresolved references supply no target.
 
 `src/security-prose-vocabulary.ts` owns only exact lexical sources shared by
 multiple prose-oriented detectors. Each owning detector still controls regex

@@ -13,6 +13,11 @@ export interface CorruptedSecurityIdentifier {
   authority: SecurityIdentifierAuthority;
 }
 
+export interface ReviewedDefaultIgnorableProjection {
+  sanitized: string;
+  removedCodePoints: string[];
+}
+
 const REVIEWED_DEFAULT_IGNORABLE_RANGES: ReadonlyArray<
   readonly [start: number, end: number]
 > = [
@@ -54,16 +59,9 @@ export function corruptedSecurityIdentifier(
         ? definition.skillKey
         : definition.nonSkillKey) !== key,
   );
-  const removedCodePoints: string[] = [];
-  let sanitizedKey = "";
-  for (const character of key) {
-    const codePoint = character.codePointAt(0)!;
-    if (isReviewedDefaultIgnorable(codePoint)) {
-      removedCodePoints.push(formatCodePoint(codePoint));
-    } else {
-      sanitizedKey += character;
-    }
-  }
+  const projection = reviewedDefaultIgnorableProjection(key);
+  const sanitizedKey = projection.sanitized;
+  const removedCodePoints = projection.removedCodePoints;
   if (removedCodePoints.length === 0) return undefined;
   const definition = definitions.find(
     (candidate) =>
@@ -78,6 +76,30 @@ export function corruptedSecurityIdentifier(
     removedCodePoints: [...new Set(removedCodePoints)],
     definition,
     authority,
+  };
+}
+
+/**
+ * Remove only the reviewed characters shared by bounded security-authority
+ * integrity checks. Callers must still require an exact trusted identifier or
+ * delimiter match before assigning security meaning to the projection.
+ */
+export function reviewedDefaultIgnorableProjection(
+  value: string,
+): ReviewedDefaultIgnorableProjection {
+  const removedCodePoints: string[] = [];
+  let sanitized = "";
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)!;
+    if (isReviewedDefaultIgnorable(codePoint)) {
+      removedCodePoints.push(formatCodePoint(codePoint));
+    } else {
+      sanitized += character;
+    }
+  }
+  return {
+    sanitized,
+    removedCodePoints: [...new Set(removedCodePoints)],
   };
 }
 

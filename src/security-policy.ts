@@ -21,6 +21,7 @@ import {
 } from "./metadata-definitions.js";
 import {
   corruptedSecurityIdentifier,
+  reviewedDefaultIgnorableProjection,
   type SecurityIdentifierAuthority,
 } from "./security-identifier-integrity.js";
 
@@ -61,7 +62,8 @@ export interface ResolvedSecurityPolicy {
 
 export interface CanonicalSecurityMetadataIssue {
   key: string;
-  operationalField: CanonicalSecurityOperationalField;
+  operationalField?: CanonicalSecurityOperationalField;
+  invalidOperationalFields?: readonly CanonicalSecurityOperationalField[];
   reason: string;
   startLine: number;
   endLine: number;
@@ -115,6 +117,14 @@ const CANONICAL_SECURITY_FIELDS: ReadonlyMap<
   ]),
 );
 
+const ALL_SECURITY_OPERATIONAL_FIELDS = [
+  ...new Set(
+    SECURITY_METADATA_FIELD_DEFINITIONS.map(
+      (definition) => definition.operationalField,
+    ),
+  ),
+] as CanonicalSecurityOperationalField[];
+
 function nonSkillSecurityFields(
   operationalField: CanonicalSecurityOperationalField,
 ): Set<string> {
@@ -136,9 +146,24 @@ function parseRenmaSecurityMetadata(
 ): CanonicalSecurityMetadataResult {
   const policy = emptySecurityPolicy();
   const issues: CanonicalSecurityMetadataIssue[] = [];
+  const lines = content.split(/\r?\n/);
+  const openerCorruption = corruptedFrontmatterAuthorityOpener(
+    lines[0] ?? "",
+    "non-skill",
+  );
+  if (openerCorruption !== undefined) {
+    recordSecurityAuthorityIssue(policy, issues, {
+      key: lines[0] ?? "",
+      reason: openerCorruption,
+      startLine: 1,
+      endLine: 1,
+      snippet: lines[0] ?? "",
+      identifierAuthority: "non-skill",
+    });
+    return { policy, issues };
+  }
   if (!frontmatter.present) return { policy, issues };
 
-  const lines = content.split(/\r?\n/);
   if (
     !frontmatter.closed ||
     !frontmatter.mapping ||
@@ -423,7 +448,9 @@ export function resolveOperationalSecurityPolicy(
 
   const policy = emptySecurityPolicy();
   for (const issue of semantic.issues) {
-    recordInvalidCanonicalPolicyField(policy, issue.operationalField, issue);
+    for (const operationalField of invalidOperationalFieldsForIssue(issue)) {
+      recordInvalidCanonicalPolicyField(policy, operationalField, issue);
+    }
   }
   return { policy, issues: semantic.issues };
 }
@@ -435,6 +462,38 @@ export function validateCanonicalSecurityMetadata(
   const inspection = inspectAgentSkill(document);
   const policy = emptySecurityPolicy();
   const issues: CanonicalSecurityMetadataIssue[] = [];
+  const firstLine = document.lines[0] ?? "";
+  const openerCorruption = corruptedFrontmatterAuthorityOpener(
+    firstLine,
+    "canonical",
+  );
+  if (openerCorruption !== undefined) {
+    recordSecurityAuthorityIssue(policy, issues, {
+      key: firstLine,
+      reason: openerCorruption,
+      startLine: 1,
+      endLine: 1,
+      snippet: firstLine,
+      identifierAuthority: "canonical",
+    });
+  }
+  for (const field of inspection.frontmatter.fields) {
+    const projection = reviewedDefaultIgnorableProjection(field.key);
+    if (
+      projection.removedCodePoints.length === 0 ||
+      projection.sanitized !== "metadata"
+    ) {
+      continue;
+    }
+    recordSecurityAuthorityIssue(policy, issues, {
+      key: field.key,
+      reason: `canonical security metadata container contains reviewed invisible/default-ignorable code point${
+        projection.removedCodePoints.length === 1 ? "" : "s"
+      } ${projection.removedCodePoints.join(", ")}; it resembles exact Agent Skills key "metadata", but its contents and values were not interpreted`,
+      ...canonicalFieldEvidence(document, field),
+      identifierAuthority: "canonical",
+    });
+  }
   for (const field of inspection.frontmatter.metadataFields) {
     const corruption = corruptedSecurityIdentifier(field.key, "canonical");
     if (corruption === undefined) continue;
@@ -543,6 +602,54 @@ function corruptedIdentifierReason(corruption: {
   } ${corruption.removedCodePoints.join(", ")}; it resembles exact registered key ${JSON.stringify(
     corruption.sanitizedKey,
   )}, but its value was not interpreted`;
+}
+
+function corruptedFrontmatterAuthorityOpener(
+  firstLine: string,
+  authority: SecurityIdentifierAuthority,
+): string | undefined {
+  if (authority === "canonical") {
+    if (firstLine.replace(/^\uFEFF/u, "").trim() === "---") return undefined;
+  } else {
+    if (firstLine === "---" || firstLine === "\uFEFF---") {
+      return undefined;
+    }
+  }
+
+  const projection = reviewedDefaultIgnorableProjection(firstLine);
+  if (projection.removedCodePoints.length === 0) return undefined;
+  const sanitized =
+    authority === "canonical"
+      ? projection.sanitized.replace(/^\uFEFF/u, "").trim()
+      : projection.sanitized;
+  if (sanitized !== "---") return undefined;
+  return `security-bearing frontmatter opener contains reviewed invisible/default-ignorable code point${
+    projection.removedCodePoints.length === 1 ? "" : "s"
+  } ${projection.removedCodePoints.join(", ")}; it resembles the artifact's frontmatter delimiter, but no frontmatter or values were interpreted`;
+}
+
+function recordSecurityAuthorityIssue(
+  policy: SecurityPolicy,
+  issues: CanonicalSecurityMetadataIssue[],
+  issue: Omit<CanonicalSecurityMetadataIssue, "invalidOperationalFields">,
+): void {
+  const recorded = {
+    ...issue,
+    invalidOperationalFields: ALL_SECURITY_OPERATIONAL_FIELDS,
+  };
+  issues.push(recorded);
+  for (const operationalField of ALL_SECURITY_OPERATIONAL_FIELDS) {
+    recordInvalidCanonicalPolicyField(policy, operationalField, recorded);
+  }
+}
+
+function invalidOperationalFieldsForIssue(
+  issue: CanonicalSecurityMetadataIssue,
+): readonly CanonicalSecurityOperationalField[] {
+  if (issue.invalidOperationalFields !== undefined) {
+    return issue.invalidOperationalFields;
+  }
+  return issue.operationalField === undefined ? [] : [issue.operationalField];
 }
 
 export function applySecurityConfig(
