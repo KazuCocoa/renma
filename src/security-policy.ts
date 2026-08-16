@@ -611,7 +611,7 @@ function corruptedFrontmatterAuthorityOpener(
   if (authority === "canonical") {
     if (firstLine.replace(/^\uFEFF/u, "").trim() === "---") return undefined;
   } else {
-    if (firstLine === "---") {
+    if (firstLine === "---" || firstLine === "\uFEFF---") {
       return undefined;
     }
   }
