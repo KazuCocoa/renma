@@ -880,7 +880,7 @@ export async function discoverArtifacts(
   );
   const discoveredPaths = new Set([
     ...paths,
-    ...walked.files.filter((relativePath) =>
+    ...[...walked.files, ...walked.excludedFiles].filter((relativePath) =>
       SKILL_SUPPORT_EXISTENCE_GLOBS.some((pattern) =>
         path.matchesGlob(relativePath, pattern),
       ),

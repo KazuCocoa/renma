@@ -56,6 +56,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   relationship. Missing targets remain structural findings rather than
   inspection-coverage issues.
 
+### Fixed
+
+- Preserved safe Skill-local support file identity across exact exclusion so a
+  unique basename-only static reference still produces blocking `excluded`
+  inspection evidence. Excluded files continue to count during basename
+  disambiguation, while their contents remain unread and unparsed; excluded
+  directories remain untraversed and symlinks remain non-candidates.
+
 ## [0.32.1] - 2026-08-13
 
 ### Fixed

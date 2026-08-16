@@ -9,6 +9,7 @@ export type SafeRepositoryPathResult =
 
 export interface RepositoryWalkResult {
   files: string[];
+  excludedFiles: string[];
   traversedDirectories: string[];
   symlinks: string[];
   depthLimited: Array<{
@@ -28,6 +29,7 @@ export async function walkRepositoryFiles(
 ): Promise<RepositoryWalkResult> {
   const result: RepositoryWalkResult = {
     files: [],
+    excludedFiles: [],
     traversedDirectories: [],
     symlinks: [],
     depthLimited: [],
@@ -73,7 +75,12 @@ export async function walkRepositoryFiles(
       const relativePath = relativeDirectory
         ? `${relativeDirectory}/${entry.name}`
         : entry.name;
-      if (options.excluded(relativePath)) continue;
+      if (options.excluded(relativePath)) {
+        // Retain only regular-file identity. Excluded directories remain
+        // untraversed, and excluded symlinks never become path candidates.
+        if (entry.isFile) result.excludedFiles.push(relativePath);
+        continue;
+      }
       const entryDepth = depth + 1;
       if (entryDepth > options.maxDepth) {
         result.depthLimited.push({
