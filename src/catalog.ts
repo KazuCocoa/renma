@@ -149,6 +149,7 @@ export function buildCatalog(
   ),
   skillParents: SkillParentIndex = buildSkillParentIndex(documents),
   metadataPolicy?: RequiredMetadataPolicyOptions,
+  incompleteSupportDirectories: ReadonlySet<string> = new Set(),
 ): {
   catalog: Catalog;
   diagnostics: Diagnostic[];
@@ -247,7 +248,12 @@ export function buildCatalog(
 
   const dependencies = [
     ...entries.flatMap((entry) => dependenciesForEntry(entry)),
-    ...buildStaticSupportDependencies(documents, entries, repositoryPaths),
+    ...buildStaticSupportDependencies(
+      documents,
+      entries,
+      repositoryPaths,
+      incompleteSupportDirectories,
+    ),
   ].sort((a, b) => {
     const byFrom = a.from.localeCompare(b.from);
     if (byFrom !== 0) return byFrom;

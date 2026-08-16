@@ -362,6 +362,20 @@ test("unreferenced excluded support does not gain expectation authority", async 
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
+test("an excluded support directory without a basename reference is not blocking", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(
+    t,
+    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
+    "Run `npm` checks, review the repository, and report completion.",
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+});
+
 test("ambiguous Skill ownership cannot authorize expected support inspection", async (t) => {
   const fixture = await referencedSupportFixture(
     t,
@@ -492,36 +506,151 @@ test("a basename-only symlink target is never followed and blocks as symlink evi
   );
 });
 
-test("an excluded support directory remains untraversed and does not invent a basename target", async (t) => {
+test("an excluded support directory blocks an unresolved basename without inventing a target", async (t) => {
+  const boundaryPath = "skills/demo/references";
   const fixture = await referencedSupportFixture(
     t,
     {
-      exclude: ["node_modules", "dist", ".git", "skills/demo/references"],
+      exclude: ["node_modules", "dist", ".git", boundaryPath],
     },
     "Read `runtime.txt` before continuing.",
   );
   await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
-
-  const snapshot = await collectRepositorySnapshot(fixture.root, {
-    failOn: "high",
-  });
+  const parsedPaths: string[] = [];
+  const snapshot = await collectRepositorySnapshot(
+    fixture.root,
+    { failOn: "high" },
+    { onDocumentParse: (artifactPath) => parsedPaths.push(artifactPath) },
+  );
   const result = scanFromRepositorySnapshot(snapshot);
+  const issue = result.inspectionCoverage.blockingIssues.find(
+    (candidate) => candidate.path === boundaryPath,
+  );
 
+  assert.ok(snapshot.core.excludedSupportDirectoryPaths.has(boundaryPath));
   assert.equal(snapshot.repositoryPaths.has(SUPPORT_PATH), false);
   assert.equal(snapshot.repositoryPathStates.has(SUPPORT_PATH), false);
+  assert.ok(!parsedPaths.includes(SUPPORT_PATH));
+  assert.equal(issue?.state, "excluded");
+  assert.equal(issue?.scope, "subtree");
+  assert.equal(issue?.strictBlocking, true);
+  assert.equal(issue?.details?.expectationSource, "static-support-reference");
+  assert.equal(issue?.details?.owningSkillPath, "skills/demo/SKILL.md");
+  assert.equal(issue?.details?.sourcePath, "skills/demo/SKILL.md");
+  assert.equal(issue?.details?.sourceLine, 9);
+  assert.equal(issue?.details?.reachabilityDepth, 1);
+  assert.equal(
+    result.securityAnalysisCoverage.artifacts.some(
+      (artifact) => artifact.path === SUPPORT_PATH,
+    ),
+    false,
+  );
+  assert.ok(
+    evaluateStrictScan(result).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+  );
+});
+
+test("an explicit path under an excluded support directory keeps exact blocking evidence", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(t, {
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.deepEqual(
+    result.inspectionCoverage.blockingIssues.map(({ path, state, scope }) => ({
+      path,
+      state,
+      scope,
+    })),
+    [{ path: SUPPORT_PATH, state: "excluded", scope: "exact" }],
+  );
+});
+
+test("a visible basename candidate cannot become unique beside an excluded support subtree", async (t) => {
+  const boundaryPath = "skills/demo/examples";
+  const hiddenPath = `${boundaryPath}/nested/runtime.txt`;
+  const fixture = await referencedSupportFixture(
+    t,
+    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
+    "Read `runtime.txt` before continuing.",
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+  await fixture.write(hiddenPath, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.deepEqual(
+    result.inspectionCoverage.blockingIssues.map(({ path, state, scope }) => ({
+      path,
+      state,
+      scope,
+    })),
+    [{ path: boundaryPath, state: "excluded", scope: "subtree" }],
+  );
+  assert.ok(!result.inspectionCoverage.inspectedPaths.includes(SUPPORT_PATH));
+  assert.notEqual(
+    result.securityAnalysisCoverage.artifacts.find(
+      (artifact) => artifact.path === SUPPORT_PATH,
+    )?.analyses.semanticInstructions,
+    "analyzed",
+  );
+});
+
+test("known duplicate basename candidates remain ambiguous beside an excluded subtree", async (t) => {
+  const boundaryPath = "skills/demo/examples";
+  const fixture = await referencedSupportFixture(
+    t,
+    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
+    "Read `runtime.txt` before continuing.",
+  );
+  await fixture.write(
+    "skills/demo/references/one/runtime.txt",
+    UNSAFE_INSTRUCTION,
+  );
+  await fixture.write(
+    "skills/demo/references/two/runtime.txt",
+    UNSAFE_INSTRUCTION,
+  );
+  await fixture.write(`${boundaryPath}/hidden.txt`, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
-test("external, absolute, and escaping references do not create support findings or expectations", async (t) => {
+test("an excluded support subtree owned by another Skill does not block a resolved basename", async (t) => {
+  const unrelatedBoundary = "skills/other/references";
   const fixture = await referencedSupportFixture(
     t,
-    undefined,
+    { exclude: ["node_modules", "dist", ".git", unrelatedBoundary] },
+    "Read `runtime.txt` before continuing.",
+  );
+  await fixture.write(SUPPORT_PATH, "Review the repository.\n");
+  await fixture.write(`${unrelatedBoundary}/hidden.txt`, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(result.inspectionCoverage.inspectedPaths.includes(SUPPORT_PATH));
+});
+
+test("external, absolute, and escaping references do not create support findings or expectations", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(
+    t,
+    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
     [
       "Read [external](https://example.test/references/runtime.txt).",
       "Read `/references/runtime.txt`.",
       "Read `../references/runtime.txt`.",
     ].join("\n"),
   );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
 
   const result = await scan(fixture.root, { failOn: "high" });
 
@@ -574,18 +703,44 @@ test("a parsed transitive parent preserves an excluded basename-only child expec
   assert.equal(issue?.details?.reachabilityDepth, 2);
 });
 
+test("a parsed transitive parent fails closed at an excluded basename candidate boundary", async (t) => {
+  const indexPath = "skills/demo/references/index.md";
+  const boundaryPath = "skills/demo/examples";
+  const fixture = await referencedSupportFixture(
+    t,
+    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
+    "Read `references/index.md` before continuing.",
+  );
+  await fixture.write(indexPath, "Read `runtime.txt` before continuing.\n");
+  await fixture.write(`${boundaryPath}/runtime.txt`, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+  const issue = result.inspectionCoverage.blockingIssues.find(
+    (candidate) => candidate.path === boundaryPath,
+  );
+
+  assert.equal(issue?.state, "excluded");
+  assert.equal(issue?.scope, "subtree");
+  assert.equal(issue?.details?.sourcePath, indexPath);
+  assert.equal(issue?.details?.sourceLine, 1);
+  assert.equal(issue?.details?.reachabilityDepth, 2);
+});
+
 test("an unparsed transitive parent cannot authorize unknown child references", async (t) => {
   const fixture = await referencedSupportFixture(
     t,
-    { max_file_size_bytes: 1_000 },
+    {
+      max_file_size_bytes: 1_000,
+      exclude: ["node_modules", "dist", ".git", "skills/demo/examples"],
+    },
     "Read `references/index.md` before continuing.",
   );
   const indexPath = "skills/demo/references/index.md";
   await fixture.write(
     indexPath,
-    `Read \`references/runtime.txt\` before continuing.\n${"x".repeat(1_100)}`,
+    `Read \`runtime.txt\` before continuing.\n${"x".repeat(1_100)}`,
   );
-  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+  await fixture.write("skills/demo/examples/runtime.txt", UNSAFE_INSTRUCTION);
 
   const result = await scan(fixture.root, { failOn: "high" });
 
@@ -658,6 +813,47 @@ test("inspection coverage diff reports referenced support parsed-to-blocked regr
         fromState: "parsed",
         toState: "oversize",
         scope: "exact",
+      },
+    ],
+  );
+});
+
+test("inspection coverage diff reports a basename candidate namespace becoming excluded", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Read `runtime.txt` before continuing.",
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+  const baseline = await scan(fixture.root, { failOn: "high" });
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  const target = await scan(fixture.root, { failOn: "high" });
+
+  const diff = buildInspectionCoverageDiff(
+    baseline.inspectionCoverage,
+    target.inspectionCoverage,
+  );
+
+  assert.deepEqual(
+    diff.regressions.map(
+      ({ path, fromState, toState, scope, previouslyInspectedPaths }) => ({
+        path,
+        fromState,
+        toState,
+        scope,
+        previouslyInspectedPaths,
+      }),
+    ),
+    [
+      {
+        path: boundaryPath,
+        fromState: "parsed",
+        toState: "excluded",
+        scope: "subtree",
+        previouslyInspectedPaths: [SUPPORT_PATH],
       },
     ],
   );

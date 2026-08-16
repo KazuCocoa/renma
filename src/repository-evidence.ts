@@ -61,6 +61,7 @@ export interface RepositorySnapshotCore {
   readonly discoveredPaths: ReadonlySet<string>;
   readonly skippedPathStates: ReadonlyMap<string, RepositoryPathState>;
   readonly blockedTraversalPaths: ReadonlySet<string>;
+  readonly excludedSupportDirectoryPaths: ReadonlySet<string>;
   readonly discoveryDiagnostics: Diagnostic[];
   readonly executableDependencyCandidates: ExecutableDependencyCandidate[];
 }
@@ -202,6 +203,7 @@ export async function collectRepositorySnapshotCore(
     discoveredPaths,
     skippedPathStates,
     blockedTraversalPaths,
+    excludedSupportDirectoryPaths,
   } = await discoverWithBoundarySources(root, config, evidenceBoundarySources);
   const documents = artifacts.map((artifact) => {
     instrumentation?.onDocumentParse?.(artifact.path);
@@ -225,6 +227,7 @@ export async function collectRepositorySnapshotCore(
     discoveredPaths,
     skippedPathStates,
     blockedTraversalPaths,
+    excludedSupportDirectoryPaths,
     discoveryDiagnostics,
     executableDependencyCandidates,
   });
@@ -296,6 +299,7 @@ async function discoverWithBoundarySources(
   const skippedPathStates = new Map<string, RepositoryPathState>();
   const blockedTraversalPaths = new Set<string>();
   const traversedDirectoryPaths = new Set<string>();
+  const excludedSupportDirectoryPaths = new Set<string>();
   for (const discovery of discoveries) {
     for (const artifact of discovery.artifacts) {
       artifacts.set(artifact.path, artifact);
@@ -315,9 +319,13 @@ async function discoverWithBoundarySources(
     for (const traversedPath of discovery.traversedDirectoryPaths) {
       traversedDirectoryPaths.add(traversedPath);
     }
+    for (const excludedPath of discovery.excludedSupportDirectoryPaths) {
+      excludedSupportDirectoryPaths.add(excludedPath);
+    }
   }
   for (const traversedPath of traversedDirectoryPaths) {
     blockedTraversalPaths.delete(traversedPath);
+    excludedSupportDirectoryPaths.delete(traversedPath);
   }
   return {
     artifacts: [...artifacts.values()].sort((left, right) =>
@@ -330,6 +338,7 @@ async function discoverWithBoundarySources(
     skippedPathStates,
     blockedTraversalPaths,
     traversedDirectoryPaths,
+    excludedSupportDirectoryPaths,
   };
 }
 
@@ -422,6 +431,7 @@ function createRepositoryProjections(
         policy: core.config.metadata,
         ...(core.configPath ? { configPath: core.configPath } : {}),
       },
+      core.excludedSupportDirectoryPaths,
     );
     return {
       catalog: built.catalog,
@@ -487,6 +497,7 @@ function createRepositorySnapshot(
         documents: core.documents,
         repositoryPaths,
         repositoryPathStates,
+        incompleteSupportDirectories: core.excludedSupportDirectoryPaths,
         skillParents: projections.catalog().skillParents,
         securityPolicies: projections.securityPolicies(),
         dependencyCandidates: core.executableDependencyCandidates,
