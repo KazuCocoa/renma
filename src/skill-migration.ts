@@ -21,7 +21,10 @@ import { parseDocument } from "./markdown.js";
 import { validateCanonicalSecurityMetadata } from "./security-policy.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
-import { parseAgentSkillFrontmatter } from "./yaml-frontmatter.js";
+import {
+  ensureYamlFrontmatterForDocument,
+  type ParsedYamlFrontmatter,
+} from "./yaml-frontmatter.js";
 
 const STANDARD_FIELDS = new Set<string>(AGENT_SKILLS_TOP_LEVEL_FIELDS);
 const LEGACY_FIELDS = new Set<string>(LEGACY_RENMA_SKILL_FIELDS);
@@ -93,7 +96,7 @@ export function buildAgentSkillMigrationSuggestion(
   document: ParsedDocument,
   options: AgentSkillMigrationOptions = {},
 ): AgentSkillMigrationSuggestion {
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   const validation = validateAgentSkill(document);
   const entrypoint = options.entrypoint;
   const historicalEntrypoint =
@@ -449,7 +452,7 @@ function validateMigrationCandidate(
 
 function collectStructuralBlocks(
   document: ParsedDocument,
-  frontmatter: ReturnType<typeof parseAgentSkillFrontmatter>,
+  frontmatter: ParsedYamlFrontmatter,
   blocked: SkillMigrationBlock[],
 ): void {
   if (!frontmatter.present) {
@@ -550,7 +553,7 @@ function migrationDescription(
     return trimmed && Array.from(trimmed).length <= 1024 ? trimmed : undefined;
   }
 
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   const lines = document.lines.slice(frontmatter.bodyStartLine - 1);
   const paragraphs: string[] = [];
   let active: string[] = [];

@@ -1,3 +1,5 @@
+import { renmaFrontmatterEnvelope } from "./frontmatter-envelope.js";
+
 /** A deterministic, model-neutral token estimate unit. */
 export interface EstimatedTokenUnit {
   value: string;
@@ -94,9 +96,8 @@ export function estimatedTokenUnits(value: string): EstimatedTokenUnit[] {
 /** Return Markdown after a complete leading YAML frontmatter block. */
 export function markdownBody(value: string): string {
   const lines = value.split(/\r?\n/);
-  if (lines[0]?.trim() !== "---") return value;
-  const end = lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return end < 0 ? value : lines.slice(end + 1).join("\n");
+  const envelope = renmaFrontmatterEnvelope(lines);
+  return envelope.closingIndex === undefined
+    ? value
+    : lines.slice(envelope.closingIndex + 1).join("\n");
 }

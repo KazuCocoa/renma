@@ -1,5 +1,4 @@
 import path from "node:path";
-import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import type { Catalog, CatalogEntry } from "./model.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -10,6 +9,7 @@ import {
   NON_SKILL_AUXILIARY_METADATA_KEYS,
   NON_SKILL_CATALOG_METADATA_KEYS,
 } from "./metadata-definitions.js";
+import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
 
 export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
   DEPRECATED_FIELD: "CONTEXT-LENS-DEPRECATED-FIELD",
@@ -43,6 +43,10 @@ const REQUIRED_LENS_FIELDS = [
   NON_SKILL_CATALOG_METADATA_KEYS.purpose,
   NON_SKILL_CATALOG_METADATA_KEYS.applies_to,
 ];
+const LENS_OPERATIONAL_FIELDS = new Set<string>([
+  ...Object.values(NON_SKILL_CATALOG_METADATA_KEYS),
+  ...Object.values(NON_SKILL_AUXILIARY_METADATA_KEYS),
+]);
 
 export interface ContextLensDiagnosticCounts {
   error: number;
@@ -257,27 +261,65 @@ function unsupportedKindDiagnostics(document: ParsedDocument): Diagnostic[] {
 }
 
 function frontmatterDiagnostics(document: ParsedDocument): Diagnostic[] {
-  if (document.lines[0]?.trim() !== "---") return [];
-  const closingIndex = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  if (closingIndex >= 0) return [];
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  if (!frontmatter.present) return [];
+  if (!frontmatter.closed) {
+    return [
+      {
+        code: CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER,
+        severity: "error",
+        path: document.artifact.path,
+        message:
+          "Context lens frontmatter starts with --- but does not include a closing --- delimiter.",
+        evidence: {
+          path: document.artifact.path,
+          startLine: 1,
+          endLine: document.lines.length,
+          snippet: "unclosed frontmatter",
+        },
+      },
+    ];
+  }
 
-  return [
-    {
+  const diagnostics: Diagnostic[] = [];
+  for (const error of frontmatter.errors) {
+    diagnostics.push({
+      code: CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER,
+      severity: "error",
+      path: document.artifact.path,
+      message: `Context lens frontmatter contains invalid YAML (${error.code}). No operational lens metadata was selected.`,
+      evidence: lineEvidence(document, error.line),
+    });
+  }
+  if (frontmatter.errors.length === 0 && !frontmatter.mapping) {
+    diagnostics.push({
       code: CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER,
       severity: "error",
       path: document.artifact.path,
       message:
-        "Context lens frontmatter starts with --- but does not include a closing --- delimiter.",
+        "Context lens frontmatter must be a YAML mapping. No operational lens metadata was selected.",
+      evidence: lineEvidence(document, 2),
+    });
+  }
+  for (const duplicate of frontmatter.duplicateFields.filter((field) =>
+    LENS_OPERATIONAL_FIELDS.has(field.key),
+  )) {
+    diagnostics.push({
+      code: CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER,
+      severity: "error",
+      path: document.artifact.path,
+      message: `Context lens operational field "${duplicate.key}" is declared more than once. No value was selected for that field.`,
       evidence: {
         path: document.artifact.path,
-        startLine: 1,
-        endLine: document.lines.length,
-        snippet: "unclosed frontmatter",
+        startLine: duplicate.startLine,
+        endLine: duplicate.endLine,
+        snippet: document.lines
+          .slice(duplicate.startLine - 1, duplicate.endLine)
+          .join("\n"),
       },
-    },
-  ];
+    });
+  }
+  return diagnostics;
 }
 
 function requiredFieldDiagnostics(document: ParsedDocument): Diagnostic[] {
@@ -672,7 +714,23 @@ function missingFieldEvidence(
 function frontmatterRange(
   document: ParsedDocument,
 ): { startLine: number; endLine: number } | undefined {
-  return frontmatterRangeForArtifact(document.artifact, document.lines);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  return frontmatter.closed
+    ? { startLine: 1, endLine: frontmatter.bodyStartLine - 1 }
+    : undefined;
+}
+
+function lineEvidence(
+  document: ParsedDocument,
+  requestedLine: number,
+): Evidence {
+  const line = Math.min(Math.max(requestedLine, 1), document.lines.length || 1);
+  return {
+    path: document.artifact.path,
+    startLine: line,
+    endLine: line,
+    snippet: document.lines[line - 1] ?? "",
+  };
 }
 
 function bodyLines(document: ParsedDocument): string[] {

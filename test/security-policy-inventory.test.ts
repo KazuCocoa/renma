@@ -456,8 +456,8 @@ test("floating allowances are visible as local policy metadata with exact eviden
     {
       path: "contexts/allowance.md",
       startLine: 2,
-      endLine: 2,
-      snippet: "allowed_floating_dependencies:",
+      endLine: 3,
+      snippet: "allowed_floating_dependencies:\n  - npm:appium@latest",
     },
   ]);
 
@@ -586,7 +586,10 @@ test("profiles and repository config cannot supply or accumulate floating allowa
 
   assert.deepEqual(
     local?.evidence.policyFields.map(({ snippet }) => snippet),
-    ["security_profile: strict", "allowed_floating_dependencies:"],
+    [
+      "security_profile: strict",
+      "allowed_floating_dependencies:\n  - npm:appium@latest",
+    ],
   );
   assert.deepEqual(
     profileOnly?.evidence.policyFields.map(({ snippet }) => snippet),

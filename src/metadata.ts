@@ -21,12 +21,14 @@ import {
   AGENT_SKILL_TOP_LEVEL_KEYS,
   CANONICAL_SKILL_METADATA_KEYS,
   CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
+  NON_SKILL_AUXILIARY_METADATA_KEYS,
   NON_SKILL_CATALOG_METADATA_KEYS,
   SUPPORT_ASSET_TOKEN_BUDGET_KINDS,
   SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS,
 } from "./metadata-definitions.js";
 import {
-  parseAgentSkillFrontmatter,
+  ensureYamlFrontmatterForDocument,
+  recognizedMalformedTopLevelKeys,
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
@@ -124,9 +126,16 @@ type TokenBudgetKey = (typeof SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS)[number];
 const NON_SKILL_CATALOG_KEY_SET = new Set<string>(
   Object.values(NON_SKILL_CATALOG_METADATA_KEYS),
 );
+const NON_SKILL_OPERATIONAL_METADATA_KEY_SET = new Set<string>([
+  ...NON_SKILL_CATALOG_KEY_SET,
+  ...Object.values(NON_SKILL_AUXILIARY_METADATA_KEYS),
+]);
 
 const SUPPORT_ASSET_TOKEN_BUDGET_KIND_SET = new Set<string>(
   SUPPORT_ASSET_TOKEN_BUDGET_KINDS,
+);
+const SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEY_SET = new Set<string>(
+  SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS,
 );
 
 type SupportAssetTokenBudgetKind =
@@ -153,9 +162,9 @@ export function parseSupportAssetTokenBudgetDecision(
   const overrideValidationBaseline =
     TOKEN_BUDGET_OVERRIDE_VALIDATION_BASELINE[document.artifact.kind];
   const estimatedTokens = estimateTokens(document.artifact.content);
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   const parsedFields = frontmatter.fields.filter(isTokenBudgetField);
-  const rawFields = rawTokenBudgetFields(document);
+  const rawFields = rawTokenBudgetFields(document, frontmatter);
   if (parsedFields.length === 0 && rawFields.length === 0) {
     return {
       status: "absent",
@@ -363,25 +372,21 @@ function isTokenBudgetField(
   );
 }
 
-function rawTokenBudgetFields(document: ParsedDocument): Array<{
+function rawTokenBudgetFields(
+  document: ParsedDocument,
+  frontmatter: ParsedYamlFrontmatter,
+): Array<{
   key: TokenBudgetKey;
   evidence: Evidence;
 }> {
-  if (document.lines[0]?.replace(/^\uFEFF/, "").trim() !== "---") return [];
-  const fields: Array<{ key: TokenBudgetKey; evidence: Evidence }> = [];
-  for (let index = 1; index < document.lines.length; index += 1) {
-    const line = document.lines[index] ?? "";
-    if (/^---\s*$/.test(line)) break;
-    const match = line.match(
-      /^(token_budget_override|token_budget_rationale|token_budget_reviewed_at)\s*:/,
-    );
-    if (!match) continue;
-    fields.push({
-      key: match[1] as TokenBudgetKey,
-      evidence: documentLineEvidence(document, index + 1),
-    });
-  }
-  return fields;
+  return recognizedMalformedTopLevelKeys(
+    document.artifact.content,
+    frontmatter,
+    SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEY_SET,
+  ).map((field) => ({
+    key: field.key as TokenBudgetKey,
+    evidence: documentLineEvidence(document, field.startLine),
+  }));
 }
 
 function fieldEvidence(
@@ -965,7 +970,7 @@ function operationalMetadataSource(
   diagnostics: Diagnostic[],
 ): OperationalMetadataSource {
   if (document.artifact.kind !== "skill") {
-    return legacyMetadataSource(document);
+    return renmaMetadataSource(document, diagnostics);
   }
 
   const inspection = inspectAgentSkill(document);
@@ -977,9 +982,45 @@ function operationalMetadataSource(
   );
 }
 
-function legacyMetadataSource(
+function renmaMetadataSource(
   document: ParsedDocument,
+  diagnostics: Diagnostic[],
 ): OperationalMetadataSource {
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  const malformed =
+    frontmatter.present &&
+    (!frontmatter.closed ||
+      !frontmatter.mapping ||
+      frontmatter.errors.length > 0);
+  if (malformed) {
+    const error = frontmatter.errors[0];
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_INVALID_RENMA_FRONTMATTER, {
+        severity: "error",
+        path: document.artifact.path,
+        message: !frontmatter.closed
+          ? "Non-Skill Renma frontmatter is not closed. No operational metadata was selected."
+          : error === undefined
+            ? "Non-Skill Renma frontmatter must be a YAML mapping. No operational metadata was selected."
+            : `Non-Skill Renma frontmatter contains invalid YAML (${error.code}). No operational metadata was selected.`,
+        evidence: documentLineEvidence(document, error?.line ?? 1),
+      }),
+    );
+  }
+
+  for (const duplicate of frontmatter.duplicateFields.filter((field) =>
+    NON_SKILL_OPERATIONAL_METADATA_KEY_SET.has(field.key),
+  )) {
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_INVALID_RENMA_FRONTMATTER, {
+        severity: "error",
+        path: document.artifact.path,
+        message: `Non-Skill operational metadata field "${duplicate.key}" is declared more than once. No value was selected for that field.`,
+        evidence: fieldEvidence(document, duplicate),
+      }),
+    );
+  }
+
   return {
     values: Object.fromEntries(
       Object.entries(document.metadata).filter(([key]) =>

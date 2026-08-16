@@ -3,6 +3,10 @@ import test from "node:test";
 import { markdownBodyStartLineForArtifact } from "../src/frontmatter-envelope.js";
 import { parseDocument } from "../src/markdown.js";
 import {
+  parseAssetMetadata,
+  parseSupportAssetTokenBudgetDecision,
+} from "../src/metadata.js";
+import {
   ensureMarkdownSyntaxForDocument,
   markdownBodyStartLine,
   markdownSyntaxForDocument,
@@ -320,6 +324,219 @@ test("frontmatter removal preserves original-file lines for CRLF input", () => {
   assert.equal(document.lines[4], "# Body");
 });
 
+test("non-Skill operational metadata uses YAML scalar and sequence semantics", () => {
+  const document = parseDocument(
+    markdownArtifact(
+      `---
+id: context.yaml-semantics # source note
+version: 2
+owner: "qa-platform"
+purpose: >
+  Review parser behavior
+  with semantic YAML values.
+tags: [parser, "yaml semantics"]
+requires_context:
+  - context.testing.base
+  - context.testing.comments # source note
+---
+# YAML semantics
+`,
+      "contexts/yaml-semantics.md",
+      "context",
+    ),
+  );
+  const parsed = parseAssetMetadata(document);
+
+  assert.equal(document.metadata.id, "context.yaml-semantics");
+  assert.equal(document.metadata.version, "2");
+  assert.equal(document.metadata.owner, "qa-platform");
+  assert.equal(
+    parsed.metadata.purpose,
+    "Review parser behavior with semantic YAML values.",
+  );
+  assert.deepEqual(parsed.metadata.tags, ["parser", "yaml semantics"]);
+  assert.deepEqual(parsed.metadata.requiresContext, [
+    "context.testing.base",
+    "context.testing.comments",
+  ]);
+  assert.equal(document.metadataFields.purpose?.startLine, 5);
+  assert.equal(document.metadataFields.purpose?.endLine, 7);
+  assert.deepEqual(
+    document.metadataListItems.requires_context?.map((item) => item.raw),
+    ["  - context.testing.base", "  - context.testing.comments # source note"],
+  );
+});
+
+test("non-Skill metadata retains comma scalar compatibility after YAML parsing", () => {
+  const document = parseDocument(
+    markdownArtifact(
+      `---
+id: context.compatibility
+tags: "parser, yaml"
+when_to_use: review, validation
+---
+# Compatibility
+`,
+      "contexts/compatibility.md",
+      "context",
+    ),
+  );
+  const parsed = parseAssetMetadata(document);
+
+  assert.deepEqual(parsed.metadata.tags, ["parser", "yaml"]);
+  assert.deepEqual(parsed.metadata.whenToUse, ["review", "validation"]);
+});
+
+test("malformed and duplicate non-Skill metadata never selects guessed values", () => {
+  const malformed = parseDocument(
+    markdownArtifact(
+      `---
+id: context.malformed
+owner: qa-platform
+purpose: "unterminated
+---
+# Malformed
+`,
+      "contexts/malformed.md",
+      "context",
+    ),
+  );
+  const duplicate = parseDocument(
+    markdownArtifact(
+      `---
+id: context.duplicate
+owner: restrictive-team
+owner: permissive-team
+status: stable
+---
+# Duplicate
+`,
+      "contexts/duplicate.md",
+      "context",
+    ),
+  );
+  const malformedResult = parseAssetMetadata(malformed);
+  const duplicateResult = parseAssetMetadata(duplicate);
+
+  assert.deepEqual(malformed.metadata, {});
+  assert.equal(malformedResult.metadata.id, undefined);
+  assert.ok(
+    malformedResult.diagnostics.some(
+      (diagnostic) => diagnostic.code === "META-INVALID-RENMA-FRONTMATTER",
+    ),
+  );
+  assert.equal(duplicate.metadata.owner, undefined);
+  assert.equal(duplicateResult.metadata.owner, undefined);
+  assert.equal(duplicateResult.metadata.id, "context.duplicate");
+  assert.equal(duplicateResult.metadata.status, "stable");
+  assert.ok(
+    duplicateResult.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "META-INVALID-RENMA-FRONTMATTER" &&
+        diagnostic.evidence?.startLine === 4,
+    ),
+  );
+});
+
+test("an unclosed exact Renma envelope is invalid without selecting metadata", () => {
+  const document = parseDocument(
+    markdownArtifact(
+      `---
+id: context.example
+owner: qa
+# no closing delimiter
+`,
+      "contexts/unclosed.md",
+      "context",
+    ),
+  );
+  const parsed = parseAssetMetadata(document);
+  const invalid = parsed.diagnostics.find(
+    (diagnostic) => diagnostic.code === "META-INVALID-RENMA-FRONTMATTER",
+  );
+
+  assert.deepEqual(document.metadata, {});
+  assert.equal(parsed.metadata.id, undefined);
+  assert.equal(parsed.metadata.owner, undefined);
+  assert.equal(invalid?.evidence?.startLine, 1);
+  assert.equal(invalid?.evidence?.snippet, "---");
+
+  for (const opener of [" ---", "--- ", "\uFEFF---"]) {
+    const nonCanonical = parseAssetMetadata(
+      parseDocument(
+        markdownArtifact(
+          `${opener}\nid: context.noncanonical\nowner: qa\n`,
+          "contexts/noncanonical.md",
+          "context",
+        ),
+      ),
+    );
+    assert.equal(nonCanonical.metadata.id, undefined, JSON.stringify(opener));
+    assert.equal(
+      nonCanonical.diagnostics.some(
+        (diagnostic) => diagnostic.code === "META-INVALID-RENMA-FRONTMATTER",
+      ),
+      false,
+      JSON.stringify(opener),
+    );
+  }
+});
+
+test("an unclosed token-budget declaration remains invalid at the default limit", () => {
+  const decision = parseSupportAssetTokenBudgetDecision(
+    parseDocument(
+      markdownArtifact(
+        `---
+token_budget_override: 12000
+token_budget_rationale: Keep this ordered reference intact.
+# no closing delimiter
+`,
+        "skills/demo/references/unclosed.md",
+        "reference",
+      ),
+    ),
+  );
+
+  assert.equal(decision.status, "invalid");
+  assert.equal(decision.defaultLimit, 7200);
+  assert.equal(decision.effectiveLimit, 7200);
+  assert.equal(decision.overrideLimit, undefined);
+  assert.equal(decision.declaredOverrideLimit, undefined);
+  assert.ok(
+    decision.invalidReasons.includes(
+      "token-budget decision frontmatter must be closed",
+    ),
+  );
+  assert.equal(decision.evidence?.startLine, 2);
+  assert.equal(decision.evidence?.snippet, "token_budget_override: 12000");
+});
+
+test("unsupported non-Skill YAML shapes do not become guessed strings", () => {
+  const document = parseDocument(
+    markdownArtifact(
+      `---
+id:
+  namespace: context
+owner: qa-platform
+tags:
+  - parser
+  - nested: unsupported
+---
+# Unsupported shapes
+`,
+      "contexts/unsupported-shapes.md",
+      "context",
+    ),
+  );
+  const parsed = parseAssetMetadata(document);
+
+  assert.equal(document.metadata.id, undefined);
+  assert.equal(document.metadata.tags, undefined);
+  assert.equal(parsed.metadata.id, undefined);
+  assert.deepEqual(parsed.metadata.tags, []);
+  assert.equal(parsed.metadata.owner, "qa-platform");
+});
+
 test("frontmatter block-scalar delimiters stay outside the Markdown body", () => {
   const document = parseDocument(
     artifact(`---
@@ -608,6 +825,27 @@ test("general Markdown keeps whitespace thematic breaks in its syntax projection
         ["Another heading", 7],
       ],
       fixture.firstLine,
+    );
+  }
+});
+
+test("non-Skill metadata authority requires exact opening and closing delimiters", () => {
+  const fixtures = [
+    " ---\nid: context.indented\n---\n# Visible",
+    "--- \nid: context.trailing-open\n---\n# Visible",
+    "\uFEFF---\nid: context.bom\n---\n# Visible",
+    "---\nid: context.trailing-close\n--- \n# Visible",
+  ];
+
+  for (const [index, content] of fixtures.entries()) {
+    const document = parseDocument(
+      markdownArtifact(content, `contexts/non-exact-${index}.md`, "context"),
+    );
+    assert.deepEqual(document.metadata, {}, JSON.stringify(content));
+    assert.equal(
+      parseAssetMetadata(document).metadata.id,
+      undefined,
+      JSON.stringify(content),
     );
   }
 });

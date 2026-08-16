@@ -197,6 +197,27 @@ test("non-Skill owner uses the registered top-level key", () => {
   );
 });
 
+test("required non-Skill owner uses the same inline-comment YAML value as the catalog", () => {
+  const built = buildCatalogWithPolicy(
+    [
+      document(
+        "contexts/commented-owner.md",
+        "context",
+        `---
+id: context.commented-owner
+owner: "qa-platform" # reviewed owner
+---
+# Present
+`,
+      ),
+    ],
+    ["owner"],
+  );
+
+  assert.equal(built.catalog.entries[0]?.metadata.owner, "qa-platform");
+  assert.equal(policyDiagnostics(built.diagnostics).length, 0);
+});
+
 test("inherited effective owner does not satisfy an explicit declaration", () => {
   const built = buildCatalogWithPolicy(
     [

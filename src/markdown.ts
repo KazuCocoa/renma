@@ -3,9 +3,11 @@ import {
   parseMarkdownSyntax,
 } from "./markdown-syntax.js";
 import {
-  markdownBodyStartLineForArtifact,
-  renmaFrontmatterEnvelope,
-} from "./frontmatter-envelope.js";
+  attachYamlFrontmatter,
+  parseFrontmatterForArtifact,
+  type ParsedYamlFrontmatter,
+  type YamlFrontmatterField,
+} from "./yaml-frontmatter.js";
 import { NON_SKILL_LIST_METADATA_KEYS } from "./metadata-definitions.js";
 import type { Artifact } from "./types/artifact.js";
 import type {
@@ -35,13 +37,17 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
       metadataListItems: {},
     };
   }
-  const sourceLines = artifact.content.split(/\r?\n/);
+  const frontmatter = parseFrontmatterForArtifact(artifact);
   const syntax = parseMarkdownSyntax(
     artifact.content,
-    markdownBodyStartLineForArtifact(artifact, sourceLines),
+    frontmatter.closed ? frontmatter.bodyStartLine : 1,
   );
   const lines = syntax.sourceLines;
-  const metadata = parseFrontmatter(artifact.path, lines);
+  const metadata = projectFrontmatterMetadata(
+    artifact.path,
+    lines,
+    frontmatter,
+  );
   const document: ParsedDocument = {
     artifact,
     lines,
@@ -69,62 +75,92 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
     metadataFields: metadata.fields,
     metadataListItems: metadata.listItems,
   };
+  attachYamlFrontmatter(document, frontmatter);
   attachMarkdownSyntax(document, syntax);
   return document;
 }
 
 const LIST_METADATA_KEYS = new Set<string>(NON_SKILL_LIST_METADATA_KEYS);
 
-function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
+function projectFrontmatterMetadata(
+  path: string,
+  lines: string[],
+  frontmatter: ParsedYamlFrontmatter,
+): ParsedMetadata {
   const values: Record<string, MetadataValue> = {};
   const fields: Record<string, MetadataFieldEvidence> = {};
   const listItems: Record<string, MetadataFieldEvidence[]> = {};
-  const envelope = renmaFrontmatterEnvelope(lines);
-  if (!envelope.present) return { values, fields, listItems };
+  if (
+    !frontmatter.present ||
+    !frontmatter.closed ||
+    !frontmatter.mapping ||
+    frontmatter.errors.length > 0
+  ) {
+    return { values, fields, listItems };
+  }
 
-  let activeListKey: string | undefined;
-  let activeListStartLine: number | undefined;
-  for (let index = 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (index === envelope.closingIndex) break;
-    const listItem = line?.match(/^\s+-\s+(.+)$/);
-    if (activeListKey && listItem) {
-      const current = values[activeListKey];
-      if (Array.isArray(current)) current.push(listItem[1]?.trim() ?? "");
-      const activeListItems = (listItems[activeListKey] ??= []);
-      activeListItems.push(
-        frontmatterFieldEvidence(path, activeListKey, lines, index, index),
+  const duplicateKeys = new Set(
+    frontmatter.duplicateFields.map((field) => field.key),
+  );
+  for (const field of frontmatter.fields) {
+    if (duplicateKeys.has(field.key)) continue;
+    const normalized = normalizeMetadataField(field);
+    if (normalized === undefined) continue;
+    values[field.key] = normalized;
+    fields[field.key] = yamlMetadataFieldEvidence(path, lines, field);
+    if (field.sequenceItems !== undefined) {
+      listItems[field.key] = field.sequenceItems.map((item) =>
+        frontmatterFieldEvidence(
+          path,
+          field.key,
+          lines,
+          item.startLine - 1,
+          item.endLine - 1,
+        ),
       );
-      fields[activeListKey] = frontmatterFieldEvidence(
-        path,
-        activeListKey,
-        lines,
-        activeListStartLine ?? index,
-        index,
-      );
-      continue;
     }
-
-    activeListKey = undefined;
-    activeListStartLine = undefined;
-    const match = line?.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!match) continue;
-
-    const key = match[1] as string;
-    const value = match[2]?.trim() ?? "";
-    if (LIST_METADATA_KEYS.has(key) && value.length === 0) {
-      values[key] = [];
-      listItems[key] = [];
-      fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
-      activeListKey = key;
-      activeListStartLine = index;
-      continue;
-    }
-
-    values[key] = value;
-    fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
   }
   return { values, fields, listItems };
+}
+
+function normalizeMetadataField(
+  field: YamlFrontmatterField,
+): MetadataValue | undefined {
+  if (Array.isArray(field.value)) {
+    if (!LIST_METADATA_KEYS.has(field.key)) return undefined;
+    const values = field.value.map(normalizeMetadataScalar);
+    return values.some((value) => value === undefined)
+      ? undefined
+      : (values as string[]);
+  }
+  return normalizeMetadataScalar(field.value);
+}
+
+function normalizeMetadataScalar(value: unknown): string | undefined {
+  if (value === null || value === undefined) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
+function yamlMetadataFieldEvidence(
+  path: string,
+  lines: string[],
+  field: YamlFrontmatterField,
+): MetadataFieldEvidence {
+  return frontmatterFieldEvidence(
+    path,
+    field.key,
+    lines,
+    field.startLine - 1,
+    field.endLine - 1,
+  );
 }
 
 function frontmatterFieldEvidence(

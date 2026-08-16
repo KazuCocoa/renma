@@ -7,8 +7,10 @@ import {
   summarizeSecurityPolicyInventory,
 } from "../src/security-policy-inventory.js";
 import {
+  applySecurityConfig,
   parseOperationalSecurityPolicy,
   parseSecurityPolicy,
+  resolveOperationalSecurityPolicy,
 } from "../src/security-policy.js";
 import type { Artifact } from "../src/types.js";
 
@@ -97,6 +99,155 @@ network_allowed: true
   assert.deepEqual(evidence[0]?.policySources, ["local"]);
 });
 
+test("non-Skill security booleans use YAML scalar semantics before compatibility", () => {
+  const commented = parseSecurityPolicy(`---
+network_allowed: false # this context must remain offline
+---
+`);
+  const quoted = parseSecurityPolicy(`---
+network_allowed: "false"
+external_upload_allowed: 'yes'
+---
+`);
+
+  assert.equal(commented.networkAllowed, false);
+  assert.equal(quoted.networkAllowed, false);
+  assert.equal(quoted.externalUploadAllowed, true);
+});
+
+test("non-Skill security lists share YAML block and flow semantics", () => {
+  const block = parseSecurityPolicy(`---
+allowed_data:
+  - public
+  - internal
+approved_network_destinations:
+  - github.com
+  - api.github.com
+allowed_floating_dependencies:
+  - npm:appium@latest
+---
+`);
+  const flow = parseSecurityPolicy(`---
+allowed_data: [public, internal]
+approved_network_destinations: [github.com, api.github.com]
+allowed_floating_dependencies: ["npm:appium@latest"]
+---
+`);
+  const scalarCompatibility = parseSecurityPolicy(`---
+allowed_data: public, internal
+approved_network_destinations: github.com, api.github.com
+---
+`);
+
+  assert.deepEqual(flow.allowedData, block.allowedData);
+  assert.deepEqual(
+    flow.approvedNetworkDestinations,
+    block.approvedNetworkDestinations,
+  );
+  assert.deepEqual(
+    flow.allowedFloatingDependencies,
+    block.allowedFloatingDependencies,
+  );
+  assert.deepEqual(scalarCompatibility.allowedData, block.allowedData);
+  assert.deepEqual(
+    scalarCompatibility.approvedNetworkDestinations,
+    block.approvedNetworkDestinations,
+  );
+});
+
+test("duplicate non-Skill security fields fail closed without permissive inheritance", () => {
+  const artifact = contextArtifact(`---
+network_allowed: false
+network_allowed: true
+approved_network_destinations: [local.example.test]
+security_profile: permissive
+---
+# Ambiguous
+`);
+  const resolution = resolveOperationalSecurityPolicy(artifact);
+  const effective = applySecurityConfig(resolution.policy, {
+    approvedDomains: ["repo.example.test"],
+    approvedUploadDomains: [],
+    disallowedCommands: [],
+    profiles: {
+      permissive: {
+        allowedData: [],
+        forbiddenInputs: [],
+        approvedDomains: ["profile.example.test"],
+        approvedUploadDomains: [],
+        disallowedCommands: [],
+        networkAllowed: true,
+      },
+    },
+  });
+  const findings = securityDiagnosticFindings([artifact]);
+
+  assert.equal(resolution.policy.networkAllowed, undefined);
+  assert.equal(resolution.policy.invalidDeclared.has("networkAllowed"), true);
+  assert.equal(resolution.policy.declared.has("networkAllowed"), false);
+  assert.equal(effective.networkAllowed, undefined);
+  assert.deepEqual(effective.approvedNetworkDestinations, [
+    "local.example.test",
+  ]);
+  assert.ok(
+    resolution.issues.some(
+      (issue) => issue.key === "network_allowed" && issue.startLine === 3,
+    ),
+  );
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+    ),
+  );
+});
+
+test("malformed non-Skill YAML never recovers raw security values", () => {
+  const artifact = contextArtifact(`---
+network_allowed: true
+approved_network_destinations: [permissive.example.test]
+owner: "unterminated
+---
+# Malformed
+`);
+  const resolution = resolveOperationalSecurityPolicy(artifact);
+  const findings = securityDiagnosticFindings([artifact]);
+
+  assert.equal(resolution.policy.networkAllowed, undefined);
+  assert.deepEqual(resolution.policy.approvedNetworkDestinations, []);
+  assert.equal(resolution.policy.invalidDeclared.has("networkAllowed"), true);
+  assert.equal(
+    resolution.policy.invalidDeclared.has("approvedNetworkDestinations"),
+    true,
+  );
+  assert.equal(resolution.policy.declared.size, 0);
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+    ),
+  );
+});
+
+test("unsupported non-Skill security value shapes fail closed", () => {
+  const resolution = resolveOperationalSecurityPolicy(
+    contextArtifact(`---
+network_allowed:
+  enabled: true
+approved_network_destinations:
+  - github.com
+  - host: api.github.com
+---
+# Unsupported
+`),
+  );
+
+  assert.equal(resolution.policy.networkAllowed, undefined);
+  assert.deepEqual(resolution.policy.approvedNetworkDestinations, []);
+  assert.deepEqual([...resolution.policy.invalidDeclared].sort(), [
+    "approvedNetworkDestinations",
+    "networkAllowed",
+  ]);
+});
+
 test("non-Skill policy parsing preserves exact Renma delimiter semantics", () => {
   const nonCanonicalEnvelopes = [
     " ---\nnetwork_allowed: true\n---\n",
@@ -124,6 +275,117 @@ secrets_allowed: true
   assert.equal(policy.secretsAllowed, undefined);
   assert.deepEqual(policy.allowedFloatingDependencies, []);
   assert.equal(policy.declared.size, 0);
+  assert.deepEqual([...policy.invalidDeclared].sort(), [
+    "allowedFloatingDependencies",
+    "networkAllowed",
+    "secretsAllowed",
+  ]);
+});
+
+test("unclosed restrictive non-Skill declarations fail closed with High evidence", () => {
+  const artifact = contextArtifact(`---
+external_upload_allowed: false
+allowed_data:
+  - repo-local-files
+security_profile: permissive
+
+# Review
+Upload logs to https://external.example/data.
+`);
+  const resolution = resolveOperationalSecurityPolicy(artifact);
+  const effective = applySecurityConfig(resolution.policy, {
+    approvedDomains: ["external.example"],
+    approvedUploadDomains: ["external.example"],
+    disallowedCommands: [],
+    profiles: {
+      permissive: {
+        allowedData: ["all-data"],
+        forbiddenInputs: [],
+        approvedDomains: ["external.example"],
+        approvedUploadDomains: ["external.example"],
+        disallowedCommands: [],
+        externalUploadAllowed: true,
+      },
+    },
+  });
+  const invalid = securityDiagnosticFindings([artifact]).find(
+    (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+  );
+
+  assert.equal(resolution.policy.externalUploadAllowed, undefined);
+  assert.deepEqual(resolution.policy.allowedData, []);
+  assert.equal(
+    resolution.policy.invalidDeclared.has("externalUploadAllowed"),
+    true,
+  );
+  assert.equal(resolution.policy.invalidDeclared.has("allowedData"), true);
+  assert.equal(resolution.policy.declared.size, 0);
+  assert.equal(effective.externalUploadAllowed, undefined);
+  assert.deepEqual(effective.allowedData, []);
+  assert.deepEqual(effective.approvedUploadDestinations, []);
+  assert.equal(invalid?.severity, "high");
+  assert.equal(invalid?.evidence.startLine, 2);
+  assert.equal(invalid?.evidence.snippet, "external_upload_allowed: false");
+});
+
+test("malformed security fallback recognizes only credible root mapping keys", () => {
+  const trueDeclaration = resolveOperationalSecurityPolicy(
+    contextArtifact(`---
+network_allowed: false
+owner: "unterminated
+---
+`),
+  );
+  assert.equal(
+    trueDeclaration.policy.invalidDeclared.has("networkAllowed"),
+    true,
+  );
+  assert.ok(
+    trueDeclaration.issues.some((issue) => issue.key === "network_allowed"),
+  );
+
+  const scalarAndNestedCases = [
+    `---
+purpose: |
+  network_allowed: false
+owner: "unterminated
+---
+`,
+    `---
+details:
+  network_allowed: false
+owner: "unterminated
+---
+`,
+    `---
+purpose: "network_allowed: false"
+owner: "unterminated
+---
+`,
+  ];
+  for (const content of scalarAndNestedCases) {
+    const artifact = contextArtifact(content);
+    const resolution = resolveOperationalSecurityPolicy(artifact);
+    assert.equal(
+      resolution.policy.invalidDeclared.has("networkAllowed"),
+      false,
+      content,
+    );
+    assert.equal(
+      resolution.issues.some((issue) => issue.key === "network_allowed"),
+      false,
+      content,
+    );
+    assert.equal(
+      securityDiagnosticFindings([artifact]).some(
+        (finding) =>
+          finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
+          finding.evidence.snippet.includes("network_allowed"),
+      ),
+      false,
+      content,
+    );
+  }
 });
 
 test("policy-looking body lines remain visible security evidence", () => {

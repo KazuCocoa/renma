@@ -14,7 +14,7 @@ import type { MetadataConfig } from "./types/configuration.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import {
-  parseAgentSkillFrontmatter,
+  ensureYamlFrontmatterForDocument,
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
@@ -120,7 +120,7 @@ function canonicalSkillPresence(
   document: ParsedDocument,
   definition: RequiredMetadataPolicyDefinition,
 ): RequiredMetadataPresence {
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   const metadataMappings = frontmatter.fields.filter(
     (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
@@ -201,7 +201,7 @@ function nonSkillPresence(
   metadata: AssetMetadata,
   definition: RequiredMetadataPolicyDefinition,
 ): RequiredMetadataPresence {
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   const fields = frontmatter.fields.filter(
     (field) => field.key === definition.nonSkillKey,
   );
