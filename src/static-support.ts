@@ -749,11 +749,11 @@ function potentialBasenameReferenceTokens(line: string): string[] {
   const tokens = new Set<string>();
 
   for (const link of markdownLinkDestinations(line)) {
-    addExactBasenameToken(tokens, line, link.value, false);
+    addExactBasenameToken(tokens, line, link.value);
   }
 
   for (const match of line.matchAll(/([`'"])(.*?)\1/g)) {
-    addExactBasenameToken(tokens, line, match[2] ?? "", true);
+    addExactBasenameToken(tokens, line, match[2] ?? "");
   }
 
   return [...tokens].sort((left, right) => left.localeCompare(right));
@@ -763,25 +763,11 @@ function addExactBasenameToken(
   tokens: Set<string>,
   line: string,
   value: string,
-  requireFilenameShape: boolean,
 ): void {
   const candidate = normalizePotentialBasename(value);
-  if (
-    candidate &&
-    (!requireFilenameShape ||
-      hasCandidateIndependentFilenameShape(candidate)) &&
-    containsExactBasename(line, candidate)
-  ) {
+  if (candidate && containsExactBasename(line, candidate)) {
     tokens.add(candidate);
   }
-}
-
-/**
- * Keep candidate-independent quoted tokens bounded to filename-like syntax
- * without requiring an extension. Known candidates do not need this guard.
- */
-function hasCandidateIndependentFilenameShape(value: string): boolean {
-  return /[._-]/u.test(value) || /^\p{Lu}/u.test(value);
 }
 
 function normalizePotentialBasename(value: string): string | undefined {

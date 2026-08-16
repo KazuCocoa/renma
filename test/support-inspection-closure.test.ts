@@ -384,12 +384,12 @@ test("unreferenced excluded support does not gain expectation authority", async 
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
-test("an excluded support directory without a basename reference is not blocking", async (t) => {
+test("ordinary prose does not become incomplete basename evidence", async (t) => {
   const boundaryPath = "skills/demo/references";
   const fixture = await referencedSupportFixture(
     t,
     { exclude: ["node_modules", "dist", ".git", boundaryPath] },
-    "Run `npm` checks, review the repository, and report completion.",
+    "Review repository state and report completion.",
   );
   await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
 
@@ -727,20 +727,6 @@ test("an excluded support subtree owned by another Skill does not block a resolv
 
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
   assert.ok(result.inspectionCoverage.inspectedPaths.includes(SUPPORT_PATH));
-});
-
-test("ordinary prose does not become incomplete basename evidence", async (t) => {
-  const boundaryPath = "skills/demo/references";
-  const fixture = await referencedSupportFixture(
-    t,
-    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
-    "Review repository state and report completion.",
-  );
-  await fixture.write(`${boundaryPath}/README`, UNSAFE_INSTRUCTION);
-
-  const result = await scan(fixture.root, { failOn: "high" });
-
-  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
 test("external, absolute, and escaping references do not create support findings or expectations", async (t) => {
