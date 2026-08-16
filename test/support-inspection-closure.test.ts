@@ -37,6 +37,72 @@ test("a unique basename-only support reference resolves during normal inspection
   );
 });
 
+test("unquoted basename syntax stays exact normally and becomes boundary-only when hidden", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Read runtime.txt before continuing.",
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+
+  const normal = await scan(fixture.root, { failOn: "high" });
+  assert.equal(normal.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(normal.inspectionCoverage.inspectedPaths.includes(SUPPORT_PATH));
+  assert.equal(
+    normal.securityAnalysisCoverage.artifacts.find(
+      (artifact) => artifact.path === SUPPORT_PATH,
+    )?.analyses.semanticInstructions,
+    "analyzed",
+  );
+
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  const parsedPaths: string[] = [];
+  const snapshot = await collectRepositorySnapshot(
+    fixture.root,
+    { failOn: "high" },
+    { onDocumentParse: (artifactPath) => parsedPaths.push(artifactPath) },
+  );
+  const hidden = scanFromRepositorySnapshot(snapshot);
+  const issue = hidden.inspectionCoverage.blockingIssues.find(
+    (candidate) => candidate.path === boundaryPath,
+  );
+
+  assert.equal(snapshot.repositoryPaths.has(SUPPORT_PATH), false);
+  assert.equal(snapshot.repositoryPathStates.has(SUPPORT_PATH), false);
+  assert.ok(!parsedPaths.includes(SUPPORT_PATH));
+  assert.equal(issue?.state, "excluded");
+  assert.equal(issue?.scope, "subtree");
+  assert.equal(issue?.details?.sourcePath, "skills/demo/SKILL.md");
+  assert.equal(issue?.details?.sourceLine, 9);
+  assert.equal(issue?.details?.reachabilityDepth, 1);
+  assert.ok(
+    evaluateStrictScan(hidden).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+  );
+  assert.equal(
+    snapshot.catalog.dependencies.some(
+      (dependency) => dependency.kind === "statically_references",
+    ),
+    false,
+  );
+  assert.equal(
+    hidden.executableSurfaceInventory?.surfaces.some(
+      (surface) => surface.path === SUPPORT_PATH,
+    ),
+    false,
+  );
+  assert.equal(
+    hidden.securityAnalysisCoverage.artifacts.some(
+      (artifact) => artifact.path === SUPPORT_PATH,
+    ),
+    false,
+  );
+});
+
 test("an extensionless basename uses the normal candidate-backed resolver", async (t) => {
   const targetPath = "skills/demo/references/README";
   const fixture = await referencedSupportFixture(
@@ -56,6 +122,37 @@ test("an extensionless basename uses the normal candidate-backed resolver", asyn
     snapshot.catalog.dependencies.some(
       (dependency) => dependency.kind === "statically_references",
     ),
+  );
+});
+
+test("unquoted conventional extensionless basenames retain normal and hidden parity", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const readmePath = `${boundaryPath}/README`;
+  const dockerfilePath = `${boundaryPath}/Dockerfile`;
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Read README and Dockerfile before continuing.",
+  );
+  await fixture.write(readmePath, "Review repository support.\n");
+  await fixture.write(dockerfilePath, "Review container support.\n");
+
+  const normal = await scan(fixture.root, { failOn: "high" });
+  assert.equal(normal.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(normal.inspectionCoverage.inspectedPaths.includes(readmePath));
+  assert.ok(normal.inspectionCoverage.inspectedPaths.includes(dockerfilePath));
+
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  const hidden = await scan(fixture.root, { failOn: "high" });
+  assert.deepEqual(
+    hidden.inspectionCoverage.blockingIssues.map(({ path, state, scope }) => ({
+      path,
+      state,
+      scope,
+    })),
+    [{ path: boundaryPath, state: "excluded", scope: "subtree" }],
   );
 });
 
@@ -398,6 +495,24 @@ test("ordinary prose does not become incomplete basename evidence", async (t) =>
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
+test("inline command tokens do not become incomplete basename evidence", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(
+    t,
+    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
+    [
+      "Run `npm` checks before continuing.",
+      "Use `git` for version control.",
+      "Call `node` for the local tool.",
+    ].join("\n"),
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+});
+
 test("ambiguous Skill ownership cannot authorize expected support inspection", async (t) => {
   const fixture = await referencedSupportFixture(
     t,
@@ -419,7 +534,7 @@ test("duplicate basename ambiguity does not select an oversized target", async (
   const fixture = await referencedSupportFixture(
     t,
     { max_file_size_bytes: 1_000 },
-    "Read `runtime.txt` before continuing.",
+    "Read runtime.txt before continuing.",
   );
   await fixture.write(
     "skills/demo/references/one/runtime.txt",
@@ -574,6 +689,33 @@ test("an excluded support directory blocks an unresolved basename without invent
   );
 });
 
+test("Markdown link basenames retain normal and hidden parity", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Read [runtime](runtime.txt) before continuing.",
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+
+  const normal = await scan(fixture.root, { failOn: "high" });
+  assert.equal(normal.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(normal.inspectionCoverage.inspectedPaths.includes(SUPPORT_PATH));
+
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  const hidden = await scan(fixture.root, { failOn: "high" });
+  assert.deepEqual(
+    hidden.inspectionCoverage.blockingIssues.map(({ path, state, scope }) => ({
+      path,
+      state,
+      scope,
+    })),
+    [{ path: boundaryPath, state: "excluded", scope: "subtree" }],
+  );
+});
+
 test("an excluded support directory blocks a quoted extensionless basename", async (t) => {
   const boundaryPath = "skills/demo/references";
   const targetPath = `${boundaryPath}/README`;
@@ -696,7 +838,7 @@ test("known duplicate basename candidates remain ambiguous beside an excluded su
   const fixture = await referencedSupportFixture(
     t,
     { exclude: ["node_modules", "dist", ".git", boundaryPath] },
-    "Read `runtime.txt` before continuing.",
+    "Read runtime.txt before continuing.",
   );
   await fixture.write(
     "skills/demo/references/one/runtime.txt",
@@ -912,7 +1054,7 @@ test("unclosed non-Skill frontmatter follows the canonical body-start behavior",
   );
   await fixture.write(
     indexPath,
-    "---\nid: reference.index\nRead `runtime.txt` before continuing.\n",
+    "---\nid: reference_index\nRead `runtime.txt` before continuing.\n",
   );
   await fixture.write(`${boundaryPath}/runtime.txt`, UNSAFE_INSTRUCTION);
 

@@ -60,6 +60,11 @@ interface IncompleteStaticSupportBasenameReference {
   raw: string;
 }
 
+interface BasenameReferenceToken {
+  basename: string;
+  raw: string;
+}
+
 interface StaticSupportReferenceAnalysis {
   references: StaticSupportReference[];
   incompleteBasenameReferences: IncompleteStaticSupportBasenameReference[];
@@ -141,34 +146,22 @@ function analyzeStaticSupportReferences(
       addReference(normalized, value.raw, index + 1);
     }
 
-    const matchedCandidateBasenames = new Set<string>();
-    for (const [basename, paths] of candidatesByBasename) {
-      if (!containsExactBasename(line, basename)) continue;
-      matchedCandidateBasenames.add(basename);
-      if (paths.length !== 1 || explicitBasenames.has(basename)) continue;
+    for (const token of basenameReferenceTokens(line)) {
+      if (explicitBasenames.has(token.basename)) continue;
+      const paths = candidatesByBasename.get(token.basename) ?? [];
+      if (paths.length > 1) continue;
       if (candidateSetIncomplete) {
         if (index >= bodyStartIndex) {
-          addIncompleteBasename(basename, index + 1);
+          addIncompleteBasename(token, index + 1);
         }
         continue;
       }
+      if (paths.length !== 1) continue;
       const normalized = normalizeStaticSupportReference(
         paths[0]!,
         skillDirectory,
       );
-      if (normalized) addReference(normalized, basename, index + 1);
-    }
-
-    if (candidateSetIncomplete && index >= bodyStartIndex) {
-      for (const basename of potentialBasenameReferenceTokens(line)) {
-        if (
-          explicitBasenames.has(basename) ||
-          matchedCandidateBasenames.has(basename)
-        ) {
-          continue;
-        }
-        addIncompleteBasename(basename, index + 1);
-      }
+      if (normalized) addReference(normalized, token.raw, index + 1);
     }
   }
 
@@ -189,15 +182,18 @@ function analyzeStaticSupportReferences(
     });
   }
 
-  function addIncompleteBasename(basename: string, line: number): void {
-    const key = `${line}:${basename}`;
+  function addIncompleteBasename(
+    token: BasenameReferenceToken,
+    line: number,
+  ): void {
+    const key = `${line}:${token.basename}`;
     if (seenIncomplete.has(key)) return;
     seenIncomplete.add(key);
     incompleteBasenameReferences.push({
       sourcePath: document.artifact.path,
-      basename,
+      basename: token.basename,
       line,
-      raw: basename,
+      raw: token.raw,
     });
   }
 
@@ -740,34 +736,69 @@ function containsExactBasename(content: string, basename: string): boolean {
 }
 
 /**
- * Extract syntactically explicit basename forms accepted by the same
- * exact-token matcher as candidate-backed resolution. This is used solely
- * when an excluded support subtree makes the candidate inventory incomplete;
- * it never manufactures a target path.
+ * Parse the one basename-only support-reference syntax consumed by both
+ * candidate-backed resolution and incomplete-candidate boundary evidence.
  */
-function potentialBasenameReferenceTokens(line: string): string[] {
-  const tokens = new Set<string>();
+function basenameReferenceTokens(line: string): BasenameReferenceToken[] {
+  const tokens = new Map<string, BasenameReferenceToken>();
 
-  for (const link of markdownLinkDestinations(line)) {
-    addExactBasenameToken(tokens, line, link.value);
+  const markdownLinks = markdownLinkDestinations(line);
+  for (const link of markdownLinks) {
+    addBasenameReferenceToken(tokens, line, link.value);
   }
 
-  for (const match of line.matchAll(/([`'"])(.*?)\1/g)) {
-    addExactBasenameToken(tokens, line, match[2] ?? "");
+  let bareLine = maskRawMatches(
+    line,
+    markdownLinks.map((link) => link.raw),
+  );
+  const quotedMatches: string[] = [];
+  for (const match of bareLine.matchAll(/([`'"])(.*?)\1/g)) {
+    addBasenameReferenceToken(tokens, line, match[2] ?? "");
+    quotedMatches.push(match[0]);
+  }
+  bareLine = maskRawMatches(bareLine, quotedMatches);
+
+  for (const match of bareLine.matchAll(/[^\s`'"()[\]{},;:!?/\\]+/g)) {
+    const raw = match[0];
+    addBasenameReferenceToken(
+      tokens,
+      line,
+      raw.endsWith(".") ? raw.slice(0, -1) : raw,
+    );
   }
 
-  return [...tokens].sort((left, right) => left.localeCompare(right));
+  return [...tokens.values()].sort(
+    (left, right) =>
+      left.basename.localeCompare(right.basename) ||
+      left.raw.localeCompare(right.raw),
+  );
 }
 
-function addExactBasenameToken(
-  tokens: Set<string>,
+function addBasenameReferenceToken(
+  tokens: Map<string, BasenameReferenceToken>,
   line: string,
   value: string,
 ): void {
   const candidate = normalizePotentialBasename(value);
-  if (candidate && containsExactBasename(line, candidate)) {
-    tokens.add(candidate);
-  }
+  if (
+    !candidate ||
+    !isStaticSupportBasename(candidate) ||
+    !containsExactBasename(line, candidate)
+  )
+    return;
+  tokens.set(candidate, { basename: candidate, raw: candidate });
+}
+
+/** Filename syntax, not natural-language intent, bounds basename references. */
+function isStaticSupportBasename(value: string): boolean {
+  return (
+    /^\.[\p{L}\p{N}_-]+$/u.test(value) ||
+    /^(?:[\p{L}\p{N}_-]+(?:[ .][\p{L}\p{N}_-]+)*)\.[\p{L}][\p{L}\p{N}_-]*$/u.test(
+      value,
+    ) ||
+    /^[\p{Lu}\p{N}][\p{Lu}\p{N}_-]*$/u.test(value) ||
+    /^\p{Lu}[\p{L}\p{N}_-]*file$/u.test(value)
+  );
 }
 
 function normalizePotentialBasename(value: string): string | undefined {

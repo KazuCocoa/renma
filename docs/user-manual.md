@@ -1293,12 +1293,14 @@ against the collected repository snapshot. It validates the declared path but
 does not execute the command. Non-Skill documents do not receive an inferred
 Skill-relative base.
 
-Static support reachability accepts explicit Skill-relative paths, explicit
-basenames, Markdown link targets, quoted/code-form paths, and one additional
-hop through a directly referenced index/reference. Free-prose matches against
-generic filename stems such as `run`, `check`, or `logo` are not evidence.
-Extensionless executables and quoted or linked asset paths with spaces are
-valid; `..` traversal outside the Skill root remains invalid.
+Static support reachability accepts explicit Skill-relative paths,
+filename-shaped basenames in quoted or unquoted exact-token form, Markdown link
+targets, quoted/code-form paths, and one additional hop through a directly
+referenced index/reference. Free-prose matches against generic filename stems
+such as `run`, `check`, or `logo` are not evidence, and wrapping command names
+such as `npm`, `git`, or `node` in inline code does not turn them into support
+references. Extensionless executables and quoted or linked asset paths with
+spaces are valid; `..` traversal outside the Skill root remains invalid.
 
 Use `exclude` for files Renma should not scan. Use `suppressions` for audited
 exceptions where Renma should scan the file, detect matching findings, omit
