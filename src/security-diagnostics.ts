@@ -36,10 +36,9 @@ import type {
   YamlFrontmatterComment,
   YamlFrontmatterCommentAnalysis,
 } from "./yaml-frontmatter.js";
-import { parseYamlFrontmatterComments } from "./yaml-frontmatter.js";
+import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
-import { frontmatterEnvelopeForArtifact } from "./frontmatter-envelope.js";
 import { inspectAgentSkill } from "./agent-skills.js";
 import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
 import {
@@ -208,6 +207,29 @@ const RULES = {
     ],
     llmHint:
       "Inspect the exact metadata.renma.* evidence and ask for human confirmation of the intended policy before replacing it. Do not guess a permissive value.",
+    confidence: "high",
+    riskClass: "violation",
+  },
+  invalidRenmaPolicyMetadata: {
+    id: DIAGNOSTIC_IDS.SEC_INVALID_RENMA_POLICY_METADATA,
+    category: "safety",
+    title: "Non-Skill Renma security metadata is invalid or ambiguous",
+    whyItMatters:
+      "An invalid local policy declaration must fail closed instead of inheriting a more permissive profile or repository value.",
+    remediation:
+      "Repair the YAML or replace the value only after confirming the intended policy. Do not recover authority from raw lines.",
+    constraints: [
+      "Do not guess the intended boolean, list, or profile value.",
+      "Keep the exact non-Skill Renma frontmatter delimiter contract.",
+      "Preserve the local declaration as blocked until a human confirms the policy.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the frontmatter is valid YAML with one declaration per recognized field.",
+      "Confirm inherited policy does not broaden the rejected local declaration.",
+    ],
+    llmHint:
+      "Inspect the exact non-Skill frontmatter evidence and ask for human confirmation before repairing the rejected policy declaration. Do not infer a permissive value.",
     confidence: "high",
     riskClass: "violation",
   },
@@ -1632,7 +1654,6 @@ function prepareSecurityDocumentAnalysis(
       : undefined;
   const frontmatter = frontmatterCommentAnalysisForDocument(
     document,
-    sourceLines,
     plainTextSupport,
     skillFrontmatter,
   );
@@ -1679,7 +1700,6 @@ function prepareSecurityDocumentAnalysis(
 
 function frontmatterCommentAnalysisForDocument(
   document: ParsedDocument,
-  sourceLines: readonly string[],
   plainTextSupport: boolean,
   skillFrontmatter: ParsedYamlFrontmatter | undefined,
 ): YamlFrontmatterCommentAnalysis | undefined {
@@ -1691,18 +1711,8 @@ function frontmatterCommentAnalysisForDocument(
   // does not gain a new hidden-frontmatter surface merely from a delimiter.
   if (document.artifact.kind === "unknown") return undefined;
 
-  const envelope = frontmatterEnvelopeForArtifact(
-    document.artifact,
-    sourceLines,
-  );
-  if (!envelope.present) return undefined;
-  if (envelope.closingIndex === undefined) {
-    return { commentsAnalyzable: false, comments: [] };
-  }
-  return parseYamlFrontmatterComments(
-    document.artifact.content,
-    envelope.closingIndex,
-  );
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  return frontmatter.present ? frontmatter : undefined;
 }
 
 function preparePlainTextSupportSecurityAnalysis(
@@ -4092,17 +4102,24 @@ function pushOverrideContradiction(
 function invalidCanonicalSecurityDetections(
   issues: readonly CanonicalSecurityMetadataIssue[],
 ): Detection[] {
-  return issues.map((issue) => ({
-    metadata: {
-      ...RULES.invalidCanonicalPolicyMetadata,
-      title: `Invalid metadata.${issue.key}: ${issue.reason}.`,
-    },
-    severity: "high",
-    startLine: issue.startLine,
-    endLine: issue.endLine,
-    snippet: issue.snippet,
-    dedupeKey: `invalid-canonical-policy:${issue.key}:${issue.startLine}`,
-  }));
+  return issues.map((issue) => {
+    const canonical = issue.key.startsWith("renma.");
+    return {
+      metadata: {
+        ...(canonical
+          ? RULES.invalidCanonicalPolicyMetadata
+          : RULES.invalidRenmaPolicyMetadata),
+        title: canonical
+          ? `Invalid metadata.${issue.key}: ${issue.reason}.`
+          : `Invalid ${issue.key}: ${issue.reason}.`,
+      },
+      severity: "high",
+      startLine: issue.startLine,
+      endLine: issue.endLine,
+      snippet: issue.snippet,
+      dedupeKey: `invalid-${canonical ? "canonical" : "renma"}-policy:${issue.key}:${issue.startLine}`,
+    };
+  });
 }
 
 function policyFieldEvidence(

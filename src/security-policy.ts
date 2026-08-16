@@ -3,12 +3,16 @@ import {
   parseFloatingDependencyAllowance,
   type FloatingDependencyAllowance,
 } from "./dependency-selectors.js";
-import { renmaFrontmatterEnvelope } from "./frontmatter-envelope.js";
 import { parseDocument } from "./markdown.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
-import type { YamlFrontmatterField } from "./yaml-frontmatter.js";
+import {
+  ensureYamlFrontmatterForDocument,
+  parseRenmaFrontmatter,
+  type ParsedYamlFrontmatter,
+  type YamlFrontmatterField,
+} from "./yaml-frontmatter.js";
 import {
   SECURITY_METADATA_FIELD_DEFINITIONS,
   type CanonicalSecurityOperationalField,
@@ -115,111 +119,264 @@ function nonSkillSecurityFields(
   );
 }
 
-type ParsedBlockList = {
-  values: string[];
-  nextIndex: number;
-};
-
 export function parseSecurityPolicy(content: string): SecurityPolicy {
+  return parseRenmaSecurityMetadata(content, parseRenmaFrontmatter(content))
+    .policy;
+}
+
+function parseRenmaSecurityMetadata(
+  content: string,
+  frontmatter: ParsedYamlFrontmatter,
+): CanonicalSecurityMetadataResult {
   const policy = emptySecurityPolicy();
+  const issues: CanonicalSecurityMetadataIssue[] = [];
+  if (!frontmatter.present || !frontmatter.closed) return { policy, issues };
 
   const lines = content.split(/\r?\n/);
-  const envelope = renmaFrontmatterEnvelope(lines);
-  if (envelope.closingIndex === undefined) return policy;
-  const scanEnd = envelope.closingIndex;
-
-  for (let index = 1; index < scanEnd; index += 1) {
-    const line = lines[index] ?? "";
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/);
-    if (!match) {
-      continue;
-    }
-
-    const rawKey = match[1] ?? "";
-    const rawValue = match[2] ?? "";
-    const key = rawKey.trim();
-    const value = rawValue.trim();
-    const blockList =
-      value.length === 0
-        ? parseBlockList(lines, index, scanEnd)
-        : { values: [], nextIndex: index + 1 };
-
-    const booleanField = BOOLEAN_POLICY_FIELDS.get(key);
-    if (booleanField !== undefined) {
-      const parsed = parseBoolean(value);
-      if (parsed !== undefined) {
-        (policy[booleanField] as boolean | undefined) = parsed;
-        policy.declared.add(booleanField);
-        policy.lineByField.set(booleanField, index + 1);
-      }
-      continue;
-    }
-
-    if (DESTINATION_POLICY_FIELDS.has(key)) {
-      const destinations = policyListValues(value, blockList);
-      policy.approvedNetworkDestinations.push(...destinations);
-      policy.declared.add("approvedNetworkDestinations");
-      policy.lineByField.set("approvedNetworkDestinations", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (UPLOAD_DESTINATION_POLICY_FIELDS.has(key)) {
-      const destinations = policyListValues(value, blockList);
-      policy.approvedUploadDestinations.push(...destinations);
-      policy.declared.add("approvedUploadDestinations");
-      policy.lineByField.set("approvedUploadDestinations", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (ALLOWED_DATA_POLICY_FIELDS.has(key)) {
-      const values = policyListValues(value, blockList);
-      policy.allowedData.push(...values);
-      policy.declared.add("allowedData");
-      policy.lineByField.set("allowedData", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (FORBIDDEN_INPUT_POLICY_FIELDS.has(key)) {
-      policy.forbiddenInputs.push(...policyListValues(value, blockList));
-      policy.declared.add("forbiddenInputs");
-      policy.lineByField.set("forbiddenInputs", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS.has(key)) {
-      const rawValues =
-        value.length === 0
-          ? parseRawBlockList(lines, index, scanEnd)
-          : {
-              values: parseRawList(value),
-              nextIndex: index + 1,
-            };
-      policy.allowedFloatingDependencies.push(
-        ...rawValues.values.flatMap((raw) => {
-          const allowance = parseFloatingDependencyAllowance(raw);
-          return allowance === undefined ? [] : [allowance];
-        }),
+  if (!frontmatter.mapping || frontmatter.errors.length > 0) {
+    const reason =
+      frontmatter.errors[0] === undefined
+        ? "frontmatter root must be a YAML mapping"
+        : `frontmatter YAML is invalid (${frontmatter.errors[0].code})`;
+    for (const declaration of recognizedRenmaSecurityDeclarations(
+      frontmatter,
+      lines,
+    )) {
+      recordRenmaSecurityIssue(
+        policy,
+        issues,
+        declaration.definition,
+        declaration.evidence,
+        `${reason}; no raw value was interpreted`,
       );
-      policy.declared.add("allowedFloatingDependencies");
-      policy.lineByField.set("allowedFloatingDependencies", index + 1);
-      if (value.length === 0 && rawValues.values.length > 0) {
-        index = rawValues.nextIndex - 1;
-      }
+    }
+    return { policy, issues };
+  }
+
+  for (const definition of SECURITY_METADATA_FIELD_DEFINITIONS) {
+    const fields = frontmatter.fields.filter(
+      (field) => field.key === definition.nonSkillKey,
+    );
+    if (fields.length === 0) continue;
+    if (fields.length > 1) {
+      recordRenmaSecurityIssue(
+        policy,
+        issues,
+        definition,
+        yamlSecurityFieldEvidence(lines, fields[1]!),
+        "field is declared more than once and is operationally ambiguous",
+      );
       continue;
     }
 
-    if (SECURITY_PROFILE_POLICY_FIELDS.has(key)) {
-      policy.securityProfile = value;
-      policy.declared.add("securityProfile");
-      policy.lineByField.set("securityProfile", index + 1);
+    const field = fields[0]!;
+    const evidence = yamlSecurityFieldEvidence(lines, field);
+    if (definition.encoding === "boolean") {
+      const scalar = renmaScalarText(field.value);
+      const parsed = scalar === undefined ? undefined : parseBoolean(scalar);
+      if (parsed === undefined) {
+        recordRenmaSecurityIssue(
+          policy,
+          issues,
+          definition,
+          evidence,
+          `expected a compatible boolean scalar; rejected ${describeRejectedValue(field.value)}`,
+        );
+        continue;
+      }
+      policy[definition.operationalField] = parsed;
+      recordRenmaPolicyField(policy, definition.operationalField, evidence);
+      continue;
+    }
+
+    if (definition.encoding === "list") {
+      const parsed = renmaListValue(field.value);
+      if (!parsed.valid) {
+        recordRenmaSecurityIssue(
+          policy,
+          issues,
+          definition,
+          evidence,
+          parsed.reason,
+        );
+        continue;
+      }
+      if (definition.operationalField === "allowedFloatingDependencies") {
+        const allowances = parsed.values.map(parseFloatingDependencyAllowance);
+        if (allowances.some((allowance) => allowance === undefined)) {
+          recordRenmaSecurityIssue(
+            policy,
+            issues,
+            definition,
+            evidence,
+            "expected selector-specific npm: or pypi: floating dependency entries",
+          );
+          continue;
+        }
+        policy.allowedFloatingDependencies.push(
+          ...(allowances as FloatingDependencyAllowance[]),
+        );
+      } else {
+        policy[definition.operationalField].push(...parsed.values);
+      }
+      recordRenmaPolicyField(policy, definition.operationalField, evidence);
+      continue;
+    }
+
+    const profile = renmaScalarText(field.value)?.trim();
+    if (profile === undefined) {
+      recordRenmaSecurityIssue(
+        policy,
+        issues,
+        definition,
+        evidence,
+        `expected a scalar security profile; rejected ${describeRejectedValue(field.value)}`,
+      );
+      continue;
+    }
+    policy.securityProfile = profile;
+    recordRenmaPolicyField(policy, definition.operationalField, evidence);
+  }
+
+  return { policy, issues };
+}
+
+function recognizedRenmaSecurityDeclarations(
+  frontmatter: ParsedYamlFrontmatter,
+  lines: string[],
+): Array<{
+  definition: SecurityMetadataFieldDefinition;
+  evidence: SecurityPolicyFieldEvidence;
+}> {
+  const declarations = new Map<
+    string,
+    {
+      definition: SecurityMetadataFieldDefinition;
+      evidence: SecurityPolicyFieldEvidence;
+    }
+  >();
+  const definitions = new Map<string, SecurityMetadataFieldDefinition>(
+    SECURITY_METADATA_FIELD_DEFINITIONS.map((definition) => [
+      definition.nonSkillKey,
+      definition,
+    ]),
+  );
+
+  for (const field of frontmatter.fields) {
+    const definition = definitions.get(field.key);
+    if (definition !== undefined && !declarations.has(field.key)) {
+      declarations.set(field.key, {
+        definition,
+        evidence: yamlSecurityFieldEvidence(lines, field),
+      });
     }
   }
 
-  return policy;
+  const closingIndex = frontmatter.bodyStartLine - 2;
+  for (let index = 1; index < closingIndex; index += 1) {
+    const keyMatch = lines[index]?.match(
+      /^\s*(?:"([A-Za-z_][A-Za-z0-9_]*)"|'([A-Za-z_][A-Za-z0-9_]*)'|([A-Za-z_][A-Za-z0-9_]*))\s*:/,
+    );
+    const key = keyMatch?.[1] ?? keyMatch?.[2] ?? keyMatch?.[3];
+    const definition = key === undefined ? undefined : definitions.get(key);
+    if (definition === undefined || declarations.has(definition.nonSkillKey)) {
+      continue;
+    }
+    declarations.set(definition.nonSkillKey, {
+      definition,
+      evidence: {
+        startLine: index + 1,
+        endLine: index + 1,
+        snippet: lines[index] ?? "",
+      },
+    });
+  }
+
+  return SECURITY_METADATA_FIELD_DEFINITIONS.flatMap((definition) => {
+    const declaration = declarations.get(definition.nonSkillKey);
+    return declaration === undefined ? [] : [declaration];
+  });
+}
+
+function recordRenmaSecurityIssue(
+  policy: SecurityPolicy,
+  issues: CanonicalSecurityMetadataIssue[],
+  definition: SecurityMetadataFieldDefinition,
+  evidence: SecurityPolicyFieldEvidence,
+  reason: string,
+): void {
+  issues.push({
+    key: definition.nonSkillKey,
+    operationalField: definition.operationalField,
+    reason,
+    ...evidence,
+  });
+  recordInvalidCanonicalPolicyField(
+    policy,
+    definition.operationalField,
+    evidence,
+  );
+}
+
+function recordRenmaPolicyField(
+  policy: SecurityPolicy,
+  operationalField: CanonicalSecurityOperationalField,
+  evidence: SecurityPolicyFieldEvidence,
+): void {
+  policy.declared.add(operationalField);
+  policy.lineByField.set(operationalField, evidence.startLine);
+  policy.evidenceByField.set(operationalField, evidence);
+}
+
+function yamlSecurityFieldEvidence(
+  lines: string[],
+  field: Pick<YamlFrontmatterField, "startLine" | "endLine">,
+): SecurityPolicyFieldEvidence {
+  return {
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: lines.slice(field.startLine - 1, field.endLine).join("\n"),
+  };
+}
+
+function renmaScalarText(value: unknown): string | undefined {
+  if (value === null || value === undefined) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
+type RenmaListParseResult =
+  { valid: true; values: string[] } | { valid: false; reason: string };
+
+function renmaListValue(value: unknown): RenmaListParseResult {
+  if (!Array.isArray(value)) {
+    const scalar = renmaScalarText(value);
+    return scalar === undefined
+      ? {
+          valid: false,
+          reason: `expected a YAML sequence or compatible scalar; rejected ${describeRejectedValue(value)}`,
+        }
+      : { valid: true, values: parseList(scalar) };
+  }
+
+  const normalized = value.map(renmaScalarText);
+  if (normalized.some((item) => item === undefined)) {
+    return {
+      valid: false,
+      reason: "expected a YAML sequence containing scalar values only",
+    };
+  }
+  return {
+    valid: true,
+    values: (normalized as string[]).map((item) => item.trim()).filter(Boolean),
+  };
 }
 
 /** Resolve the operational security source for one repository artifact. */
@@ -235,10 +392,10 @@ export function resolveOperationalSecurityPolicy(
 ): CanonicalSecurityMetadataResult {
   const document = isParsedDocument(input) ? input : parseDocument(input);
   if (document.artifact.kind !== "skill") {
-    return {
-      policy: parseSecurityPolicy(document.artifact.content),
-      issues: [],
-    };
+    return parseRenmaSecurityMetadata(
+      document.artifact.content,
+      ensureYamlFrontmatterForDocument(document),
+    );
   }
 
   const inspection = inspectAgentSkill(document);
@@ -378,6 +535,7 @@ export function resolveSecurityConfig(
   };
 
   const chain = securityProfileChain(policy.securityProfile, config);
+  const invalidProfile = policy.invalidDeclared.has("securityProfile");
   const inheritedNetwork = inheritedProfileBoolean(chain, "networkAllowed");
   const inheritedUpload = inheritedProfileBoolean(
     chain,
@@ -394,7 +552,7 @@ export function resolveSecurityConfig(
     resolvePermissionBoolean(
       policy.networkAllowed,
       inheritedNetwork,
-      policy.invalidDeclared.has("networkAllowed"),
+      policy.invalidDeclared.has("networkAllowed") || invalidProfile,
     ),
   );
   setResolvedBoolean(
@@ -403,7 +561,7 @@ export function resolveSecurityConfig(
     resolvePermissionBoolean(
       policy.externalUploadAllowed,
       inheritedUpload,
-      policy.invalidDeclared.has("externalUploadAllowed"),
+      policy.invalidDeclared.has("externalUploadAllowed") || invalidProfile,
     ),
   );
   setResolvedBoolean(
@@ -412,7 +570,7 @@ export function resolveSecurityConfig(
     resolvePermissionBoolean(
       policy.secretsAllowed,
       inheritedSecrets,
-      policy.invalidDeclared.has("secretsAllowed"),
+      policy.invalidDeclared.has("secretsAllowed") || invalidProfile,
     ),
   );
   setResolvedBoolean(
@@ -421,7 +579,7 @@ export function resolveSecurityConfig(
     resolveRequiredBoolean(
       policy.humanApprovalRequired,
       inheritedApproval,
-      policy.invalidDeclared.has("humanApprovalRequired"),
+      policy.invalidDeclared.has("humanApprovalRequired") || invalidProfile,
     ),
   );
   if (
@@ -705,19 +863,29 @@ function inheritedProfileBoolean(
 function mayInheritAllowedData(policy: SecurityPolicy): boolean {
   return (
     !policy.declared.has("allowedData") &&
-    !policy.invalidDeclared.has("allowedData")
+    !policy.invalidDeclared.has("allowedData") &&
+    !policy.invalidDeclared.has("securityProfile")
   );
 }
 
 function mayInheritForbiddenInputs(policy: SecurityPolicy): boolean {
-  return !policy.declared.has("forbiddenInputs");
+  return (
+    !policy.declared.has("forbiddenInputs") &&
+    !policy.invalidDeclared.has("securityProfile")
+  );
 }
 
 function mayAccumulate(
   policy: SecurityPolicy,
   field: "approvedNetworkDestinations" | "approvedUploadDestinations",
 ): boolean {
-  return !policy.invalidDeclared.has(field);
+  return (
+    !policy.invalidDeclared.has(field) &&
+    !policy.invalidDeclared.has("networkAllowed") &&
+    (field !== "approvedUploadDestinations" ||
+      !policy.invalidDeclared.has("externalUploadAllowed")) &&
+    !policy.invalidDeclared.has("securityProfile")
+  );
 }
 
 export function securityProfileChain(
@@ -780,75 +948,6 @@ export function isSecurityPolicyLine(line: string): boolean {
       ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS.has(key) ||
       SECURITY_PROFILE_POLICY_FIELDS.has(key))
   );
-}
-
-function parseBlockList(
-  lines: string[],
-  startIndex: number,
-  scanEnd: number,
-): ParsedBlockList {
-  const values: string[] = [];
-  let index = startIndex + 1;
-  for (; index < scanEnd; index += 1) {
-    const line = lines[index] ?? "";
-    if (line.trim().length === 0) break;
-
-    const match = line.match(/^\s*-\s*(.*?)\s*$/);
-    if (!match) break;
-
-    values.push(...parseList(match[1] ?? ""));
-  }
-
-  return { values, nextIndex: index };
-}
-
-function parseRawBlockList(
-  lines: string[],
-  startIndex: number,
-  scanEnd: number,
-): ParsedBlockList {
-  const values: string[] = [];
-  let index = startIndex + 1;
-  for (; index < scanEnd; index += 1) {
-    const line = lines[index] ?? "";
-    if (line.trim().length === 0) break;
-    const match = line.match(/^\s*-\s*(.*?)\s*$/u);
-    if (!match) break;
-    const value = stripMatchingQuotes((match[1] ?? "").trim());
-    if (value.length > 0) values.push(value);
-  }
-  return { values, nextIndex: index };
-}
-
-function parseRawList(value: string): string[] {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("[")) return [stripMatchingQuotes(trimmed)];
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    return Array.isArray(parsed) &&
-      parsed.every((item) => typeof item === "string")
-      ? parsed
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function stripMatchingQuotes(value: string): string {
-  const first = value[0];
-  return first !== undefined &&
-    (first === '"' || first === "'") &&
-    value.at(-1) === first
-    ? value.slice(1, -1)
-    : value;
-}
-
-function policyListValues(value: string, blockList: ParsedBlockList): string[] {
-  return value.length > 0 ? parseList(value) : blockList.values;
-}
-
-function consumesBlockList(value: string, blockList: ParsedBlockList): boolean {
-  return value.length === 0 && blockList.values.length > 0;
 }
 
 function uniqueStrings(values: string[]): string[] {

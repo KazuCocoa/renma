@@ -158,6 +158,27 @@ const CATALOG_FINDING_DEFINITION_LIST = [
   },
   {
     ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_INVALID_RENMA_FRONTMATTER,
+    title: "Non-Skill Renma frontmatter is invalid or ambiguous",
+    severity: "high",
+    whyItMatters:
+      "Malformed YAML or duplicate operational keys cannot provide deterministic catalog and governance metadata.",
+    remediation:
+      "Repair the exact Renma frontmatter envelope and keep one valid YAML declaration per operational field.",
+    constraints: [
+      "Do not recover metadata values from raw lines.",
+      "Do not broaden the exact non-Skill delimiter contract.",
+      "Do not guess which duplicate declaration was intended.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the frontmatter parses as one YAML mapping without duplicate operational keys.",
+    ],
+    llmHint:
+      "Repair the YAML structure or duplicate declaration only after preserving and confirming the intended metadata value.",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
     code: DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
     title: "Lifecycle metadata uses an invalid status transition date",
     severity: "medium",

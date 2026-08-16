@@ -1,9 +1,33 @@
 import type { Artifact } from "./types/artifact.js";
-import { agentSkillFrontmatterEnvelope } from "./yaml-frontmatter.js";
 
 export interface FrontmatterEnvelope {
   present: boolean;
   closingIndex: number | undefined;
+}
+
+/**
+ * Locate an Agent Skills YAML envelope without parsing its contents.
+ *
+ * The opening delimiter retains the established BOM and surrounding-whitespace
+ * handling. A closing delimiter must begin in column one, but may retain
+ * trailing whitespace. Indented delimiter-looking text therefore remains YAML
+ * content, including inside block scalars.
+ */
+export function agentSkillFrontmatterEnvelope(
+  lines: readonly string[],
+): FrontmatterEnvelope {
+  const firstLine = lines[0]?.replace(/^\uFEFF/, "").trim();
+  if (firstLine !== "---") {
+    return { present: false, closingIndex: undefined };
+  }
+
+  const closingIndex = lines.findIndex(
+    (line, index) => index > 0 && /^---\s*$/.test(line),
+  );
+  return {
+    present: true,
+    closingIndex: closingIndex < 0 ? undefined : closingIndex,
+  };
 }
 
 /** Locate the exact delimiter contract used by general Renma metadata. */

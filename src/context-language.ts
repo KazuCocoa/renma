@@ -1,3 +1,6 @@
+import type { ParsedDocument } from "./types/metadata.js";
+import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
+
 const DATED_OR_VERSIONED_CONTEXT_LINE_PATTERN =
   /\b(?:\d{4}-\d{2}-\d{2}|v?\d+\.\d+(?:\.\d+)?)\b/i;
 const VAGUE_WORDING_PATTERNS: LinePattern[] = [
@@ -43,10 +46,7 @@ type LinePattern = {
   label: string;
 };
 
-type ContextDocument = {
-  artifact: { path: string };
-  lines: string[];
-};
+type ContextDocument = ParsedDocument;
 
 type ContextDiagnostic = {
   severity: "warning";
@@ -144,11 +144,8 @@ function markdownBodyLineIndexes(document: ContextDocument): number[] {
 }
 
 function frontmatterEndLine(document: ContextDocument): number {
-  if (document.lines[0]?.trim() !== "---") return 0;
-  const endIndex = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return endIndex < 0 ? 0 : endIndex + 1;
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  return frontmatter.closed ? frontmatter.bodyStartLine - 1 : 0;
 }
 
 function evidence(

@@ -53,7 +53,7 @@ id: context.testing.boundary-value-analysis
 owner: qa-platform
 status: stable
 when_to_use:
-  - TODO: define positive scope
+  - "TODO: define positive scope"
 when_not_to_use: TBD
 ---
 # Boundary Value Analysis

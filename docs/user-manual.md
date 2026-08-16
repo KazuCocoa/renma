@@ -434,8 +434,10 @@ transition rules for upload permission and human approval.
   `"false"`. The Discovery publication marker is one-state and accepts only
   exact `"true"`; `"false"` means invalid, not unpublished. Omission means
   unpublished.
-- Top-level non-Skill catalog/security lists accept ordinary YAML block lists
-  and the existing comma-separated scalar form. Top-level security booleans are
+- Top-level non-Skill catalog/security lists accept ordinary YAML block or flow
+  sequences and the existing comma-separated scalar form. Values first use
+  YAML 1.2 scalar semantics, so comments are not value text, quotes are
+  removed, and block scalars retain their semantic text. Top-level security booleans are
   case-insensitive `true`, `yes`, `allowed`, `allow`, or `1`, and `false`,
   `no`, `denied`, `deny`, or `0`. Prefer YAML `true`/`false` for new assets.
 - Dates must be real calendar dates in `YYYY-MM-DD` form. Review cycles support
@@ -485,6 +487,13 @@ value. Invalid recognized canonical security declarations fail closed and can
 retain restrictive inherited policy while preventing permissive inheritance;
 the [Security Policy Guide](security-policy.md) defines the field-specific
 precedence and diagnostic behavior.
+
+The same ambiguity rule applies to recognized non-Skill operational fields.
+Malformed YAML supplies no catalog, governance, Context Lens, or security
+values. Duplicate recognized keys supply no value for the duplicated field,
+and invalid local security declarations block permissive inheritance. Bounded
+raw-key detection may establish that malformed frontmatter declared a known
+security field, but it never recovers or authorizes the raw value.
 
 For example, suspend and later restore a Skill through two reviewed Git/PR
 changes:

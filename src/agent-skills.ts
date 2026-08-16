@@ -10,7 +10,7 @@ import type { CommandInvocation } from "./types/decision.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import { renmaCommand } from "./command-invocation.js";
 import {
-  parseAgentSkillFrontmatter,
+  ensureYamlFrontmatterForDocument,
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
@@ -165,7 +165,7 @@ export function validateAgentSkills(
 export function validateAgentSkill(
   document: ParsedDocument,
 ): AgentSkillValidationResult {
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   return validateAgentSkillFrontmatter(document, frontmatter);
 }
 
@@ -173,7 +173,7 @@ export function validateAgentSkill(
 export function inspectAgentSkill(
   document: ParsedDocument,
 ): AgentSkillInspection {
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
   return {
     frontmatter,
     validation: validateAgentSkillFrontmatter(document, frontmatter),
@@ -186,7 +186,7 @@ export function resolvedAgentSkillDescription(
 ): string | undefined {
   if (document.artifact.kind !== "skill") return undefined;
   return nonEmptyString(
-    parseAgentSkillFrontmatter(document.artifact.content).values[
+    ensureYamlFrontmatterForDocument(document).values[
       AGENT_SKILL_TOP_LEVEL_KEYS.description
     ],
   );

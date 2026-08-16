@@ -340,6 +340,131 @@ Review boundary context for ambiguity.
   assert.deepEqual(report.diagnostics, []);
 });
 
+test("Context Lens consumes quoted, flow, and block values from shared YAML state", () => {
+  const documents = [
+    parseDocument(
+      artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+---
+# Boundary Value Analysis
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "contexts/testing/spec-review-lens.md",
+        "context",
+        `---
+id: lens.testing.spec-review
+type: "context_lens"
+owner: qa-platform
+purpose: >
+  Review boundary-sensitive
+  specifications.
+applies_to: [context.testing.boundary-value-analysis]
+---
+# Spec Review Lens
+
+Apply the reviewed boundary interpretation.
+`,
+      ),
+    ),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+
+  assert.equal(report.summary.totalLensCount, 1);
+  assert.equal(report.summary.validLensCount, 1);
+  assert.deepEqual(report.summary.targetReferences, [
+    "context.testing.boundary-value-analysis",
+  ]);
+  assert.deepEqual(report.diagnostics, []);
+  assert.equal(
+    parseAssetMetadata(documents[1]!).metadata.purpose,
+    "Review boundary-sensitive specifications.",
+  );
+});
+
+test("Context Lens rejects malformed, duplicate, and non-exact Renma envelopes", () => {
+  const malformed = parseDocument(
+    artifact(
+      "lenses/malformed.md",
+      "context_lens",
+      `---
+id: lens.testing.malformed
+owner: qa-platform
+purpose: "unterminated
+---
+# Malformed Lens
+`,
+    ),
+  );
+  const duplicate = parseDocument(
+    artifact(
+      "lenses/duplicate-owner.md",
+      "context_lens",
+      `---
+id: lens.testing.duplicate-owner
+owner: first-team
+owner: second-team
+purpose: review
+applies_to: [context.testing.boundary-value-analysis]
+---
+# Duplicate Lens
+`,
+    ),
+  );
+  const nonExactClosing = parseDocument(
+    artifact(
+      "lenses/non-exact-closing.md",
+      "context_lens",
+      `---
+id: lens.testing.non-exact
+owner: qa-platform
+purpose: review
+applies_to: [context.testing.boundary-value-analysis]
+${"--- "}
+# Non-exact closing
+`,
+    ),
+  );
+  const documents = [malformed, duplicate, nonExactClosing];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+  const diagnosticsByPath = (path: string) =>
+    report.diagnostics.filter((diagnostic) => diagnostic.path === path);
+
+  assert.ok(
+    diagnosticsByPath("lenses/malformed.md").some(
+      (diagnostic) =>
+        diagnostic.code ===
+        CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER,
+    ),
+  );
+  assert.ok(
+    diagnosticsByPath("lenses/duplicate-owner.md").some(
+      (diagnostic) =>
+        diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER &&
+        diagnostic.evidence?.startLine === 4,
+    ),
+  );
+  assert.ok(
+    diagnosticsByPath("lenses/non-exact-closing.md").some(
+      (diagnostic) =>
+        diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.UNPARSEABLE_FRONTMATTER &&
+        diagnostic.message.includes("does not include a closing"),
+    ),
+  );
+  assert.deepEqual(nonExactClosing.metadata, {});
+});
+
 test("summarizeContextLensGovernance rejects resolved non-Context targets", () => {
   const context = artifact(
     "contexts/testing/test-quality.md",

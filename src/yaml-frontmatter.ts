@@ -2,6 +2,7 @@ import {
   isMap,
   isNode,
   isScalar,
+  isSeq,
   LineCounter,
   Parser,
   parseDocument as parseYamlDocument,
@@ -9,7 +10,15 @@ import {
   type Node,
   type Pair,
 } from "yaml";
+import {
+  agentSkillFrontmatterEnvelope,
+  frontmatterEnvelopeForArtifact,
+  renmaFrontmatterEnvelope,
+  type FrontmatterEnvelope,
+} from "./frontmatter-envelope.js";
 import { AGENT_SKILL_TOP_LEVEL_KEYS } from "./metadata-definitions.js";
+import type { Artifact } from "./types/artifact.js";
+import type { ParsedDocument } from "./types/metadata.js";
 
 export interface YamlFrontmatterError {
   code: string;
@@ -19,6 +28,13 @@ export interface YamlFrontmatterError {
 
 export interface YamlFrontmatterField {
   key: string;
+  value: unknown;
+  startLine: number;
+  endLine: number;
+  sequenceItems?: YamlFrontmatterSequenceItem[];
+}
+
+export interface YamlFrontmatterSequenceItem {
   value: unknown;
   startLine: number;
   endLine: number;
@@ -62,42 +78,66 @@ export type YamlFrontmatterCommentAnalysis = Pick<
   "commentsAnalyzable" | "comments"
 >;
 
-export interface AgentSkillFrontmatterEnvelope {
-  present: boolean;
-  closingIndex: number | undefined;
-}
-
-/**
- * Locate an Agent Skills YAML envelope without parsing its contents.
- *
- * The opening delimiter retains the established BOM and surrounding-whitespace
- * handling. A closing delimiter must begin in column one, but may retain
- * trailing whitespace. Indented delimiter-looking text therefore remains YAML
- * content, including inside block scalars.
- */
-export function agentSkillFrontmatterEnvelope(
-  lines: readonly string[],
-): AgentSkillFrontmatterEnvelope {
-  const firstLine = lines[0]?.replace(/^\uFEFF/, "").trim();
-  if (firstLine !== "---") {
-    return { present: false, closingIndex: undefined };
-  }
-
-  const closingIndex = lines.findIndex(
-    (line, index) => index > 0 && /^---\s*$/.test(line),
-  );
-  return {
-    present: true,
-    closingIndex: closingIndex < 0 ? undefined : closingIndex,
-  };
-}
+const frontmatterByDocument = new WeakMap<
+  ParsedDocument,
+  ParsedYamlFrontmatter
+>();
 
 /** Parse a focused YAML 1.2 frontmatter document without replacing the Markdown parser. */
 export function parseAgentSkillFrontmatter(
   content: string,
 ): ParsedYamlFrontmatter {
   const lines = content.split(/\r?\n/);
-  const envelope = agentSkillFrontmatterEnvelope(lines);
+  return parseFrontmatterEnvelope(lines, agentSkillFrontmatterEnvelope(lines));
+}
+
+/** Parse the exact general Renma frontmatter envelope as YAML 1.2. */
+export function parseRenmaFrontmatter(content: string): ParsedYamlFrontmatter {
+  const lines = content.split(/\r?\n/);
+  return parseFrontmatterEnvelope(lines, renmaFrontmatterEnvelope(lines));
+}
+
+/** Select one envelope contract from the discovered artifact role and parse it once. */
+export function parseFrontmatterForArtifact(
+  artifact: Pick<Artifact, "kind" | "content">,
+): ParsedYamlFrontmatter {
+  const lines = artifact.content.split(/\r?\n/);
+  return parseFrontmatterEnvelope(
+    lines,
+    frontmatterEnvelopeForArtifact(artifact, lines),
+  );
+}
+
+/** Retain the primary artifact-aware YAML parse as private document state. */
+export function attachYamlFrontmatter(
+  document: ParsedDocument,
+  frontmatter: ParsedYamlFrontmatter,
+): void {
+  frontmatterByDocument.set(document, frontmatter);
+}
+
+/** Return the primary artifact-aware YAML parse retained for this document. */
+export function yamlFrontmatterForDocument(
+  document: ParsedDocument,
+): ParsedYamlFrontmatter | undefined {
+  return frontmatterByDocument.get(document);
+}
+
+/** Recover artifact-aware YAML state only for independently reconstructed documents. */
+export function ensureYamlFrontmatterForDocument(
+  document: ParsedDocument,
+): ParsedYamlFrontmatter {
+  const attached = yamlFrontmatterForDocument(document);
+  if (attached !== undefined) return attached;
+  const frontmatter = parseFrontmatterForArtifact(document.artifact);
+  attachYamlFrontmatter(document, frontmatter);
+  return frontmatter;
+}
+
+function parseFrontmatterEnvelope(
+  lines: string[],
+  envelope: FrontmatterEnvelope,
+): ParsedYamlFrontmatter {
   if (!envelope.present) return emptyResult(false, false, 1);
   if (envelope.closingIndex === undefined) {
     return emptyResult(true, false, lines.length + 1);
@@ -142,26 +182,6 @@ export function parseAgentSkillFrontmatter(
     duplicateMetadataKeys: findDuplicates(metadataFields),
     errors,
   };
-}
-
-/**
- * Extract comments from a frontmatter envelope already proven closed by its
- * artifact-specific delimiter contract. The closing index is zero-based.
- */
-export function parseYamlFrontmatterComments(
-  content: string,
-  closingIndex: number,
-): YamlFrontmatterCommentAnalysis {
-  const lines = content.split(/\r?\n/);
-  if (
-    !Number.isSafeInteger(closingIndex) ||
-    closingIndex <= 0 ||
-    closingIndex >= lines.length
-  ) {
-    return { commentsAnalyzable: false, comments: [] };
-  }
-  return parseYamlFrontmatterSource(lines.slice(1, closingIndex).join("\n"))
-    .commentAnalysis;
 }
 
 function parseYamlFrontmatterSource(source: string) {
@@ -346,15 +366,37 @@ function mapFields(
         ? startLine - 1
         : lineCounter.linePos(Math.max(startOffset ?? 0, endOffset - 1)).line) +
       1;
+    const sequenceItems = isSeq(pair.value)
+      ? pair.value.items.map((item) => ({
+          value: nodeValue(document, item),
+          ...nodeLineRange(item, lineCounter, startLine),
+        }))
+      : undefined;
     return [
       {
         key,
         value: nodeValue(document, pair.value),
         startLine,
         endLine,
+        ...(sequenceItems ? { sequenceItems } : {}),
       },
     ];
   });
+}
+
+function nodeLineRange(
+  value: unknown,
+  lineCounter: LineCounter,
+  fallbackLine: number,
+): { startLine: number; endLine: number } {
+  const range = nodeRange(value);
+  if (range === undefined) {
+    return { startLine: fallbackLine, endLine: fallbackLine };
+  }
+  return {
+    startLine: lineCounter.linePos(range[0]).line + 1,
+    endLine: lineCounter.linePos(Math.max(range[0], range[2] - 1)).line + 1,
+  };
 }
 
 function scalarString(value: unknown): string | undefined {
@@ -368,7 +410,7 @@ function nodeValue(document: Document.Parsed, value: unknown): unknown {
   return isNode(value) ? value.toJS(document) : value;
 }
 
-function nodeRange(value: unknown): Node["range"] | undefined {
+function nodeRange(value: unknown): NonNullable<Node["range"]> | undefined {
   return isNode(value) ? (value.range ?? undefined) : undefined;
 }
 

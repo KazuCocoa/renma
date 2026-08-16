@@ -161,6 +161,16 @@ status: stable
 `,
     ),
     document(
+      "contexts/malformed-frontmatter.md",
+      "context",
+      `---
+id: context.malformed-frontmatter
+owner: "unterminated
+---
+# Malformed Frontmatter
+`,
+    ),
+    document(
       "contexts/source.md",
       "context",
       `---

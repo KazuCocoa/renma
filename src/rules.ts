@@ -24,7 +24,7 @@ import {
   tokenBudgetOverage,
   tokenBudgetSectionCandidates,
 } from "./token-budget-analysis.js";
-import { estimateTokens, markdownBody } from "./token-estimator.js";
+import { estimateTokens } from "./token-estimator.js";
 import type { Evidence, Finding, Severity } from "./types/diagnostics.js";
 import type {
   MetadataFieldEvidence,
@@ -43,6 +43,7 @@ import {
   type RenmaScaffoldPlaceholderMarker,
   type RenmaScaffoldPlaceholderName,
 } from "./scaffold-placeholders.js";
+import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -951,9 +952,7 @@ function shapeFindings(
       : (document.metadata.description ?? "");
   // Skill budgets measure only Markdown after frontmatter. Agent Skills loads
   // metadata separately, and Renma applies independent metadata budgets.
-  const bodyTokenCount = estimateTokens(
-    markdownBody(document.artifact.content),
-  );
+  const bodyTokenCount = estimateTokens(markdownBodyForDocument(document));
 
   if (!description) {
     findings.push(
@@ -1557,9 +1556,7 @@ function supportSharedContextCandidateFindings(
     return [];
   }
 
-  const estimatedTokens = estimateTokens(
-    markdownBody(document.artifact.content),
-  );
+  const estimatedTokens = estimateTokens(markdownBodyForDocument(document));
   if (
     document.lines.length < QUALITY.sharedSupportCandidate.minLines &&
     estimatedTokens < QUALITY.sharedSupportCandidate.minTokens
@@ -2572,17 +2569,18 @@ function localSupportPathReferences(
 }
 
 function markdownBodyLineIndexes(document: ParsedDocument): number[] {
-  if (document.lines[0]?.trim() !== "---") {
-    return document.lines.map((_, index) => index);
-  }
-
-  const frontmatterEnd = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  const bodyStart = frontmatterEnd >= 0 ? frontmatterEnd + 1 : 0;
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  const bodyStart = frontmatter.closed ? frontmatter.bodyStartLine - 1 : 0;
   return document.lines
     .map((_, index) => index)
     .filter((index) => index >= bodyStart);
+}
+
+function markdownBodyForDocument(document: ParsedDocument): string {
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  return frontmatter.closed
+    ? document.lines.slice(frontmatter.bodyStartLine - 1).join("\n")
+    : document.artifact.content;
 }
 
 function listMetadataValue(value: MetadataValue | undefined): string[] {
