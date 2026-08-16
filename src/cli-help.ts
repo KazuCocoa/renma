@@ -32,7 +32,7 @@ const OPTION_HELP = {
   strict: {
     flags: "--strict",
     description:
-      "Fail on threshold findings, invalid Agent Skills, error diagnostics, or blocking inspection-coverage issues.",
+      "Fail on threshold findings, invalid Agent Skills, error diagnostics, blocking inspection-coverage issues, or incomplete applicable security analysis.",
   },
   entrypoint: {
     flags: "--entrypoint <skill-id-or-SKILL.md-path>",
@@ -200,7 +200,8 @@ export const COMMAND_HELP = [
       "JSON output includes structured diagnostics, review bundles, and guidance intended for downstream tools and coding agents.",
       "Agent Skills migration commands use structured command and args fields in JSON; text display paths use POSIX shell quoting when needed.",
       "When repair constraints or verification steps are present, follow them instead of broadening the edit.",
-      "Without --strict, scan exits according to the active finding threshold. Strict mode additionally rejects invalid Agent Skills, error diagnostics, and blocking inspection-coverage issues; warnings and suppressed findings are not generally made fatal.",
+      "Without --strict, scan exits according to the active finding threshold. Strict mode additionally rejects invalid Agent Skills, error diagnostics, blocking inspection-coverage issues, and applicable YAML frontmatter-comment analysis that could not be completed safely.",
+      "Strict mode does not generally make warnings, suppressed findings, or other unsupported or non-analyzable security-analysis states fatal.",
       "Inspection coverage reports whether expected first-class agent-facing paths were actually inspected. Renma does not follow symlinks.",
     ],
     exitBehavior: [
