@@ -23,6 +23,7 @@ import {
   requiredMarkdownPosition as requiredPosition,
   type MarkdownNodeRecord,
   type MarkdownCodeBlockRecord,
+  type MarkdownLinkTargetRecord,
   type MarkdownSourceRange,
   type MarkdownSyntax,
 } from "./markdown-syntax.js";
@@ -98,6 +99,7 @@ const SAFETY_HEADING_RE =
 export class MarkdownSecurityView {
   readonly semanticUnits: MarkdownSemanticUnit[];
   readonly htmlComments: MarkdownHtmlComment[];
+  readonly resolvedDestinations: readonly MarkdownLinkTargetRecord[];
 
   private readonly sourceLines: string[];
   readonly bodyStartLine: number;
@@ -116,6 +118,8 @@ export class MarkdownSecurityView {
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
   private readonly codeBlocks: readonly MarkdownCodeBlockRecord[];
+  private readonly definitionLines = new Set<number>();
+  private readonly visibleLineProjections: readonly VisibleLineProjection[];
   private readonly eligibility: MarkdownSecurityEligibility;
   private readonly inlineCodeByUnit = new WeakMap<
     MarkdownSemanticUnit,
@@ -128,7 +132,17 @@ export class MarkdownSecurityView {
   ) {
     this.sourceLines = syntax.sourceLines;
     this.bodyStartLine = syntax.bodyStartLine;
+    this.resolvedDestinations = syntax.linkTargets;
     this.eligibility = eligibility;
+    for (const definition of syntax.definitions) {
+      for (
+        let line = definition.startLine;
+        line <= definition.endLine;
+        line += 1
+      ) {
+        this.definitionLines.add(line - 1);
+      }
+    }
     this.codeBlocks =
       eligibility === "raw-agent-visible" ? [] : syntax.codeBlocks;
     this.codeBlocksByNode = new Map(
@@ -143,6 +157,13 @@ export class MarkdownSecurityView {
       this.thematicBreaks = [];
       this.htmlComments = [];
       this.visibleLines = [...this.sourceLines];
+      this.visibleLineProjections = this.sourceLines.map((text) => ({
+        text,
+        sourceToVisibleOffsets: Array.from(
+          { length: text.length + 1 },
+          (_, index) => index,
+        ),
+      }));
       this.semanticUnits = this.sourceLines.some((line) => line.trim())
         ? [
             {
@@ -208,6 +229,7 @@ export class MarkdownSecurityView {
       this.sourceLines,
       this.htmlComments,
     );
+    this.visibleLineProjections = visibleLineProjections;
     this.visibleLines = visibleLineProjections.map(({ text }) => text);
 
     const paragraphCandidates = paragraphRecords.map((record) =>
@@ -277,6 +299,21 @@ export class MarkdownSecurityView {
 
   isNonOperationalExampleLine(lineIndex: number): boolean {
     return this.nonOperationalExampleLines.has(lineIndex);
+  }
+
+  isLinkDefinitionLine(lineIndex: number): boolean {
+    return this.definitionLines.has(lineIndex);
+  }
+
+  /** Map a one-based original source column into the visible projection. */
+  visibleOffsetForSourceColumn(lineIndex: number, column: number): number {
+    const projection = this.visibleLineProjections[lineIndex];
+    if (projection === undefined) return 0;
+    const sourceOffset = Math.max(
+      0,
+      Math.min(projection.sourceToVisibleOffsets.length - 1, column - 1),
+    );
+    return projection.sourceToVisibleOffsets[sourceOffset] ?? 0;
   }
 
   instructionLine(lineIndex: number): string {

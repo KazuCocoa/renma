@@ -19,6 +19,10 @@ import {
   type CanonicalSecurityOperationalField,
   type SecurityMetadataFieldDefinition,
 } from "./metadata-definitions.js";
+import {
+  corruptedSecurityIdentifier,
+  type SecurityIdentifierAuthority,
+} from "./security-identifier-integrity.js";
 
 export type { CanonicalSecurityOperationalField } from "./metadata-definitions.js";
 
@@ -62,6 +66,7 @@ export interface CanonicalSecurityMetadataIssue {
   startLine: number;
   endLine: number;
   snippet: string;
+  identifierAuthority?: SecurityIdentifierAuthority;
 }
 
 export interface CanonicalSecurityMetadataResult {
@@ -157,6 +162,20 @@ function parseRenmaSecurityMetadata(
       );
     }
     return { policy, issues };
+  }
+
+  for (const field of frontmatter.fields) {
+    const corruption = corruptedSecurityIdentifier(field.key, "non-skill");
+    if (corruption === undefined) continue;
+    recordRenmaSecurityIssue(
+      policy,
+      issues,
+      corruption.definition,
+      yamlSecurityFieldEvidence(lines, field),
+      corruptedIdentifierReason(corruption),
+      field.key,
+      corruption.authority,
+    );
   }
 
   for (const definition of SECURITY_METADATA_FIELD_DEFINITIONS) {
@@ -301,12 +320,15 @@ function recordRenmaSecurityIssue(
   definition: SecurityMetadataFieldDefinition,
   evidence: SecurityPolicyFieldEvidence,
   reason: string,
+  key = definition.nonSkillKey,
+  identifierAuthority?: SecurityIdentifierAuthority,
 ): void {
   issues.push({
-    key: definition.nonSkillKey,
+    key,
     operationalField: definition.operationalField,
     reason,
     ...evidence,
+    ...(identifierAuthority === undefined ? {} : { identifierAuthority }),
   });
   recordInvalidCanonicalPolicyField(
     policy,
@@ -414,6 +436,23 @@ export function validateCanonicalSecurityMetadata(
   const policy = emptySecurityPolicy();
   const issues: CanonicalSecurityMetadataIssue[] = [];
   for (const field of inspection.frontmatter.metadataFields) {
+    const corruption = corruptedSecurityIdentifier(field.key, "canonical");
+    if (corruption === undefined) continue;
+    const evidence = canonicalFieldEvidence(document, field);
+    issues.push({
+      key: field.key,
+      operationalField: corruption.definition.operationalField,
+      reason: corruptedIdentifierReason(corruption),
+      ...evidence,
+      identifierAuthority: corruption.authority,
+    });
+    recordInvalidCanonicalPolicyField(
+      policy,
+      corruption.definition.operationalField,
+      evidence,
+    );
+  }
+  for (const field of inspection.frontmatter.metadataFields) {
     const definition = CANONICAL_SECURITY_FIELDS.get(field.key);
     if (definition === undefined) continue;
 
@@ -493,6 +532,17 @@ export function validateCanonicalSecurityMetadata(
   }
 
   return { policy, issues };
+}
+
+function corruptedIdentifierReason(corruption: {
+  sanitizedKey: string;
+  removedCodePoints: readonly string[];
+}): string {
+  return `security identifier contains reviewed invisible/default-ignorable code point${
+    corruption.removedCodePoints.length === 1 ? "" : "s"
+  } ${corruption.removedCodePoints.join(", ")}; it resembles exact registered key ${JSON.stringify(
+    corruption.sanitizedKey,
+  )}, but its value was not interpreted`;
 }
 
 export function applySecurityConfig(

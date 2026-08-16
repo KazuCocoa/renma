@@ -5,6 +5,11 @@ import {
   logicalSkillDirectory,
 } from "./discovery.js";
 import { markdownBodyStartLineForArtifact } from "./frontmatter-envelope.js";
+import {
+  ensureMarkdownSyntaxForDocument,
+  type MarkdownLinkTargetRecord,
+  type MarkdownSourceColumnRange,
+} from "./markdown-syntax.js";
 import type { SkillParentIndex } from "./catalog.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -105,17 +110,24 @@ function analyzeStaticSupportReferences(
   const seenReferences = new Set<string>();
   const seenIncomplete = new Set<string>();
   const candidateSetIncomplete = incompleteCandidateDirectories.length > 0;
+  const markdownSyntax = ensureMarkdownSyntaxForDocument(document);
+  const markdownStructuralRanges = [
+    ...(markdownSyntax?.linkSyntax ?? []),
+    ...(markdownSyntax?.definitions ?? []),
+  ];
   const bodyStartIndex =
     markdownBodyStartLineForArtifact(document.artifact, document.lines) - 1;
   for (let index = 0; index < document.lines.length; index += 1) {
     const line = document.lines[index] ?? "";
-    const explicitValues: Array<{ raw: string; value: string }> = [];
+    const explicitValues: Array<{ raw: string; value: string }> =
+      markdownSyntax?.linkTargets
+        .filter((target) => target.startLine === index + 1)
+        .map((target) => ({ raw: target.source, value: target.target })) ?? [];
 
-    const markdownLinks = markdownLinkDestinations(line);
-    explicitValues.push(...markdownLinks);
-    let unquotedLine = maskRawMatches(
+    let unquotedLine = maskMarkdownStructuralEvidence(
       line,
-      markdownLinks.map((link) => link.raw),
+      index + 1,
+      markdownStructuralRanges,
     );
     const quotedMatches: string[] = [];
     for (const match of unquotedLine.matchAll(
@@ -147,7 +159,14 @@ function analyzeStaticSupportReferences(
     }
 
     if (index < bodyStartIndex) continue;
-    for (const token of basenameReferenceTokens(line)) {
+    const basenameTokens = [
+      ...markdownBasenameReferenceTokens(
+        markdownSyntax?.linkTargets ?? [],
+        index + 1,
+      ),
+      ...basenameReferenceTokens(unquotedLine),
+    ];
+    for (const token of basenameTokens) {
       if (explicitBasenames.has(token.basename)) continue;
       const paths = candidatesByBasename.get(token.basename) ?? [];
       if (paths.length > 1) continue;
@@ -208,6 +227,18 @@ function analyzeStaticSupportReferences(
         left.line - right.line || left.basename.localeCompare(right.basename),
     ),
   };
+}
+
+function markdownBasenameReferenceTokens(
+  destinations: readonly MarkdownLinkTargetRecord[],
+  lineNumber: number,
+): BasenameReferenceToken[] {
+  return destinations.flatMap((destination): BasenameReferenceToken[] => {
+    if (destination.startLine !== lineNumber) return [];
+    const basename = normalizePotentialBasename(destination.target);
+    if (basename === undefined || !isStaticSupportBasename(basename)) return [];
+    return [{ basename, raw: destination.source }];
+  });
 }
 
 /**
@@ -641,82 +672,6 @@ function normalizeStaticSupportReference(
   return { targetPath: normalized, relativePath };
 }
 
-function markdownLinkDestinations(
-  line: string,
-): Array<{ raw: string; value: string }> {
-  const destinations: Array<{ raw: string; value: string }> = [];
-  let searchFrom = 0;
-  while (searchFrom < line.length) {
-    const opener = line.indexOf("](", searchFrom);
-    if (opener < 0) break;
-    const rawStart = line.lastIndexOf("[", opener);
-    let cursor = opener + 2;
-    while (/\s/.test(line[cursor] ?? "")) cursor += 1;
-    const destinationStart = cursor;
-    let destination = "";
-
-    if (line[cursor] === "<") {
-      cursor += 1;
-      const valueStart = cursor;
-      while (cursor < line.length && line[cursor] !== ">") cursor += 1;
-      if (line[cursor] === ">") {
-        destination = line.slice(valueStart, cursor);
-        cursor += 1;
-      }
-    } else {
-      let nestedParentheses = 0;
-      while (cursor < line.length) {
-        const character = line[cursor] ?? "";
-        if (character === "\\" && cursor + 1 < line.length) {
-          cursor += 2;
-          continue;
-        }
-        if (character === "(") {
-          nestedParentheses += 1;
-        } else if (character === ")") {
-          if (nestedParentheses === 0) break;
-          nestedParentheses -= 1;
-        } else if (/\s/.test(character) && nestedParentheses === 0) {
-          break;
-        }
-        cursor += 1;
-      }
-      destination = line.slice(destinationStart, cursor);
-    }
-
-    let outerClose = cursor;
-    let titleParentheses = 0;
-    let quote: string | undefined;
-    while (outerClose < line.length) {
-      const character = line[outerClose] ?? "";
-      if (character === "\\") {
-        outerClose += 2;
-        continue;
-      }
-      if (quote) {
-        if (character === quote) quote = undefined;
-      } else if (character === '"' || character === "'") {
-        quote = character;
-      } else if (character === "(") {
-        titleParentheses += 1;
-      } else if (character === ")") {
-        if (titleParentheses === 0) break;
-        titleParentheses -= 1;
-      }
-      outerClose += 1;
-    }
-
-    if (destination && outerClose < line.length) {
-      destinations.push({
-        raw: line.slice(rawStart >= 0 ? rawStart : opener, outerClose + 1),
-        value: destination,
-      });
-    }
-    searchFrom = Math.max(outerClose + 1, opener + 2);
-  }
-  return destinations;
-}
-
 function stripUriSuffix(value: string): string {
   const query = value.indexOf("?");
   const fragment = value.indexOf("#");
@@ -740,16 +695,7 @@ function containsExactBasename(content: string, basename: string): boolean {
  */
 function basenameReferenceTokens(line: string): BasenameReferenceToken[] {
   const tokens = new Map<string, BasenameReferenceToken>();
-
-  const markdownLinks = markdownLinkDestinations(line);
-  for (const link of markdownLinks) {
-    addBasenameReferenceToken(tokens, line, link.value);
-  }
-
-  let bareLine = maskRawMatches(
-    line,
-    markdownLinks.map((link) => link.raw),
-  );
+  let bareLine = line;
   const quotedMatches: string[] = [];
   for (const match of bareLine.matchAll(/([`'"])(.*?)\1/g)) {
     addBasenameReferenceToken(tokens, line, match[2] ?? "");
@@ -771,6 +717,22 @@ function basenameReferenceTokens(line: string): BasenameReferenceToken[] {
       left.basename.localeCompare(right.basename) ||
       left.raw.localeCompare(right.raw),
   );
+}
+
+function maskMarkdownStructuralEvidence(
+  line: string,
+  lineNumber: number,
+  ranges: readonly MarkdownSourceColumnRange[],
+): string {
+  const masked = line.split("");
+  for (const range of ranges) {
+    if (lineNumber < range.startLine || lineNumber > range.endLine) continue;
+    const start = lineNumber === range.startLine ? range.startColumn - 1 : 0;
+    const end =
+      lineNumber === range.endLine ? range.endColumn - 1 : masked.length;
+    masked.fill(" ", Math.max(0, start), Math.min(masked.length, end));
+  }
+  return masked.join("");
 }
 
 function addBasenameReferenceToken(

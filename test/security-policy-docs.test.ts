@@ -23,6 +23,18 @@ test("Security Policy Guide documents the current Skill and non-Skill syntax bou
   assert.match(guide, /Invalid recognized canonical values fail\s+closed/);
   assert.match(
     guide,
+    /Markdown destination and repository-link semantics[\s\S]*shared Markdown parser[\s\S]*reference definition supplies target identity only/,
+  );
+  assert.match(
+    guide,
+    /unknown` Markdown only when[\s\S]*does\s+not grant new metadata or[\s\S]*security-policy authority/,
+  );
+  assert.match(
+    guide,
+    /Registered security-policy identifiers are a narrower ASCII trust boundary[\s\S]*never recovers or interprets the corrupted key's[\s\S]*value/,
+  );
+  assert.match(
+    guide,
     /field-level provenance[\s\S]*direct asset-local declaration change[\s\S]*owning Skill[\s\S]*reusable security profile[\s\S]*repository security\s+configuration/,
   );
   assert.match(

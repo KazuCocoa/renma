@@ -10,6 +10,7 @@ import type {
   DestinationAnalysis,
   LogicalShellCommand,
   NetworkDestination,
+  ResolvedDestinationEvidence,
   ShellProjection,
 } from "./types.js";
 
@@ -35,6 +36,7 @@ export type {
   LogicalShellCommand,
   NetworkDestination,
   OperationalDestination,
+  ResolvedDestinationEvidence,
   ShellProjection,
   SourceSpan,
 } from "./types.js";

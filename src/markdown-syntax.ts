@@ -1,11 +1,14 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type {
   Code,
+  Definition as MdastDefinition,
   Heading as MdastHeading,
   Html,
   Image as MdastImage,
+  ImageReference as MdastImageReference,
   InlineCode,
   Link as MdastLink,
+  LinkReference as MdastLinkReference,
   Nodes,
   Parents,
   Root,
@@ -45,21 +48,39 @@ export interface MarkdownHeadingRecord extends MarkdownSourceRange {
   text: string;
 }
 
-export interface MarkdownLinkRecord extends MarkdownSourceRange {
-  kind: "link";
-  node: MdastLink;
+interface MarkdownResolvedDestinationBase extends MarkdownSourceColumnRange {
   text: string;
   target: string;
+  source: string;
+  definitionStartLine?: number;
+  definitionEndLine?: number;
 }
 
-export interface MarkdownImageRecord extends MarkdownSourceRange {
+export interface MarkdownLinkRecord extends MarkdownResolvedDestinationBase {
+  kind: "link";
+  node: MdastLink | MdastLinkReference;
+}
+
+export interface MarkdownImageRecord extends MarkdownResolvedDestinationBase {
   kind: "image";
-  node: MdastImage;
-  text: string;
-  target: string;
+  node: MdastImage | MdastImageReference;
 }
 
 export type MarkdownLinkTargetRecord = MarkdownLinkRecord | MarkdownImageRecord;
+
+/** One parser-recognized link/image use, including unresolved references. */
+export interface MarkdownLinkSyntaxRecord extends MarkdownSourceColumnRange {
+  node: MdastLink | MdastLinkReference | MdastImage | MdastImageReference;
+  source: string;
+}
+
+/** One parser-recognized definition. Definitions identify targets but are not uses. */
+export interface MarkdownDefinitionRecord extends MarkdownSourceColumnRange {
+  node: MdastDefinition;
+  identifier: string;
+  target: string;
+  source: string;
+}
 
 export interface MarkdownCodeBlockRecord extends MarkdownSourceRange {
   node: Code;
@@ -86,6 +107,8 @@ export interface MarkdownSyntax {
   links: MarkdownLinkRecord[];
   images: MarkdownImageRecord[];
   linkTargets: MarkdownLinkTargetRecord[];
+  linkSyntax: MarkdownLinkSyntaxRecord[];
+  definitions: MarkdownDefinitionRecord[];
   codeBlocks: MarkdownCodeBlockRecord[];
 }
 
@@ -132,15 +155,59 @@ export function parseMarkdownSyntax(
       },
     ];
   });
+  const definitions = records.flatMap((record): MarkdownDefinitionRecord[] => {
+    if (record.node.type !== "definition") return [];
+    return [
+      {
+        node: record.node,
+        ...markdownSourceColumnRange(record.node, resolvedBodyStartLine),
+        identifier: record.node.identifier,
+        target: record.node.url,
+        source: markdownNodeSource(
+          record.node,
+          sourceLines,
+          resolvedBodyStartLine,
+        ),
+      },
+    ];
+  });
+  // CommonMark resolves duplicate definitions to the first definition. mdast
+  // owns identifier normalization and reference-kind recognition; this shared
+  // projection only joins those parser-owned identities.
+  const definitionByIdentifier = new Map<string, MarkdownDefinitionRecord>();
+  for (const definition of definitions) {
+    if (!definitionByIdentifier.has(definition.identifier)) {
+      definitionByIdentifier.set(definition.identifier, definition);
+    }
+  }
+  const linkSyntax = records.flatMap((record): MarkdownLinkSyntaxRecord[] => {
+    if (!isMarkdownLinkSyntaxNode(record.node)) return [];
+    return [
+      {
+        node: record.node,
+        ...markdownSourceColumnRange(record.node, resolvedBodyStartLine),
+        source: markdownNodeSource(
+          record.node,
+          sourceLines,
+          resolvedBodyStartLine,
+        ),
+      },
+    ];
+  });
   const linkTargets = records.flatMap((record): MarkdownLinkTargetRecord[] => {
     if (record.node.type === "link") {
       return [
         {
           kind: "link",
           node: record.node,
-          ...markdownSourceRange(record.node, resolvedBodyStartLine),
+          ...markdownSourceColumnRange(record.node, resolvedBodyStartLine),
           text: markdownNodeText(record.node),
           target: record.node.url,
+          source: markdownNodeSource(
+            record.node,
+            sourceLines,
+            resolvedBodyStartLine,
+          ),
         },
       ];
     }
@@ -149,9 +216,54 @@ export function parseMarkdownSyntax(
         {
           kind: "image",
           node: record.node,
-          ...markdownSourceRange(record.node, resolvedBodyStartLine),
+          ...markdownSourceColumnRange(record.node, resolvedBodyStartLine),
           text: record.node.alt ?? "",
           target: record.node.url,
+          source: markdownNodeSource(
+            record.node,
+            sourceLines,
+            resolvedBodyStartLine,
+          ),
+        },
+      ];
+    }
+    if (record.node.type === "linkReference") {
+      const definition = definitionByIdentifier.get(record.node.identifier);
+      if (definition === undefined) return [];
+      return [
+        {
+          kind: "link",
+          node: record.node,
+          ...markdownSourceColumnRange(record.node, resolvedBodyStartLine),
+          text: markdownNodeText(record.node),
+          target: definition.target,
+          source: markdownNodeSource(
+            record.node,
+            sourceLines,
+            resolvedBodyStartLine,
+          ),
+          definitionStartLine: definition.startLine,
+          definitionEndLine: definition.endLine,
+        },
+      ];
+    }
+    if (record.node.type === "imageReference") {
+      const definition = definitionByIdentifier.get(record.node.identifier);
+      if (definition === undefined) return [];
+      return [
+        {
+          kind: "image",
+          node: record.node,
+          ...markdownSourceColumnRange(record.node, resolvedBodyStartLine),
+          text: record.node.alt ?? "",
+          target: definition.target,
+          source: markdownNodeSource(
+            record.node,
+            sourceLines,
+            resolvedBodyStartLine,
+          ),
+          definitionStartLine: definition.startLine,
+          definitionEndLine: definition.endLine,
         },
       ];
     }
@@ -177,6 +289,8 @@ export function parseMarkdownSyntax(
     links,
     images,
     linkTargets,
+    linkSyntax,
+    definitions,
     codeBlocks,
   };
 }
@@ -255,6 +369,25 @@ export function markdownSourceColumnRange(
   };
 }
 
+/** Return the exact original source occupied by one positioned mdast node. */
+export function markdownNodeSource(
+  node: { position?: Position | undefined },
+  sourceLines: readonly string[],
+  bodyStartLine: number,
+): string {
+  const range = markdownSourceColumnRange(node, bodyStartLine);
+  const lines = sourceLines.slice(range.startLine - 1, range.endLine);
+  if (lines.length === 0) return "";
+  lines[0] = (lines[0] ?? "").slice(range.startColumn - 1);
+  const lastIndex = lines.length - 1;
+  if (range.startLine === range.endLine) {
+    lines[0] = (lines[0] ?? "").slice(0, range.endColumn - range.startColumn);
+  } else {
+    lines[lastIndex] = (lines[lastIndex] ?? "").slice(0, range.endColumn - 1);
+  }
+  return lines.join("\n");
+}
+
 /** Collect descendant text without exposing mdast details to ordinary callers. */
 export function markdownNodeText(node: Nodes | Parents): string {
   if (node.type === "text" || node.type === "inlineCode") {
@@ -264,9 +397,22 @@ export function markdownNodeText(node: Nodes | Parents): string {
     const value = (node as Html).value;
     return value.trimStart().startsWith("<!--") ? "" : value;
   }
-  if (node.type === "image") return node.alt ?? "";
+  if (node.type === "image" || node.type === "imageReference") {
+    return node.alt ?? "";
+  }
   if ("children" in node) return node.children.map(markdownNodeText).join("");
   return "";
+}
+
+function isMarkdownLinkSyntaxNode(
+  node: Nodes,
+): node is MdastLink | MdastLinkReference | MdastImage | MdastImageReference {
+  return (
+    node.type === "link" ||
+    node.type === "linkReference" ||
+    node.type === "image" ||
+    node.type === "imageReference"
+  );
 }
 
 /** Traverse the shared tree once and retain parent/ancestor context. */

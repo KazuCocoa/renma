@@ -267,7 +267,12 @@ id: arbitrary
   );
   assert.equal(
     coverageArtifact(coverage, "README.md").analyses.yamlFrontmatterComments,
-    "not-applicable",
+    "analyzed",
+  );
+  assert.equal(
+    coverageArtifact(coverage, "README.md").surfaceCounts
+      ?.yamlFrontmatterComments,
+    1,
   );
   assert.ok(
     result.findings.some(
@@ -285,10 +290,17 @@ id: arbitrary
         finding.details?.matchedDiagnosticId === "SEC-DESTRUCTIVE-COMMAND",
     ),
   );
+  assert.ok(
+    result.findings.some(
+      (finding) =>
+        finding.id === "SEC-HIDDEN-FRONTMATTER-INSTRUCTION" &&
+        finding.evidence.path === "README.md" &&
+        finding.evidence.startLine === 3,
+    ),
+  );
   for (const artifactPath of [
     "contexts/malformed.md",
     "contexts/unclosed.md",
-    "README.md",
   ]) {
     assert.equal(
       result.findings.some(
@@ -353,7 +365,7 @@ id: arbitrary
   assert.equal(
     coverageArtifact(result.securityAnalysisCoverage.artifacts, "README.md")
       .analyses.yamlFrontmatterComments,
-    "not-applicable",
+    "analyzed",
   );
   assert.equal(
     strict.matches.some(

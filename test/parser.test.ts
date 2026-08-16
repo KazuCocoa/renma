@@ -230,16 +230,23 @@ test("links retain image targets while mdast keeps node kinds distinct", () => {
   assert.equal(syntax?.images[0]?.text, "diagram");
 });
 
-test("reference-style target resolution remains intentionally deferred", () => {
+test("reference-style targets resolve through parser-owned definition identities", () => {
   const document = parseDocument(
-    artifact(`[guide][guide-ref] and ![diagram][diagram-ref]
+    artifact(`[guide][guide-ref], [collapsed][], [shortcut], and ![diagram][diagram-ref]
 
 [guide-ref]: docs/guide.md
+[collapsed]: docs/collapsed.md
+[shortcut]: docs/shortcut.md
 [diagram-ref]: assets/flow.png
 `),
   );
 
-  assert.deepEqual(document.links, []);
+  assert.deepEqual(document.links, [
+    { text: "guide", target: "docs/guide.md", line: 1 },
+    { text: "collapsed", target: "docs/collapsed.md", line: 1 },
+    { text: "shortcut", target: "docs/shortcut.md", line: 1 },
+    { text: "diagram", target: "assets/flow.png", line: 1 },
+  ]);
 });
 
 test("outline headings remain top-level and exclude quoted container headings", () => {

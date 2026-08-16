@@ -95,6 +95,17 @@ content. Intentional cases use the existing narrowly path-scoped suppression
 with a documented reason, and intentional bidirectional formatting requires
 human confirmation.
 
+Registered security-policy identifiers are a narrower ASCII trust boundary.
+For canonical `metadata.renma.*` security keys and registered non-Skill
+security keys, Renma compares a non-exact parsed YAML key only after removing a
+reviewed set of invisible/default-ignorable code points. If and only if that
+bounded comparison becomes an exact registered identifier, Renma rejects the
+source key as a corrupted declaration, records the operational field in
+`invalidDeclared`, and emits the applicable High invalid-policy finding with
+the exact source evidence. It never recovers or interprets the corrupted key's
+value. Ordinary multilingual keys, normalization differences, confusables,
+and visible spelling mistakes do not enter this comparison.
+
 Specialized scanners can complement this bounded policy and instruction
 analysis without becoming Renma dependencies or Renma findings. Renma does not
 bundle, require, or invoke SkillSpector or any other external scanner. See
@@ -417,6 +428,16 @@ host`. A transport-less IPv4 literal or host with a port or path is lexically
 unambiguous but still requires an operational action in the same clause;
 direct `fetch` and `download` forms are accepted for these strong candidates.
 Prefer an explicit URL when prose remains ambiguous.
+
+Markdown destination and repository-link semantics used by security and static
+support analysis come from the shared Markdown parser whenever it has
+deterministic target evidence. Inline links, parser-recognized autolinks, and
+resolved full, collapsed, or shortcut reference links therefore carry the same
+target identity. The positioned link use supplies operational source evidence;
+a reference definition supplies target identity only and is not itself an
+instruction or static-support edge. Missing reference definitions are not
+inferred, and static support still accepts only Skill-local targets under
+`references/`, `scripts/`, `assets/`, `profiles/`, or `examples/`.
 
 Repository-relative and absolute local paths, Windows drive paths, unlisted
 bare and hidden filenames, dotted Renma Skill, Context, or lens IDs, and command
@@ -805,19 +826,26 @@ and inert. This comment projection is separate from the raw hidden-Unicode
 pass, which continues to inspect every discovered UTF-8 text artifact before
 Markdown filtering.
 
-Closed, successfully parsed Skill frontmatter and eligible known non-Skill
-Markdown frontmatter receive a parallel, additive projection for syntactic YAML
-comments. Skills retain the Agent Skills envelope rules; non-Skills retain the
-exact Renma `---` envelope rules. A recognized instruction emits
+Closed, successfully parsed Skill frontmatter and eligible non-Skill Markdown
+frontmatter receive a parallel, additive projection for syntactic YAML comments.
+Skills retain the Agent Skills envelope rules; non-Skills retain the exact
+Renma `---` envelope rules. This includes `unknown` Markdown only when that same
+exact non-Skill parser recognizes the envelope; this comment eligibility does
+not grant new metadata or security-policy authority to the artifact. A
+recognized instruction emits
 `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`, preserves the underlying diagnostic ID,
 and maps evidence back to the exact full-line or inline comment span. Comment
 tokens come from the YAML parser's concrete syntax tree: quoted `#` text and
 block-scalar content are not comments, while malformed or unclosed frontmatter
-is not heuristically recovered. Adjacent full-line comments are projected as a
-single deterministic block so the existing bounded semantic rules can
-correlate their text. Arbitrary `unknown` repository Markdown does not gain
-this analysis merely from containing delimiters. The outer YAML comment is the
-eligibility boundary: inner Markdown blockquotes, HTML-comment syntax, code
+is not heuristically recovered. If the exact envelope is present but cannot be
+safely analyzed, coverage is `not-analyzable`, including for `unknown`
+Markdown; delimiter-looking noncanonical text remains `not-applicable`.
+Adjacent full-line comments are projected as a single deterministic block so
+the existing bounded semantic rules can correlate their text. In short, if
+Renma excludes an exact parser-owned frontmatter envelope from Markdown body
+analysis, YAML comments in that envelope remain accountable to security
+coverage. The outer YAML comment is the eligibility boundary: inner Markdown
+blockquotes, HTML-comment syntax, code
 presentation, and example labels cannot hide its raw text from this
 projection. The comment projection also accepts no policy authority from its
 own text: a policy-looking prefix is still analyzed as raw evidence and cannot
@@ -1136,8 +1164,8 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, ASCII-token-internal ZWJ/ZWNJ, or consecutive Variation Selector run. | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
 | `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`      | A syntactic YAML frontmatter comment contains a bounded recognized security-sensitive operational instruction even though metadata consumers ignore it. | Remove the hidden instruction, or move intentional agent-facing guidance into visible Markdown with applicable policy and safeguards.                                                                                                                                                                                                                                       | Eligible agent-facing YAML frontmatter comment |
 | `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`      | A raw HTML comment contains a bounded recognized security-sensitive operational instruction even though rendered Markdown hides it. | Remove the hidden instruction, or move intentional agent-facing guidance into visible Markdown with applicable policy and safeguards.                                                                                                                                                                                                                                       | Agent-facing Markdown body                 |
-| `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding.                                                        | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value.                                                                                                                                                                                                                                                    | Skill metadata                             |
-| `SEC-INVALID-RENMA-POLICY-METADATA`       | A recognized non-Skill policy declaration is malformed, duplicated, ambiguous, or has an unsupported YAML value shape.              | Repair the exact Renma YAML declaration only after confirming intent; do not recover a value from raw lines or guess a permissive replacement.                                                                                                                                                                                                                               | Non-Skill metadata                         |
+| `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding, or an invisible/default-ignorable character corrupts the registered key. | Confirm the intended policy, then repair the exact key and documented string encoding; do not recover the corrupted value or guess a permissive replacement.                                                                                                                                                                                                                 | Skill metadata                             |
+| `SEC-INVALID-RENMA-POLICY-METADATA`       | A recognized non-Skill policy declaration is malformed, duplicated, ambiguous, has an unsupported YAML value shape, or has an invisibly corrupted registered key. | Repair the exact Renma YAML declaration only after confirming intent; do not recover a value from the corrupted key or raw lines, and do not guess a permissive replacement.                                                                                                                                                                                                 | Non-Skill metadata                         |
 | `SEC-MISSING-POLICY-METADATA`             | Sensitive instructions lack a declared policy.                                                                                       | Add local policy fields or select a configured security profile using the syntax for that asset kind.                                                                                                                                                                                                                                                                       | Metadata                                   |
 | `SEC-INSTRUCTION-VIOLATES-POLICY`         | Agent-facing text asks for behavior denied by policy.                                                                                 | Rewrite the instruction or adjust policy only after review.                                                                                                                                                                                                                                                                                                                 | Body, canonical Skill `description`, or metadata |
 | `SEC-MISSING-HUMAN-APPROVAL-GUARD`        | A sensitive action lacks nearby approval wording.                                                                                    | Add explicit human approval close to the action.                                                                                                                                                                                                                                                                                                                            | Body or canonical Skill `description`      |

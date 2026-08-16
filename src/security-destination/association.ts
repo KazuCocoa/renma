@@ -13,6 +13,7 @@ import type {
   DestinationCandidate,
   NetworkDestination,
   OperationalDestination,
+  ResolvedDestinationEvidence,
   ShellProjection,
 } from "./types.js";
 import {
@@ -55,17 +56,35 @@ const CLOUD_UPLOAD_RE = new RegExp(
   "i",
 );
 
-export function analyzeDestinations(input: string): DestinationAnalysis {
+export function analyzeDestinations(
+  input: string,
+  resolvedDestinations: readonly ResolvedDestinationEvidence[] = [],
+): DestinationAnalysis {
   const shellProjection = projectShellContinuations(input);
-  return analyzeDestinationsFromProjection(input, shellProjection);
+  return analyzeDestinationsFromProjection(
+    input,
+    shellProjection,
+    resolvedDestinations,
+  );
 }
 
 export function analyzeDestinationsFromProjection(
   originalInput: string,
   shellProjection: ShellProjection,
+  resolvedDestinations: readonly ResolvedDestinationEvidence[] = [],
 ): DestinationAnalysis {
   validateShellProjection(originalInput, shellProjection);
-  const candidates = classifyDestinationCandidates(shellProjection.projection);
+  const projectedResolvedDestinations = resolvedDestinations.map((evidence) =>
+    projectResolvedDestinationEvidence(
+      evidence,
+      shellProjection,
+      originalInput.length,
+    ),
+  );
+  const candidates = classifyDestinationCandidates(
+    shellProjection.projection,
+    projectedResolvedDestinations,
+  );
   const maskedProjection = maskDestinationCandidates(
     shellProjection.projection,
     candidates,
@@ -87,6 +106,48 @@ export function analyzeDestinationsFromProjection(
       ...associatedOperationalDestinations(context, "upload"),
     ],
   };
+}
+
+function projectResolvedDestinationEvidence(
+  evidence: ResolvedDestinationEvidence,
+  projection: ShellProjection,
+  inputLength: number,
+): ResolvedDestinationEvidence {
+  if (
+    !Number.isSafeInteger(evidence.startOffset) ||
+    !Number.isSafeInteger(evidence.endOffset) ||
+    evidence.startOffset < 0 ||
+    evidence.endOffset <= evidence.startOffset ||
+    evidence.endOffset > inputLength
+  ) {
+    throw new RangeError(
+      "Resolved destination evidence falls outside original input",
+    );
+  }
+  const startOffset = projection.sourceOffsetByProjectionOffset.findIndex(
+    (sourceOffset) => sourceOffset >= evidence.startOffset,
+  );
+  if (startOffset < 0) {
+    throw new RangeError(
+      "Resolved destination evidence is absent from destination projection",
+    );
+  }
+  let endOffset = projection.sourceOffsetByProjectionOffset.length;
+  for (let index = startOffset; index < endOffset; index += 1) {
+    if (
+      (projection.sourceOffsetByProjectionOffset[index] ?? Infinity) >=
+      evidence.endOffset
+    ) {
+      endOffset = index;
+      break;
+    }
+  }
+  if (endOffset <= startOffset) {
+    throw new RangeError(
+      "Resolved destination evidence is absent from destination projection",
+    );
+  }
+  return { target: evidence.target, startOffset, endOffset };
 }
 
 function validateShellProjection(

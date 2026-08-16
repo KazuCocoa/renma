@@ -123,6 +123,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "model.ts",
         "quality-profile.ts",
         "scaffold-placeholders.ts",
+        "security-identifier-integrity.ts",
         "skill-path-contract.ts",
         "types.ts",
       ],
