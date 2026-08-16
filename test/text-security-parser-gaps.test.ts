@@ -471,9 +471,17 @@ test("exact unknown frontmatter comment surfaces have accurate coverage", () => 
         finding.evidence.path === "COMMENTED.md",
     ),
   );
+  assert.equal(state("BOM.md"), "analyzed");
+  assert.ok(
+    analysis.findings.some(
+      (finding) =>
+        finding.id === "SEC-HIDDEN-FRONTMATTER-INSTRUCTION" &&
+        finding.evidence.path === "BOM.md",
+    ),
+  );
   assert.equal(state("MALFORMED.md"), "not-analyzable");
   assert.equal(state("UNCLOSED.md"), "not-analyzable");
-  for (const path of ["SPACED.md", "INDENTED.md", "BOM.md"]) {
+  for (const path of ["SPACED.md", "INDENTED.md"]) {
     assert.equal(state(path), "not-applicable", path);
   }
 });
@@ -533,8 +541,7 @@ external_upload_allowed: false
   assert.equal(clean.policy.externalUploadAllowed, false);
   assert.equal(clean.issues.length, 0);
 
-  const bomOpener = "\uFEFF---";
-  const bomArtifact = contextArtifact(`${bomOpener}
+  const bomArtifact = contextArtifact(`\uFEFF---
 external_upload_allowed: false
 security_profile: permissive
 ---
@@ -556,19 +563,61 @@ security_profile: permissive
       },
     },
   });
-  const bomInvalid = securityDiagnosticFindings([bomArtifact]).find(
-    (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+  assert.equal(bomResolution.policy.externalUploadAllowed, false);
+  assert.equal(bomResolution.policy.securityProfile, "permissive");
+  assert.ok(bomResolution.policy.declared.has("externalUploadAllowed"));
+  assert.ok(bomResolution.policy.declared.has("securityProfile"));
+  assert.equal(bomResolution.policy.invalidDeclared.size, 0);
+  assert.equal(bomEffective.externalUploadAllowed, false);
+  assert.equal(bomResolution.issues.length, 0);
+  assert.equal(
+    securityDiagnosticFindings([bomArtifact]).some(
+      (finding) => finding.id === "SEC-INVALID-RENMA-POLICY-METADATA",
+    ),
+    false,
   );
 
-  assert.equal(bomResolution.policy.externalUploadAllowed, undefined);
-  assert.equal(bomResolution.policy.securityProfile, undefined);
-  assert.equal(bomResolution.policy.declared.size, 0);
-  assert.ok(bomResolution.policy.invalidDeclared.has("externalUploadAllowed"));
-  assert.ok(bomResolution.policy.invalidDeclared.has("securityProfile"));
-  assert.equal(bomEffective.externalUploadAllowed, undefined);
-  assert.equal(bomInvalid?.severity, "high");
-  assert.equal(bomResolution.issues[0]?.snippet, bomOpener);
-  assert.equal(bomInvalid?.evidence.snippet, "---");
+  const bomThenCorrupted = contextArtifact(`\uFEFF---\u200e
+external_upload_allowed: false
+---
+# Review
+`);
+  const bomThenCorruptedResolution =
+    resolveOperationalSecurityPolicy(bomThenCorrupted);
+  assert.equal(
+    bomThenCorruptedResolution.policy.externalUploadAllowed,
+    undefined,
+  );
+  assert.ok(
+    bomThenCorruptedResolution.policy.invalidDeclared.has(
+      "externalUploadAllowed",
+    ),
+  );
+  assert.ok(
+    securityDiagnosticFindings([bomThenCorrupted]).some(
+      (finding) =>
+        finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
+        finding.severity === "high",
+    ),
+  );
+
+  const doubleBomArtifact = contextArtifact(`\uFEFF\uFEFF---
+external_upload_allowed: false
+---
+# Review
+`);
+  const doubleBomResolution = resolveOperationalSecurityPolicy(doubleBomArtifact);
+  assert.equal(doubleBomResolution.policy.externalUploadAllowed, undefined);
+  assert.ok(
+    doubleBomResolution.policy.invalidDeclared.has("externalUploadAllowed"),
+  );
+  assert.ok(
+    securityDiagnosticFindings([doubleBomArtifact]).some(
+      (finding) =>
+        finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
+        finding.severity === "high",
+    ),
+  );
 
   for (const firstLine of [" ---", "--- "]) {
     const artifact = contextArtifact(`${firstLine}
@@ -702,8 +751,8 @@ external_upload_allowed: false
     );
   }
   await fixture.write(
-    "contexts/corrupted-opener-bom.md",
-    `\uFEFF---
+    "contexts/corrupted-opener-double-bom.md",
+    `\uFEFF\uFEFF---
 external_upload_allowed: false
 ---
 # Corrupted
@@ -739,7 +788,7 @@ metad\u200eata:
       (finding) =>
         finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
         finding.severity === "high" &&
-        finding.evidence.path === "contexts/corrupted-opener-bom.md",
+        finding.evidence.path === "contexts/corrupted-opener-double-bom.md",
     ),
   );
   assert.ok(
