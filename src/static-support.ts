@@ -146,14 +146,13 @@ function analyzeStaticSupportReferences(
       addReference(normalized, value.raw, index + 1);
     }
 
+    if (index < bodyStartIndex) continue;
     for (const token of basenameReferenceTokens(line)) {
       if (explicitBasenames.has(token.basename)) continue;
       const paths = candidatesByBasename.get(token.basename) ?? [];
       if (paths.length > 1) continue;
       if (candidateSetIncomplete) {
-        if (index >= bodyStartIndex) {
-          addIncompleteBasename(token, index + 1);
-        }
+        addIncompleteBasename(token, index + 1);
         continue;
       }
       if (paths.length !== 1) continue;

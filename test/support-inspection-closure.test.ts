@@ -156,6 +156,129 @@ test("unquoted conventional extensionless basenames retain normal and hidden par
   );
 });
 
+test("Skill frontmatter basenames do not authorize support reachability", async (t) => {
+  const boundaryPath = "skills/demo/references";
+  const downstreamPath = `${boundaryPath}/downstream.txt`;
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.write(
+    "skills/demo/SKILL.md",
+    [
+      "---",
+      "name: demo",
+      "description: Review runtime.txt. Use when support inspection is requested.",
+      "metadata:",
+      "  renma.owner: security",
+      "---",
+      "# Demo",
+      "",
+      "Review repository state before continuing.",
+      "",
+    ].join("\n"),
+  );
+  await fixture.write(
+    SUPPORT_PATH,
+    "Read `references/downstream.txt` before continuing.\n",
+  );
+  await fixture.write(downstreamPath, UNSAFE_INSTRUCTION);
+
+  const normalSnapshot = await collectRepositorySnapshot(fixture.root, {
+    failOn: "high",
+  });
+  const normal = scanFromRepositorySnapshot(normalSnapshot);
+
+  assert.equal(normal.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(!normal.inspectionCoverage.inspectedPaths.includes(SUPPORT_PATH));
+  assert.ok(!normal.inspectionCoverage.inspectedPaths.includes(downstreamPath));
+  assert.equal(
+    normalSnapshot.catalog.dependencies.some(
+      (dependency) =>
+        dependency.kind === "statically_references" &&
+        dependency.sourcePath === "skills/demo/SKILL.md",
+    ),
+    false,
+  );
+  assert.equal(
+    normal.executableSurfaceInventory?.surfaces.some(
+      (surface) =>
+        surface.path === SUPPORT_PATH || surface.path === downstreamPath,
+    ),
+    false,
+  );
+  for (const targetPath of [SUPPORT_PATH, downstreamPath]) {
+    assert.notEqual(
+      normal.securityAnalysisCoverage.artifacts.find(
+        (artifact) => artifact.path === targetPath,
+      )?.analyses.semanticInstructions,
+      "analyzed",
+    );
+  }
+
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  const hidden = await scan(fixture.root, { failOn: "high" });
+
+  assert.equal(hidden.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(!hidden.inspectionCoverage.inspectedPaths.includes(downstreamPath));
+  assert.equal(
+    hidden.securityAnalysisCoverage.artifacts.some(
+      (artifact) =>
+        artifact.path === SUPPORT_PATH || artifact.path === downstreamPath,
+    ),
+    false,
+  );
+  assert.equal(
+    evaluateStrictScan(hidden).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+    false,
+  );
+});
+
+test("an explicit Skill frontmatter support path retains exact authority", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", SUPPORT_PATH],
+  });
+  await fixture.write(
+    "skills/demo/SKILL.md",
+    [
+      "---",
+      "name: demo",
+      "description: Review `references/runtime.txt`. Use when support inspection is requested.",
+      "metadata:",
+      "  renma.owner: security",
+      "---",
+      "# Demo",
+      "",
+      "Review repository state before continuing.",
+      "",
+    ].join("\n"),
+  );
+  await fixture.write(SUPPORT_PATH, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.deepEqual(
+    result.inspectionCoverage.blockingIssues.map(
+      ({ path, state, scope, details }) => ({
+        path,
+        state,
+        scope,
+        sourceLine: details?.sourceLine,
+      }),
+    ),
+    [
+      {
+        path: SUPPORT_PATH,
+        state: "excluded",
+        scope: "exact",
+        sourceLine: 3,
+      },
+    ],
+  );
+});
+
 test("an excluded unique basename-only support target remains exact blocking evidence without content access", async (t) => {
   const fixture = await referencedSupportFixture(
     t,
@@ -983,33 +1106,114 @@ test("non-Skill delimiter-looking whitespace remains body text for incomplete ba
   assert.equal(issue?.details?.reachabilityDepth, 2);
 });
 
-test("canonical non-Skill frontmatter is excluded from incomplete basename evidence", async (t) => {
-  const indexPath = "skills/demo/references/index.md";
-  const boundaryPath = "skills/demo/examples";
+test("canonical non-Skill frontmatter basenames stay non-authoritative before and after exclusion", async (t) => {
+  const indexPath = "skills/demo/profiles/index.md";
+  const boundaryPath = "skills/demo/references";
+  const targetPath = SUPPORT_PATH;
   const fixture = await referencedSupportFixture(
     t,
-    { exclude: ["node_modules", "dist", ".git", boundaryPath] },
-    "Read `references/index.md` before continuing.",
+    undefined,
+    "Read `profiles/index.md` before continuing.",
   );
-  await fixture.write(
-    indexPath,
-    [
-      "---",
-      "id: `FRONTMATTER_ONLY`",
-      "---",
-      "Read `runtime.txt` before continuing.",
-      "",
-    ].join("\n"),
-  );
-  await fixture.write(`${boundaryPath}/runtime.txt`, UNSAFE_INSTRUCTION);
+  const frontmatterOnly = [
+    "---",
+    "id: reference.index",
+    "note: runtime.txt",
+    "---",
+    "Review repository state before continuing.",
+    "",
+  ].join("\n");
+  const bodyReference = [
+    "---",
+    "id: reference.index",
+    "note: runtime.txt",
+    "---",
+    "Read runtime.txt before continuing.",
+    "",
+  ].join("\n");
+  await fixture.write(indexPath, frontmatterOnly);
+  await fixture.write(targetPath, UNSAFE_INSTRUCTION);
 
-  const result = await scan(fixture.root, { failOn: "high" });
-  const issue = result.inspectionCoverage.blockingIssues.find(
+  const normalMetadataSnapshot = await collectRepositorySnapshot(fixture.root, {
+    failOn: "high",
+  });
+  const normalMetadata = scanFromRepositorySnapshot(normalMetadataSnapshot);
+
+  assert.equal(normalMetadata.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(
+    !normalMetadata.inspectionCoverage.inspectedPaths.includes(targetPath),
+  );
+  assert.equal(
+    normalMetadataSnapshot.catalog.dependencies.some(
+      (dependency) =>
+        dependency.kind === "statically_references" &&
+        dependency.sourcePath === indexPath,
+    ),
+    false,
+  );
+  assert.notEqual(
+    normalMetadata.securityAnalysisCoverage.artifacts.find(
+      (artifact) => artifact.path === targetPath,
+    )?.analyses.semanticInstructions,
+    "analyzed",
+  );
+
+  await fixture.write(indexPath, bodyReference);
+  const normalBody = await scan(fixture.root, { failOn: "high" });
+
+  assert.ok(normalBody.inspectionCoverage.inspectedPaths.includes(targetPath));
+  assert.equal(
+    normalBody.securityAnalysisCoverage.artifacts.find(
+      (artifact) => artifact.path === targetPath,
+    )?.analyses.semanticInstructions,
+    "analyzed",
+  );
+
+  await fixture.write(indexPath, frontmatterOnly);
+  await fixture.writeConfig({
+    exclude: ["node_modules", "dist", ".git", boundaryPath],
+  });
+  const hiddenMetadataSnapshot = await collectRepositorySnapshot(fixture.root, {
+    failOn: "high",
+  });
+  const hiddenMetadata = scanFromRepositorySnapshot(hiddenMetadataSnapshot);
+
+  assert.equal(hiddenMetadataSnapshot.repositoryPaths.has(targetPath), false);
+  assert.equal(
+    hiddenMetadataSnapshot.repositoryPathStates.has(targetPath),
+    false,
+  );
+  assert.equal(hiddenMetadata.inspectionCoverage.blockingIssues.length, 0);
+  assert.equal(
+    hiddenMetadata.executableSurfaceInventory?.surfaces.some(
+      (surface) => surface.path === targetPath,
+    ),
+    false,
+  );
+  assert.equal(
+    hiddenMetadata.securityAnalysisCoverage.artifacts.some(
+      (artifact) => artifact.path === targetPath,
+    ),
+    false,
+  );
+  assert.equal(
+    evaluateStrictScan(hiddenMetadata).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+    false,
+  );
+
+  await fixture.write(indexPath, bodyReference);
+  const hiddenBody = await scan(fixture.root, { failOn: "high" });
+  const issue = hiddenBody.inspectionCoverage.blockingIssues.find(
     (candidate) => candidate.path === boundaryPath,
   );
 
+  assert.equal(issue?.state, "excluded");
+  assert.equal(issue?.scope, "subtree");
   assert.equal(issue?.details?.sourcePath, indexPath);
-  assert.equal(issue?.details?.sourceLine, 4);
+  assert.equal(issue?.details?.sourceLine, 5);
+  assert.equal(issue?.details?.reachabilityDepth, 2);
 });
 
 test("Skill basename fallback uses Agent Skills delimiter semantics", async (t) => {
