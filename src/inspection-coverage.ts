@@ -9,7 +9,10 @@ import {
   RESERVED_SKILL_SUPPORT_DIRS,
 } from "./discovery.js";
 import type { RepositoryPathState } from "./repository-paths.js";
-import type { StaticSupportReachabilityEvidence } from "./static-support.js";
+import type {
+  StaticSupportBoundaryReachabilityEvidence,
+  StaticSupportReachabilityEvidence,
+} from "./static-support.js";
 import type { Artifact } from "./types/artifact.js";
 import type { AssetClassificationEvidence } from "./types/classification.js";
 import type { ScanConfig } from "./types/configuration.js";
@@ -138,6 +141,7 @@ export function buildInspectionCoverage(
   config: Pick<ScanConfig, "globs" | "exclude">,
   blockedTraversalPaths: ReadonlySet<string> = new Set(),
   expectedSupportPaths: readonly StaticSupportReachabilityEvidence[] = [],
+  incompleteSupportBoundaries: readonly StaticSupportBoundaryReachabilityEvidence[] = [],
   artifacts: readonly Artifact[] = [],
   supportBoundaryConfig?: Pick<
     ScanConfig,
@@ -255,9 +259,30 @@ export function buildInspectionCoverage(
       ];
     },
   );
+  const incompleteSupportBoundaryEvidence = incompleteSupportBoundaries.map(
+    (expectation): InspectionCoveragePathEvidence => ({
+      path: expectation.boundaryPath,
+      state: "excluded",
+      scope: "subtree",
+      reason:
+        "A parsed basename-only Skill support reference may resolve inside this explicitly excluded subtree, so Renma cannot establish a complete candidate set without crossing the scan boundary.",
+      classification: classifyAssetPath(expectation.boundaryPath),
+      strictBlocking: true,
+      details: {
+        expectationSource: "static-support-reference",
+        owningSkillPath: expectation.owningSkillPath,
+        sourcePath: expectation.sourcePath,
+        sourceLine: expectation.sourceLine,
+        reachabilityDepth: expectation.depth,
+        inspectionKind: "repository-resource",
+        scanBoundaryDisposition: "explicitly-excluded",
+      },
+    }),
+  );
   const pathEvidence = dedupeCoverageEvidence([
     ...firstClassPathEvidence,
     ...supportPathEvidence,
+    ...incompleteSupportBoundaryEvidence,
   ]).sort((left, right) => left.path.localeCompare(right.path));
   const blockingIssues = pathEvidence.filter(
     (evidence): evidence is InspectionCoverageIssue =>

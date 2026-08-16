@@ -56,6 +56,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   relationship. Missing targets remain structural findings rather than
   inspection-coverage issues.
 
+### Fixed
+
+- Preserved safe Skill-local support file identity across exact exclusion so a
+  unique basename-only static reference still produces blocking `excluded`
+  inspection evidence. Excluded files continue to count during basename
+  disambiguation, while their contents remain unread and unparsed. When an
+  excluded support directory makes a basename candidate set incomplete, Renma
+  now emits blocking subtree evidence without traversing the directory or
+  inventing an exact child path. Symlink targets remain unfollowed and
+  uninspectable even when their path identity supplies blocking evidence.
+
 ## [0.32.1] - 2026-08-13
 
 ### Fixed

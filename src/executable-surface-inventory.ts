@@ -243,6 +243,7 @@ export interface ExecutableSurfaceInventoryInput {
   documents: ParsedDocument[];
   repositoryPaths: ReadonlySet<string>;
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>;
+  incompleteSupportDirectories?: ReadonlySet<string>;
   skillParents: SkillParentIndex;
   securityPolicies: readonly SecurityPolicyAssetEvidence[];
   dependencyCandidates?: readonly ExecutableDependencyCandidate[];
@@ -774,11 +775,16 @@ function collectStaticSurfaceReferences(
         classified.skillDirectory === skillDirectory
       );
     });
+    const incompleteCandidateDirectories = localIncompleteSupportDirectories(
+      input,
+      skillDirectory,
+    );
     for (const source of sources) {
       for (const reference of staticSupportReferences(
         source,
         skillDirectory,
         candidatePaths,
+        incompleteCandidateDirectories,
       )) {
         const row = {
           sourcePath: source.artifact.path,
@@ -858,16 +864,34 @@ function collectReachability(
         classified.skillDirectory === skillDirectory
       );
     });
+    const incompleteCandidateDirectories = localIncompleteSupportDirectories(
+      input,
+      skillDirectory,
+    );
     for (const [surfacePath, depth] of localSupportReachabilityDepth(
       skill,
       skillDirectory,
       localSupportDocs,
       candidatePaths,
+      incompleteCandidateDirectories,
     )) {
       result.set(surfacePath, depth);
     }
   }
   return result;
+}
+
+function localIncompleteSupportDirectories(
+  input: ExecutableSurfaceInventoryInput,
+  skillDirectory: string,
+): string[] {
+  return [...(input.incompleteSupportDirectories ?? [])].filter((candidate) => {
+    const classified = classifyRepositorySkillPath(candidate);
+    return (
+      classified?.kind === "support" &&
+      classified.skillDirectory === skillDirectory
+    );
+  });
 }
 
 function surfaceScope(

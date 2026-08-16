@@ -13,7 +13,7 @@ import { runRules } from "./rules.js";
 import { analyzeSecurityDiagnostics } from "./security-diagnostics.js";
 import {
   plainTextSupportSecurityReachability,
-  staticallyExpectedSupportPaths,
+  staticallyExpectedSupportInspection,
 } from "./static-support.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
@@ -74,18 +74,23 @@ export function scanFromRepositorySnapshot(
       ? {
           repositoryPaths: snapshot.repositoryPaths,
           repositoryPathStates: snapshot.repositoryPathStates,
+          incompleteSupportDirectories:
+            snapshot.core.excludedSupportDirectoryPaths,
         }
       : {
           evaluationDate: options.evaluationDate,
           repositoryPaths: snapshot.repositoryPaths,
           repositoryPathStates: snapshot.repositoryPathStates,
+          incompleteSupportDirectories:
+            snapshot.core.excludedSupportDirectoryPaths,
         };
   const classifications = snapshot.classifications;
   const plainTextSupportReachability = plainTextSupportSecurityReachability(
     snapshot.documents,
     snapshot.repositoryPaths,
+    snapshot.core.excludedSupportDirectoryPaths,
   );
-  const expectedSupportPaths = staticallyExpectedSupportPaths(
+  const expectedSupport = staticallyExpectedSupportInspection(
     snapshot.documents,
     [
       ...new Set([
@@ -94,6 +99,7 @@ export function scanFromRepositorySnapshot(
       ]),
     ],
     snapshot.skillParents,
+    [...snapshot.core.excludedSupportDirectoryPaths],
   );
   const securityAnalysis = analyzeSecurityDiagnostics(
     snapshot.documents,
@@ -176,7 +182,8 @@ export function scanFromRepositorySnapshot(
       snapshot.repositoryPathStates,
       snapshot.core.repositoryPathConfig,
       snapshot.core.blockedTraversalPaths,
-      expectedSupportPaths,
+      expectedSupport.paths,
+      expectedSupport.incompleteBoundaries,
       snapshot.artifacts,
       snapshot.config,
     ),

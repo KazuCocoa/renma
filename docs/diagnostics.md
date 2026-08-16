@@ -769,9 +769,19 @@ instruction analysis only when the existing repository-local static-reference
 graph proves it reachable from exactly one owning Skill. This eligibility
 supports direct and deterministically transitive references; it does not arise
 from directory placement, discovery, proximity, basename ambiguity, external
-URLs, absolute or escaping paths, unresolved targets, or symlinks. The
-plain-text file has no policy authority, and findings retain its original path,
-line, and snippet. Otherwise identical unreachable `.txt` remains
+URLs, absolute or escaping paths, unresolved targets, or symlinks. For this
+uniqueness decision, the repository retains safe regular-file identity across
+exact exclusion: a uniquely resolved excluded target remains expected and
+blocks inspection, while every excluded candidate still counts when a basename
+would otherwise be ambiguous. If an excluded Skill-local support directory
+makes that candidate set unknowable, the parsed basename reference produces
+blocking subtree evidence without inventing an exact child target. Excluded
+file contents remain unread and unparsed, and excluded directories remain
+untraversed. Symlink targets are never followed or treated as inspectable
+support; a referenced symlink path may still be retained as blocking repository
+evidence. A reachable plain-text file has no policy authority, and findings
+retain its original path, line, and snippet. Otherwise identical unreachable
+`.txt` remains
 `unsupported`. JSON, YAML, TOML, source code, executable support, and binary
 assets do not enter this semantic path. Successfully parsed closed frontmatter
 with no YAML comments reports comment analysis as `analyzed` and a zero surface

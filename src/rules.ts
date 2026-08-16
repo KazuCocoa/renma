@@ -60,6 +60,7 @@ interface RuleOptions {
   evaluationDate?: Date | string;
   repositoryPaths?: ReadonlySet<string>;
   repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>;
+  incompleteSupportDirectories?: ReadonlySet<string>;
 }
 
 const SECRET_PATTERN =
@@ -202,6 +203,7 @@ export function runRules(
       evaluationDay(options.evaluationDate),
       options.repositoryPaths,
       options.repositoryPathStates,
+      options.incompleteSupportDirectories,
     ),
     catalog,
     config,
@@ -217,6 +219,7 @@ function rulesForEvaluationDate(
   evaluationDate: string,
   repositoryPaths?: ReadonlySet<string>,
   repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>,
+  incompleteSupportDirectories?: ReadonlySet<string>,
 ): Rule[] {
   return [
     {
@@ -265,6 +268,7 @@ function rulesForEvaluationDate(
           documents,
           repositoryPaths,
           repositoryPathStates,
+          incompleteSupportDirectories,
         ),
     },
     {
@@ -2289,6 +2293,7 @@ function skillLocalSupportReachabilityFindings(
   documents: ParsedDocument[],
   repositoryPaths?: ReadonlySet<string>,
   repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>,
+  incompleteSupportDirectories: ReadonlySet<string> = new Set(),
 ): Finding[] {
   const skills = documents.filter(
     (document) => document.artifact.kind === "skill",
@@ -2318,6 +2323,15 @@ function skillLocalSupportReachabilityFindings(
           );
         })
       : localSupportDocs.map((document) => document.artifact.path);
+    const localIncompleteDirectories = [...incompleteSupportDirectories].filter(
+      (candidate) => {
+        const classified = classifyRepositorySkillPath(candidate);
+        return (
+          classified?.kind === "support" &&
+          classified.skillDirectory === skillDir
+        );
+      },
+    );
     const findings: Finding[] = [];
     const text = skill.artifact.content.toLowerCase();
     const hasLocalSupportGuidance =
@@ -2359,6 +2373,7 @@ function skillLocalSupportReachabilityFindings(
       skillDir,
       localSupportDocs,
       localSupportPaths,
+      localIncompleteDirectories,
     );
     for (const document of localSupportDocs) {
       const depth = reachabilityDepth.get(document.artifact.path);
@@ -2427,6 +2442,7 @@ function skillLocalSupportReachabilityFindings(
         source,
         skillDir,
         localSupportPaths,
+        localIncompleteDirectories,
       )) {
         if (
           reference.relative.startsWith("examples/") &&
@@ -2540,15 +2556,19 @@ function localSupportPathReferences(
   document: ParsedDocument,
   skillDir: string,
   candidatePaths: string[],
+  incompleteCandidateDirectories: readonly string[] = [],
 ): Array<{ raw: string; relative: string; target: string; line: number }> {
-  return staticSupportReferences(document, skillDir, candidatePaths).map(
-    (reference) => ({
-      raw: reference.raw,
-      relative: reference.relativePath,
-      target: reference.targetPath,
-      line: reference.line,
-    }),
-  );
+  return staticSupportReferences(
+    document,
+    skillDir,
+    candidatePaths,
+    incompleteCandidateDirectories,
+  ).map((reference) => ({
+    raw: reference.raw,
+    relative: reference.relativePath,
+    target: reference.targetPath,
+    line: reference.line,
+  }));
 }
 
 function markdownBodyLineIndexes(document: ParsedDocument): number[] {

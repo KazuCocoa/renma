@@ -833,6 +833,7 @@ export async function discoverArtifacts(
   skippedPathStates: ReadonlyMap<string, RepositoryPathState>;
   blockedTraversalPaths: ReadonlySet<string>;
   traversedDirectoryPaths: ReadonlySet<string>;
+  excludedSupportDirectoryPaths: ReadonlySet<string>;
 }> {
   const diagnostics: Diagnostic[] = [];
   const skippedPathStates = new Map<string, RepositoryPathState>();
@@ -841,6 +842,12 @@ export async function discoverArtifacts(
     maxDepth: config.maxDepth,
     excluded: (relativePath) => isExcluded(relativePath, config.exclude),
   });
+  const excludedSupportDirectoryPaths = new Set(
+    walked.excludedDirectories.filter(
+      (relativePath) =>
+        classifyRepositorySkillPath(relativePath)?.kind === "support",
+    ),
+  );
   diagnostics.push(...skillLikeLayoutDiagnostics(walked.files));
   diagnostics.push(
     ...walked.symlinks.map((symlinkPath) => ({
@@ -880,7 +887,7 @@ export async function discoverArtifacts(
   );
   const discoveredPaths = new Set([
     ...paths,
-    ...walked.files.filter((relativePath) =>
+    ...[...walked.files, ...walked.excludedFiles].filter((relativePath) =>
       SKILL_SUPPORT_EXISTENCE_GLOBS.some((pattern) =>
         path.matchesGlob(relativePath, pattern),
       ),
@@ -972,6 +979,7 @@ export async function discoverArtifacts(
     skippedPathStates,
     blockedTraversalPaths,
     traversedDirectoryPaths: new Set(walked.traversedDirectories),
+    excludedSupportDirectoryPaths,
   };
 }
 

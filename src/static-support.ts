@@ -4,6 +4,7 @@ import {
   classifyRepositorySkillPath,
   logicalSkillDirectory,
 } from "./discovery.js";
+import { markdownBodyStartLineForArtifact } from "./frontmatter-envelope.js";
 import type { SkillParentIndex } from "./catalog.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -38,14 +39,60 @@ export interface StaticSupportReachabilityEvidence {
   depth: number;
 }
 
+export interface StaticSupportBoundaryReachabilityEvidence {
+  boundaryPath: string;
+  owningSkillPath: string;
+  sourcePath: string;
+  sourceLine: number;
+  sourceRaw: string;
+  depth: number;
+}
+
+export interface StaticSupportInspectionExpectations {
+  paths: StaticSupportReachabilityEvidence[];
+  incompleteBoundaries: StaticSupportBoundaryReachabilityEvidence[];
+}
+
+interface IncompleteStaticSupportBasenameReference {
+  sourcePath: string;
+  basename: string;
+  line: number;
+  raw: string;
+}
+
+interface BasenameReferenceToken {
+  basename: string;
+  raw: string;
+}
+
+interface StaticSupportReferenceAnalysis {
+  references: StaticSupportReference[];
+  incompleteBasenameReferences: IncompleteStaticSupportBasenameReference[];
+}
+
 /** Parse exact, repository-local support references once for rules and graphs. */
 export function staticSupportReferences(
   document: ParsedDocument,
   skillDirectory: string,
   localCandidatePaths: readonly string[],
+  incompleteCandidateDirectories: readonly string[] = [],
 ): StaticSupportReference[] {
+  return analyzeStaticSupportReferences(
+    document,
+    skillDirectory,
+    localCandidatePaths,
+    incompleteCandidateDirectories,
+  ).references;
+}
+
+function analyzeStaticSupportReferences(
+  document: ParsedDocument,
+  skillDirectory: string,
+  localCandidatePaths: readonly string[],
+  incompleteCandidateDirectories: readonly string[],
+): StaticSupportReferenceAnalysis {
   const candidatesByBasename = new Map<string, string[]>();
-  for (const candidate of localCandidatePaths) {
+  for (const candidate of new Set(localCandidatePaths)) {
     const basename = path.posix.basename(candidate);
     const values = candidatesByBasename.get(basename) ?? [];
     values.push(candidate);
@@ -53,13 +100,19 @@ export function staticSupportReferences(
   }
 
   const references: StaticSupportReference[] = [];
-  const seen = new Set<string>();
+  const incompleteBasenameReferences: IncompleteStaticSupportBasenameReference[] =
+    [];
+  const seenReferences = new Set<string>();
+  const seenIncomplete = new Set<string>();
+  const candidateSetIncomplete = incompleteCandidateDirectories.length > 0;
+  const bodyStartIndex =
+    markdownBodyStartLineForArtifact(document.artifact, document.lines) - 1;
   for (let index = 0; index < document.lines.length; index += 1) {
     const line = document.lines[index] ?? "";
-    const values: Array<{ raw: string; value: string }> = [];
+    const explicitValues: Array<{ raw: string; value: string }> = [];
 
     const markdownLinks = markdownLinkDestinations(line);
-    values.push(...markdownLinks);
+    explicitValues.push(...markdownLinks);
     let unquotedLine = maskRawMatches(
       line,
       markdownLinks.map((link) => link.raw),
@@ -69,7 +122,7 @@ export function staticSupportReferences(
       /([`'"])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/.*?)\1/g,
     )) {
       if (match[2]) {
-        values.push({ raw: match[0], value: match[2] });
+        explicitValues.push({ raw: match[0], value: match[2] });
         quotedMatches.push(match[0]);
       }
     }
@@ -77,39 +130,84 @@ export function staticSupportReferences(
     for (const match of unquotedLine.matchAll(
       /(?:^|[\s([])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/[^\s)`'"\],;]+)/g,
     )) {
-      if (match[1]) values.push({ raw: match[0].trim(), value: match[1] });
+      if (match[1]) {
+        explicitValues.push({ raw: match[0].trim(), value: match[1] });
+      }
     }
 
-    for (const [basename, paths] of candidatesByBasename) {
-      if (paths.length !== 1 || !containsExactBasename(line, basename))
-        continue;
-      values.push({ raw: basename, value: paths[0]! });
-    }
-
-    for (const value of values) {
+    const explicitBasenames = new Set<string>();
+    for (const value of explicitValues) {
       const normalized = normalizeStaticSupportReference(
         value.value,
         skillDirectory,
       );
       if (!normalized) continue;
-      const key = `${index + 1}:${normalized.targetPath}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      references.push({
-        sourcePath: document.artifact.path,
-        targetPath: normalized.targetPath,
-        relativePath: normalized.relativePath,
-        line: index + 1,
-        raw: value.raw,
-      });
+      explicitBasenames.add(path.posix.basename(normalized.targetPath));
+      addReference(normalized, value.raw, index + 1);
+    }
+
+    if (index < bodyStartIndex) continue;
+    for (const token of basenameReferenceTokens(line)) {
+      if (explicitBasenames.has(token.basename)) continue;
+      const paths = candidatesByBasename.get(token.basename) ?? [];
+      if (paths.length > 1) continue;
+      if (candidateSetIncomplete) {
+        addIncompleteBasename(token, index + 1);
+        continue;
+      }
+      if (paths.length !== 1) continue;
+      const normalized = normalizeStaticSupportReference(
+        paths[0]!,
+        skillDirectory,
+      );
+      if (normalized) addReference(normalized, token.raw, index + 1);
     }
   }
-  return references.sort(
-    (left, right) =>
-      left.line - right.line ||
-      left.targetPath.localeCompare(right.targetPath) ||
-      left.raw.localeCompare(right.raw),
-  );
+
+  function addReference(
+    normalized: { targetPath: string; relativePath: string },
+    raw: string,
+    line: number,
+  ): void {
+    const key = `${line}:${normalized.targetPath}`;
+    if (seenReferences.has(key)) return;
+    seenReferences.add(key);
+    references.push({
+      sourcePath: document.artifact.path,
+      targetPath: normalized.targetPath,
+      relativePath: normalized.relativePath,
+      line,
+      raw,
+    });
+  }
+
+  function addIncompleteBasename(
+    token: BasenameReferenceToken,
+    line: number,
+  ): void {
+    const key = `${line}:${token.basename}`;
+    if (seenIncomplete.has(key)) return;
+    seenIncomplete.add(key);
+    incompleteBasenameReferences.push({
+      sourcePath: document.artifact.path,
+      basename: token.basename,
+      line,
+      raw: token.raw,
+    });
+  }
+
+  return {
+    references: references.sort(
+      (left, right) =>
+        left.line - right.line ||
+        left.targetPath.localeCompare(right.targetPath) ||
+        left.raw.localeCompare(right.raw),
+    ),
+    incompleteBasenameReferences: incompleteBasenameReferences.sort(
+      (left, right) =>
+        left.line - right.line || left.basename.localeCompare(right.basename),
+    ),
+  };
 }
 
 /**
@@ -121,16 +219,18 @@ export function localSupportReachabilityDepth(
   skillDirectory: string,
   localSupportDocs: ParsedDocument[],
   candidatePaths: string[],
+  incompleteCandidateDirectories: readonly string[] = [],
 ): Map<string, number> {
   const reachable = localSupportReferenceReachability(
     skill,
     skillDirectory,
     localSupportDocs,
     candidatePaths,
+    incompleteCandidateDirectories,
   );
   return new Map(
     localSupportDocs.flatMap((document): Array<[string, number]> => {
-      const evidence = reachable.get(document.artifact.path);
+      const evidence = reachable.paths.get(document.artifact.path);
       return evidence ? [[document.artifact.path, evidence.depth]] : [];
     }),
   );
@@ -140,15 +240,20 @@ export function localSupportReachabilityDepth(
  * Prove expected Skill-local targets from parsed reference sources, including
  * targets that discovery could not turn into ParsedDocument evidence.
  */
-export function staticallyExpectedSupportPaths(
+export function staticallyExpectedSupportInspection(
   documents: ParsedDocument[],
   candidatePaths: readonly string[],
   skillParents: SkillParentIndex,
-): StaticSupportReachabilityEvidence[] {
+  incompleteCandidateDirectories: readonly string[] = [],
+): StaticSupportInspectionExpectations {
   const documentsByPath = new Map(
     documents.map((document) => [document.artifact.path, document]),
   );
-  const expected = new Map<string, StaticSupportReachabilityEvidence>();
+  const expectedPaths = new Map<string, StaticSupportReachabilityEvidence>();
+  const incompleteBoundaries = new Map<
+    string,
+    StaticSupportBoundaryReachabilityEvidence
+  >();
 
   for (const [skillDirectory, parents] of [...skillParents].sort(
     ([left], [right]) => left.localeCompare(right),
@@ -170,24 +275,48 @@ export function staticallyExpectedSupportPaths(
         classified.skillDirectory === skillDirectory
       );
     });
-    for (const evidence of localSupportReferenceReachability(
+    const localIncompleteDirectories = incompleteCandidateDirectories.filter(
+      (candidate) => {
+        const classified = classifyRepositorySkillPath(candidate);
+        return (
+          classified?.kind === "support" &&
+          classified.skillDirectory === skillDirectory
+        );
+      },
+    );
+    const reachability = localSupportReferenceReachability(
       skill,
       skillDirectory,
       localSupportDocs,
       localCandidatePaths,
-    ).values()) {
-      const previous = expected.get(evidence.targetPath);
+      localIncompleteDirectories,
+    );
+    for (const evidence of reachability.paths.values()) {
+      const previous = expectedPaths.get(evidence.targetPath);
       if (!previous || compareReachabilityEvidence(evidence, previous) < 0) {
-        expected.set(evidence.targetPath, evidence);
+        expectedPaths.set(evidence.targetPath, evidence);
+      }
+    }
+    for (const evidence of reachability.incompleteBoundaries.values()) {
+      const previous = incompleteBoundaries.get(evidence.boundaryPath);
+      if (!previous || compareReachabilityEvidence(evidence, previous) < 0) {
+        incompleteBoundaries.set(evidence.boundaryPath, evidence);
       }
     }
   }
 
-  return [...expected.values()].sort(
-    (left, right) =>
-      left.targetPath.localeCompare(right.targetPath) ||
-      compareReachabilityEvidence(left, right),
-  );
+  return {
+    paths: [...expectedPaths.values()].sort(
+      (left, right) =>
+        left.targetPath.localeCompare(right.targetPath) ||
+        compareReachabilityEvidence(left, right),
+    ),
+    incompleteBoundaries: [...incompleteBoundaries.values()].sort(
+      (left, right) =>
+        left.boundaryPath.localeCompare(right.boundaryPath) ||
+        compareReachabilityEvidence(left, right),
+    ),
+  };
 }
 
 /**
@@ -198,6 +327,7 @@ export function staticallyExpectedSupportPaths(
 export function plainTextSupportSecurityReachability(
   documents: ParsedDocument[],
   repositoryPaths: ReadonlySet<string>,
+  incompleteCandidateDirectories: ReadonlySet<string> = new Set(),
 ): ReadonlyMap<string, PlainTextSupportSecurityReachability> {
   const skillsByDirectory = new Map<string, ParsedDocument[]>();
   for (const document of documents) {
@@ -227,11 +357,21 @@ export function plainTextSupportSecurityReachability(
         classified.skillDirectory === skillDirectory
       );
     });
+    const localIncompleteDirectories = [
+      ...incompleteCandidateDirectories,
+    ].filter((candidate) => {
+      const classified = classifyRepositorySkillPath(candidate);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
     const reachability = localSupportReachabilityDepth(
       skill,
       skillDirectory,
       localSupportDocs,
       candidatePaths,
+      localIncompleteDirectories,
     );
 
     for (const document of localSupportDocs) {
@@ -262,17 +402,30 @@ function localSupportReferenceReachability(
   skillDirectory: string,
   localSupportDocs: ParsedDocument[],
   candidatePaths: readonly string[],
-): Map<string, StaticSupportReachabilityEvidence> {
+  incompleteCandidateDirectories: readonly string[],
+): {
+  paths: Map<string, StaticSupportReachabilityEvidence>;
+  incompleteBoundaries: Map<string, StaticSupportBoundaryReachabilityEvidence>;
+} {
   const sources = [skill, ...localSupportDocs].sort((left, right) =>
     left.artifact.path.localeCompare(right.artifact.path),
   );
-  const references = new Map(
+  const analyses = new Map(
     sources.map((document) => [
       document.artifact.path,
-      staticSupportReferences(document, skillDirectory, [...candidatePaths]),
+      analyzeStaticSupportReferences(
+        document,
+        skillDirectory,
+        candidatePaths,
+        incompleteCandidateDirectories,
+      ),
     ]),
   );
-  const reachable = new Map<string, StaticSupportReachabilityEvidence>();
+  const paths = new Map<string, StaticSupportReachabilityEvidence>();
+  const incompleteBoundaries = new Map<
+    string,
+    StaticSupportBoundaryReachabilityEvidence
+  >();
   let changed = true;
 
   while (changed) {
@@ -281,9 +434,10 @@ function localSupportReferenceReachability(
       const sourceDepth =
         source.artifact.path === skill.artifact.path
           ? 0
-          : reachable.get(source.artifact.path)?.depth;
+          : paths.get(source.artifact.path)?.depth;
       if (sourceDepth === undefined) continue;
-      for (const reference of references.get(source.artifact.path) ?? []) {
+      const analysis = analyses.get(source.artifact.path);
+      for (const reference of analysis?.references ?? []) {
         const evidence: StaticSupportReachabilityEvidence = {
           targetPath: reference.targetPath,
           owningSkillPath: skill.artifact.path,
@@ -292,21 +446,44 @@ function localSupportReferenceReachability(
           sourceRaw: reference.raw,
           depth: sourceDepth + 1,
         };
-        const previous = reachable.get(reference.targetPath);
+        const previous = paths.get(reference.targetPath);
         if (!previous || compareReachabilityEvidence(evidence, previous) < 0) {
-          reachable.set(reference.targetPath, evidence);
+          paths.set(reference.targetPath, evidence);
           changed = true;
+        }
+      }
+      for (const reference of analysis?.incompleteBasenameReferences ?? []) {
+        for (const boundaryPath of incompleteCandidateDirectories) {
+          const evidence: StaticSupportBoundaryReachabilityEvidence = {
+            boundaryPath,
+            owningSkillPath: skill.artifact.path,
+            sourcePath: reference.sourcePath,
+            sourceLine: reference.line,
+            sourceRaw: reference.raw,
+            depth: sourceDepth + 1,
+          };
+          const previous = incompleteBoundaries.get(boundaryPath);
+          if (
+            !previous ||
+            compareReachabilityEvidence(evidence, previous) < 0
+          ) {
+            incompleteBoundaries.set(boundaryPath, evidence);
+          }
         }
       }
     }
   }
 
-  return reachable;
+  return { paths, incompleteBoundaries };
 }
 
 function compareReachabilityEvidence(
-  left: StaticSupportReachabilityEvidence,
-  right: StaticSupportReachabilityEvidence,
+  left:
+    | StaticSupportReachabilityEvidence
+    | StaticSupportBoundaryReachabilityEvidence,
+  right:
+    | StaticSupportReachabilityEvidence
+    | StaticSupportBoundaryReachabilityEvidence,
 ): number {
   return (
     left.depth - right.depth ||
@@ -332,6 +509,7 @@ export function buildStaticSupportDependencies(
   documents: ParsedDocument[],
   entries: CatalogEntry[],
   repositoryPaths: ReadonlySet<string>,
+  incompleteCandidateDirectories: ReadonlySet<string> = new Set(),
 ): Dependency[] {
   const documentsByPath = new Map(
     documents.map((document) => [document.artifact.path, document]),
@@ -391,6 +569,15 @@ export function buildStaticSupportDependencies(
         classified.skillDirectory === skillDirectory
       );
     });
+    const localIncompleteDirectories = [
+      ...incompleteCandidateDirectories,
+    ].filter((candidate) => {
+      const classified = classifyRepositorySkillPath(candidate);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
     const sources = [skill, ...localEntries]
       .map((entry) => documentsByPath.get(entry.sourcePath))
       .filter((document): document is ParsedDocument => document !== undefined);
@@ -399,6 +586,7 @@ export function buildStaticSupportDependencies(
         source,
         skillDirectory,
         candidatePaths,
+        localIncompleteDirectories,
       )) {
         const target = entriesByPath.get(reference.targetPath);
         if (
@@ -544,6 +732,92 @@ function containsExactBasename(content: string, basename: string): boolean {
     `(?:^|[\\s\`'"()\\[\\]{},;:])${escaped}(?=$|[\\s\`'"()\\[\\]{},;:?!]|\\.(?=\\s|$))`,
     "m",
   ).test(content);
+}
+
+/**
+ * Parse the one basename-only support-reference syntax consumed by both
+ * candidate-backed resolution and incomplete-candidate boundary evidence.
+ */
+function basenameReferenceTokens(line: string): BasenameReferenceToken[] {
+  const tokens = new Map<string, BasenameReferenceToken>();
+
+  const markdownLinks = markdownLinkDestinations(line);
+  for (const link of markdownLinks) {
+    addBasenameReferenceToken(tokens, line, link.value);
+  }
+
+  let bareLine = maskRawMatches(
+    line,
+    markdownLinks.map((link) => link.raw),
+  );
+  const quotedMatches: string[] = [];
+  for (const match of bareLine.matchAll(/([`'"])(.*?)\1/g)) {
+    addBasenameReferenceToken(tokens, line, match[2] ?? "");
+    quotedMatches.push(match[0]);
+  }
+  bareLine = maskRawMatches(bareLine, quotedMatches);
+
+  for (const match of bareLine.matchAll(/[^\s`'"()[\]{},;:!?/\\]+/g)) {
+    const raw = match[0];
+    addBasenameReferenceToken(
+      tokens,
+      line,
+      raw.endsWith(".") ? raw.slice(0, -1) : raw,
+    );
+  }
+
+  return [...tokens.values()].sort(
+    (left, right) =>
+      left.basename.localeCompare(right.basename) ||
+      left.raw.localeCompare(right.raw),
+  );
+}
+
+function addBasenameReferenceToken(
+  tokens: Map<string, BasenameReferenceToken>,
+  line: string,
+  value: string,
+): void {
+  const candidate = normalizePotentialBasename(value);
+  if (
+    !candidate ||
+    !isStaticSupportBasename(candidate) ||
+    !containsExactBasename(line, candidate)
+  )
+    return;
+  tokens.set(candidate, { basename: candidate, raw: candidate });
+}
+
+/** Filename syntax, not natural-language intent, bounds basename references. */
+function isStaticSupportBasename(value: string): boolean {
+  return (
+    /^\.[\p{L}\p{N}_-]+$/u.test(value) ||
+    /^(?:[\p{L}\p{N}_-]+(?:[ .][\p{L}\p{N}_-]+)*)\.[\p{L}][\p{L}\p{N}_-]*$/u.test(
+      value,
+    ) ||
+    /^[\p{Lu}\p{N}][\p{Lu}\p{N}_-]*$/u.test(value) ||
+    /^\p{Lu}[\p{L}\p{N}_-]*file$/u.test(value)
+  );
+}
+
+function normalizePotentialBasename(value: string): string | undefined {
+  const cleaned = decodePath(stripUriSuffix(value.trim())).replace(
+    /^<|>$/g,
+    "",
+  );
+  if (
+    !cleaned ||
+    cleaned === "." ||
+    cleaned === ".." ||
+    cleaned.includes("/") ||
+    cleaned.includes("\\") ||
+    cleaned.includes(":") ||
+    cleaned.includes("?") ||
+    cleaned.includes("#")
+  ) {
+    return undefined;
+  }
+  return cleaned;
 }
 
 function decodePath(value: string): string {
