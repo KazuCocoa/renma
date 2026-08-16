@@ -9,6 +9,7 @@ export const STRICT_SCAN_MATCH_IDS = {
   INVALID_AGENT_SKILL: "strict_scan.invalid_agent_skill",
   ERROR_DIAGNOSTIC: "strict_scan.error_diagnostic",
   INCOMPLETE_INSPECTION: "strict_scan.incomplete_inspection",
+  INCOMPLETE_SECURITY_ANALYSIS: "strict_scan.incomplete_security_analysis",
 } as const;
 
 export type StrictScanMatchId =
@@ -34,6 +35,8 @@ export function evaluateStrictScan(result: ScanResult): StrictScanEvaluation {
   const errorDiagnosticCount = result.diagnostics.filter(
     (diagnostic) => diagnostic.severity === "error",
   ).length;
+  const incompleteSecurityAnalysisCount =
+    strictBlockingSecurityAnalysisIssues(result);
   const matches: StrictScanMatch[] = [];
   if (thresholdFindingCount > 0) {
     matches.push({
@@ -64,9 +67,25 @@ export function evaluateStrictScan(result: ScanResult): StrictScanEvaluation {
         "Expected agent-facing artifacts could not be inspected completely.",
     });
   }
+  if (incompleteSecurityAnalysisCount > 0) {
+    matches.push({
+      id: STRICT_SCAN_MATCH_IDS.INCOMPLETE_SECURITY_ANALYSIS,
+      count: incompleteSecurityAnalysisCount,
+      summary:
+        "Applicable YAML frontmatter-comment analysis could not be completed safely.",
+    });
+  }
   return {
     schemaVersion: STRICT_SCAN_EVALUATION_SCHEMA_VERSION,
     outcome: matches.length > 0 ? "fail" : "pass",
     matches,
   };
+}
+
+/** Count only applicable parser-owned YAML comment surfaces that failed closed. */
+function strictBlockingSecurityAnalysisIssues(result: ScanResult): number {
+  return result.securityAnalysisCoverage.artifacts.filter(
+    (artifact) =>
+      artifact.analyses.yamlFrontmatterComments === "not-analyzable",
+  ).length;
 }

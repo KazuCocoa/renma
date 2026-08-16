@@ -3,7 +3,10 @@ import test from "node:test";
 
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
-import { evaluateStrictScan } from "../src/strict-scan.js";
+import {
+  evaluateStrictScan,
+  STRICT_SCAN_MATCH_IDS,
+} from "../src/strict-scan.js";
 import type { SecurityAnalysisCoverageArtifact } from "../src/types/security-analysis-coverage.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
@@ -166,6 +169,12 @@ description: Review local evidence. Use when deterministic review is requested.
     ),
     false,
   );
+  const strict = evaluateStrictScan(result);
+  const incomplete = strict.matches.find(
+    (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_SECURITY_ANALYSIS,
+  );
+  assert.equal(strict.outcome, "fail");
+  assert.equal(incomplete?.count, 3);
 });
 
 test("eligible non-Skill frontmatter coverage comes from the comment extractor", async (t) => {
@@ -291,6 +300,69 @@ id: arbitrary
       artifactPath,
     );
   }
+  const strict = evaluateStrictScan(result);
+  const incomplete = strict.matches.find(
+    (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_SECURITY_ANALYSIS,
+  );
+  assert.equal(strict.outcome, "fail");
+  assert.equal(incomplete?.count, 2);
+});
+
+test("strict security completeness ignores analyzed and inapplicable YAML comment surfaces", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.write(
+    "contexts/clean.md",
+    `---
+id: context.clean
+owner: security
+---
+# Clean
+`,
+  );
+  await fixture.write("contexts/no-frontmatter.md", "# Visible\n");
+  await fixture.write(
+    "README.md",
+    `---
+id: arbitrary
+# Hidden analysis is intentionally inapplicable for unknown Markdown.
+---
+# Arbitrary
+`,
+  );
+
+  const result = await scan(fixture.root, {
+    failOn: "critical",
+    format: "json",
+  });
+  const strict = evaluateStrictScan(result);
+
+  assert.equal(
+    coverageArtifact(
+      result.securityAnalysisCoverage.artifacts,
+      "contexts/clean.md",
+    ).analyses.yamlFrontmatterComments,
+    "analyzed",
+  );
+  assert.equal(
+    coverageArtifact(
+      result.securityAnalysisCoverage.artifacts,
+      "contexts/no-frontmatter.md",
+    ).analyses.yamlFrontmatterComments,
+    "not-applicable",
+  );
+  assert.equal(
+    coverageArtifact(result.securityAnalysisCoverage.artifacts, "README.md")
+      .analyses.yamlFrontmatterComments,
+    "not-applicable",
+  );
+  assert.equal(
+    strict.matches.some(
+      (match) =>
+        match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_SECURITY_ANALYSIS,
+    ),
+    false,
+  );
+  assert.equal(strict.outcome, "pass");
 });
 
 test("statically reachable plain-text Skill support receives semantic analysis", async (t) => {

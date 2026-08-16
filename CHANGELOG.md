@@ -41,11 +41,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   every discovered and scanned artifact. The target-state rows distinguish
   executed, unsupported, inapplicable, and non-analyzable hidden-Unicode,
   Markdown semantic instruction, canonical Skill description, and YAML
-  frontmatter comment layers without changing findings, strict scan, or CI
-  policy.
+  frontmatter comment layers without changing findings or CI policy.
 
 ### Changed
 
+- Restricted non-Skill local security-policy authority to canonical, closed
+  Renma frontmatter envelopes. Policy-looking Markdown body text remains
+  visible instruction evidence and can no longer authorize network, secret,
+  upload, approval, or floating-dependency behavior. Strict scans now also fail
+  with `strict_scan.incomplete_security_analysis` when applicable parser-owned
+  YAML frontmatter-comment analysis cannot be completed safely.
 - Raised `SUPPORT-MISSING-PATH` from Medium to High because a statically
   referenced local resource that does not exist is a broken declared
   relationship. Missing targets remain structural findings rather than
