@@ -606,7 +606,8 @@ external_upload_allowed: false
 ---
 # Review
 `);
-  const doubleBomResolution = resolveOperationalSecurityPolicy(doubleBomArtifact);
+  const doubleBomResolution =
+    resolveOperationalSecurityPolicy(doubleBomArtifact);
   assert.equal(doubleBomResolution.policy.externalUploadAllowed, undefined);
   assert.ok(
     doubleBomResolution.policy.invalidDeclared.has("externalUploadAllowed"),
