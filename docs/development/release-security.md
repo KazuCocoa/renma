@@ -29,12 +29,11 @@ repository-controlled verification before requesting an OIDC token.
 
 Audit date: 2026-08-17.
 
-`npm audit --omit=dev` reports zero production vulnerabilities. The published
-CLI's runtime dependency set is therefore vulnerability-free under the current
-lockfile. The full development audit reports two moderate and one high package
-results in the VitePress-only documentation toolchain: VitePress `1.6.4`
-resolves Vite `5.4.21`, which resolves esbuild `0.21.5`. The inherited advisory
-set is:
+`npm audit --omit=dev` reports no known production vulnerabilities under the
+current lockfile. The full development audit reports two moderate and one high
+package results in the VitePress-only documentation toolchain: VitePress
+`1.6.4` resolves Vite `5.4.21`, which resolves esbuild `0.21.5`. The inherited
+advisory set is:
 
 - [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99):
   esbuild development-server cross-origin response exposure, patched in
@@ -49,6 +48,16 @@ set is:
   Windows alternate-path bypass of Vite's `server.fs.deny`, patched on the
   Vite 6 line in `6.4.3`.
 
+These transitive version matches do not establish that every vulnerable code
+path is reachable through VitePress. The two Vite path-traversal advisories
+depend on an attacker being able to reach a running development server, so
+preventing untrusted network access is an effective mitigation for those
+advisories. The Windows `launch-editor` advisory is different: an
+attacker-controlled web page can send a request from the browser to the
+middleware on a localhost Vite development server. Binding that server to
+localhost, or merely avoiding intentionally supplied untrusted input, does not
+prevent that browser-triggered attack.
+
 The stable VitePress release remains `1.6.4` and declares Vite `^5.4.14`, so
 `npm audit` reports `fixAvailable: false`; no supported stable upgrade can move
 this repository to the patched Vite and esbuild lines. VitePress
@@ -58,10 +67,14 @@ stable VitePress release and the full and production-only audits before 1.0.0;
 adopt the first supported stable upgrade that clears the advisories and passes
 the full repository validation suite.
 
-Until then, treat this as a non-blocking local documentation-tooling risk: do
-not expose the VitePress/Vite development server to untrusted networks, and on
-Windows do not use its editor-opening endpoint with untrusted input. Production
-package publication is not blocked by this dev-only chain.
+Until then, treat this as a non-blocking local documentation-tooling risk. Do
+not expose the VitePress/Vite development server to untrusted networks; this
+addresses the network-exposure-dependent Vite path-traversal advisories. Prefer
+`npm run docs:build`, which exits without leaving a development server running.
+On Windows, avoid running `npm run docs:dev` while browsing untrusted content,
+and disable NTLM where organizational policy permits. Upgrade to the first
+supported stable VitePress version containing the fixes. Production package
+publication is not blocked solely by these development-only audit results.
 
 `npm run docs:build` also succeeds while the bundled Vite/esbuild version warns
 that the TypeScript `ES2024` target is unrecognized. This is a docs-build
