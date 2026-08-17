@@ -104,11 +104,13 @@ behavior rather than maintaining a second field list.
 
 For canonical Skills, `description` is the sole portable discovery source of
 truth for what the Skill does and when it should be selected.
-`renma.when-to-use` and `renma.when-not-to-use` are rejected and not
-interpreted. Historical top-level `when_to_use` and `when_not_to_use` may help
-an explicit pre-0.16 migration recover a portable description, but are not
-emitted as Renma metadata. Their top-level non-Skill forms remain appropriate
-for shared Context Assets.
+`renma.when-to-use` and `renma.when-not-to-use` are reported as unsupported
+Renma metadata and are not interpreted. Their presence alone does not make an
+otherwise valid Agent Skills string-to-string `metadata` mapping
+specification-invalid. Historical top-level `when_to_use` and
+`when_not_to_use` may help an explicit pre-0.16 migration recover a portable
+description, but are not emitted as Renma metadata. Their top-level non-Skill
+forms remain appropriate for shared Context Assets.
 
 Renma normalizes the governance values into the existing asset metadata model
 used by scan findings, inspect, catalog, ownership, graph and dependency
@@ -299,8 +301,9 @@ before retrying.
 Repository-relative classification normalizes leading and internal `.` segments
 and safe `..` segments before checking the root. A path is rejected if `..`
 escapes its original `skills/` or `.agents/skills/` root, even if a later segment
-would appear to re-enter it. User-facing structured command argv retains the
-exact path discovered by `scan` or supplied by the user.
+would appear to re-enter it. The same invariant applies to explicit historical
+migration targets. User-facing structured command argv retains the exact path
+discovered by `scan` or supplied by the user.
 
 Inside an Agent Skill directory, `assets/`, `examples/`, `profiles/`,
 `references/`, and `scripts/` contain Skill-local support material and are not
@@ -319,13 +322,15 @@ renma scan . --format json
 
 The JSON report includes a dedicated `agentSkills` summary and per-Skill
 results. Text output includes a concise valid/invalid summary, structural issues,
-authoring warnings, and a `suggest-metadata` migration command when pre-0.16
-Renma Skill fields or a historical entrypoint spelling are present.
+authoring warnings, and a `suggest-metadata` migration command when a canonical
+entrypoint contains pre-0.16 Renma Skill fields. Historical filename spellings
+are not Agent Skills results; repository diagnostics report them as migration-
+only inputs and direct maintainers to `suggest-metadata`.
 
-In JSON, `migrationCommand` contains structured `command` and `args` fields plus
-a display string. The argv fields preserve the exact path and are the source of
-truth for tools. Text output uses POSIX shell quoting when a path contains
-spaces or shell metacharacters.
+In JSON, `migrationCommand` on an Agent Skills result contains structured
+`command` and `args` fields plus a display string. The argv fields preserve the
+exact path and are the source of truth for tools. Text output uses POSIX shell
+quoting when a path contains spaces or shell metacharacters.
 
 The locally versioned validation profile uses the maintained `yaml` package in
 YAML 1.2 mode. It validates:
@@ -405,34 +410,37 @@ scalars does not hide body diagnostics.
 ## Agent Skills Diagnostic Identifiers
 
 Agent Skills diagnostics use stable identifiers in the `agentSkills` portion of
-scan output. `AS-SKILL-*` identifiers are specification errors and make the
-Skill invalid. `RN-SKILL-*` identifiers are Renma authoring warnings and do not
-affect structural validity or the existing `--fail-on` threshold.
+scan output. Specification errors make the Skill invalid. Renma authoring
+warnings do not affect structural validity or the existing `--fail-on`
+threshold. The historical-looking
+`AS-SKILL-UNSUPPORTED-ROUTING-METADATA` identifier is a Renma-owned v1
+compatibility warning, not an Agent Skills specification error; it remains in
+the `agentSkills` projection so maintainers get exact child-key evidence while
+the value stays non-operational.
 
 ### Specification errors
 
-| Identifier                              | Meaning                                                                                                                          |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `AS-SKILL-NONCANONICAL-FILENAME`        | The entrypoint filename is not exactly `SKILL.md`.                                                                               |
-| `AS-SKILL-MISSING-FRONTMATTER`          | YAML frontmatter is absent.                                                                                                      |
-| `AS-SKILL-UNCLOSED-FRONTMATTER`         | The opening frontmatter delimiter has no closing delimiter.                                                                      |
-| `AS-SKILL-INVALID-YAML`                 | The frontmatter is not valid YAML.                                                                                               |
-| `AS-SKILL-FRONTMATTER-NOT-MAPPING`      | The frontmatter root is not a YAML mapping.                                                                                      |
-| `AS-SKILL-DUPLICATE-FIELD`              | A top-level frontmatter field is declared more than once.                                                                        |
-| `AS-SKILL-DUPLICATE-METADATA-KEY`       | A key in `metadata` is declared more than once.                                                                                  |
-| `AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD`   | A top-level field is outside the Agent Skills field set.                                                                         |
-| `AS-SKILL-MISSING-NAME`                 | The required `name` field is absent or empty.                                                                                    |
-| `AS-SKILL-INVALID-NAME`                 | `name` has the wrong type or violates the name rules.                                                                            |
-| `AS-SKILL-NAME-DIRECTORY-MISMATCH`      | The normalized `name` does not match its immediate parent directory.                                                             |
-| `AS-SKILL-MISSING-DESCRIPTION`          | The required `description` field is absent or empty.                                                                             |
-| `AS-SKILL-INVALID-DESCRIPTION`          | `description` is not a string.                                                                                                   |
-| `AS-SKILL-DESCRIPTION-TOO-LONG`         | `description` exceeds 1,024 Unicode code points.                                                                                 |
-| `AS-SKILL-INVALID-COMPATIBILITY`        | `compatibility` is not a non-empty string.                                                                                       |
-| `AS-SKILL-COMPATIBILITY-TOO-LONG`       | `compatibility` exceeds 500 Unicode code points.                                                                                 |
-| `AS-SKILL-INVALID-LICENSE`              | `license` is present but is not a string.                                                                                        |
-| `AS-SKILL-INVALID-ALLOWED-TOOLS`        | `allowed-tools` is present but is not a string.                                                                                  |
-| `AS-SKILL-INVALID-METADATA`             | `metadata` is not a string-to-string mapping.                                                                                    |
-| `AS-SKILL-UNSUPPORTED-ROUTING-METADATA` | Removed `renma.when-to-use` or `renma.when-not-to-use` metadata is present and not interpreted; move Skill routing boundaries into `description`. |
+| Identifier                            | Meaning                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `AS-SKILL-NONCANONICAL-FILENAME`      | The entrypoint filename is not exactly `SKILL.md`.                                          |
+| `AS-SKILL-MISSING-FRONTMATTER`        | YAML frontmatter is absent.                                                                 |
+| `AS-SKILL-UNCLOSED-FRONTMATTER`       | The opening frontmatter delimiter has no closing delimiter.                                 |
+| `AS-SKILL-INVALID-YAML`               | The frontmatter is not valid YAML.                                                          |
+| `AS-SKILL-FRONTMATTER-NOT-MAPPING`    | The frontmatter root is not a YAML mapping.                                                 |
+| `AS-SKILL-DUPLICATE-FIELD`            | A top-level frontmatter field is declared more than once.                                   |
+| `AS-SKILL-DUPLICATE-METADATA-KEY`     | A key in `metadata` is declared more than once.                                             |
+| `AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD` | A top-level field is outside the Agent Skills field set.                                    |
+| `AS-SKILL-MISSING-NAME`               | The required `name` field is absent or empty.                                               |
+| `AS-SKILL-INVALID-NAME`               | `name` has the wrong type or violates the name rules.                                       |
+| `AS-SKILL-NAME-DIRECTORY-MISMATCH`    | The normalized `name` does not match its immediate parent directory.                        |
+| `AS-SKILL-MISSING-DESCRIPTION`        | The required `description` field is absent or empty.                                        |
+| `AS-SKILL-INVALID-DESCRIPTION`        | `description` is not a string.                                                              |
+| `AS-SKILL-DESCRIPTION-TOO-LONG`       | `description` exceeds 1,024 Unicode code points.                                            |
+| `AS-SKILL-INVALID-COMPATIBILITY`      | `compatibility` is not a non-empty string.                                                  |
+| `AS-SKILL-COMPATIBILITY-TOO-LONG`     | `compatibility` exceeds 500 Unicode code points.                                            |
+| `AS-SKILL-INVALID-LICENSE`            | `license` is present but is not a string.                                                   |
+| `AS-SKILL-INVALID-ALLOWED-TOOLS`      | `allowed-tools` is present but is not a string.                                             |
+| `AS-SKILL-INVALID-METADATA`           | `metadata` is not a string-to-string mapping.                                               |
 
 ### Renma authoring warnings
 
@@ -447,6 +455,7 @@ not disable the ordinary English-primary authoring warnings.
 
 | Identifier                                          | Meaning                                                                                                                            |
 | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `AS-SKILL-UNSUPPORTED-ROUTING-METADATA`             | Removed `renma.when-to-use` or `renma.when-not-to-use` metadata is present and ignored by Renma; this warning does not make the Agent Skill invalid. |
 | `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY`       | The description does not state when the Skill should be used.                                                                      |
 | `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY`           | The description does not clearly state what the Skill does. This is a Renma authoring warning, not an Agent Skills validity error. |
 | `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY`     | A body selection exclusion is absent from the description.                                                                         |
