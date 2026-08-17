@@ -4,7 +4,9 @@ import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 import {
   classifyAbsoluteSkillEntrypointPath,
+  classifyAssetPath,
   classifyRepositorySkillEntrypointPath,
+  normalizeAssetRepositoryRelativePath,
   repositoryClassificationPath,
   RESERVED_SKILL_SUPPORT_DIRS,
 } from "../discovery.js";
@@ -12,7 +14,7 @@ import {
   RENMA_FIRST_AUTHORING_BOUNDARY,
   SKILL_AUTHORING_PRINCIPLE,
 } from "../guidance/skill-authoring.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import {
   readSkillAuthoringHandoff,
   validateSkillAuthoringHandoffIdentityAndGraph,
@@ -25,6 +27,7 @@ import { RENMA_SCAFFOLD_PLACEHOLDERS } from "../scaffold-placeholders.js";
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
 export type ScaffoldResource = "references" | "scripts" | "assets";
+export const SCAFFOLD_JSON_SCHEMA_VERSION = "renma.scaffold.v1" as const;
 
 export interface ScaffoldOptions {
   kind: ScaffoldKind;
@@ -65,7 +68,9 @@ export async function runScaffoldCommand(
   const bundle = buildScaffoldBundle(options, handoff);
 
   if (options.format === "json") {
-    process.stdout.write(formatJsonDocument(bundle));
+    process.stdout.write(
+      formatVersionedJsonDocument(SCAFFOLD_JSON_SCHEMA_VERSION, bundle),
+    );
     return CLI_EXIT.success;
   }
 
@@ -110,6 +115,7 @@ export function buildScaffoldBundle(
       "--handoff cannot be combined with --id, --title, --owner, --tags, or --resources.",
     );
   }
+  validateScaffoldTargetPath(options.kind, options.targetPath);
   const suppliedSkill = handoff?.assetGraph.skill;
   const id =
     suppliedSkill?.id ??
@@ -177,6 +183,49 @@ export function buildScaffoldBundle(
   };
   if (handoff) bundle.handoff = handoff;
   return bundle;
+}
+
+function validateScaffoldTargetPath(
+  kind: ScaffoldKind,
+  targetPath: string,
+): void {
+  if (kind === "skill") return;
+  const normalizedPath = targetPath.replaceAll("\\", "/");
+  const repositoryBoundary = repositoryClassificationPath(normalizedPath);
+  const relativePath =
+    repositoryBoundary.state === "resolved"
+      ? repositoryBoundary.relativePath
+      : normalizeAssetRepositoryRelativePath(normalizedPath);
+  const classification = relativePath
+    ? classifyAssetPath(relativePath, {
+        ...(kind === "context_lens" ? { metadataType: "context_lens" } : {}),
+      })
+    : undefined;
+  const isMarkdownFile =
+    relativePath !== undefined &&
+    relativePath.endsWith(".md") &&
+    relativePath.split("/").length > 1;
+
+  if (
+    kind === "context" &&
+    classification?.kind === "context" &&
+    isMarkdownFile
+  ) {
+    return;
+  }
+  if (
+    kind === "context_lens" &&
+    classification?.kind === "context_lens" &&
+    isMarkdownFile
+  ) {
+    return;
+  }
+
+  throw new CliUserError(
+    kind === "context"
+      ? "Context scaffolds require a Markdown target under contexts/** or the supported legacy context/** root so normal discovery classifies it as a Context Asset."
+      : "Context Lens scaffolds require a Markdown target under lenses/**, contexts/**, or the supported legacy context/** root so normal discovery classifies it as a Context Lens.",
+  );
 }
 
 function renderSkillScaffold(metadata: {

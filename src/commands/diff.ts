@@ -67,7 +67,7 @@ import {
   type InspectionCoverageDiff,
   zeroInspectionCoverage,
 } from "../inspection-coverage.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 import { securityPolicyRelaxations } from "../security-policy-ci-policy.js";
 import {
@@ -128,6 +128,7 @@ class GitCommandError extends Error {
 }
 
 export type DiffFormat = "json" | "markdown";
+export const DIFF_JSON_SCHEMA_VERSION = "renma.diff.v1" as const;
 
 export interface DiffReport {
   root: string;
@@ -755,7 +756,7 @@ export function formatDiff(
   format: DiffFormat,
 ): string {
   if (format === "json") {
-    return formatJsonDocument(report);
+    return formatVersionedJsonDocument(DIFF_JSON_SCHEMA_VERSION, report);
   }
   return formatDiffMarkdown(report);
 }

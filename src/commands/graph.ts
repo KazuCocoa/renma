@@ -35,7 +35,7 @@ import type {
   DependencyKind,
 } from "../model.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositorySnapshot,
@@ -57,6 +57,7 @@ import {
 } from "./executable-graph.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
+export const GRAPH_JSON_SCHEMA_VERSION = "renma.graph.v1" as const;
 export type GraphEdgeKind =
   DependencyKind | "continues_with" | "invokes" | "contains";
 export type GraphView =
@@ -241,7 +242,7 @@ export function graphFromRepositorySnapshot(
 }
 
 export function formatGraphJson(report: GraphReport): string {
-  return formatJsonDocument(report);
+  return formatVersionedJsonDocument(GRAPH_JSON_SCHEMA_VERSION, report);
 }
 
 function focusGraph(report: GraphReport, focus?: string): GraphReport {

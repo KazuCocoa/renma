@@ -23,9 +23,19 @@ export function formatJsonDocument(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+/** Add a schema identity at a public JSON boundary without mutating its model. */
+export function formatVersionedJsonDocument(
+  schemaVersion: string,
+  value: object,
+): string {
+  return formatJsonDocument({ schemaVersion, ...value });
+}
+
+export const SCAN_JSON_SCHEMA_VERSION = "renma.scan.v1" as const;
+
 /** Format a scan result as pretty-printed JSON. */
 export function formatJson(result: ScanResult): string {
-  return formatJsonDocument(result);
+  return formatVersionedJsonDocument(SCAN_JSON_SCHEMA_VERSION, result);
 }
 
 /** Format a scan result as human-readable terminal text. */

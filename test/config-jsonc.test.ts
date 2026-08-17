@@ -285,6 +285,86 @@ test("equivalent JSON and JSONC normalize to the same configuration", async (t) 
   });
 });
 
+test("rejects duplicate properties at every configuration object depth", async (t) => {
+  const cases = [
+    {
+      name: "top-level conflicting values",
+      file: "renma.config.json",
+      source: '{\n  "format": "json",\n  "format": "text"\n}\n',
+      path: "format",
+      line: 3,
+      column: 3,
+    },
+    {
+      name: "nested identical values",
+      file: "renma.config.json",
+      source:
+        '{\n  "security": {\n    "ci_policy": "fail",\n    "ci_policy": "fail"\n  }\n}\n',
+      path: "security.ci_policy",
+      line: 4,
+      column: 5,
+    },
+    {
+      name: "security profile",
+      file: "renma.config.jsonc",
+      source:
+        '{\n  "security": {\n    "profiles": {\n      "restricted": {\n        "network_allowed": false,\n        "network_allowed": true\n      }\n    }\n  }\n}\n',
+      path: "security.profiles.restricted.network_allowed",
+      line: 6,
+      column: 9,
+    },
+    {
+      name: "JSONC comments between duplicates",
+      file: "renma.config.jsonc",
+      source:
+        '{\n  "security": {\n    "ci_policy": "warn",\n    // A comment must not hide the duplicate syntax-tree property.\n    "ci_policy": "fail"\n  }\n}\n',
+      path: "security.ci_policy",
+      line: 5,
+      column: 5,
+    },
+  ] as const;
+
+  for (const fixtureCase of cases) {
+    await t.test(fixtureCase.name, async (caseContext) => {
+      const root = await fixture(caseContext);
+      const configPath = path.join(root, fixtureCase.file);
+      await writeFile(configPath, fixtureCase.source);
+
+      await assert.rejects(loadConfig(root, {}), (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /contains duplicate property/);
+        assert.match(
+          error.message,
+          new RegExp(
+            `at ${fixtureCase.path} on line ${fixtureCase.line}, column ${fixtureCase.column}`,
+          ),
+        );
+        assert.match(error.message, /first declared on line/);
+        return true;
+      });
+    });
+  }
+});
+
+test("allows the same property name in distinct sibling objects", async (t) => {
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.jsonc"),
+    `{
+  "scan_boundary": { "ci_policy": "warn" },
+  "security": { "ci_policy": "fail" },
+  "quality": { "ci_policy": "warn" }
+}
+`,
+  );
+
+  const loaded = await loadConfig(root, {});
+
+  assert.equal(loaded.config.scanBoundary.ciPolicy, "warn");
+  assert.equal(loaded.config.security.ciPolicy, "fail");
+  assert.equal(loaded.config.quality.ciPolicy, "warn");
+});
+
 test("quality token thresholds reject non-positive or non-safe-integer values", async (t) => {
   const invalidValues: Array<[string, unknown]> = [
     ["zero", 0],

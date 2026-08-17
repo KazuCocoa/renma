@@ -26,6 +26,91 @@
   },
   "exports": {
     "./package.json": "./package.json",
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    },
+    "./types/artifact": {
+      "types": "./dist/types/artifact.d.ts",
+      "import": "./dist/types/artifact.js",
+      "default": "./dist/types/artifact.js"
+    },
+    "./types/classification": {
+      "types": "./dist/types/classification.d.ts",
+      "import": "./dist/types/classification.js",
+      "default": "./dist/types/classification.js"
+    },
+    "./types/configuration": {
+      "types": "./dist/types/configuration.d.ts",
+      "import": "./dist/types/configuration.js",
+      "default": "./dist/types/configuration.js"
+    },
+    "./types/decision": {
+      "types": "./dist/types/decision.d.ts",
+      "import": "./dist/types/decision.js",
+      "default": "./dist/types/decision.js"
+    },
+    "./types/diagnostics": {
+      "types": "./dist/types/diagnostics.d.ts",
+      "import": "./dist/types/diagnostics.js",
+      "default": "./dist/types/diagnostics.js"
+    },
+    "./types/governance": {
+      "types": "./dist/types/governance.d.ts",
+      "import": "./dist/types/governance.js",
+      "default": "./dist/types/governance.js"
+    },
+    "./types/metadata": {
+      "types": "./dist/types/metadata.d.ts",
+      "import": "./dist/types/metadata.js",
+      "default": "./dist/types/metadata.js"
+    },
+    "./types/scan-result": {
+      "types": "./dist/types/scan-result.d.ts",
+      "import": "./dist/types/scan-result.js",
+      "default": "./dist/types/scan-result.js"
+    },
+    "./discovery": {
+      "types": "./dist/discovery.d.ts",
+      "import": "./dist/discovery.js",
+      "default": "./dist/discovery.js"
+    },
+    "./inspect": {
+      "types": "./dist/commands/inspect.d.ts",
+      "import": "./dist/commands/inspect.js",
+      "default": "./dist/commands/inspect.js"
+    },
+    "./skill-index": {
+      "types": "./dist/commands/skill-index.d.ts",
+      "import": "./dist/commands/skill-index.js",
+      "default": "./dist/commands/skill-index.js"
+    },
+    "./guide": {
+      "types": "./dist/commands/guide.d.ts",
+      "import": "./dist/commands/guide.js",
+      "default": "./dist/commands/guide.js"
+    },
+    "./skill-authoring": {
+      "types": "./dist/guidance/skill-authoring.d.ts",
+      "import": "./dist/guidance/skill-authoring.js",
+      "default": "./dist/guidance/skill-authoring.js"
+    },
+    "./guide-renderer": {
+      "types": "./dist/renderers/guide.d.ts",
+      "import": "./dist/renderers/guide.js",
+      "default": "./dist/renderers/guide.js"
+    },
+    "./suggest-metadata": {
+      "types": "./dist/commands/suggest-metadata.d.ts",
+      "import": "./dist/commands/suggest-metadata.js",
+      "default": "./dist/commands/suggest-metadata.js"
+    },
+    "./skill-migration": {
+      "types": "./dist/skill-migration.d.ts",
+      "import": "./dist/skill-migration.js",
+      "default": "./dist/skill-migration.js"
+    },
     "./dist/types.js": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js",
@@ -134,6 +219,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck:node-min": "tsc --noEmit -p tsconfig.node-min.json",
     "test": "npm run clean:test && tsc -p tsconfig.test.json && node --enable-source-maps --test dist-test/test/*.test.js",
     "format": "prettier --write \"**/*.{ts,js,mjs,json}\"",
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json}\"",
@@ -147,6 +233,7 @@
     "@eslint/js": "^10.0.1",
     "@types/mdast": "^4.0.4",
     "@types/node": "^26.2.0",
+    "@types/node-22": "npm:@types/node@22.17.0",
     "@types/unist": "^3.0.3",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",

@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "renma.scan.v1",
   "root": "<ROOT>",
   "configPath": "renma.config.json",
   "scanBoundary": {

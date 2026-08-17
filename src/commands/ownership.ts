@@ -7,10 +7,11 @@ import {
   type AssetOwnership,
   type AssetStatus,
 } from "../model.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
 export type OwnershipFormat = "json" | "markdown";
+export const OWNERSHIP_JSON_SCHEMA_VERSION = "renma.ownership.v1" as const;
 
 export interface OwnershipKindSummary {
   kind: AssetKind;
@@ -140,7 +141,7 @@ export async function ownership(
 }
 
 export function formatOwnershipJson(report: OwnershipReport): string {
-  return formatJsonDocument(report);
+  return formatVersionedJsonDocument(OWNERSHIP_JSON_SCHEMA_VERSION, report);
 }
 
 export function formatOwnershipMarkdown(report: OwnershipReport): string {

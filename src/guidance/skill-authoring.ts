@@ -10,6 +10,8 @@ export const SKILL_AUTHORING_PRINCIPLE =
 
 export const RENMA_FIRST_AUTHORING_BOUNDARY =
   "Use Renma to establish repository asset and metadata boundaries first. Use platform-native Skill authoring guidance to refine semantics within those boundaries.";
+export const SKILL_AUTHORING_GUIDE_SCHEMA_VERSION =
+  "renma.skill-authoring-guide.v1" as const;
 
 export interface SkillAuthoringProgressionClasses {
   blocking: string;
@@ -85,6 +87,7 @@ export interface SkillAuthoringIllustration {
 }
 
 export interface SkillAuthoringGuidance {
+  schemaVersion: typeof SKILL_AUTHORING_GUIDE_SCHEMA_VERSION;
   topic: "skill";
   renmaVersion: string;
   principle: string;
@@ -118,6 +121,7 @@ export function buildSkillAuthoringGuidance(
   ).join(", ");
 
   return {
+    schemaVersion: SKILL_AUTHORING_GUIDE_SCHEMA_VERSION,
     topic: "skill",
     renmaVersion,
     principle: SKILL_AUTHORING_PRINCIPLE,

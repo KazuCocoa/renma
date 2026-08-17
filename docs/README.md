@@ -68,6 +68,9 @@ They describe implementation rationale and are not normative user guidance.
 - [Repository Context BOM v2](repository-context-bom.md) defines
   `renma.repository-context-bom.v2`, deterministic ordering, reproducibility,
   and the declared-manifest boundary.
+- [Machine-Readable JSON Compatibility](machine-readable-json.md) inventories
+  top-level command contracts, defines the 1.x additive/breaking policy, and
+  identifies environment-derived fields.
 - [Experimental Execution Contract](execution-contract.md) defines the
   `renma.experimental-execution-contract.v1` static `possible` relationship
   artifact, single-snapshot guarantee, bounded completeness, and external

@@ -74,6 +74,23 @@ test("representative public JSON matches fixed compatibility baselines", async (
     outputs.set(item.name, normalizedStdout);
   }
 
+  assert.deepEqual(
+    Object.fromEntries(
+      [...outputs].map(([name, output]) => [
+        name,
+        record(JSON.parse(output)).schemaVersion,
+      ]),
+    ),
+    {
+      scan: "renma.scan.v1",
+      catalog: "renma.catalog.v1",
+      graph: "renma.graph.v1",
+      "skill-index": "renma.skill-index.v1",
+      readiness: "renma.readiness.v1",
+      bom: "renma.repository-context-bom.v2",
+    },
+  );
+
   const catalogOutput = parseOutput(outputs, "catalog");
   const catalogDiagnostics = arrayOfRecords(catalogOutput.diagnostics);
   assert.ok(

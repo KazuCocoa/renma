@@ -26,7 +26,7 @@ import {
 import { zeroExecutableSurfaceInventory } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import type {
   SkillDiscoveryCycleDiff,
   SkillDiscoveryDiff,
@@ -84,6 +84,7 @@ import {
 import { REQUIRED_METADATA_CONFIGURATION_KEY } from "../metadata-definitions.js";
 
 export type CiReportFormat = DiffFormat;
+export const CI_REPORT_JSON_SCHEMA_VERSION = "renma.ci-report.v1" as const;
 export type CiReportStatus = "pass" | "warn" | "fail";
 export type CiReportFailureThreshold = "fail" | "warn";
 type CiCompatibleExecutableSurfaceDiff = Omit<
@@ -347,7 +348,9 @@ export function formatCiReport(
   report: CiReportFormatInput,
   format: CiReportFormat,
 ): string {
-  if (format === "json") return formatJsonDocument(report);
+  if (format === "json") {
+    return formatVersionedJsonDocument(CI_REPORT_JSON_SCHEMA_VERSION, report);
+  }
   return formatCiReportMarkdown(report);
 }
 

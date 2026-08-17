@@ -724,6 +724,7 @@ test("readiness markdown presents ready score 100 findings as non-blocking advis
   >;
 
   assert.equal(report.score, 100);
+  assert.equal(json.schemaVersion, "renma.readiness.v1");
   assert.equal(report.level, "ready");
   assert.equal(
     report.checks.some((check) => check.status === "fail"),

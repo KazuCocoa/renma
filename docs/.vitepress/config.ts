@@ -80,6 +80,10 @@ export default defineConfig({
           { text: "Declared Impact", link: "/declared-impact" },
           { text: "Skill Discovery", link: "/skill-discovery" },
           {
+            text: "Machine-Readable JSON",
+            link: "/machine-readable-json",
+          },
+          {
             text: "Repository Context BOM",
             link: "/repository-context-bom",
           },

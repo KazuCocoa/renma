@@ -43,6 +43,9 @@ jobs:
       - name: Run TypeCheck
         run: npm run typecheck
 
+      - name: Check minimum Node API compatibility
+        run: npm run typecheck:node-min
+
       - name: Run Prettier check
         run: npm run format:check
 

@@ -115,6 +115,7 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
     main(["suggest-metadata", target, "--format", "json"]),
   );
   const suggestion = JSON.parse(result.stdout) as {
+    schemaVersion: string;
     kind: string;
     ownerProvided: boolean;
     suggestedMode: string;
@@ -125,6 +126,7 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
   };
 
   assert.equal(result.code, 0);
+  assert.equal(suggestion.schemaVersion, "renma.metadata-suggestion.v1");
   assert.equal(suggestion.kind, "skill");
   assert.equal(suggestion.suggestedMode, "agent-skills-migration");
   assert.equal(suggestion.ownerProvided, false);
@@ -138,6 +140,7 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
     ),
   );
   assert.deepEqual(Object.keys(suggestion), [
+    "schemaVersion",
     "path",
     "kind",
     "suggestedMode",
@@ -161,6 +164,7 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
     main(["suggest-metadata", target, "--format", "json"]),
   );
   const suggestion = JSON.parse(result.stdout) as {
+    schemaVersion: string;
     instructions: string[];
     blockedMetadata: Array<{ field: string; reason: string }>;
     agentSkills: {
@@ -178,6 +182,7 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
   assert.equal(suggestion.agentSkills.direction, "none");
   assert.equal(suggestion.agentSkills.proposalKind, "none");
   assert.deepEqual(Object.keys(suggestion), [
+    "schemaVersion",
     "path",
     "kind",
     "suggestedMode",

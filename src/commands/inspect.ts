@@ -18,7 +18,7 @@ import {
   type TargetRepositoryEvidence,
 } from "../evidence/target.js";
 import type { CatalogEntry, Dependency } from "../model.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import { renderTextOutline } from "../renderers/inspect.js";
 import type { AssetClassificationEvidence } from "../types/classification.js";
 import type { AssetGovernanceEvidence } from "../types/governance.js";
@@ -32,6 +32,10 @@ import { frontmatterRangeForArtifact } from "../frontmatter-envelope.js";
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
 export type InspectFormat = "json" | "text";
+export const INSPECT_OUTLINE_JSON_SCHEMA_VERSION =
+  "renma.inspect-outline.v1" as const;
+export const INSPECT_SLICE_JSON_SCHEMA_VERSION =
+  "renma.inspect-slice.v1" as const;
 
 export interface InspectOptions {
   format?: InspectFormat;
@@ -55,7 +59,9 @@ export async function runInspectCommand(
   if (options.lines) {
     const slice = await buildInspectSlice(target, options.lines);
     process.stdout.write(
-      options.format === "text" ? `${slice.text}\n` : formatJsonDocument(slice),
+      options.format === "text"
+        ? `${slice.text}\n`
+        : formatVersionedJsonDocument(INSPECT_SLICE_JSON_SCHEMA_VERSION, slice),
     );
     return 0;
   }
@@ -64,7 +70,10 @@ export async function runInspectCommand(
   process.stdout.write(
     options.format === "text"
       ? renderTextOutline(outline)
-      : formatJsonDocument(outline),
+      : formatVersionedJsonDocument(
+          INSPECT_OUTLINE_JSON_SCHEMA_VERSION,
+          outline,
+        ),
   );
   return 0;
 }

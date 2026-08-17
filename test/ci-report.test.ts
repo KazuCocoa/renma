@@ -334,8 +334,9 @@ test("formatCiReport change overview leaves JSON output byte-for-byte unchanged"
 
 test("formatCiReport renders structured JSON", () => {
   const json = formatCiReport(sampleReport(), "json");
-  const parsed = JSON.parse(json) as CiReport;
+  const parsed = JSON.parse(json) as CiReport & { schemaVersion: string };
 
+  assert.equal(parsed.schemaVersion, "renma.ci-report.v1");
   assert.equal(parsed.status, "fail");
   assert.equal(parsed.summary.highOrCriticalFindingsDelta, 1);
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");

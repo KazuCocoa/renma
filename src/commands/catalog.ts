@@ -8,11 +8,12 @@ import {
   type CatalogEntry,
   type Dependency,
 } from "../model.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import { collectRepositoryEvidence } from "../repository-evidence.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
 export type CatalogFormat = "json" | "markdown";
+export const CATALOG_JSON_SCHEMA_VERSION = "renma.catalog.v1" as const;
 
 /** Complete result emitted by the catalog command before formatting. */
 export interface CatalogResult {
@@ -68,7 +69,7 @@ export async function catalog(
 
 /** Format the catalog command result as deterministic pretty JSON. */
 export function formatCatalogJson(result: CatalogResult): string {
-  return formatJsonDocument(result);
+  return formatVersionedJsonDocument(CATALOG_JSON_SCHEMA_VERSION, result);
 }
 
 /** Format a compact Markdown catalog intended for code review and generated docs. */

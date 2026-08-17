@@ -100,6 +100,7 @@ test("graph composition view resolves required and optional closure with provena
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
   const output = JSON.parse(result.stdout) as {
+    schemaVersion: string;
     view: string;
     composition: {
       root: { id: string };
@@ -114,6 +115,7 @@ test("graph composition view resolves required and optional closure with provena
       cycleFree: boolean;
     };
   };
+  assert.equal(output.schemaVersion, "renma.graph.v1");
   assert.equal(output.view, "composition");
   assert.equal(output.composition.root.id, "demo");
   assert.deepEqual(

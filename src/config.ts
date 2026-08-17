@@ -4,6 +4,7 @@ import {
   getNodeValue,
   parseTree,
   printParseErrorCode,
+  type Node as JsonNode,
   type ParseError,
 } from "jsonc-parser";
 import type {
@@ -213,7 +214,73 @@ async function readConfigFile(configPath: string): Promise<unknown> {
       `Config file ${configPath} is not valid ${format} at line ${location.line}, column ${location.column}: ${printParseErrorCode(firstError.error)}.`,
     );
   }
+  const duplicate = tree ? findDuplicateProperty(tree) : undefined;
+  if (duplicate) {
+    const location = sourceLocation(raw, duplicate.offset);
+    const firstLocation = sourceLocation(raw, duplicate.firstOffset);
+    throw new ConfigError(
+      `Config file ${configPath} contains duplicate property ${JSON.stringify(duplicate.key)} at ${duplicate.path} on line ${location.line}, column ${location.column}; it was first declared on line ${firstLocation.line}, column ${firstLocation.column}.`,
+    );
+  }
   return tree ? (getNodeValue(tree) as unknown) : undefined;
+}
+
+interface DuplicateProperty {
+  key: string;
+  path: string;
+  offset: number;
+  firstOffset: number;
+}
+
+/** Find the first duplicate property while preserving JSON syntax-tree scope. */
+function findDuplicateProperty(
+  node: JsonNode,
+  pathSegments: Array<string | number> = [],
+): DuplicateProperty | undefined {
+  if (node.type === "object") {
+    const firstOffsets = new Map<string, number>();
+    for (const property of node.children ?? []) {
+      const [keyNode, valueNode] = property.children ?? [];
+      if (property.type !== "property" || typeof keyNode?.value !== "string") {
+        continue;
+      }
+      const key = keyNode.value;
+      const firstOffset = firstOffsets.get(key);
+      if (firstOffset !== undefined) {
+        return {
+          key,
+          path: formatJsonPath([...pathSegments, key]),
+          offset: keyNode.offset,
+          firstOffset,
+        };
+      }
+      firstOffsets.set(key, keyNode.offset);
+      if (valueNode) {
+        const nested = findDuplicateProperty(valueNode, [...pathSegments, key]);
+        if (nested) return nested;
+      }
+    }
+  } else if (node.type === "array") {
+    for (const [index, child] of (node.children ?? []).entries()) {
+      const nested = findDuplicateProperty(child, [...pathSegments, index]);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+function formatJsonPath(segments: Array<string | number>): string {
+  return segments.reduce<string>(
+    (result, segment) =>
+      typeof segment === "number"
+        ? `${result}[${segment}]`
+        : /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)
+          ? result
+            ? `${result}.${segment}`
+            : segment
+          : `${result}[${JSON.stringify(segment)}]`,
+    "",
+  );
 }
 
 function configFormat(configPath: string): "JSON" | "JSONC" {
