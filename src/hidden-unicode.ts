@@ -1,6 +1,16 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { Artifact } from "./types/artifact.js";
 import type { Finding } from "./types/diagnostics.js";
+import {
+  C0_CONTROL_RANGES,
+  DELETE_AND_C1_CONTROL_RANGE,
+  formatCodePoint,
+  isCodePointInRange,
+  isCodePointInRanges,
+  TAG_BLOCK_RANGE,
+  UNICODE_CODE_POINTS,
+  VARIATION_SELECTOR_RANGES,
+} from "./unicode-primitives.js";
 
 type UnicodeCategory = "bidi-control" | "invisible-character";
 
@@ -26,20 +36,10 @@ interface EvidenceToken {
   readonly text: string;
 }
 
-interface VariationSelectorRange {
-  readonly name: string;
-  readonly startCodePoint: number;
-  readonly endCodePoint: number;
-  readonly characterName: (codePoint: number) => string;
-}
-
 const MAX_SNIPPET_LENGTH = 240;
 const ASCII_TOKEN_CHARACTER = /^[A-Za-z0-9_.\-/:@%+=]$/u;
 
 const MIN_CONSECUTIVE_VARIATION_SELECTORS = 2;
-const BLACK_FLAG = 0x1f3f4;
-const TAG_CODE_POINT_OFFSET = 0xe0000;
-const CANCEL_TAG = 0xe007f;
 
 // Unicode Emoji currently defines these three exact sequences as the RGI
 // subdivision flags. Keep this bounded to reviewed data instead of accepting
@@ -52,64 +52,59 @@ const RGI_EMOJI_TAG_PAYLOADS = ["gbeng", "gbsct", "gbwls"] as const;
 // language, mathematical, emoji, and formatting uses exist. Add only
 // deterministic, high-signal composition or context rules that preserve
 // legitimate multilingual Unicode content.
-const VARIATION_SELECTOR_RANGES: readonly VariationSelectorRange[] = [
-  {
-    name: "Mongolian Free Variation Selectors",
-    startCodePoint: 0x180b,
-    endCodePoint: 0x180d,
-    characterName: mongolianVariationSelectorName,
-  },
-  {
-    name: "Mongolian Free Variation Selectors",
-    startCodePoint: 0x180f,
-    endCodePoint: 0x180f,
-    characterName: mongolianVariationSelectorName,
-  },
-  {
-    name: "Variation Selectors",
-    startCodePoint: 0xfe00,
-    endCodePoint: 0xfe0f,
-    characterName: (codePoint) =>
-      `VARIATION SELECTOR-${codePoint - 0xfe00 + 1}`,
-  },
-  {
-    name: "Variation Selectors Supplement",
-    startCodePoint: 0xe0100,
-    endCodePoint: 0xe01ef,
-    characterName: (codePoint) =>
-      `VARIATION SELECTOR-${codePoint - 0xe0100 + 17}`,
-  },
-];
-
 const BIDI_CONTROLS = new Map<number, string>([
-  [0x202a, "LEFT-TO-RIGHT EMBEDDING"],
-  [0x202b, "RIGHT-TO-LEFT EMBEDDING"],
-  [0x202c, "POP DIRECTIONAL FORMATTING"],
-  [0x202d, "LEFT-TO-RIGHT OVERRIDE"],
-  [0x202e, "RIGHT-TO-LEFT OVERRIDE"],
-  [0x2066, "LEFT-TO-RIGHT ISOLATE"],
-  [0x2067, "RIGHT-TO-LEFT ISOLATE"],
-  [0x2068, "FIRST STRONG ISOLATE"],
-  [0x2069, "POP DIRECTIONAL ISOLATE"],
+  [UNICODE_CODE_POINTS.LEFT_TO_RIGHT_EMBEDDING, "LEFT-TO-RIGHT EMBEDDING"],
+  [UNICODE_CODE_POINTS.RIGHT_TO_LEFT_EMBEDDING, "RIGHT-TO-LEFT EMBEDDING"],
+  [
+    UNICODE_CODE_POINTS.POP_DIRECTIONAL_FORMATTING,
+    "POP DIRECTIONAL FORMATTING",
+  ],
+  [UNICODE_CODE_POINTS.LEFT_TO_RIGHT_OVERRIDE, "LEFT-TO-RIGHT OVERRIDE"],
+  [UNICODE_CODE_POINTS.RIGHT_TO_LEFT_OVERRIDE, "RIGHT-TO-LEFT OVERRIDE"],
+  [UNICODE_CODE_POINTS.LEFT_TO_RIGHT_ISOLATE, "LEFT-TO-RIGHT ISOLATE"],
+  [UNICODE_CODE_POINTS.RIGHT_TO_LEFT_ISOLATE, "RIGHT-TO-LEFT ISOLATE"],
+  [UNICODE_CODE_POINTS.FIRST_STRONG_ISOLATE, "FIRST STRONG ISOLATE"],
+  [UNICODE_CODE_POINTS.POP_DIRECTIONAL_ISOLATE, "POP DIRECTIONAL ISOLATE"],
 ]);
 
 const NAMED_INVISIBLE_CHARACTERS = new Map<number, string>([
-  [0x00ad, "SOFT HYPHEN"],
-  [0x034f, "COMBINING GRAPHEME JOINER"],
-  [0x200b, "ZERO WIDTH SPACE"],
-  [0x200c, "ZERO WIDTH NON-JOINER"],
-  [0x200d, "ZERO WIDTH JOINER"],
-  [0x2060, "WORD JOINER"],
-  [0x206a, "INHIBIT SYMMETRIC SWAPPING"],
-  [0x206b, "ACTIVATE SYMMETRIC SWAPPING"],
-  [0x206c, "INHIBIT ARABIC FORM SHAPING"],
-  [0x206d, "ACTIVATE ARABIC FORM SHAPING"],
-  [0x206e, "NATIONAL DIGIT SHAPES"],
-  [0x206f, "NOMINAL DIGIT SHAPES"],
-  [0xfeff, "ZERO WIDTH NO-BREAK SPACE"],
-  [0xfff9, "INTERLINEAR ANNOTATION ANCHOR"],
-  [0xfffa, "INTERLINEAR ANNOTATION SEPARATOR"],
-  [0xfffb, "INTERLINEAR ANNOTATION TERMINATOR"],
+  [UNICODE_CODE_POINTS.SOFT_HYPHEN, "SOFT HYPHEN"],
+  [UNICODE_CODE_POINTS.COMBINING_GRAPHEME_JOINER, "COMBINING GRAPHEME JOINER"],
+  [UNICODE_CODE_POINTS.ZERO_WIDTH_SPACE, "ZERO WIDTH SPACE"],
+  [UNICODE_CODE_POINTS.ZERO_WIDTH_NON_JOINER, "ZERO WIDTH NON-JOINER"],
+  [UNICODE_CODE_POINTS.ZERO_WIDTH_JOINER, "ZERO WIDTH JOINER"],
+  [UNICODE_CODE_POINTS.WORD_JOINER, "WORD JOINER"],
+  [
+    UNICODE_CODE_POINTS.INHIBIT_SYMMETRIC_SWAPPING,
+    "INHIBIT SYMMETRIC SWAPPING",
+  ],
+  [
+    UNICODE_CODE_POINTS.ACTIVATE_SYMMETRIC_SWAPPING,
+    "ACTIVATE SYMMETRIC SWAPPING",
+  ],
+  [
+    UNICODE_CODE_POINTS.INHIBIT_ARABIC_FORM_SHAPING,
+    "INHIBIT ARABIC FORM SHAPING",
+  ],
+  [
+    UNICODE_CODE_POINTS.ACTIVATE_ARABIC_FORM_SHAPING,
+    "ACTIVATE ARABIC FORM SHAPING",
+  ],
+  [UNICODE_CODE_POINTS.NATIONAL_DIGIT_SHAPES, "NATIONAL DIGIT SHAPES"],
+  [UNICODE_CODE_POINTS.NOMINAL_DIGIT_SHAPES, "NOMINAL DIGIT SHAPES"],
+  [UNICODE_CODE_POINTS.BYTE_ORDER_MARK, "ZERO WIDTH NO-BREAK SPACE"],
+  [
+    UNICODE_CODE_POINTS.INTERLINEAR_ANNOTATION_ANCHOR,
+    "INTERLINEAR ANNOTATION ANCHOR",
+  ],
+  [
+    UNICODE_CODE_POINTS.INTERLINEAR_ANNOTATION_SEPARATOR,
+    "INTERLINEAR ANNOTATION SEPARATOR",
+  ],
+  [
+    UNICODE_CODE_POINTS.INTERLINEAR_ANNOTATION_TERMINATOR,
+    "INTERLINEAR ANNOTATION TERMINATOR",
+  ],
 ]);
 
 const C0_CONTROL_NAMES = [
@@ -347,7 +342,10 @@ function suspiciousCharacter(
 
   if (allowedEmojiTagIndexes.has(scalarIndex)) return undefined;
 
-  if (codePoint === 0x200c || codePoint === 0x200d) {
+  if (
+    codePoint === UNICODE_CODE_POINTS.ZERO_WIDTH_NON_JOINER ||
+    codePoint === UNICODE_CODE_POINTS.ZERO_WIDTH_JOINER
+  ) {
     if (!insideAsciiLikeToken(scalars, scalarIndex)) return undefined;
     return {
       codePoint,
@@ -356,7 +354,7 @@ function suspiciousCharacter(
     };
   }
 
-  if (codePoint === 0xfeff) {
+  if (codePoint === UNICODE_CODE_POINTS.BYTE_ORDER_MARK) {
     if (lineIndex === 0 && scalarIndex === 0) return undefined;
     return {
       codePoint,
@@ -375,7 +373,15 @@ function variationSelectorNameForCodePoint(
   codePoint: number,
 ): string | undefined {
   const range = variationSelectorRange(codePoint);
-  return range?.characterName(codePoint);
+  if (range === undefined) return undefined;
+  if (range.name === "Mongolian Free Variation Selectors") {
+    return mongolianVariationSelectorName(codePoint);
+  }
+  const firstSelectorNumber =
+    range.name === "Variation Selectors Supplement" ? 17 : 1;
+  return `VARIATION SELECTOR-${
+    codePoint - range.startCodePoint + firstSelectorNumber
+  }`;
 }
 
 function mongolianVariationSelectorName(codePoint: number): string {
@@ -427,10 +433,9 @@ function isVariationSelector(codePoint: number | undefined): boolean {
 
 function variationSelectorRange(
   codePoint: number,
-): VariationSelectorRange | undefined {
-  return VARIATION_SELECTOR_RANGES.find(
-    ({ startCodePoint, endCodePoint }) =>
-      codePoint >= startCodePoint && codePoint <= endCodePoint,
+): (typeof VARIATION_SELECTOR_RANGES)[number] | undefined {
+  return VARIATION_SELECTOR_RANGES.find((range) =>
+    isCodePointInRange(codePoint, range),
   );
 }
 
@@ -440,13 +445,14 @@ function allowedEmojiTagSequenceIndexes(
   const indexes = new Set<number>();
 
   for (const [baseIndex, scalar] of scalars.entries()) {
-    if (scalar.codePointAt(0) !== BLACK_FLAG) continue;
+    if (scalar.codePointAt(0) !== UNICODE_CODE_POINTS.BLACK_FLAG) continue;
 
     for (const payload of RGI_EMOJI_TAG_PAYLOADS) {
       const terminatorIndex = baseIndex + payload.length + 1;
       if (
         !emojiTagPayloadMatches(scalars, baseIndex + 1, payload) ||
-        scalars[terminatorIndex]?.codePointAt(0) !== CANCEL_TAG ||
+        scalars[terminatorIndex]?.codePointAt(0) !==
+          UNICODE_CODE_POINTS.CANCEL_TAG ||
         embeddedInsideAsciiLikeToken(scalars, baseIndex, terminatorIndex)
       ) {
         continue;
@@ -468,7 +474,7 @@ function emojiTagPayloadMatches(
   return [...payload].every(
     (character, offset) =>
       scalars[payloadStartIndex + offset]?.codePointAt(0) ===
-      TAG_CODE_POINT_OFFSET + character.charCodeAt(0),
+      UNICODE_CODE_POINTS.TAG_BLOCK_START + character.charCodeAt(0),
   );
 }
 
@@ -488,16 +494,12 @@ function embeddedInsideAsciiLikeToken(
 }
 
 function alwaysDetectedInvisibleName(codePoint: number): string | undefined {
-  if (
-    (codePoint >= 0x0000 && codePoint <= 0x0008) ||
-    (codePoint >= 0x000b && codePoint <= 0x000c) ||
-    (codePoint >= 0x000e && codePoint <= 0x001f)
-  ) {
+  if (isCodePointInRanges(codePoint, C0_CONTROL_RANGES)) {
     return C0_CONTROL_NAMES[codePoint];
   }
-  if (codePoint >= 0x007f && codePoint <= 0x009f) {
-    if (codePoint === 0x007f) return "DELETE";
-    return C1_CONTROL_NAMES[codePoint - 0x0080];
+  if (isCodePointInRange(codePoint, DELETE_AND_C1_CONTROL_RANGE)) {
+    if (codePoint === UNICODE_CODE_POINTS.DELETE) return "DELETE";
+    return C1_CONTROL_NAMES[codePoint - UNICODE_CODE_POINTS.C1_CONTROL_START];
   }
   if (isTagCharacter(codePoint)) {
     return tagCharacterName(codePoint);
@@ -506,10 +508,15 @@ function alwaysDetectedInvisibleName(codePoint: number): string | undefined {
 }
 
 function tagCharacterName(codePoint: number): string {
-  if (codePoint === 0xe0001) return "LANGUAGE TAG";
-  if (codePoint === 0xe007f) return "CANCEL TAG";
-  if (codePoint >= 0xe0020 && codePoint <= 0xe007e) {
-    return `TAG ${asciiCharacterName(codePoint - 0xe0000)}`;
+  if (codePoint === UNICODE_CODE_POINTS.LANGUAGE_TAG) return "LANGUAGE TAG";
+  if (codePoint === UNICODE_CODE_POINTS.CANCEL_TAG) return "CANCEL TAG";
+  if (
+    codePoint >= UNICODE_CODE_POINTS.TAG_PAYLOAD_START &&
+    codePoint <= UNICODE_CODE_POINTS.TAG_PAYLOAD_END
+  ) {
+    return `TAG ${asciiCharacterName(
+      codePoint - UNICODE_CODE_POINTS.TAG_BLOCK_START,
+    )}`;
   }
   return "TAG CHARACTER";
 }
@@ -622,15 +629,13 @@ function variationSelectorDetails(
   }
 
   const reportedRanges = VARIATION_SELECTOR_RANGES.filter((range) =>
-    variationOccurrences.some(
-      ({ character }) =>
-        character.codePoint >= range.startCodePoint &&
-        character.codePoint <= range.endCodePoint,
+    variationOccurrences.some(({ character }) =>
+      isCodePointInRange(character.codePoint, range),
     ),
   ).map(({ name, startCodePoint, endCodePoint }) => ({
     name,
-    startCodePoint: formattedCodePoint(startCodePoint),
-    endCodePoint: formattedCodePoint(endCodePoint),
+    startCodePoint: formatCodePoint(startCodePoint),
+    endCodePoint: formatCodePoint(endCodePoint),
   }));
 
   return {
@@ -656,7 +661,7 @@ function characterDetails(occurrences: Occurrence[]): CharacterDetail[] {
   return [...counts.entries()]
     .sort(([left], [right]) => left - right)
     .map(([codePoint, { name, count }]) => ({
-      codePoint: formattedCodePoint(codePoint),
+      codePoint: formatCodePoint(codePoint),
       name,
       count,
     }));
@@ -797,13 +802,9 @@ function boundedEvidenceWindow(
 }
 
 function escapedCharacter(character: SuspiciousCharacter): string {
-  return `<${formattedCodePoint(character.codePoint)} ${character.name}>`;
-}
-
-function formattedCodePoint(codePoint: number): string {
-  return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
+  return `<${formatCodePoint(character.codePoint)} ${character.name}>`;
 }
 
 function isTagCharacter(codePoint: number): boolean {
-  return codePoint >= 0xe0000 && codePoint <= 0xe007f;
+  return isCodePointInRange(codePoint, TAG_BLOCK_RANGE);
 }

@@ -160,11 +160,17 @@ already-discovered Artifact.content
   -> existing policy diagnostics
 ```
 
-`src/hidden-unicode.ts` owns the isolated raw-source check. It accepts one
-already-classified `Artifact`, returns no findings for binary content, and
-inspects text without Markdown parsing, visibility projection, normalization,
-or command analysis. `analyzeSecurityDiagnostics()` appends those raw findings
-before entering the eligible semantic pipeline and derives
+`src/unicode-primitives.ts` owns the dependency-free Unicode vocabulary shared
+by security consumers: reviewed code-point ranges and boundary values, closed
+range membership, and `U+...` formatting. It has no findings, policy metadata,
+artifact types, or authority decisions. `src/hidden-unicode.ts` owns the
+isolated, context-sensitive raw-source check. It accepts one already-classified
+`Artifact`, returns no findings for binary content, and inspects text without
+Markdown parsing, visibility projection, normalization, or command analysis.
+Its high-signal rules remain narrower than the shared vocabulary so legitimate
+multilingual, emoji, and formatting use does not become an unconditional
+finding. `analyzeSecurityDiagnostics()` appends those raw findings before
+entering the eligible semantic pipeline and derives
 `renma.security-analysis-coverage.v1` from the same prepared analysis objects.
 The established `securityDiagnosticFindings()` API remains a findings-only
 projection of that pass. Discovery scope, artifact classification,
@@ -213,13 +219,14 @@ Security coverage consumes that exact extraction state directly, so zero
 comments can mean `analyzed` only when the extractor actually ran
 successfully.
 
-`src/security-identifier-integrity.ts` owns the single reviewed
-default-ignorable vocabulary used at registered security-authority boundaries.
+`src/security-identifier-integrity.ts` composes the broader reviewed removal
+vocabulary from those shared primitives and owns its authority semantics.
 Policy resolution compares parser-owned keys and artifact-selected opener
 syntax only against exact trusted spellings after that bounded projection. A
 matching corrupted opener or canonical `metadata` container produces invalid
 declaration evidence for every potentially hidden security field, but the
-projected delimiter, container, contents, and values never gain authority.
+projected delimiter, container, contents, and values never gain authority or
+normalization-based recovery.
 
 `src/security-diagnostics.ts` owns semantic-surface eligibility, effective
 policy, guard application, fallback selection, evidence projection, ordering,

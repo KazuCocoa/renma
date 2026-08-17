@@ -2,6 +2,14 @@ import {
   SECURITY_METADATA_FIELD_DEFINITIONS,
   type SecurityMetadataFieldDefinition,
 } from "./metadata-definitions.js";
+import {
+  C0_CONTROL_RANGES,
+  DELETE_AND_C1_CONTROL_RANGE,
+  formatCodePoint,
+  isCodePointInRanges,
+  type CodePointRange,
+  UNICODE_RANGES,
+} from "./unicode-primitives.js";
 
 export type SecurityIdentifierAuthority = "canonical" | "non-skill";
 
@@ -18,30 +26,26 @@ export interface ReviewedDefaultIgnorableProjection {
   removedCodePoints: string[];
 }
 
-const REVIEWED_DEFAULT_IGNORABLE_RANGES: ReadonlyArray<
-  readonly [start: number, end: number]
-> = [
-  [0x0000, 0x0008], // C0 controls excluding supported whitespace
-  [0x000b, 0x000c],
-  [0x000e, 0x001f],
-  [0x007f, 0x009f], // DELETE and C1 controls
-  [0x00ad, 0x00ad], // SOFT HYPHEN
-  [0x034f, 0x034f], // COMBINING GRAPHEME JOINER
-  [0x061c, 0x061c], // ARABIC LETTER MARK
-  [0x115f, 0x1160], // Hangul fillers
-  [0x17b4, 0x17b5], // Khmer inherent vowels
-  [0x180b, 0x180f], // Mongolian free variation selectors and separator
-  [0x200b, 0x200f], // zero-width characters, LRM, and RLM
-  [0x202a, 0x202e], // bidi embeddings and overrides
-  [0x2060, 0x206f], // word joiner and bidi/deprecated format controls
-  [0x3164, 0x3164], // Hangul filler
-  [0xfe00, 0xfe0f], // Variation Selectors
-  [0xfeff, 0xfeff], // zero-width no-break space
-  [0xffa0, 0xffa0], // halfwidth Hangul filler
-  [0xfff9, 0xfffb], // interlinear annotation controls
-  [0xe0000, 0xe0001], // tag base and language tag
-  [0xe0020, 0xe007f], // tag characters
-  [0xe0100, 0xe01ef], // Variation Selectors Supplement
+const REVIEWED_DEFAULT_IGNORABLE_RANGES: readonly CodePointRange[] = [
+  ...C0_CONTROL_RANGES,
+  DELETE_AND_C1_CONTROL_RANGE,
+  UNICODE_RANGES.softHyphen,
+  UNICODE_RANGES.combiningGraphemeJoiner,
+  UNICODE_RANGES.arabicLetterMark,
+  UNICODE_RANGES.hangulFillers,
+  UNICODE_RANGES.khmerInherentVowels,
+  UNICODE_RANGES.mongolianVariationSelectorsAndSeparator,
+  UNICODE_RANGES.zeroWidthCharactersAndDirectionalMarks,
+  UNICODE_RANGES.bidiEmbeddingsAndOverrides,
+  UNICODE_RANGES.wordJoinerAndBidiFormatControls,
+  UNICODE_RANGES.hangulFiller,
+  UNICODE_RANGES.variationSelectors,
+  UNICODE_RANGES.byteOrderMark,
+  UNICODE_RANGES.halfwidthHangulFiller,
+  UNICODE_RANGES.interlinearAnnotationControls,
+  UNICODE_RANGES.tagBaseAndLanguageTag,
+  UNICODE_RANGES.tagPayloadAndCancel,
+  UNICODE_RANGES.variationSelectorsSupplement,
 ];
 
 /**
@@ -104,11 +108,5 @@ export function reviewedDefaultIgnorableProjection(
 }
 
 function isReviewedDefaultIgnorable(codePoint: number): boolean {
-  return REVIEWED_DEFAULT_IGNORABLE_RANGES.some(
-    ([start, end]) => codePoint >= start && codePoint <= end,
-  );
-}
-
-function formatCodePoint(codePoint: number): string {
-  return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
+  return isCodePointInRanges(codePoint, REVIEWED_DEFAULT_IGNORABLE_RANGES);
 }

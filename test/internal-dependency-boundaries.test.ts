@@ -126,6 +126,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "security-identifier-integrity.ts",
         "skill-path-contract.ts",
         "types.ts",
+        "unicode-primitives.ts",
       ],
     ),
     ...topLevelModules("parsing", "source parsing and lexical projection", [
