@@ -24,6 +24,7 @@ import {
 } from "../security-prose-vocabulary.js";
 
 type OffsetSpan = { start: number; end: number };
+type AssociationGroup = OffsetSpan & { associated: boolean };
 type Association = Pick<
   OperationalDestination,
   "actionKind" | "tool" | "commandSpan" | "transferSpan"
@@ -191,10 +192,13 @@ function associatedOperationalDestinations(
   intent: "network" | "upload",
 ): OperationalDestination[] {
   const associated: OperationalDestination[] = [];
-  let previousCandidate: DestinationCandidate | undefined;
-  let previousAssociated = false;
+  let previousGroup: AssociationGroup | undefined;
 
   for (const candidate of context.candidates) {
+    const overlapsPreviousGroup =
+      previousGroup !== undefined &&
+      candidate.start < previousGroup.end &&
+      previousGroup.start < candidate.end;
     const canRepresentDestination =
       candidate.destination !== undefined ||
       candidate.explicitTransport !== undefined;
@@ -209,11 +213,11 @@ function associatedOperationalDestinations(
           : uploadDestinationAssociation(context, candidate, clause);
       if (
         association === undefined &&
-        previousAssociated &&
-        previousCandidate !== undefined &&
+        previousGroup?.associated === true &&
+        !overlapsPreviousGroup &&
         isDestinationListContinuation(
           context.shellProjection.projection,
-          previousCandidate,
+          previousGroup,
           candidate,
         )
       ) {
@@ -246,14 +250,19 @@ function associatedOperationalDestinations(
             : { kind: "evaluated" },
       });
     }
-    const sharesPreviousSpan =
-      previousCandidate !== undefined &&
-      candidate.start === previousCandidate.start &&
-      candidate.end === previousCandidate.end;
-    previousCandidate = candidate;
-    previousAssociated = sharesPreviousSpan
-      ? previousAssociated || association !== undefined
-      : association !== undefined;
+    if (overlapsPreviousGroup && previousGroup !== undefined) {
+      previousGroup = {
+        start: Math.min(previousGroup.start, candidate.start),
+        end: Math.max(previousGroup.end, candidate.end),
+        associated: previousGroup.associated || association !== undefined,
+      };
+    } else {
+      previousGroup = {
+        start: candidate.start,
+        end: candidate.end,
+        associated: association !== undefined,
+      };
+    }
   }
 
   return associated;
@@ -400,13 +409,14 @@ function destinationClauseSpans(
 
 function isDestinationListContinuation(
   line: string,
-  previous: DestinationCandidate,
+  previous: OffsetSpan,
   candidate: DestinationCandidate,
 ): boolean {
   if (candidate.start < previous.end) return false;
-  const trailingPunctuation = previous.raw.match(/[),.;:!?]+$/u)?.[0] ?? "";
+  const previousRaw = line.slice(previous.start, previous.end);
+  const trailingPunctuation = previousRaw.match(/[),.;:!?]+$/u)?.[0] ?? "";
   if (/[.;:!?]/u.test(trailingPunctuation)) return false;
-  const trailingComma = previous.raw.match(/,+$/u)?.[0] ?? "";
+  const trailingComma = previousRaw.match(/,+$/u)?.[0] ?? "";
   const separator = `${trailingComma}${line.slice(previous.end, candidate.start)}`;
   return (
     /^(?:\s|,|\band\b|\bor\b)+$/iu.test(separator) &&
