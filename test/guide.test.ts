@@ -113,6 +113,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
   assert.equal(formatResult.stdout, aliasResult.stdout);
   const output = JSON.parse(formatResult.stdout) as Record<string, unknown>;
   assert.deepEqual(Object.keys(output), [
+    "schemaVersion",
     "topic",
     "renmaVersion",
     "principle",
@@ -128,6 +129,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     "illustrations",
     "verification",
   ]);
+  assert.equal(output.schemaVersion, "renma.skill-authoring-guide.v1");
   assert.equal(output.topic, "skill");
   assert.equal(typeof output.renmaVersion, "string");
   assert.ok((output.renmaVersion as string).length > 0);

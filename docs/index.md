@@ -49,6 +49,8 @@ npx renma readiness . --format markdown
   document.
 - [User Manual](user-manual.md) contains the authoritative operational metadata
   reference and covers current CLI workflows and commands.
+- [Machine-Readable JSON Compatibility](machine-readable-json.md) defines the
+  top-level schema identifiers and 1.x compatibility rules for JSON commands.
 - [Authoring Guide](authoring-guide.md) defines Skill and Context authoring
   workflows.
 - [Changelog](changelog.md) records release history and compatibility notes.

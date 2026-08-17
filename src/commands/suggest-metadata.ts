@@ -19,7 +19,7 @@ import {
   collectTargetRepositoryEvidence,
   type TargetRepositoryEvidence,
 } from "../evidence/target.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import { buildAgentSkillMigrationSuggestion } from "../skill-migration.js";
 import { renderMetadataPrompt } from "../renderers/metadata-suggestion.js";
 import type { ArtifactKind } from "../types/artifact.js";
@@ -35,6 +35,8 @@ export type {
 export { renderMetadataPrompt };
 
 export type SuggestMetadataFormat = "prompt" | "json";
+export const METADATA_SUGGESTION_JSON_SCHEMA_VERSION =
+  "renma.metadata-suggestion.v1" as const;
 
 export interface SuggestMetadataOptions {
   format?: SuggestMetadataFormat;
@@ -60,7 +62,10 @@ export async function runSuggestMetadataCommand(
   const format = options.format ?? "prompt";
   process.stdout.write(
     format === "json"
-      ? formatJsonDocument(suggestion)
+      ? formatVersionedJsonDocument(
+          METADATA_SUGGESTION_JSON_SCHEMA_VERSION,
+          suggestion,
+        )
       : renderMetadataPrompt(suggestion),
   );
   return 0;

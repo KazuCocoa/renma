@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "renma.graph.v1",
   "root": "<ROOT>",
   "configPath": "renma.config.json",
   "scannedFileCount": 7,

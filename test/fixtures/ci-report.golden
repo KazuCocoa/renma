@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "renma.ci-report.v1",
   "root": "/repo",
   "from": {
     "ref": "main",

@@ -694,7 +694,7 @@ test("published handoff schema validates the guide template and bounds malformed
   );
 });
 
-test("existing scaffold JSON remains compatible when no handoff is supplied", async () => {
+test("scaffold JSON adds its schema identity without requiring a handoff", async () => {
   const result = await capture(() =>
     main([
       "scaffold",
@@ -709,6 +709,7 @@ test("existing scaffold JSON remains compatible when no handoff is supplied", as
   assert.equal(result.code, 0);
   const bundle = JSON.parse(result.stdout) as Record<string, unknown>;
   assert.deepEqual(Object.keys(bundle), [
+    "schemaVersion",
     "kind",
     "path",
     "id",
@@ -720,6 +721,7 @@ test("existing scaffold JSON remains compatible when no handoff is supplied", as
     "content",
     "prompt",
   ]);
+  assert.equal(bundle.schemaVersion, "renma.scaffold.v1");
   assert.equal("handoff" in bundle, false);
   assert.doesNotMatch(String(bundle.content), /renma\.requires-lens/);
 });

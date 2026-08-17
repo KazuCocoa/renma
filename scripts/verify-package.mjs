@@ -13,7 +13,78 @@ import { spawnSync } from "node:child_process";
 const PACKAGE_NAME = "renma";
 const PACKAGE_JSON_SPECIFIER = "renma/package.json";
 const REPOSITORY_ONLY_README_PREFIXES = ["docs/development/"];
-const PUBLIC_DEEP_IMPORTS = [
+const SEMANTIC_PUBLIC_IMPORTS = [
+  ["renma/types", "dist/types.js", "dist/types.d.ts"],
+  [
+    "renma/types/artifact",
+    "dist/types/artifact.js",
+    "dist/types/artifact.d.ts",
+  ],
+  [
+    "renma/types/classification",
+    "dist/types/classification.js",
+    "dist/types/classification.d.ts",
+  ],
+  [
+    "renma/types/configuration",
+    "dist/types/configuration.js",
+    "dist/types/configuration.d.ts",
+  ],
+  [
+    "renma/types/decision",
+    "dist/types/decision.js",
+    "dist/types/decision.d.ts",
+  ],
+  [
+    "renma/types/diagnostics",
+    "dist/types/diagnostics.js",
+    "dist/types/diagnostics.d.ts",
+  ],
+  [
+    "renma/types/governance",
+    "dist/types/governance.js",
+    "dist/types/governance.d.ts",
+  ],
+  [
+    "renma/types/metadata",
+    "dist/types/metadata.js",
+    "dist/types/metadata.d.ts",
+  ],
+  [
+    "renma/types/scan-result",
+    "dist/types/scan-result.js",
+    "dist/types/scan-result.d.ts",
+  ],
+  ["renma/discovery", "dist/discovery.js", "dist/discovery.d.ts"],
+  ["renma/inspect", "dist/commands/inspect.js", "dist/commands/inspect.d.ts"],
+  [
+    "renma/skill-index",
+    "dist/commands/skill-index.js",
+    "dist/commands/skill-index.d.ts",
+  ],
+  ["renma/guide", "dist/commands/guide.js", "dist/commands/guide.d.ts"],
+  [
+    "renma/skill-authoring",
+    "dist/guidance/skill-authoring.js",
+    "dist/guidance/skill-authoring.d.ts",
+  ],
+  [
+    "renma/guide-renderer",
+    "dist/renderers/guide.js",
+    "dist/renderers/guide.d.ts",
+  ],
+  [
+    "renma/suggest-metadata",
+    "dist/commands/suggest-metadata.js",
+    "dist/commands/suggest-metadata.d.ts",
+  ],
+  [
+    "renma/skill-migration",
+    "dist/skill-migration.js",
+    "dist/skill-migration.d.ts",
+  ],
+];
+const LEGACY_PUBLIC_DEEP_IMPORTS = [
   ["renma/dist/types.js", "dist/types.js", "dist/types.d.ts"],
   [
     "renma/dist/types/artifact.js",
@@ -118,7 +189,10 @@ const PRIVATE_PACKAGE_SPECIFIERS = [
   ...PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS,
 ];
 const CLI_ONLY_PACKAGE_SPECIFIERS = ["renma", "renma/dist/index.js"];
-const PUBLIC_MODULE_IMPORTS = [...PUBLIC_DEEP_IMPORTS];
+const PUBLIC_MODULE_IMPORTS = [
+  ...SEMANTIC_PUBLIC_IMPORTS,
+  ...LEGACY_PUBLIC_DEEP_IMPORTS,
+];
 const PRIVATE_DECLARATION_SPECIFIERS = [
   ...PRIVATE_PACKAGE_SPECIFIERS,
   ...PRIVATE_PACKAGE_SPECIFIERS.map((specifier) =>
@@ -319,7 +393,7 @@ async function verifyInstalledExports(packageRoot) {
 
   const expectedKeys = new Set([
     packageExportKey(PACKAGE_JSON_SPECIFIER),
-    ...PUBLIC_DEEP_IMPORTS.map(([specifier]) => packageExportKey(specifier)),
+    ...PUBLIC_MODULE_IMPORTS.map(([specifier]) => packageExportKey(specifier)),
   ]);
   assertSameStrings(
     Object.keys(exportsMap),

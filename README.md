@@ -201,6 +201,25 @@ npm run build
 node dist/index.js scan . --fail-on high
 ```
 
+### Library imports
+
+Use semantic package exports for new TypeScript or JavaScript consumers. For
+example:
+
+```ts
+import type { ScanResult } from "renma/types";
+import { classifyAssetPath } from "renma/discovery";
+import { buildInspectOutline } from "renma/inspect";
+import { buildSkillIndexReport } from "renma/skill-index";
+import { runGuideCommand } from "renma/guide";
+```
+
+The complete allowlist also includes focused type subpaths plus
+`renma/skill-authoring`, `renma/guide-renderer`, `renma/suggest-metadata`, and
+`renma/skill-migration`. Existing documented `renma/dist/...` specifiers remain
+compatibility aliases, but new consumers should not depend on build-directory
+names. The package root is the CLI entrypoint and is not a library import.
+
 ## Command Overview
 
 | Command | Main question |
@@ -338,6 +357,7 @@ a trust score.
 - [Repository Context BOM v2](docs/repository-context-bom.md)
 - [Experimental Execution Contract](docs/execution-contract.md)
 - [Trust Graph v2](docs/trust-graph.md)
+- [Machine-Readable JSON Compatibility](docs/machine-readable-json.md)
 - [Skill Authoring Handoff v1 Schema](docs/schemas/skill-authoring-handoff-v1.schema.json)
 - [Changelog](CHANGELOG.md)
 - [Examples](https://github.com/KazuCocoa/renma/tree/main/examples)

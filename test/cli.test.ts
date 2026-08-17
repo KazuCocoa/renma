@@ -7,6 +7,7 @@ import { main } from "../src/cli.js";
 import { COMMAND_HELP, commandOptionNames } from "../src/cli-help.js";
 import { buildInspectOutline } from "../src/commands/inspect.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
+import { classifyAssetPath } from "../src/discovery.js";
 import { scan } from "../src/scanner.js";
 
 test("scan discovers default artifacts and emits deterministic findings", async () => {
@@ -1220,6 +1221,7 @@ test("CLI prints a platform-neutral semantic split prompt", async () => {
     main(["suggest-semantic-split", source, "--format", "json"]),
   );
   const semanticSplitReviewBundle = JSON.parse(json.stdout) as {
+    schemaVersion: string;
     context: {
       siblingFiles: Array<{ path: string }>;
     };
@@ -1236,6 +1238,10 @@ test("CLI prints a platform-neutral semantic split prompt", async () => {
     };
   };
   assert.equal(json.code, 0);
+  assert.equal(
+    semanticSplitReviewBundle.schemaVersion,
+    "renma.semantic-split-suggestion.v1",
+  );
   assert.equal(semanticSplitReviewBundle.mode, "codex-semantic-split-prompt");
   assert.equal(semanticSplitReviewBundle.mutatesFiles, false);
   assert.match(
@@ -1284,11 +1290,13 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
   );
   assert.equal(outlineResult.code, 0);
   const outline = JSON.parse(outlineResult.stdout) as {
+    schemaVersion: string;
     codeFences: Array<{ range: string }>;
     frontmatterRange: string;
     headings: Array<{ preview: string[]; range: string; text: string }>;
     links: Array<{ line: number; target: string }>;
   };
+  assert.equal(outline.schemaVersion, "renma.inspect-outline.v1");
   assert.equal(outline.frontmatterRange, "L1-L3");
   assert.deepEqual(
     outline.headings.map((heading) => heading.text),
@@ -1306,6 +1314,16 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
   assert.equal(sliceResult.code, 0);
   assert.match(sliceResult.stdout, /L0008: ## Windows/);
   assert.match(sliceResult.stdout, /L0009: Use PowerShell\./);
+
+  const sliceJsonResult = await withCapturedConsole(() =>
+    main(["inspect", source, "--lines", "L8-L9", "--format", "json"]),
+  );
+  assert.equal(sliceJsonResult.code, 0);
+  assert.equal(
+    (JSON.parse(sliceJsonResult.stdout) as { schemaVersion: string })
+      .schemaVersion,
+    "renma.inspect-slice.v1",
+  );
 });
 
 test("inspect does not report whitespace thematic breaks as frontmatter", async () => {
@@ -2396,6 +2414,83 @@ test("scaffold context file output omits Skill-specific next steps", async () =>
   assert.equal(result.stdout, `Created ${target}\n`);
   assert.doesNotMatch(result.stdout, /Next steps:/);
   assert.doesNotMatch(result.stdout, /standard Skill authoring guidance/);
+  assert.equal(
+    (await scan(root)).securityPolicyInventory?.assetKinds.context,
+    1,
+  );
+});
+
+test("scaffold targets conform to normal asset classification paths", async () => {
+  const cases = [
+    {
+      kind: "context",
+      relativePath: "contexts/testing/canonical.md",
+      expectedKind: "context",
+    },
+    {
+      kind: "context",
+      relativePath: "context/testing/legacy.md",
+      expectedKind: "context",
+    },
+    {
+      kind: "context_lens",
+      relativePath: "lenses/testing/canonical.md",
+      expectedKind: "context_lens",
+    },
+    {
+      kind: "context_lens",
+      relativePath: "contexts/testing/typed-lens.md",
+      expectedKind: "context_lens",
+    },
+  ] as const;
+
+  for (const fixtureCase of cases) {
+    const classification = classifyAssetPath(fixtureCase.relativePath, {
+      ...(fixtureCase.kind === "context_lens"
+        ? { metadataType: "context_lens" }
+        : {}),
+    });
+    assert.equal(classification.kind, fixtureCase.expectedKind);
+
+    const result = await withCapturedConsole(() =>
+      main([
+        "scaffold",
+        fixtureCase.kind,
+        fixtureCase.relativePath,
+        "--format",
+        "json",
+        "--owner",
+        "qa-platform",
+      ]),
+    );
+    assert.equal(result.code, 0, fixtureCase.relativePath);
+    assert.ok(
+      result.stdout.includes(
+        `"path": ${JSON.stringify(fixtureCase.relativePath)}`,
+      ),
+      fixtureCase.relativePath,
+    );
+  }
+});
+
+test("scaffold rejects targets that normal discovery cannot classify as requested", async () => {
+  const cases = [
+    ["context", "docs/not-context.md", /Context scaffolds require/],
+    ["context", "lenses/not-context.md", /Context scaffolds require/],
+    ["context", "contexts/not-markdown.txt", /Markdown target/],
+    ["context_lens", "docs/not-lens.md", /Context Lens scaffolds require/],
+    ["context_lens", "skills/demo/lens.md", /Context Lens scaffolds require/],
+    ["context_lens", "lenses/not-markdown.txt", /Markdown target/],
+  ] as const;
+
+  for (const [kind, target, expectedError] of cases) {
+    const result = await withCapturedConsole(() =>
+      main(["scaffold", kind, target, "--format", "json"]),
+    );
+    assert.equal(result.code, 2, target);
+    assert.match(result.stderr, expectedError, target);
+    assert.equal(result.stdout, "", target);
+  }
 });
 
 test("scaffold refuses to overwrite an existing file", async () => {
@@ -2518,6 +2613,7 @@ test("scaffold context can emit json", async () => {
 
   assert.equal(result.code, 0);
   const bundle = JSON.parse(result.stdout) as {
+    schemaVersion: string;
     kind: string;
     id: string;
     title: string;
@@ -2529,6 +2625,7 @@ test("scaffold context can emit json", async () => {
   assert.equal(bundle.title, "Boundary Value Analysis");
   assert.equal(bundle.owner, "qa-platform");
   assert.deepEqual(Object.keys(bundle), [
+    "schemaVersion",
     "kind",
     "path",
     "id",
@@ -2540,6 +2637,7 @@ test("scaffold context can emit json", async () => {
     "content",
     "prompt",
   ]);
+  assert.equal(bundle.schemaVersion, "renma.scaffold.v1");
   assert.match(
     bundle.content,
     /^id: context\.testing\.boundary-value-analysis$/m,
@@ -2648,6 +2746,7 @@ test("scaffold skill JSON keeps its field shape and includes the human-review bo
     prompt: string;
   };
   assert.deepEqual(Object.keys(bundle), [
+    "schemaVersion",
     "kind",
     "path",
     "id",
@@ -2659,6 +2758,7 @@ test("scaffold skill JSON keeps its field shape and includes the human-review bo
     "content",
     "prompt",
   ]);
+  assert.equal(bundle.schemaVersion, "renma.scaffold.v1");
   assert.match(
     bundle.prompt,
     /Have a human review meaningful semantic changes before merging/,

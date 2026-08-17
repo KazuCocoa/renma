@@ -8,11 +8,16 @@ export function canonicalJson(value: unknown): string {
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
     return `{${Object.keys(record)
-      .sort((left, right) => left.localeCompare(right))
+      .sort(compareUtf16CodeUnits)
       .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
       .join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+/** Compare strings by ECMAScript UTF-16 code-unit order without locale data. */
+function compareUtf16CodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 /** Calculate Renma's prefixed SHA-256 identity for canonical object state. */

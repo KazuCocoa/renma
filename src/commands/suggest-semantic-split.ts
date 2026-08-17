@@ -1,12 +1,14 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { buildInspectOutline, type InspectOutline } from "./inspect.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 
 const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const CONTEXT_DIRS = new Set(["references", "profiles", "examples", "r"]);
 
 export type SuggestSemanticSplitFormat = "prompt" | "json";
+export const SEMANTIC_SPLIT_SUGGESTION_JSON_SCHEMA_VERSION =
+  "renma.semantic-split-suggestion.v1" as const;
 
 export interface SuggestSemanticSplitOptions {
   format?: SuggestSemanticSplitFormat;
@@ -61,7 +63,10 @@ export async function runSuggestSemanticSplitCommand(
   const format = options.format ?? "prompt";
   process.stdout.write(
     format === "json"
-      ? formatJsonDocument(semanticSplitReviewBundle)
+      ? formatVersionedJsonDocument(
+          SEMANTIC_SPLIT_SUGGESTION_JSON_SCHEMA_VERSION,
+          semanticSplitReviewBundle,
+        )
       : renderReviewPrompt(semanticSplitReviewBundle),
   );
   return 0;

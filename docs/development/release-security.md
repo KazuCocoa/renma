@@ -17,9 +17,13 @@ exact equality with `origin/main`, and then requires the tag version to equal
 behind, or beside main; ancestry is not enough.
 
 The publish job also depends on successful tests, builds, and package checks at
-both the minimum supported Node version and the current LTS version. It is bound
-to the `npm-publish` GitHub Environment and is the only npm workflow job with
-`id-token: write`.
+both the minimum supported Node version and the current LTS version. A separate
+`typecheck:node-min` gate checks production source against Node 22.17 type
+definitions while the normal `typecheck` continues to use the current
+development definitions. This catches accidental use of newer Node APIs
+without making the everyday development type environment artificially old.
+The publish job is bound to the `npm-publish` GitHub Environment and is the only
+npm workflow job with `id-token: write`.
 
 These same-workflow checks are not sufficient against an attacker who can
 modify and push the tagged workflow commit. Such a commit could modify or remove
@@ -101,6 +105,28 @@ The environment is part of npm's expected OIDC identity. Removing
 `environment: npm-publish` from a modified workflow must cause npm trusted
 publishing to reject that workflow's OIDC identity; it must not create an
 alternate publication path.
+
+## Publication job size review
+
+The pre-1.0 review leaves the publication workflow behavior unchanged. The
+OIDC-enabled job repeats installation, tests, build, and package verification
+after the minimum/LTS matrix succeeds. It is larger than an artifact-only
+publisher, but it rebuilds and verifies the publishable package state
+immediately before `npm publish`, inside the checked release commit, without
+introducing a second artifact upload/download trust path or selecting one
+artifact from a matrix. `verify:package` discards its clean-consumer tarball,
+and `npm publish` performs packaging again, so this does not claim byte identity
+between the verified and published tarballs.
+
+A smaller publisher would be worthwhile only with a clean, integrity-bound way
+for package verification to emit the single validated tarball, upload it from
+the intended LTS matrix leg, and make the environment-protected job publish
+that exact artifact. Adding a parallel `npm pack`, mutable artifact selection,
+or an unverified handoff would weaken clarity rather than harden publication.
+The current repeated validation is therefore acceptable for 1.0 and is not a
+release blocker. Exact tag/main identity, minimum plus LTS validation, package
+content verification, the `npm-publish` environment, and OIDC Trusted
+Publishing remain mandatory.
 
 Repository code can verify Git objects, workflow structure, tests, and package
 metadata. It cannot verify that npm Trusted Publisher settings, GitHub

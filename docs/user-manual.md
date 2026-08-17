@@ -1449,6 +1449,12 @@ These commands are related, but they answer different repository-review question
 
 `catalog` is about what assets exist. `graph` is about how assets relate. `readiness` is about repository-level health score and checks. `trust-graph` is about traceability of trust-relevant evidence. `bom` is the reviewable declared repository manifest that combines asset inventory, dependencies, hashes, lifecycle, diagnostics, readiness, and security posture evidence.
 
+Every public JSON document has a top-level `schemaVersion`. Consumers must
+branch on that identifier rather than the package version or incidental field
+order. See [Machine-Readable JSON Compatibility](machine-readable-json.md) for
+the complete identifier inventory, 1.x additive/breaking rules, and the exact
+environment-derived values excluded from portable deterministic comparisons.
+
 Use `trust-graph` when a reviewer asks: "Why should this asset be considered safe, owned, current, and usable enough for an agent-facing repository?" The command does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
 
 In short:

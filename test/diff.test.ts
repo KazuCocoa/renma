@@ -1162,6 +1162,7 @@ test("formatDiff renders markdown summaries", () => {
   const markdown = formatDiff(report, "markdown");
   const parsed = JSON.parse(formatDiff(report, "json"));
 
+  assert.equal(parsed.schemaVersion, "renma.diff.v1");
   assert.match(markdown, /# Renma semantic diff/);
   assert.match(markdown, /Refs: `base` -> `head`/);
   assert.match(markdown, /Readiness score: 90 \(\+90\)/);

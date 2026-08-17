@@ -51,6 +51,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Check minimum Node API compatibility
+        run: npm run typecheck:node-min
+
       - name: Build package
         run: npm run build
 

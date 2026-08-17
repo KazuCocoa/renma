@@ -23,7 +23,7 @@ import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
-import { formatJsonDocument } from "../report.js";
+import { formatVersionedJsonDocument } from "../report.js";
 import type { Diagnostic, Finding } from "../types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
@@ -36,6 +36,7 @@ import {
 import { CLI_EXIT } from "../cli-errors.js";
 
 export type ReadinessFormat = "json" | "markdown";
+export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v1" as const;
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const MARKDOWN_FINDINGS_LIMIT =
@@ -913,7 +914,7 @@ function scaffoldCompletenessCheck(findings: Finding[]): ReadinessCheck {
 }
 
 export function formatReadinessJson(report: ReadinessReport): string {
-  return formatJsonDocument(report);
+  return formatVersionedJsonDocument(READINESS_JSON_SCHEMA_VERSION, report);
 }
 
 function workflowReadinessSummaryLine(report: ReadinessReport): string {

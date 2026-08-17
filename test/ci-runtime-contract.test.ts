@@ -135,6 +135,7 @@ test("primary CI preserves LTS quality and adds exact-floor compatibility", () =
     "npm run docs:build",
     "npm run lint",
     "npm run typecheck",
+    "npm run typecheck:node-min",
     "npm run format:check",
     "npm run build",
     "npm run test",
@@ -312,6 +313,7 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
   for (const command of [
     "npm ci",
     "npm test",
+    "npm run typecheck:node-min",
     "npm run build",
     "npm run verify:package",
   ]) {
@@ -388,6 +390,17 @@ test("release security documentation preserves the external trust boundary", () 
   const source = readFileSync("docs/development/release-security.md", "utf8");
   assert.match(source, /exact workflow filename `npm-publish\.yml`/u);
   assert.match(source, /`npm-publish` environment/u);
+  assert.match(source, /Publication job size review/u);
+  assert.match(
+    source,
+    /rebuilds and verifies the publishable package state\s+immediately before `npm publish`/u,
+  );
+  assert.match(
+    source,
+    /`npm publish` performs packaging again[\s\S]+does not claim byte identity/u,
+  );
+  assert.doesNotMatch(source, /produces and verifies the exact bytes/u);
+  assert.match(source, /current repeated validation is therefore acceptable/u);
   assert.match(source, /required reviewers/u);
   assert.match(source, /deployment branch\/tag rules/u);
   assert.match(source, /ruleset targeting\s+`v\*`/u);

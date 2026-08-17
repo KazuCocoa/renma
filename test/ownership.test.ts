@@ -185,6 +185,7 @@ test("ownership default output does not include flat owned asset list", async ()
   const markdown = formatOwnershipMarkdown(await ownership(root));
 
   assert.equal(result.code, 0);
+  assert.equal(report.schemaVersion, "renma.ownership.v1");
   assert.equal("ownedAssetList" in report, false);
   assert.equal("owners" in report, true);
   assert.doesNotMatch(markdown, /## Owned Assets/);
