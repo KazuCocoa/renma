@@ -72,9 +72,9 @@
       "default": "./dist/types/scan-result.js"
     },
     "./discovery": {
-      "types": "./dist/discovery.d.ts",
-      "import": "./dist/discovery.js",
-      "default": "./dist/discovery.js"
+      "types": "./dist/public-discovery.d.ts",
+      "import": "./dist/public-discovery.js",
+      "default": "./dist/public-discovery.js"
     }
   },
   "files": [
