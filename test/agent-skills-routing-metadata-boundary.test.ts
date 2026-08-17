@@ -38,16 +38,8 @@ metadata:
       .filter((issue) => issue.code === "AS-SKILL-UNSUPPORTED-ROUTING-METADATA")
       .map((issue) => [issue.severity, issue.category, issue.field]),
     [
-      [
-        "warning",
-        "renma-authoring",
-        "metadata.renma.when-to-use",
-      ],
-      [
-        "warning",
-        "renma-authoring",
-        "metadata.renma.when-not-to-use",
-      ],
+      ["warning", "renma-authoring", "metadata.renma.when-to-use"],
+      ["warning", "renma-authoring", "metadata.renma.when-not-to-use"],
     ],
   );
 });
