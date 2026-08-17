@@ -55,11 +55,7 @@ const SEMANTIC_PUBLIC_IMPORTS = [
     "dist/types/scan-result.js",
     "dist/types/scan-result.d.ts",
   ],
-  [
-    "renma/discovery",
-    "dist/public-discovery.js",
-    "dist/public-discovery.d.ts",
-  ],
+  ["renma/discovery", "dist/public-discovery.js", "dist/public-discovery.d.ts"],
 ];
 const REMOVED_DIST_IMPORTS = [
   ["renma/dist/types.js", "dist/types.js", "dist/types.d.ts"],
