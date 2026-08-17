@@ -672,12 +672,15 @@ function validateMetadata(
     UNSUPPORTED_ROUTING_METADATA.has(candidate.key),
   )) {
     issues.push(
-      fieldIssue(
+      createIssue(
         document,
-        field,
         IDS.AS_UNSUPPORTED_ROUTING_METADATA,
+        "warning",
+        "renma-authoring",
         `Skill metadata key "${field.key}" is not supported in Renma v1. Put portable discovery and selection boundaries in the Agent Skills description.`,
+        field.startLine,
         `metadata.${field.key}`,
+        field.endLine,
       ),
     );
   }
@@ -980,7 +983,7 @@ function usageBoundaryPattern(): RegExp {
  * Conservative English capability evidence for the Agent Skills "what" clause.
  */
 function descriptionCapabilityPattern(): RegExp {
-  return /\b(?:address(?:es|ing)?|analy[sz](?:e|es|ing)|analysis|automat(?:e|es|ing|ion)|build(?:s|ing)?|calculat(?:e|es|ing|ion)|compar(?:e|es|ing|ison)|configur(?:e|es|ing|ation)|convert(?:s|ing)?|creat(?:e|es|ing|ion)|debug(?:s|ging)?|deploy(?:s|ing|ment)?|design(?:s|ing)?|diagnos(?:e|es|ing|is)|document(?:s|ing|ation)?|edit(?:s|ing)?|evaluat(?:e|es|ing|ion)|extract(?:s|ing|ion)?|find(?:s|ing)?|fix(?:es|ing)?|generat(?:e|es|ing|ion)|guid(?:e|es|ing|ance)|implement(?:s|ing|ation)?|inspect(?:s|ing|ion)?|install(?:s|ing|ation)?|manage(?:s|ment|ing)?|migrat(?:e|es|ing|ion)|monitor(?:s|ing)?|organiz(?:e|es|ing|ation)|plan(?:s|ning)?|prepar(?:e|es|ing|ation)|produc(?:e|es|ing|tion)|publish(?:es|ing)?|read(?:s|ing)?|releas(?:e|es|ing)|render(?:s|ing)?|review(?:s|ing)?|rout(?:e|es|ing)|scaffold(?:s|ing)?|search(?:es|ing)?|summari[sz](?:e|es|ing|ation)|test(?:s|ing)?|transform(?:s|ing|ation)?|triag(?:e|es|ing)|updat(?:e|es|ing)|validat(?:e|es|ing|ion)|verif(?:y|ies|ying|ication)|writ(?:e|es|ing))\b/iu;
+  return /\b(?:address(?:es|ing)?|analy[sz](?:e|es|ing)|analysis|automat(?:e|es|ing|ion)|build(?:s|ing)?|calculat(?:e|es|ing|ion)|compar(?:e|es|ing|ison)|configur(?:e|es|ing|ation)|convert(?:s|ing)?|creat(?:e|es|ing|ion)|debug(?:s|ging)?|deploy(?:s|ing|ment)?|design(?:s|ing)?|diagnos(?:e|es|ing|is)|document(?:s|ing|ation)?|edit(?:s|ing)?|evaluat(?:e|es|ing|ion)|extract(?:s|ing|ion)?|find(?:s|ing)?|fix(?:es|ing)?|generat(?:e|es|ing|ion)|guid(?:e|es|ing|ance)|implement(?:s|ing|ation)?|inspect(?:s|ing|ion)?|install(?:s|ing|ation)?|manage(?:s|ment|ing)?|migrat(?:e|es|ing|ion)|monitor(?:s|ing)?|organiz(?:e|es|ing|ation)|plan(?:s|ning)?|prepar(?:e|es|ing|ation)|produc(?:e|es|ing|tion)|publish(?:es|ing)?|read(?:s|ing)?|releas(?:e|es|ing)|render(?:s|ing)?|review(?:s|ing)?|rout(?:e|es|ing)|scaffold(?:s|ing)?|search(?:es|ing)?|summari[sz](?:e|es|ing|ation)|test(?:s|ing)?|transform(?:s|ing|ation)|triag(?:e|es|ing)|updat(?:e|es|ing)|validat(?:e|es|ing|ion)|verif(?:y|ies|ying|ication)|writ(?:e|es|ing))\b/iu;
 }
 
 function explicitSelectionBoundaryPattern(): RegExp {
