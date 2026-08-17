@@ -52,6 +52,14 @@ comments, code, text scripts, configuration, and non-Markdown assets; it does
 not interpret scripts as executable code, include binary artifacts, or widen
 repository discovery.
 
+The dependency-free `unicode-primitives` module owns shared reviewed
+code-point ranges, boundary values, range membership, and code-point
+formatting. The hidden-Unicode scanner still owns its context-sensitive,
+high-signal finding rules, while security-identifier integrity separately owns
+the broader projection and the exact trusted-identifier or delimiter match
+required before that projection has any authority. Sharing vocabulary does not
+turn every reviewed default-ignorable code point into a raw-source finding.
+
 `SEC-SUSPICIOUS-BIDI-CONTROL` (`high` severity, `high` confidence,
 `suspicious`) covers `U+202A`–`U+202E` and `U+2066`–`U+2069`.
 `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` (`medium` severity, `high` confidence,
