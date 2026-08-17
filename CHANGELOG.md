@@ -58,6 +58,23 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Made non-Skill Renma metadata consume one shared YAML 1.2 parse before
+  catalog, governance, Context Lens, and security interpretation. Quoted,
+  block, and flow values now retain YAML semantics consistently, while
+  malformed or non-mapping frontmatter and duplicate recognized operational
+  keys fail closed with explicit diagnostics instead of selecting raw-line or
+  first/last values.
+- Routed Markdown link, image, autolink, and resolved reference destinations
+  through parser-owned evidence for security analysis and Skill-local support
+  reachability. Reference definitions remain non-operational by themselves,
+  visible labels and resolved targets remain additive when distinct, and
+  overlapping destination candidates preserve the governing instruction.
+- Closed frontmatter security-boundary gaps by accounting for parser-hidden
+  YAML comments in exact non-Skill envelopes, rejecting reviewed invisible or
+  default-ignorable corruption of registered policy keys and delimiters without
+  recovering their values, and treating exactly one absolute leading `U+FEFF`
+  as an encoding BOM while additional or embedded corruption remains
+  fail-closed.
 - Preserved safe Skill-local support file identity across exact exclusion so a
   unique basename-only static reference still produces blocking `excluded`
   inspection evidence. Excluded files continue to count during basename
