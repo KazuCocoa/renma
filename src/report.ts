@@ -28,7 +28,9 @@ export function formatVersionedJsonDocument(
   schemaVersion: string,
   value: object,
 ): string {
-  return formatJsonDocument({ schemaVersion, ...value });
+  return formatJsonDocument(
+    Object.assign({ schemaVersion }, value, { schemaVersion }),
+  );
 }
 
 export const SCAN_JSON_SCHEMA_VERSION = "renma.scan.v1" as const;

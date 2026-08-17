@@ -391,6 +391,15 @@ test("release security documentation preserves the external trust boundary", () 
   assert.match(source, /exact workflow filename `npm-publish\.yml`/u);
   assert.match(source, /`npm-publish` environment/u);
   assert.match(source, /Publication job size review/u);
+  assert.match(
+    source,
+    /rebuilds and verifies the publishable package state\s+immediately before `npm publish`/u,
+  );
+  assert.match(
+    source,
+    /`npm publish` performs packaging again[\s\S]+does not claim byte identity/u,
+  );
+  assert.doesNotMatch(source, /produces and verifies the exact bytes/u);
   assert.match(source, /current repeated validation is therefore acceptable/u);
   assert.match(source, /required reviewers/u);
   assert.match(source, /deployment branch\/tag rules/u);

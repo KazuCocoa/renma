@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { formatJsonDocument } from "../src/report.js";
+import {
+  formatJsonDocument,
+  formatVersionedJsonDocument,
+} from "../src/report.js";
 
 test("JSON documents preserve insertion order with exact pretty printing", () => {
   const value = {
@@ -32,4 +35,23 @@ test("JSON documents preserve insertion order with exact pretty printing", () =>
     ].join("\n"),
   );
   assert.equal(formatJsonDocument(value).endsWith("\n\n"), false);
+});
+
+test("versioned JSON documents keep the boundary schema authoritative", () => {
+  const value = {
+    schemaVersion: "input-controlled.v1",
+    result: "preserved",
+  };
+
+  assert.equal(
+    formatVersionedJsonDocument("boundary-controlled.v1", value),
+    [
+      "{",
+      '  "schemaVersion": "boundary-controlled.v1",',
+      '  "result": "preserved"',
+      "}",
+      "",
+    ].join("\n"),
+  );
+  assert.equal(value.schemaVersion, "input-controlled.v1");
 });

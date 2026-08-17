@@ -111,9 +111,12 @@ alternate publication path.
 The pre-1.0 review leaves the publication workflow behavior unchanged. The
 OIDC-enabled job repeats installation, tests, build, and package verification
 after the minimum/LTS matrix succeeds. It is larger than an artifact-only
-publisher, but it produces and verifies the exact bytes immediately before
-`npm publish`, inside the checked release commit, without introducing a second
-artifact upload/download trust path or selecting one artifact from a matrix.
+publisher, but it rebuilds and verifies the publishable package state
+immediately before `npm publish`, inside the checked release commit, without
+introducing a second artifact upload/download trust path or selecting one
+artifact from a matrix. `verify:package` discards its clean-consumer tarball,
+and `npm publish` performs packaging again, so this does not claim byte identity
+between the verified and published tarballs.
 
 A smaller publisher would be worthwhile only with a clean, integrity-bound way
 for package verification to emit the single validated tarball, upload it from
