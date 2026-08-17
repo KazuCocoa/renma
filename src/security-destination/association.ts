@@ -246,8 +246,14 @@ function associatedOperationalDestinations(
             : { kind: "evaluated" },
       });
     }
+    const sharesPreviousSpan =
+      previousCandidate !== undefined &&
+      candidate.start === previousCandidate.start &&
+      candidate.end === previousCandidate.end;
     previousCandidate = candidate;
-    previousAssociated = association !== undefined;
+    previousAssociated = sharesPreviousSpan
+      ? previousAssociated || association !== undefined
+      : association !== undefined;
   }
 
   return associated;
