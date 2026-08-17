@@ -208,19 +208,29 @@ function normalizeMigrationRelativePath(filePath: string): string | undefined {
   const normalizedSeparators = filePath.replaceAll("\\", "/");
   if (isAbsoluteLike(normalizedSeparators)) return undefined;
   const rawSegments = normalizedSeparators.split("/");
-  const normalizedSegments: string[] = [];
-  for (const segment of rawSegments) {
+  while (rawSegments[0] === "" || rawSegments[0] === ".") {
+    rawSegments.shift();
+  }
+  const rootMatch = matchRepositorySkillRoot(rawSegments);
+  if (!rootMatch) return undefined;
+  const resolved = rawSegments.slice(0, rootMatch.endIndex);
+  for (const segment of rawSegments.slice(rootMatch.endIndex)) {
     if (!segment || segment === ".") continue;
     if (segment === "..") {
-      if (normalizedSegments.length === 0) return undefined;
-      normalizedSegments.pop();
+      if (resolved.length <= rootMatch.endIndex) return undefined;
+      resolved.pop();
       continue;
     }
-    normalizedSegments.push(segment);
+    resolved.push(segment);
   }
-  const normalized = normalizedSegments.join("/");
-  if (!normalized) return undefined;
-  return matchRepositorySkillRoot(normalizedSegments) ? normalized : undefined;
+  const normalizedRoot = matchRepositorySkillRoot(resolved);
+  if (
+    normalizedRoot?.root !== rootMatch.root ||
+    normalizedRoot.endIndex !== rootMatch.endIndex
+  ) {
+    return undefined;
+  }
+  return resolved.join("/");
 }
 
 function isAbsoluteLike(filePath: string): boolean {
