@@ -4,6 +4,13 @@ import {
   type FloatingDependencyAllowance,
 } from "./dependency-selectors.js";
 import { parseDocument } from "./markdown.js";
+import {
+  frontmatterOpenerIntegrityInput,
+  isFrontmatterOpener,
+  normalizeFrontmatterOpener,
+  type FrontmatterContract,
+  YAML_FRONTMATTER_MARKER,
+} from "./frontmatter-envelope.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
@@ -608,23 +615,16 @@ function corruptedFrontmatterAuthorityOpener(
   firstLine: string,
   authority: SecurityIdentifierAuthority,
 ): string | undefined {
-  let authorityLine = firstLine;
-  if (authority === "canonical") {
-    if (firstLine.replace(/^\uFEFF/u, "").trim() === "---") return undefined;
-  } else {
-    authorityLine = firstLine.replace(/^\uFEFF/u, "");
-    if (authorityLine === "---") {
-      return undefined;
-    }
-  }
+  const contract: FrontmatterContract =
+    authority === "canonical" ? "agent-skill" : "renma";
+  if (isFrontmatterOpener(firstLine, contract)) return undefined;
 
-  const projection = reviewedDefaultIgnorableProjection(authorityLine);
+  const projection = reviewedDefaultIgnorableProjection(
+    frontmatterOpenerIntegrityInput(firstLine, contract),
+  );
   if (projection.removedCodePoints.length === 0) return undefined;
-  const sanitized =
-    authority === "canonical"
-      ? projection.sanitized.replace(/^\uFEFF/u, "").trim()
-      : projection.sanitized;
-  if (sanitized !== "---") return undefined;
+  const sanitized = normalizeFrontmatterOpener(projection.sanitized, contract);
+  if (sanitized !== YAML_FRONTMATTER_MARKER) return undefined;
   return `security-bearing frontmatter opener contains reviewed invisible/default-ignorable code point${
     projection.removedCodePoints.length === 1 ? "" : "s"
   } ${projection.removedCodePoints.join(", ")}; it resembles the artifact's frontmatter delimiter, but no frontmatter or values were interpreted`;
