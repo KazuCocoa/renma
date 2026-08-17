@@ -3236,7 +3236,7 @@ test("coverage regression stays WARN and --fail-on-status warn blocks it", async
   );
 });
 
-test("ci-report rejects conflicting aliases in either archived endpoint", async () => {
+test("ci-report rejects historical aliases in either archived endpoint", async () => {
   const repo = await createArchivedAliasConflictRepo();
   try {
     for (const [fromRef, toRef] of [
@@ -3248,7 +3248,9 @@ test("ci-report rejects conflicting aliases in either archived endpoint", async 
         (error: unknown) =>
           error instanceof ConfigError &&
           /security\.profiles\.restricted/.test(error.message) &&
-          /conflicting aliases for networkAllowed/.test(error.message),
+          /Historical security profile key "networkAllowed"/.test(
+            error.message,
+          ),
       );
     }
 
@@ -3268,7 +3270,8 @@ test("ci-report rejects conflicting aliases in either archived endpoint", async 
     assert.equal(command.code, 2);
     assert.equal(command.stdout, "");
     assert.match(command.stderr, /security\.profiles\.restricted/);
-    assert.match(command.stderr, /conflicting aliases for networkAllowed/);
+    assert.match(command.stderr, /Historical security profile key/);
+    assert.match(command.stderr, /Use "network_allowed" instead/);
     assert.doesNotMatch(command.stderr, /SEC-|QUAL-|strict_scan\./);
   } finally {
     await rm(repo, { force: true, recursive: true });
@@ -3876,7 +3879,7 @@ async function createArchivedAliasConflictRepo(): Promise<string> {
     join(repo, "renma.config.json"),
     JSON.stringify({
       security: {
-        profiles: { restricted: { networkAllowed: false } },
+        profiles: { restricted: { network_allowed: false } },
       },
     }),
   );
@@ -3891,7 +3894,6 @@ async function createArchivedAliasConflictRepo(): Promise<string> {
         profiles: {
           restricted: {
             networkAllowed: false,
-            network_allowed: true,
           },
         },
       },

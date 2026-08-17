@@ -30,8 +30,6 @@ metadata:
   renma.review-cycle: " P90D "
   renma.expires-at: " 2026-12-31 "
   renma.tags: '["testing","review"]'
-  renma.when-to-use: '["specification review"]'
-  renma.when-not-to-use: '[]'
   renma.requires-context: '["context.testing.boundaries"]'
   renma.optional-context: '[]'
   renma.requires-lens: '["lens.testing.spec-review"]'
@@ -55,7 +53,7 @@ metadata:
     reviewCycle: "P90D",
     expiresAt: "2026-12-31",
     tags: ["testing", "review"],
-    whenToUse: ["specification review"],
+    whenToUse: [],
     whenNotToUse: [],
     requiresContext: ["context.testing.boundaries"],
     optionalContext: [],
@@ -679,27 +677,52 @@ status: stable
   assert.equal(lifecycleEdge?.evidence?.[0]?.snippet, "  renma.status: stable");
 });
 
-test("canonical list items retain the existing metadata budget diagnostic", () => {
+test("non-Skill list items retain the existing metadata budget diagnostic", () => {
   const longBoundary = "x".repeat(257);
   const { diagnostics } = buildCatalog([
-    skillDocument(`---
-name: demo
-description: Review demo inputs. Use when a demo needs deterministic review.
-metadata:
-  renma.when-to-use: '["${longBoundary}"]'
+    parseDocument(
+      artifact(
+        "contexts/demo.md",
+        "context",
+        `---
+id: context.demo
+when_to_use:
+  - ${longBoundary}
 ---
 # Demo
-`),
+`,
+      ),
+    ),
   ]);
   const diagnostic = diagnostics.find((candidate) =>
     candidate.message.includes("Metadata list item is too long in when_to_use"),
   );
 
   assert.ok(diagnostic);
-  assert.equal(diagnostic.evidence?.startLine, 5);
-  assert.equal(
-    diagnostic.evidence?.snippet,
-    `  renma.when-to-use: '["${longBoundary}"]'`,
+  assert.equal(diagnostic.evidence?.startLine, 4);
+  assert.equal(diagnostic.evidence?.snippet, `  - ${longBoundary}`);
+});
+
+test("Skill routing metadata is rejected and never interpreted", () => {
+  const document = skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.when-to-use: '["specification review"]'
+  renma.when-not-to-use: '["runtime execution"]'
+---
+# Demo
+`);
+  const result = parseAssetMetadata(document);
+  const validation = validateAgentSkill(document);
+
+  assert.deepEqual(result.metadata.whenToUse, []);
+  assert.deepEqual(result.metadata.whenNotToUse, []);
+  assert.deepEqual(
+    validation.issues
+      .filter((issue) => issue.code === "AS-SKILL-UNSUPPORTED-ROUTING-METADATA")
+      .map((issue) => issue.field),
+    ["metadata.renma.when-to-use", "metadata.renma.when-not-to-use"],
   );
 });
 

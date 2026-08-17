@@ -284,7 +284,7 @@ function specificRepairConstraints(code: string): RepairConstraint[] {
       },
       {
         kind: "allowed_change",
-        text: "Retarget the reference to a reviewed replacement when superseded_by or canonical metadata provides one.",
+        text: "Retarget the reference when a reviewed superseded_by relationship or replacement guidance provides a destination.",
       },
       {
         kind: "requires_human_decision",
@@ -330,15 +330,15 @@ function specificRepairConstraints(code: string): RepairConstraint[] {
     ];
   }
 
-  if (code === CONTEXT_LENS_DIAGNOSTIC_CODES.DEPRECATED_FIELD) {
+  if (code === CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_LEGACY_FIELD) {
     return [
       {
-        kind: "must_preserve",
-        text: "Preserve the deprecated field value when moving it to the replacement field.",
+        kind: "must_not_change",
+        text: "Do not reinterpret the unsupported historical value as canonical Context Lens metadata.",
       },
       {
         kind: "allowed_change",
-        text: "Rename the deprecated field to the supported Context Lens field.",
+        text: "Remove the unsupported field and declare the supported Context Lens field only from reviewed intent.",
       },
     ];
   }

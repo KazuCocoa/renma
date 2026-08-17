@@ -102,12 +102,13 @@ formats, authoring status, and consumer projections. This compatibility guide
 focuses on canonical Skill serialization, the portable boundary, and migration
 behavior rather than maintaining a second field list.
 
-For new canonical Skills, `description` is the portable discovery source of
-truth for what the Skill does and when it should be selected. Existing
-`renma.when-to-use` and `renma.when-not-to-use` values remain recognized for
-governance and one-way migration preservation, but are deprecated for new Skill
-authoring because duplicating discovery semantics invites drift. They remain
-appropriate top-level governance fields for shared non-Skill Context Assets.
+For canonical Skills, `description` is the sole portable discovery source of
+truth for what the Skill does and when it should be selected.
+`renma.when-to-use` and `renma.when-not-to-use` are rejected and not
+interpreted. Historical top-level `when_to_use` and `when_not_to_use` may help
+an explicit pre-0.16 migration recover a portable description, but are not
+emitted as Renma metadata. Their top-level non-Skill forms remain appropriate
+for shared Context Assets.
 
 Renma normalizes the governance values into the existing asset metadata model
 used by scan findings, inspect, catalog, ownership, graph and dependency
@@ -133,7 +134,7 @@ only:
 metadata:
   renma.tags: '["testing","spec-review"]'
   renma.requires-context: '["context.testing.boundaries"]'
-  renma.optional-context: '[]'
+  renma.optional-context: "[]"
 ```
 
 Canonical list metadata is not comma-separated. Malformed JSON, non-array
@@ -257,10 +258,12 @@ still determines whether a discovered file is a Skill entrypoint, Skill-local
 support, or a reserved support root. Broadening a glob never turns support
 content into an independent Skill.
 
-Renma continues discovering historical `skill.md` and `*.skill.md` spellings
+The repository walk reports historical `skill.md` and `*.skill.md` spellings
 under those roots, with the same reserved-directory exclusions, so `scan` can
-report validation and migration diagnostics.
-Discovery does not make those spellings Agent Skills-compatible.
+show the required path migration. They remain unknown to operational Skill
+discovery, cataloging, ownership, inheritance, security, and dependency
+consumers. A custom glob cannot change that boundary; only an explicit
+`suggest-metadata` target creates a migration candidate.
 
 The entrypoint migration is explicit:
 
@@ -383,7 +386,9 @@ An execution constraint applies after activation. Instructions such as `Do not
 modify production files` or `Never upload secrets` belong in the body under a
 prominent heading such as `Hard Constraints`, `Prohibited Actions`, or `Safety
 Constraints`. A generic execution constraint must not be copied automatically
-into `description` or `metadata.renma.when-not-to-use`.
+into `description`. Renma v1 does not operationally accept
+`metadata.renma.when-to-use` or `metadata.renma.when-not-to-use`; portable
+Skill discovery and selection boundaries belong in `description`.
 
 Renma may report conservative authoring warnings for a missing usage boundary,
 an omitted selection exclusion, a buried or scattered execution constraint, or
@@ -406,27 +411,28 @@ affect structural validity or the existing `--fail-on` threshold.
 
 ### Specification errors
 
-| Identifier | Meaning |
-| --- | --- |
-| `AS-SKILL-NONCANONICAL-FILENAME` | The entrypoint filename is not exactly `SKILL.md`. |
-| `AS-SKILL-MISSING-FRONTMATTER` | YAML frontmatter is absent. |
-| `AS-SKILL-UNCLOSED-FRONTMATTER` | The opening frontmatter delimiter has no closing delimiter. |
-| `AS-SKILL-INVALID-YAML` | The frontmatter is not valid YAML. |
-| `AS-SKILL-FRONTMATTER-NOT-MAPPING` | The frontmatter root is not a YAML mapping. |
-| `AS-SKILL-DUPLICATE-FIELD` | A top-level frontmatter field is declared more than once. |
-| `AS-SKILL-DUPLICATE-METADATA-KEY` | A key in `metadata` is declared more than once. |
-| `AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD` | A top-level field is outside the Agent Skills field set. |
-| `AS-SKILL-MISSING-NAME` | The required `name` field is absent or empty. |
-| `AS-SKILL-INVALID-NAME` | `name` has the wrong type or violates the name rules. |
-| `AS-SKILL-NAME-DIRECTORY-MISMATCH` | The normalized `name` does not match its immediate parent directory. |
-| `AS-SKILL-MISSING-DESCRIPTION` | The required `description` field is absent or empty. |
-| `AS-SKILL-INVALID-DESCRIPTION` | `description` is not a string. |
-| `AS-SKILL-DESCRIPTION-TOO-LONG` | `description` exceeds 1,024 Unicode code points. |
-| `AS-SKILL-INVALID-COMPATIBILITY` | `compatibility` is not a non-empty string. |
-| `AS-SKILL-COMPATIBILITY-TOO-LONG` | `compatibility` exceeds 500 Unicode code points. |
-| `AS-SKILL-INVALID-LICENSE` | `license` is present but is not a string. |
-| `AS-SKILL-INVALID-ALLOWED-TOOLS` | `allowed-tools` is present but is not a string. |
-| `AS-SKILL-INVALID-METADATA` | `metadata` is not a string-to-string mapping. |
+| Identifier                              | Meaning                                                                                                                          |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `AS-SKILL-NONCANONICAL-FILENAME`        | The entrypoint filename is not exactly `SKILL.md`.                                                                               |
+| `AS-SKILL-MISSING-FRONTMATTER`          | YAML frontmatter is absent.                                                                                                      |
+| `AS-SKILL-UNCLOSED-FRONTMATTER`         | The opening frontmatter delimiter has no closing delimiter.                                                                      |
+| `AS-SKILL-INVALID-YAML`                 | The frontmatter is not valid YAML.                                                                                               |
+| `AS-SKILL-FRONTMATTER-NOT-MAPPING`      | The frontmatter root is not a YAML mapping.                                                                                      |
+| `AS-SKILL-DUPLICATE-FIELD`              | A top-level frontmatter field is declared more than once.                                                                        |
+| `AS-SKILL-DUPLICATE-METADATA-KEY`       | A key in `metadata` is declared more than once.                                                                                  |
+| `AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD`   | A top-level field is outside the Agent Skills field set.                                                                         |
+| `AS-SKILL-MISSING-NAME`                 | The required `name` field is absent or empty.                                                                                    |
+| `AS-SKILL-INVALID-NAME`                 | `name` has the wrong type or violates the name rules.                                                                            |
+| `AS-SKILL-NAME-DIRECTORY-MISMATCH`      | The normalized `name` does not match its immediate parent directory.                                                             |
+| `AS-SKILL-MISSING-DESCRIPTION`          | The required `description` field is absent or empty.                                                                             |
+| `AS-SKILL-INVALID-DESCRIPTION`          | `description` is not a string.                                                                                                   |
+| `AS-SKILL-DESCRIPTION-TOO-LONG`         | `description` exceeds 1,024 Unicode code points.                                                                                 |
+| `AS-SKILL-INVALID-COMPATIBILITY`        | `compatibility` is not a non-empty string.                                                                                       |
+| `AS-SKILL-COMPATIBILITY-TOO-LONG`       | `compatibility` exceeds 500 Unicode code points.                                                                                 |
+| `AS-SKILL-INVALID-LICENSE`              | `license` is present but is not a string.                                                                                        |
+| `AS-SKILL-INVALID-ALLOWED-TOOLS`        | `allowed-tools` is present but is not a string.                                                                                  |
+| `AS-SKILL-INVALID-METADATA`             | `metadata` is not a string-to-string mapping.                                                                                    |
+| `AS-SKILL-UNSUPPORTED-ROUTING-METADATA` | Removed `renma.when-to-use` or `renma.when-not-to-use` metadata is present and not interpreted; move Skill routing boundaries into `description`. |
 
 ### Renma authoring warnings
 
@@ -439,14 +445,14 @@ The conservative multilingual signal requires non-ASCII letter or combining-
 mark evidence; typographic punctuation and emoji in otherwise-English prose do
 not disable the ordinary English-primary authoring warnings.
 
-| Identifier | Meaning |
-| --- | --- |
-| `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY` | The description does not state when the Skill should be used. |
-| `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY` | The description does not clearly state what the Skill does. This is a Renma authoring warning, not an Agent Skills validity error. |
-| `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY` | A body selection exclusion is absent from the description. |
-| `RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT` | An execution constraint is outside a prominent constraint section. |
-| `RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED` | Execution constraints are scattered across sections. |
-| `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE` | A prohibition has no nearby supported alternative or stop behavior. |
+| Identifier                                          | Meaning                                                                                                                            |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY`       | The description does not state when the Skill should be used.                                                                      |
+| `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY`           | The description does not clearly state what the Skill does. This is a Renma authoring warning, not an Agent Skills validity error. |
+| `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY`     | A body selection exclusion is absent from the description.                                                                         |
+| `RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT`       | An execution constraint is outside a prominent constraint section.                                                                 |
+| `RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED`           | Execution constraints are scattered across sections.                                                                               |
+| `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE` | A prohibition has no nearby supported alternative or stop behavior.                                                                |
 
 ## One-Way Migration
 

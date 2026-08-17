@@ -68,14 +68,15 @@ can become catalog entries. Agent instruction files, configuration files, and
 unknown files remain discoverable and may contribute diagnostics without
 becoming catalog assets.
 
-Canonical Skill entrypoints are directory-based `SKILL.md` files under
-`skills/**` or `.agents/skills/**`, excluding paths that cross a reserved
-Skill-support directory. Historical Skill spellings remain accepted only where
-the documented compatibility contract says so. A custom scan glob does not
-turn an arbitrary path into a Skill.
+Canonical Skill entrypoints are directory-based, exact-case `SKILL.md` files
+under `skills/**` or `.agents/skills/**`, excluding paths that cross a reserved
+Skill-support directory. Historical Skill spellings are migration-only inputs
+to an explicit `suggest-metadata` request. A custom scan glob does not turn an
+arbitrary or historical path into a Skill.
 
-Shared Context Assets normally live under `contexts/`; `context/` remains an
-accepted compatibility root. Skill-local `references/`, `profiles/`,
+Shared Context Assets live under `contexts/`. The former `context/` root is
+reported with migration guidance and is not interpreted operationally.
+Skill-local `references/`, `profiles/`,
 `examples/`, `scripts/`, and `assets/` remain local support. Reused knowledge
 does not become shared merely because of its path: independent ownership,
 lifecycle, source-of-truth status, or demonstrated cross-Skill reuse establishes
@@ -232,7 +233,8 @@ in [External Review Governance](../external-review-governance.md).
 ## Change Discipline
 
 Public JSON fields, diagnostic identities, schema identifiers, CLI behavior,
-documented deep imports, and compatibility re-exports are compatibility-sensitive.
+documented semantic exports, and package-path rejection boundaries are
+compatibility-sensitive.
 New projections should reuse the shared repository snapshot and remain additive
 unless a separately reviewed contract permits a breaking change.
 

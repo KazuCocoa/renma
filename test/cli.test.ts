@@ -50,31 +50,25 @@ test("scan discovers default artifacts and emits deterministic findings", async 
   assert.equal(result.securityPolicyInventory?.assetsWithoutEffectivePolicy, 1);
 });
 
-test("scan discovers skills/demo/skill.md entrypoint as a skill", async () => {
+test("scan reports skills/demo/skill.md as migration-only", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(path.join(root, "skills", "demo", "skill.md"), "# Demo\n");
 
   const result = await scan(root);
 
-  assert.equal(result.scannedFileCount, 1);
-  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
-  assert.deepEqual(
-    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
-      (asset) => [asset.path, asset.kind],
-    ),
-    [["skills/demo/skill.md", "skill"]],
-  );
-  assert.equal(
+  assert.equal(result.scannedFileCount, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
+  assert.ok(
     result.diagnostics.some(
       (diagnostic) =>
-        diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+        diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+        diagnostic.path === "skills/demo/skill.md",
     ),
-    false,
   );
 });
 
-test("scan discovers skills/demo/foo.skill.md entrypoint as a skill", async () => {
+test("scan reports skills/demo/foo.skill.md as migration-only", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(
@@ -84,13 +78,14 @@ test("scan discovers skills/demo/foo.skill.md entrypoint as a skill", async () =
 
   const result = await scan(root);
 
-  assert.equal(result.scannedFileCount, 1);
-  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
-  assert.deepEqual(
-    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
-      (asset) => [asset.path, asset.kind],
+  assert.equal(result.scannedFileCount, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
+  assert.ok(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+        diagnostic.path === "skills/demo/foo.skill.md",
     ),
-    [["skills/demo/foo.skill.md", "skill"]],
   );
 });
 
@@ -500,7 +495,7 @@ test("CLI reports concise JSONC syntax locations without stack traces", async ()
   assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
-test("commands fail closed on conflicting security profile aliases", async () => {
+test("commands fail closed on historical security profile aliases", async () => {
   const root = await fixture();
   await writeFile(
     path.join(root, "renma.config.json"),
@@ -509,7 +504,6 @@ test("commands fail closed on conflicting security profile aliases", async () =>
         profiles: {
           restricted: {
             humanApprovalRequired: true,
-            requires_human_approval: false,
           },
         },
       },
@@ -527,12 +521,9 @@ test("commands fail closed on conflicting security profile aliases", async () =>
     assert.equal(result.code, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
     assert.match(result.stderr, /security\.profiles\.restricted/);
-    assert.match(
-      result.stderr,
-      /conflicting aliases for humanApprovalRequired/,
-    );
-    assert.match(result.stderr, /humanApprovalRequired=true/);
-    assert.match(result.stderr, /requires_human_approval=false/);
+    assert.match(result.stderr, /Historical security profile key/);
+    assert.match(result.stderr, /humanApprovalRequired/);
+    assert.match(result.stderr, /requires_human_approval/);
     assert.doesNotMatch(result.stderr, /strict_scan\.|SEC-|QUAL-/);
     assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
   }
@@ -934,7 +925,7 @@ test("CLI honors format from config", async () => {
 test("invalid config field is a usage error in CLI", async () => {
   const root = await fixture();
   await writeFile(
-    path.join(root, ".renma.json"),
+    path.join(root, "renma.config.json"),
     JSON.stringify({ failOn: "high" }),
   );
 
@@ -1394,7 +1385,7 @@ test("inspect uses the Agent Skills frontmatter contract for canonical entrypoin
   );
 });
 
-test("inspect uses the Agent Skills frontmatter contract for historical entrypoints", async () => {
+test("inspect does not classify historical entrypoints as Skills", async () => {
   for (const entrypoint of ["skill.md", "foo.skill.md"]) {
     const root = await fixture();
     const directory = path.join(root, "skills", "demo");
@@ -1416,7 +1407,7 @@ test("inspect uses the Agent Skills frontmatter contract for historical entrypoi
 
     const outline = await buildInspectOutline(source);
 
-    assert.equal(outline.classification.kind, "skill", entrypoint);
+    assert.equal(outline.classification.kind, "unknown", entrypoint);
     assert.equal(outline.frontmatterRange, "L1-L4", entrypoint);
     assert.deepEqual(
       outline.headings.map((heading) => [heading.text, heading.line]),
@@ -2428,11 +2419,6 @@ test("scaffold targets conform to normal asset classification paths", async () =
       expectedKind: "context",
     },
     {
-      kind: "context",
-      relativePath: "context/testing/legacy.md",
-      expectedKind: "context",
-    },
-    {
       kind: "context_lens",
       relativePath: "lenses/testing/canonical.md",
       expectedKind: "context_lens",
@@ -2477,6 +2463,7 @@ test("scaffold rejects targets that normal discovery cannot classify as requeste
   const cases = [
     ["context", "docs/not-context.md", /Context scaffolds require/],
     ["context", "lenses/not-context.md", /Context scaffolds require/],
+    ["context", "context/testing/legacy.md", /Context scaffolds require/],
     ["context", "contexts/not-markdown.txt", /Markdown target/],
     ["context_lens", "docs/not-lens.md", /Context Lens scaffolds require/],
     ["context_lens", "skills/demo/lens.md", /Context Lens scaffolds require/],

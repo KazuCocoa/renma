@@ -573,7 +573,7 @@
         "Run renma catalog.",
         "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
       ],
-      "llmHint": "Inspect \"contexts/inactive.md\" for superseded_by or canonical context metadata. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
+      "llmHint": "Inspect \"contexts/inactive.md\" for a reviewed superseded_by relationship or replacement guidance. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
       "details": {
         "source": "skill.review",
         "target": "context.inactive",

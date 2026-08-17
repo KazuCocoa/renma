@@ -604,8 +604,6 @@ metadata:
   renma.review-cycle: P90D
   renma.expires-at: 2025-12-31
   renma.tags: '["testing","review"]'
-  renma.when-to-use: '["specification review"]'
-  renma.when-not-to-use: '["runtime execution"]'
   renma.requires-context: '["contexts/testing/boundaries.md"]'
   renma.requires-lens: '["lens.testing.spec-review"]'
 ---

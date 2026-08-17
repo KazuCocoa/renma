@@ -56,35 +56,8 @@ const SEMANTIC_PUBLIC_IMPORTS = [
     "dist/types/scan-result.d.ts",
   ],
   ["renma/discovery", "dist/discovery.js", "dist/discovery.d.ts"],
-  ["renma/inspect", "dist/commands/inspect.js", "dist/commands/inspect.d.ts"],
-  [
-    "renma/skill-index",
-    "dist/commands/skill-index.js",
-    "dist/commands/skill-index.d.ts",
-  ],
-  ["renma/guide", "dist/commands/guide.js", "dist/commands/guide.d.ts"],
-  [
-    "renma/skill-authoring",
-    "dist/guidance/skill-authoring.js",
-    "dist/guidance/skill-authoring.d.ts",
-  ],
-  [
-    "renma/guide-renderer",
-    "dist/renderers/guide.js",
-    "dist/renderers/guide.d.ts",
-  ],
-  [
-    "renma/suggest-metadata",
-    "dist/commands/suggest-metadata.js",
-    "dist/commands/suggest-metadata.d.ts",
-  ],
-  [
-    "renma/skill-migration",
-    "dist/skill-migration.js",
-    "dist/skill-migration.d.ts",
-  ],
 ];
-const LEGACY_PUBLIC_DEEP_IMPORTS = [
+const REMOVED_DIST_IMPORTS = [
   ["renma/dist/types.js", "dist/types.js", "dist/types.d.ts"],
   [
     "renma/dist/types/artifact.js",
@@ -163,6 +136,15 @@ const LEGACY_PUBLIC_DEEP_IMPORTS = [
     "dist/skill-migration.d.ts",
   ],
 ];
+const REMOVED_SEMANTIC_IMPORTS = [
+  "renma/inspect",
+  "renma/skill-index",
+  "renma/guide",
+  "renma/skill-authoring",
+  "renma/guide-renderer",
+  "renma/suggest-metadata",
+  "renma/skill-migration",
+];
 const PRIVATE_BODY_POLICY_SPECIFIERS = [
   "renma/dist/security-body-policy/clause-facts.js",
   "renma/dist/security-body-policy/model.js",
@@ -185,14 +167,13 @@ const PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS = [
   "renma/dist/executable-surface-diff.js",
 ];
 const PRIVATE_PACKAGE_SPECIFIERS = [
+  ...REMOVED_DIST_IMPORTS.map(([specifier]) => specifier),
+  ...REMOVED_SEMANTIC_IMPORTS,
   ...PRIVATE_BODY_POLICY_SPECIFIERS,
   ...PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS,
 ];
 const CLI_ONLY_PACKAGE_SPECIFIERS = ["renma", "renma/dist/index.js"];
-const PUBLIC_MODULE_IMPORTS = [
-  ...SEMANTIC_PUBLIC_IMPORTS,
-  ...LEGACY_PUBLIC_DEEP_IMPORTS,
-];
+const PUBLIC_MODULE_IMPORTS = [...SEMANTIC_PUBLIC_IMPORTS];
 const PRIVATE_DECLARATION_SPECIFIERS = [
   ...PRIVATE_PACKAGE_SPECIFIERS,
   ...PRIVATE_PACKAGE_SPECIFIERS.map((specifier) =>
@@ -310,13 +291,12 @@ try {
     cacheDirectory,
   );
   await verifyInstalledExports(packageRoot);
-  await verifyInspectDeclarationCompatibility(packageRoot);
   await verifyPackageSpecifierPolicy(consumerDirectory);
   await verifyPackageSpecifierDeclarations(consumerDirectory);
   verifyPackagedCli(consumerDirectory);
 
   process.stdout.write(
-    `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_PACKAGE_SPECIFIERS.length} private module subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} private declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, inspect declaration compatibility, and every README-relative target.\n`,
+    `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_PACKAGE_SPECIFIERS.length} rejected module subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} rejected declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, and every README-relative target.\n`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
@@ -670,32 +650,6 @@ function verifyPackagedCli(consumerDirectory) {
     throw new Error(
       `Packaged CLI help failed: ${verified.stderr.trim() || verified.stdout.trim() || `exit code ${verified.status}`}`,
     );
-  }
-}
-
-async function verifyInspectDeclarationCompatibility(packageRoot) {
-  const declarations = await readFile(
-    path.join(packageRoot, "dist/commands/inspect.d.ts"),
-    "utf8",
-  );
-  for (const typeName of [
-    "InspectOutline",
-    "InspectAssetSummary",
-    "InspectRelationship",
-    "InspectRelationshipChain",
-    "InspectSlice",
-  ]) {
-    const declared = new RegExp(
-      `export\\s+(?:interface|type)\\s+${typeName}\\b`,
-    ).test(declarations);
-    const reexported = new RegExp(
-      `export\\s+type\\s*\\{[\\s\\S]*?\\b${typeName}\\b[\\s\\S]*?\\}\\s*from`,
-    ).test(declarations);
-    if (!declared && !reexported) {
-      throw new Error(
-        `dist/commands/inspect.d.ts no longer exports ${typeName}.`,
-      );
-    }
   }
 }
 

@@ -17,7 +17,6 @@ import {
 } from "./discovery.js";
 import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import { parseAssetMetadata } from "./metadata.js";
-import { NON_SKILL_AUXILIARY_METADATA_KEYS } from "./metadata-definitions.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
@@ -603,7 +602,7 @@ function referenceDeprecatedAssetFindings(
           "Run renma catalog.",
           "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented.",
         ],
-        llmHint: `Inspect "${target.sourcePath}" for superseded_by or canonical context metadata. If a canonical replacement exists, update ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}". If not, decide whether the reference should remain and document why.`,
+        llmHint: `Inspect "${target.sourcePath}" for a reviewed superseded_by relationship or replacement guidance. If a canonical replacement exists, update ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}". If not, decide whether the reference should remain and document why.`,
         details: {
           source: dependency.from,
           target: dependency.to,
@@ -825,11 +824,7 @@ function normalizeReference(reference: string): string {
 }
 
 function isFirstClassSharedContext(entry: CatalogEntry): boolean {
-  return (
-    entry.kind === "context" &&
-    (entry.sourcePath.startsWith("contexts/") ||
-      entry.sourcePath.startsWith("context/"))
-  );
+  return entry.kind === "context" && entry.sourcePath.startsWith("contexts/");
 }
 
 function metadataFindingEvidence(path: string, snippet: string): Evidence {
@@ -1853,7 +1848,7 @@ function skillReferencesSupersededAssetFindings(
           "Confirm the skill points to canonical shared context assets directly, or any deprecated local support file is clearly only a compatibility shim.",
         ],
         llmHint:
-          "Inspect the deprecated local support file and its superseded_by or canonical_context metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a compatibility shim.",
+          "Inspect the deprecated local support file and its superseded_by metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a migration shim.",
         details: {
           source: skillMetadata.id ?? skill.artifact.path,
           target: metadataText(document.metadata.id) ?? document.artifact.path,
@@ -1880,14 +1875,9 @@ function isSkillLocalReference(document: ParsedDocument): boolean {
 
 function sharedContextTargets(document: ParsedDocument): string[] {
   const operationalMetadata = parseAssetMetadata(document).metadata;
-  return [
-    ...operationalMetadata.supersededBy,
-    ...listMetadataValue(
-      document.metadata[NON_SKILL_AUXILIARY_METADATA_KEYS.canonical_context],
-    ),
-  ].filter(
+  return operationalMetadata.supersededBy.filter(
     (target, index, targets) =>
-      /^contexts?\//u.test(target) && targets.indexOf(target) === index,
+      /^contexts\//u.test(target) && targets.indexOf(target) === index,
   );
 }
 
@@ -1993,7 +1983,7 @@ function assetReferencesSupersededAssetFindings(
               "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
             ],
             llmHint:
-              "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
+              "Inspect the referenced deprecated asset and its reviewed superseded_by relationship. If the canonical shared context named by that relationship is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
             details: {
               source:
                 referencingMetadata.id ?? referencingDocument.artifact.path,
@@ -2584,16 +2574,6 @@ function markdownBodyForDocument(document: ParsedDocument): string {
     : document.artifact.content;
 }
 
-function listMetadataValue(value: MetadataValue | undefined): string[] {
-  if (!value) return [];
-  if (Array.isArray(value))
-    return value.map((item) => item.trim()).filter(Boolean);
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function metadataText(value: MetadataValue | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -2629,7 +2609,6 @@ function strictLayoutPolicyFindings(
     findings.push(...thinSkillLayoutFindings(document));
     findings.push(...helperCommandFindings(document, paths));
     findings.push(...layoutConsistencyFindings(document));
-    findings.push(...contextRootFindings(document));
     findings.push(...helperRootFindings(document));
   }
 
@@ -2783,26 +2762,6 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
   }
 
   return findings;
-}
-
-function contextRootFindings(document: ParsedDocument): Finding[] {
-  if (document.artifact.path.startsWith("context/")) {
-    return [
-      documentFinding(
-        document,
-        DIAGNOSTIC_IDS.LAYOUT_CONTEXT_LEGACY_ROOT,
-        "Context asset uses legacy context/ root",
-        "structure",
-        "low",
-        "Move canonical LLM-readable context assets under contexts/**.",
-        {
-          whyItMatters:
-            "The strict repository layout uses contexts/**/*.md as canonical LLM-readable context assets.",
-        },
-      ),
-    ];
-  }
-  return [];
 }
 
 function helperRootFindings(document: ParsedDocument): Finding[] {

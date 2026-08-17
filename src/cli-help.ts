@@ -163,7 +163,7 @@ export const COMMAND_HELP = [
     examples: ["renma init", "renma init .", "renma init path/to/repository"],
     interpretation: [
       "When no conventional Renma configuration exists, init creates a concise renma.config.jsonc and prints next steps.",
-      "An existing renma.config.jsonc, renma.config.json, or .renma.json is never modified, even when it is empty, malformed, or customized.",
+      "An existing renma.config.jsonc or renma.config.json is never modified, even when it is empty, malformed, or customized. A legacy .renma.json produces a rename error instead of being ignored.",
       "When multiple conventional files exist, init reports the ambiguity and changes none of them.",
       "Repositories can use Renma defaults without running init; initialization records explicit repository policy.",
     ],

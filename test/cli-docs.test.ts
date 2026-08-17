@@ -303,7 +303,7 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
     );
     assert.match(
       document,
-      /(?:does not make those spellings|spellings are not)\s+Agent Skills-compatible/,
+      /(?:not|never) operational Skills|unknown to operational Skill\s+discovery/,
     );
   }
 });

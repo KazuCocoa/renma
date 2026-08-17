@@ -1438,7 +1438,7 @@ test("diff collects and prepares each archived ref exactly once", async () => {
   }
 });
 
-test("diff rejects conflicting aliases in either archived endpoint", async () => {
+test("diff rejects historical aliases in either archived endpoint", async () => {
   const repo = await createArchivedAliasConflictRepo();
   try {
     for (const [fromRef, toRef] of [
@@ -1450,9 +1450,10 @@ test("diff rejects conflicting aliases in either archived endpoint", async () =>
         (error: unknown) =>
           error instanceof ConfigError &&
           /security\.profiles\.restricted/.test(error.message) &&
-          /conflicting aliases for networkAllowed/.test(error.message) &&
-          /networkAllowed=false/.test(error.message) &&
-          /network_allowed=true/.test(error.message),
+          /Historical security profile key "networkAllowed"/.test(
+            error.message,
+          ) &&
+          /Use "network_allowed" instead/.test(error.message),
       );
     }
   } finally {
@@ -2018,7 +2019,7 @@ async function createArchivedAliasConflictRepo(): Promise<string> {
     join(repo, "renma.config.json"),
     JSON.stringify({
       security: {
-        profiles: { restricted: { networkAllowed: false } },
+        profiles: { restricted: { network_allowed: false } },
       },
     }),
   );
@@ -2033,7 +2034,6 @@ async function createArchivedAliasConflictRepo(): Promise<string> {
         profiles: {
           restricted: {
             networkAllowed: false,
-            network_allowed: true,
           },
         },
       },

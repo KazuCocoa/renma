@@ -8,11 +8,11 @@ import {
 } from "../catalog.js";
 import {
   classifyAssetPath,
-  classifyRepositorySkillEntrypointPath,
   repositoryClassificationPath,
   type RepositoryClassificationPathResolution,
   type SkillEntrypointPath,
 } from "../discovery.js";
+import { classifyRepositorySkillMigrationEntrypointPath } from "../skill-path-contract.js";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
 import type { AssetMetadata, CatalogEntry } from "../model.js";
@@ -94,13 +94,16 @@ export async function collectTargetDocumentEvidence(
     repositoryBoundary.state === "resolved"
       ? repositoryBoundary.root
       : undefined;
+  const entrypoint = repositoryRelativePath
+    ? classifyRepositorySkillMigrationEntrypointPath(repositoryRelativePath)
+    : undefined;
   const initialClassification = classifyAssetPath(repositoryRelativePath);
   const unresolvedPath =
     options.unresolvedArtifactPath === "absolute" ? absolutePath : outputPath;
   const document = parseDocument({
     absolutePath,
     content,
-    kind: initialClassification.kind,
+    kind: entrypoint ? "skill" : initialClassification.kind,
     path: repositoryRelativePath || unresolvedPath,
     sizeBytes: Buffer.byteLength(content),
     contentClassification: "text",
@@ -110,10 +113,6 @@ export async function collectTargetDocumentEvidence(
   const classification = classifyAssetPath(repositoryRelativePath, {
     ...(metadata.type ? { metadataType: metadata.type } : {}),
   });
-  const entrypoint = repositoryRelativePath
-    ? classifyRepositorySkillEntrypointPath(repositoryRelativePath)
-    : undefined;
-
   return {
     absolutePath,
     outputPath,

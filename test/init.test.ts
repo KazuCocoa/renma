@@ -106,11 +106,7 @@ test("existing customized, empty, and malformed primary configs are preserved", 
 });
 
 test("every existing supported config prevents JSONC creation", async (t) => {
-  for (const filename of [
-    "renma.config.jsonc",
-    "renma.config.json",
-    ".renma.json",
-  ] as const) {
+  for (const filename of ["renma.config.jsonc", "renma.config.json"] as const) {
     await t.test(filename, async () => {
       const root = await fixture();
       const existingPath = path.join(root, filename);
@@ -131,6 +127,21 @@ test("every existing supported config prevents JSONC creation", async (t) => {
   }
 });
 
+test("legacy .renma.json prevents creation and reports the rename", async () => {
+  const root = await fixture();
+  const legacyPath = path.join(root, ".renma.json");
+  await writeFile(legacyPath, '{"format":"json"}\n');
+
+  const result = await withCapturedConsole(() => main(["init", root]));
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /\.renma\.json is not supported in v1/);
+  assert.match(result.stderr, /Rename it to renma\.config\.json/);
+  await assert.rejects(access(path.join(root, "renma.config.jsonc")));
+  assert.equal(await readFile(legacyPath, "utf8"), '{"format":"json"}\n');
+});
+
 test("multiple conventional configs produce an ambiguity error without changes", async () => {
   const root = await fixture();
   const primaryPath = path.join(root, "renma.config.jsonc");
@@ -144,10 +155,8 @@ test("multiple conventional configs produce an ambiguity error without changes",
 
   assert.equal(result.code, 2);
   assert.equal(result.stdout, "");
-  assert.match(
-    result.stderr,
-    /renma\.config\.jsonc, .*renma\.config\.json, .*\.renma\.json/,
-  );
+  assert.match(result.stderr, /renma\.config\.jsonc, .*renma\.config\.json/);
+  assert.doesNotMatch(result.stderr, /\.renma\.json/);
   assert.match(result.stderr, /one unambiguous repository configuration/);
   assert.match(result.stderr, /Keep .*renma\.config\.jsonc/);
   assert.match(result.stderr, /No files were changed\./);

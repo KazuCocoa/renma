@@ -7,6 +7,7 @@ export interface LayoutPolicyConfig {
   workflowAliases: Record<string, string>;
 }
 
+/** Normalized runtime projection; authored config uses the exact v1 keys documented in the Security Policy Guide. */
 export interface SecurityProfileConfig {
   allowedDataClass?: string | undefined;
   networkAllowed?: boolean | undefined;

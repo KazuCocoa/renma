@@ -300,7 +300,7 @@ Use assets/logo.png for the child output.
   );
 });
 
-test("ambiguous nearest Skill evidence fails ownership closed", async () => {
+test("historical flat entrypoints do not make canonical ownership ambiguous", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-owner-ambiguous-"));
   const skillContent = `---
 name: demo
@@ -327,13 +327,18 @@ metadata:
   );
   assert.deepEqual(script?.ownership, {
     declaredOwner: null,
-    effectiveOwner: null,
-    source: "unowned",
+    effectiveOwner: "qa-platform",
+    source: "inherited",
+    inheritedFrom: {
+      id: "skills/demo/SKILL.md",
+      sourcePath: "skills/demo/SKILL.md",
+    },
   });
-  assert.ok(
+  assert.equal(
     result.diagnostics.some((diagnostic) =>
       /Ambiguous owning Skill evidence/.test(diagnostic.message),
     ),
+    false,
   );
   assert.equal(
     result.catalog.dependencies.some(
@@ -341,12 +346,12 @@ metadata:
         dependency.kind === "inherits_owner" ||
         dependency.kind === "inherits_policy",
     ),
-    false,
+    true,
   );
   const scanResult = await scan(root);
   assert.equal(
     scanResult.securityPolicyInventory?.assetsWithInheritedPolicy,
-    0,
+    1,
   );
   assert.equal(
     scanResult.trustGraph?.edges.some(
@@ -354,11 +359,11 @@ metadata:
         edge.from === "asset:skills/demo/scripts/run.mjs" &&
         edge.type === "has_effective_policy",
     ),
-    false,
+    true,
   );
 });
 
-test("flat Skill entrypoints resolve assets, scripts, and helper commands from their logical directory", async () => {
+test("flat historical entrypoints do not authorize local support", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-flat-support-"));
   await mkdir(path.join(root, "skills", "demo", "assets"), {
     recursive: true,
@@ -391,21 +396,17 @@ node scripts/run.mjs
   );
 
   const result = await scan(root);
-  assert.equal(
-    result.findings.some(
-      (finding) =>
-        finding.id === "SUPPORT-MISSING-PATH" ||
-        finding.id === "SUPPORT-UNREACHABLE-ASSET" ||
-        finding.id === "SUPPORT-UNREACHABLE-SCRIPT" ||
-        finding.id === "HELPER-COMMAND-MISSING",
+  assert.ok(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+        diagnostic.path === "skills/demo.skill.md",
     ),
-    false,
   );
   const resolvedTargets = result.trustGraph?.edges
     .filter((edge) => edge.type === "statically_references")
     .map((edge) => edge.properties?.declaredTarget);
-  assert.ok(resolvedTargets?.includes("skills/demo/assets/data.json"));
-  assert.ok(resolvedTargets?.includes("skills/demo/scripts/run.mjs"));
+  assert.deepEqual(resolvedTargets, []);
 });
 
 test("balanced Markdown paths and encoded filename characters resolve exactly", async () => {

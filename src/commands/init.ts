@@ -2,7 +2,7 @@ import { lstat, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { renmaCommand } from "../command-invocation.js";
-import { CONFIG_FILENAMES } from "../config.js";
+import { CONFIG_FILENAMES, LEGACY_CONFIG_FILENAME } from "../config.js";
 
 export const INITIAL_CONFIG_CONTENT = `{
   // Record the rationale beside any temporary exception or disabled policy.
@@ -37,6 +37,15 @@ export async function initializeRepository(root: string): Promise<InitResult> {
     path.join(root, name),
   );
   const existing = await existingState(conventionalPaths);
+  if (existing?.state === "conflicting") return { ...existing, primaryPath };
+  const legacyPath = path.join(root, LEGACY_CONFIG_FILENAME);
+  if (await pathExists(legacyPath)) {
+    return {
+      state: "legacy-existing",
+      primaryPath,
+      existingPaths: [legacyPath],
+    };
+  }
   if (existing) return { ...existing, primaryPath };
 
   try {
@@ -103,6 +112,14 @@ export async function runInitCommand(root: string): Promise<number> {
     return CLI_EXIT.userError;
   }
 
+  if (result.state === "legacy-existing") {
+    const legacy = displayPath(result.existingPaths[0]!);
+    console.error(
+      `Legacy Renma configuration ${legacy} is not supported in v1. Rename it to renma.config.json for JSON or ${primary} when comments are needed. No files were changed.`,
+    );
+    return CLI_EXIT.userError;
+  }
+
   const existing = displayPath(result.existingPaths[0] ?? primary);
   process.stdout.write(
     `Renma is already initialized with ${existing}.\n` +
@@ -133,7 +150,6 @@ async function existingState(conventionalPaths: readonly string[]): Promise<
   const index = conventionalPaths.indexOf(existingPath);
   if (index === 0) return { state: "primary-existing", existingPaths };
   if (index === 1) return { state: "json-existing", existingPaths };
-  if (index === 2) return { state: "legacy-existing", existingPaths };
   return undefined;
 }
 

@@ -112,13 +112,7 @@ export interface InspectionCoverageDiff {
 
 const EXPECTED_AGENT_FACING_RULES = new Set<
   AssetClassificationEvidence["matchedRule"]
->([
-  "skill-entrypoint",
-  "context-root",
-  "context-root-legacy",
-  "lens-root",
-  "agent-root",
-]);
+>(["skill-entrypoint", "context-root", "lens-root", "agent-root"]);
 
 const BLOCKING_STATES = new Set<RepositoryPathState>([
   "excluded",

@@ -71,11 +71,11 @@ when resolved or stable unresolved/ambiguous reason evidence and candidate
 roots when no safe boundary can be selected.
 
 For marker-free directory-segment inference, only `.agents`, `skills`,
-`contexts`, `context`, `lenses`, and `tools` can positively establish a
+`contexts`, `lenses`, and `tools` can positively establish a
 structural boundary. Recognized root filenames are handled separately:
 `AGENTS.md` may establish its containing directory as the structural root when
-no stronger repository marker is available, while `renma.config.jsonc`,
-`renma.config.json`, and `.renma.json` normally establish the boundary through
+no stronger repository marker is available, while `renma.config.jsonc` and
+`renma.config.json` normally establish the boundary through
 repository-marker detection. The support-like names `profiles`, `references`, `examples`,
 `scripts`, and `assets` are guards only: they can block a later boundary-like
 segment or contribute ambiguity evidence, but never establish a repository root
@@ -88,6 +88,13 @@ Skill entrypoint. Renma reports the stable
 Skill-looking basename there without turning the support path into an
 entrypoint or requiring a semantics-preserving repair. See the canonical
 [entrypoint path contract](agent-skills-compatibility.md#entrypoint-paths).
+
+The repository walk emits `LAYOUT-HISTORICAL-SKILL-ENTRYPOINT` for
+`skill.md`/`*.skill.md` under a Skill root and
+`LAYOUT-LEGACY-CONTEXT-ROOT` for files under `context/**`. These diagnostics
+carry migration guidance only: the files remain `unknown`, do not enter
+operational catalogs or inheritance, and are not made operational by a custom
+glob.
 
 > Classification describes how Renma interpreted repository structure. It does
 > not by itself prove ownership, policy, lifecycle, source-of-truth status, or
@@ -152,14 +159,13 @@ later, more generic interpretation.
 
 | `matchedRule` | Repository evidence matched | Indicates | Must not be inferred |
 | --- | --- | --- | --- |
-| `skill-entrypoint` | A recognized canonical or historical Skill entrypoint shape under `skills/**` or `.agents/skills/**` that does not cross a reserved Skill-support segment. | The file is classified as a Skill entrypoint with independent scope. | That Agent Skills frontmatter is valid, that governance is complete, or that no migration is needed. |
+| `skill-entrypoint` | An exact `SKILL.md` under `skills/**` or `.agents/skills/**` that does not cross a reserved Skill-support segment. | The file is classified as a canonical Skill entrypoint with independent scope. | That Agent Skills frontmatter is valid or governance is complete. |
 | `skill-local-support` | A path inside `references/`, `profiles/`, `examples/`, `scripts/`, or `assets/` beneath a recognized Skill path shape. | The file has a structurally implied Skill parent candidate and Skill-local scope. | That the parent exists or inheritance is valid. Require `parentResolution: "resolved"` and governance evidence. |
 | `context-root` | A file under `contexts/**`. | The file is an independent Context Asset by structure; metadata may refine its `kind` to `context_lens`. | That owner, lifecycle, policy, or source-of-truth metadata is complete or valid. |
-| `context-root-legacy` | A file under the supported legacy `context/**` root. | The file is an independent Context Asset by the compatibility path rule. | That it is current, owned, authoritative, or should be moved automatically. |
 | `lens-root` | A file under `lenses/**`. | The file is an independent Context Lens by structure. | That Lens targets, governance, or policy declarations are valid. |
 | `agent-root` | `AGENTS.md` or a file under `.agents/**` after higher-priority Skill entrypoint rules. | The file is repository agent guidance with independent scope. | That it is an Agent Skill, that its instructions are valid, or that governance is complete. |
 | `repository-tool` | A file under top-level `tools/**`. | The file is repository implementation with repository-support scope. | That it is an independently governed Context Asset. |
-| `config-file` | A filename matching `renma.config.jsonc`, `renma.config.json`, or `.renma.json` after higher-priority rules. | The file is recognized as Renma configuration support. | That its contents are valid, effective for a particular target, or proof of asset governance. |
+| `config-file` | A filename matching `renma.config.jsonc` or `renma.config.json` after higher-priority rules. | The file is recognized as Renma configuration support. | That its contents are valid, effective for a particular target, or proof of asset governance. |
 | `generic-reference` | A nested `references/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `reference` parsing or inventory role, but its scope remains unknown. | That it belongs to a Skill, may inherit governance, or is an independent Context Asset. |
 | `generic-example` | A nested `examples/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `example` parsing or inventory role, but its scope remains unknown. | That it belongs to a Skill, may inherit governance, or is independently governed. |
 | `generic-profile` | A nested `profiles/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `profile` parsing or inventory role, but its scope remains unknown. | That it is selected by a Skill, may inherit governance, or defines effective policy. |
@@ -169,10 +175,9 @@ The stable path-rule precedence is:
 
 1. `skill-entrypoint`.
 2. `skill-local-support` inside a recognized Skill boundary.
-3. Recognized asset roots: `context-root`, `context-root-legacy`, `lens-root`,
-   and `agent-root`.
+3. Recognized asset roots: `context-root`, `lens-root`, and `agent-root`.
 4. Repository support or configuration: `repository-tool` and `config-file`.
-5. Compatible nested rules: `generic-reference`, `generic-example`, and
+5. Generic nested rules: `generic-reference`, `generic-example`, and
    `generic-profile`.
 6. `unknown`.
 
@@ -673,7 +678,7 @@ Context Lens governance diagnostics use stable `code` values in JSON output. `er
 
 | Code                                       | Severity             | Meaning                                                                                                       | Fix                                                                                                     |
 | ------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `CONTEXT-LENS-DEPRECATED-FIELD`            | `warning`            | A lens uses an old field alias such as `target`, `targets`, `output`, or `outputs`.                           | Use `applies_to` or `expected_outputs`.                                                                 |
+| `CONTEXT-LENS-UNSUPPORTED-LEGACY-FIELD`    | `error`              | A lens declares `target`, `targets`, `output`, or `outputs`; the value is not interpreted.                   | Replace it with reviewed `applies_to` or `expected_outputs` metadata.                                   |
 | `CONTEXT-LENS-DUPLICATE-ID`                | `error`              | Two or more lens definitions declare the same `id`.                                                           | Give each lens a unique stable ID and update references.                                                |
 | `CONTEXT-LENS-EMPTY-DEFINITION`            | `error`              | A discovered lens file is empty.                                                                              | Add required metadata and body guidance, or remove the file.                                            |
 | `CONTEXT-LENS-GOVERNANCE-MEANINGLESS`      | `warning`            | A lens has no purpose, target, focus, expected output, or body guidance.                                      | Add compact governance metadata or reviewed interpretation guidance.                                    |
@@ -682,7 +687,7 @@ Context Lens governance diagnostics use stable `code` values in JSON output. `er
 | `CONTEXT-LENS-TARGET-NOT-CONTEXT`          | `error`              | An `applies_to` target resolves to a cataloged asset whose kind is not `context`.                             | `applies_to` must reference a Context Asset ID or path; Skills, support assets, other Lenses, and repository metadata are not valid Lens targets. |
 | `CONTEXT-LENS-TARGET-NOT-FOUND`            | `error`              | An `applies_to` target does not resolve to a cataloged asset ID or path.                                      | Correct the target, add the missing context asset, or update discovery config.                          |
 | `CONTEXT-LENS-UNPARSEABLE-FRONTMATTER`     | `error`              | The exact lens frontmatter envelope is unclosed, malformed YAML, not a mapping, or duplicates a recognized operational field. | Repair the exact envelope or YAML after confirming the intended value; do not choose a duplicate winner. |
-| `CONTEXT-LENS-UNSUPPORTED-KIND`            | `warning` or `error` | `type: context_lens` appears under an unsupported artifact kind, or a lens file declares an unsupported type. | Store lens definitions under `lenses/**`, `context/**`, or `contexts/**`, and use `type: context_lens`. |
+| `CONTEXT-LENS-UNSUPPORTED-KIND`            | `warning` or `error` | `type: context_lens` appears under an unsupported artifact kind, or a lens file declares an unsupported type. | Store lens definitions under `lenses/**` or `contexts/**`, and use `type: context_lens`. |
 | `CONTEXT-LENS-UNSUPPORTED-SCOPE`           | `error`              | A lens declares a value outside the supported `context` scope.                                                | Use `scope: context` or omit the field.                                                                 |
 | `CONTEXT-LENS-UNSUPPORTED-VERSION`         | `error`              | A lens declares a value outside supported schema version `1`.                                                 | Use `version: 1` or omit the field.                                                                     |
 
@@ -1128,8 +1133,9 @@ The inventory distinguishes local metadata, inherited policy, effective policy,
 and no-effective-policy states. Trust Graph policy edges exist only for
 artifacts with effective policy and list every contributing policy source.
 
-Security profiles in JSONC and existing JSON configuration retain the same
-configuration schema.
+Security profiles use the same exact canonical property spellings in JSONC and
+JSON configuration. Historical aliases are rejected with their replacement;
+Renma does not merge or compare alternate spellings.
 Artifact-local explicit denials remain stricter than inherited profile or
 repository allowances, and network approvals remain separate from upload
 approvals. See the [Security Policy Guide](security-policy.md) for complete
@@ -1203,7 +1209,6 @@ written during scanning.
 | `DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL`           | An adopted repository has a Discovery-eligible Skill outside every published continuation graph. | No usable representative resolved Skill route path reaches the Skill from any effective published entrypoint. | Review whether the Skill is an independent entrypoint, belongs under a real source-owned continuation, or is outside the intended repository-wide policy. Do not add fake routes or publish every Skill. |
 | `DISCOVERY-UNRESOLVED-DECLARED-ROUTE`            | An exact Skill continuation is missing or ambiguous.  | No exact ID/path matches, duplicate IDs make ID lookup ambiguous, ID and path select different assets, or the path is absolute/escaping. | Correct the exact ID/path, remove a stale route, or add a real Skill only from source evidence; request human review for ambiguity. |
 | `DOCS-LAYOUT-INCONSISTENT`                       | Documentation contradicts the supported repository model. | Docs use deprecated roots, old prompt-library framing, or another independently stale statement. | Describe canonical Skill roots and valid local support separately from governed `contexts/**` assets and shared `tools/**` helpers. |
-| `LAYOUT-CONTEXT-LEGACY-ROOT`                     | Context lives under the legacy `context/**` root.    | Shared context is stored under the compatibility root instead of `contexts/**`.                    | Move the shared Context Asset to `contexts/**` and update its references.                               |
 | `LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL`         | Declared dependency uses a non-canonical reference root. | A declared dependency points outside accepted `contexts/**`, `skills/**`, `.agents/skills/**`, or `tools/**` reference paths. | Rewrite the dependency to an accepted repository-relative asset path or ID.                             |
 | `LAYOUT-DISALLOWED-SKILL-ASSET`                  | Compatibility identifier for specific local-policy violations. | Valid Agent Skills support paths do not emit this finding solely because of location. Reusable knowledge is handled by evidence-based maintenance advisories. | Review the specific evidence; keep genuinely local support in place or promote reusable knowledge through human review. |
 | `LAYOUT-HELPER-NON_TOOLS`                        | Helper file is outside supported helper locations.   | A helper script is neither under `tools/**` nor a valid Skill-local `scripts/` directory.                    | Move shared helper code under `tools/**`, or keep a genuinely Skill-specific helper in local `scripts/`. |
@@ -1236,6 +1241,7 @@ written during scanning.
 | `META-DUPLICATE-DECLARED-DEPENDENCY`             | One metadata field repeats the same dependency value. | The exact target appears multiple times in the same `requires_context`, `optional_context`, Lens, conflict, or lifecycle declaration field. | Keep one exact value after review; preserve legitimate multi-parent routes and distinct stable IDs. |
 | `META-FRONTMATTER-TOO-LARGE`                     | Frontmatter metadata is too large.                   | Frontmatter has too many lines or characters to stay a compact index.                              | Move long prose, examples, procedures, or rationale into the body or referenced context assets.        |
 | `META-INVALID-RENMA-FRONTMATTER`                 | Non-Skill Renma frontmatter is invalid or ambiguous. | The exact Renma envelope contains malformed YAML, a non-mapping root, or duplicate recognized operational keys. | Repair the YAML or duplicate declaration after confirming intent; do not recover values from raw lines. |
+| `META-UNSUPPORTED-CANONICAL-CONTEXT`             | `canonical_context` is unsupported and uninterpreted. | A non-Skill asset retains the removed compatibility field. | Use existing `superseded_by` when the asset has a reviewed replacement, then update Skill Context relationships or placement as appropriate. |
 | `META-UNKNOWN-REFERENCE`                         | Metadata reference does not resolve.                 | A dependency points to a missing asset ID or path.                                                 | Fix the reference, add the missing asset, or remove the dependency.                                    |
 | `PATH-HELPER-COMMAND-NON_TOOLS`                  | Helper command points outside supported helper locations. | A command references a script that is neither in the owning Skill's `scripts/**` nor under `tools/**`. | Keep a Skill-specific helper local or move a helper shared across workflows to `tools/**`, then update the command. |
 | `PATH-HELPER-COMMAND-SKILL-SCRIPTS`              | Compatibility identifier for the former path-only policy. | Valid commands may point to resolvable Skill-local `scripts/`; location alone no longer emits this finding. | Keep Skill-specific helpers local, or move shared helpers to `tools/**` after review.                  |

@@ -2360,7 +2360,7 @@ git reset --hard
   assert.match(destructive.evidence.snippet, /git reset --hard/);
 });
 
-test("discovered historical Skill entrypoints retain trustworthy description security analysis", async () => {
+test("historical Skill entrypoints do not enter operational security analysis", async () => {
   const entrypoints = [
     {
       path: "skills/demo/skill.md",
@@ -2393,33 +2393,33 @@ test("discovered historical Skill entrypoints retain trustworthy description sec
     await mkdir(path.dirname(source), { recursive: true });
     await writeFile(source, content);
     const result = await scan(root, { failOn: "critical" });
-    const validation = result.agentSkills.results.find(
-      (candidate) => candidate.path === entrypoint.path,
-    );
-
     assert.equal(
-      classifyRepositorySkillEntrypointPath(entrypoint.path)?.kind,
-      entrypoint.kind,
+      classifyRepositorySkillEntrypointPath(entrypoint.path),
+      undefined,
       entrypoint.path,
     );
-    assert.ok(validation, entrypoint.path);
-    assert.equal(validation.valid, false, entrypoint.path);
+    assert.equal(
+      result.agentSkills.results.some(
+        (candidate) => candidate.path === entrypoint.path,
+      ),
+      false,
+      entrypoint.path,
+    );
+    assert.equal(
+      result.findings.some(
+        (finding) => finding.evidence.path === entrypoint.path,
+      ),
+      false,
+      entrypoint.path,
+    );
     assert.ok(
-      validation.issues.some(
-        (issue) => issue.code === "AS-SKILL-NONCANONICAL-FILENAME",
+      result.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+          diagnostic.path === entrypoint.path,
       ),
       entrypoint.path,
     );
-
-    const finding = findingFor(
-      result.findings,
-      "SEC-SAFEGUARD-BYPASS-INSTRUCTION",
-    );
-    assert.equal(finding.evidence.path, entrypoint.path, entrypoint.path);
-    assert.equal(finding.evidence.startLine, 3, entrypoint.path);
-    assert.equal(finding.evidence.endLine, 4, entrypoint.path);
-    assert.match(finding.evidence.snippet, /^description: \|/, entrypoint.path);
-    assert.match(finding.evidence.snippet, /chmod 777/, entrypoint.path);
   }
 });
 

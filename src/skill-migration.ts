@@ -63,6 +63,10 @@ const BOOLEAN_SCALAR_LEGACY_FIELDS = new Set([
   "secrets_allowed",
   "requires_human_approval",
 ]);
+const UNSUPPORTED_ROUTING_METADATA = new Set([
+  "renma.when-to-use",
+  "renma.when-not-to-use",
+]);
 
 export interface SkillMigrationBlock {
   field: string;
@@ -132,6 +136,7 @@ export function buildAgentSkillMigrationSuggestion(
   if (!duplicateTopLevelMetadata && isStringRecord(existingMetadata)) {
     for (const [key, value] of Object.entries(existingMetadata)) {
       if (duplicateMetadataKeys.has(key)) continue;
+      if (UNSUPPORTED_ROUTING_METADATA.has(key)) continue;
       preservedMetadata[key] = value;
       if (key.startsWith(RENMA_METADATA_NAMESPACE_PREFIX)) {
         candidateRenmaMetadata[key] = value;
@@ -554,6 +559,11 @@ function migrationDescription(
   }
 
   const frontmatter = ensureYamlFrontmatterForDocument(document);
+  const migratedUsageDescription = migrationUsageDescription(
+    frontmatter.values.when_to_use,
+    frontmatter.values.when_not_to_use,
+  );
+  if (migratedUsageDescription) return migratedUsageDescription;
   const lines = document.lines.slice(frontmatter.bodyStartLine - 1);
   const paragraphs: string[] = [];
   let active: string[] = [];
@@ -590,6 +600,34 @@ function migrationDescription(
     if (candidate && Array.from(candidate).length <= 1024) return candidate;
   }
   return undefined;
+}
+
+function migrationUsageDescription(
+  whenToUse: unknown,
+  whenNotToUse: unknown,
+): string | undefined {
+  const positive = legacyDescriptionItems(whenToUse);
+  const negative = legacyDescriptionItems(whenNotToUse);
+  if (positive.length === 0) return undefined;
+  const candidate = [
+    `Use this skill when ${positive.join("; ")}.`,
+    ...(negative.length > 0
+      ? [`Do not use this skill when ${negative.join("; ")}.`]
+      : []),
+  ].join(" ");
+  return Array.from(candidate).length <= 1024 ? candidate : undefined;
+}
+
+function legacyDescriptionItems(value: unknown): string[] {
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value.map((item) => item.trim()).filter(Boolean);
+  }
+  if (typeof value !== "string" || !value.trim()) return [];
+  return (
+    parseLegacyStringList(value)
+      ?.map((item) => item.trim())
+      .filter(Boolean) ?? []
+  );
 }
 
 function serializeLegacyValue(

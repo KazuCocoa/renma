@@ -35,8 +35,6 @@ export const CANONICAL_SKILL_METADATA_KEYS = {
   review_cycle: "renma.review-cycle",
   expires_at: "renma.expires-at",
   tags: "renma.tags",
-  when_to_use: "renma.when-to-use",
-  when_not_to_use: "renma.when-not-to-use",
   requires_context: "renma.requires-context",
   optional_context: "renma.optional-context",
   requires_lens: "renma.requires-lens",
@@ -176,14 +174,12 @@ export const RENMA_CATALOG_METADATA_DEFINITIONS = [
   },
   {
     operationalField: "whenToUse",
-    skillKey: CANONICAL_SKILL_METADATA_KEYS.when_to_use,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.when_to_use,
     policyKey: "when_to_use",
     policyValueKind: "list",
   },
   {
     operationalField: "whenNotToUse",
-    skillKey: CANONICAL_SKILL_METADATA_KEYS.when_not_to_use,
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.when_not_to_use,
     policyKey: "when_not_to_use",
     policyValueKind: "list",
@@ -420,18 +416,12 @@ export const SECURITY_METADATA_FIELD_DEFINITIONS = [
 
 export interface NonSkillAuxiliaryMetadataDefinition {
   nonSkillKey: string;
-  consumer: "context-lens" | "reference-compatibility";
-  authoringStatus: "current" | "deprecated" | "recognized-compatibility";
-  replacement?: string;
+  consumer: "context-lens";
+  authoringStatus: "current";
 }
 
 export const NON_SKILL_AUXILIARY_METADATA_KEYS = {
   scope: "scope",
-  target: "target",
-  targets: "targets",
-  output: "output",
-  outputs: "outputs",
-  canonical_context: "canonical_context",
 } as const;
 
 /** Operational top-level fields read outside normalized catalog/security metadata. */
@@ -440,35 +430,6 @@ export const NON_SKILL_AUXILIARY_METADATA_DEFINITIONS = [
     nonSkillKey: NON_SKILL_AUXILIARY_METADATA_KEYS.scope,
     consumer: "context-lens",
     authoringStatus: "current",
-  },
-  {
-    nonSkillKey: NON_SKILL_AUXILIARY_METADATA_KEYS.target,
-    consumer: "context-lens",
-    authoringStatus: "deprecated",
-    replacement: NON_SKILL_CATALOG_METADATA_KEYS.applies_to,
-  },
-  {
-    nonSkillKey: NON_SKILL_AUXILIARY_METADATA_KEYS.targets,
-    consumer: "context-lens",
-    authoringStatus: "deprecated",
-    replacement: NON_SKILL_CATALOG_METADATA_KEYS.applies_to,
-  },
-  {
-    nonSkillKey: NON_SKILL_AUXILIARY_METADATA_KEYS.output,
-    consumer: "context-lens",
-    authoringStatus: "deprecated",
-    replacement: NON_SKILL_CATALOG_METADATA_KEYS.expected_outputs,
-  },
-  {
-    nonSkillKey: NON_SKILL_AUXILIARY_METADATA_KEYS.outputs,
-    consumer: "context-lens",
-    authoringStatus: "deprecated",
-    replacement: NON_SKILL_CATALOG_METADATA_KEYS.expected_outputs,
-  },
-  {
-    nonSkillKey: NON_SKILL_AUXILIARY_METADATA_KEYS.canonical_context,
-    consumer: "reference-compatibility",
-    authoringStatus: "recognized-compatibility",
   },
 ] as const satisfies readonly NonSkillAuxiliaryMetadataDefinition[];
 

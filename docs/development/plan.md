@@ -55,7 +55,7 @@ The current stabilization phase prioritizes:
   separate from shared lexical vocabulary;
 - removing obsolete chronology and duplicated contract lists from evergreen
   documentation;
-- protecting documented deep imports and compatibility re-exports;
+- protecting the intentional v1 package export allowlist and rejection tests;
 - keeping the VitePress site, source Markdown, README entrypoints, and packaged
   documentation aligned;
 - evaluating external-review evidence without promoting experiment output into

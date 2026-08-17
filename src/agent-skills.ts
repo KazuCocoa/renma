@@ -71,6 +71,10 @@ const AGENT_SKILLS_LIMITS = DEFAULT_QUALITY_PROFILE.agentSkills;
 const MAX_NAME_LENGTH = AGENT_SKILLS_LIMITS.nameMaxChars;
 const MAX_DESCRIPTION_LENGTH = AGENT_SKILLS_LIMITS.descriptionMaxChars;
 const MAX_COMPATIBILITY_LENGTH = AGENT_SKILLS_LIMITS.compatibilityMaxChars;
+const UNSUPPORTED_ROUTING_METADATA = new Set([
+  "renma.when-to-use",
+  "renma.when-not-to-use",
+]);
 
 export type AgentSkillFormat =
   "agent-skills" | "renma-legacy" | "hybrid" | "unknown";
@@ -422,6 +426,7 @@ function normalizeAndValidateAgentSkillName(
 }
 
 export function legacyRenmaMetadataKey(field: string): string | undefined {
+  if (field === "when_to_use" || field === "when_not_to_use") return undefined;
   return LEGACY_FIELDS.has(field)
     ? `renma.${field.replaceAll("_", "-")}`
     : undefined;
@@ -660,6 +665,19 @@ function validateMetadata(
         firstField(frontmatter, AGENT_SKILL_TOP_LEVEL_KEYS.metadata)
           ?.startLine ?? 1,
         AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
+      ),
+    );
+  }
+  for (const field of frontmatter.metadataFields.filter((candidate) =>
+    UNSUPPORTED_ROUTING_METADATA.has(candidate.key),
+  )) {
+    issues.push(
+      fieldIssue(
+        document,
+        field,
+        IDS.AS_UNSUPPORTED_ROUTING_METADATA,
+        `Skill metadata key "${field.key}" is not supported in Renma v1. Put portable discovery and selection boundaries in the Agent Skills description.`,
+        `metadata.${field.key}`,
       ),
     );
   }

@@ -666,7 +666,6 @@ test("plain-text eligibility does not widen to executable, structured, binary, o
     "skills/bounded/references/external.txt",
     "skills/bounded/references/absolute.txt",
     "skills/bounded/references/escaping.txt",
-    "skills/ambiguous-owner/references/runtime.txt",
   ]) {
     assert.equal(
       coverageArtifact(coverage, artifactPath).analyses.semanticInstructions,
@@ -675,17 +674,22 @@ test("plain-text eligibility does not widen to executable, structured, binary, o
     );
   }
   assert.equal(
+    coverageArtifact(coverage, "skills/ambiguous-owner/references/runtime.txt")
+      .analyses.semanticInstructions,
+    "analyzed",
+  );
+  assert.equal(
     coverageArtifact(coverage, "skills/bounded/assets/pixel.png").analyses
       .semanticInstructions,
     "not-applicable",
   );
-  assert.equal(
+  assert.ok(
     result.findings.some(
       (finding) =>
         finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION" &&
-        finding.evidence.path !== "skills/bounded/SKILL.md",
+        finding.evidence.path ===
+          "skills/ambiguous-owner/references/runtime.txt",
     ),
-    false,
   );
 });
 

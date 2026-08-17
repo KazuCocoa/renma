@@ -1180,9 +1180,9 @@ skills/foo/tools/helper.mjs
   -> not canonical Skill-local support
 ```
 
-Use `contexts/**` for preferred independent Context and `context/**` only for
-compatibility. Nested `references/`, `examples/`, `profiles/`, `scripts/`, or
-`assets/` does not override either Context root. The same names are Skill-local
+Use `contexts/**` for independent Context; move any historical `context/**`
+content there after updating its references. Nested `references/`, `examples/`,
+`profiles/`, `scripts/`, or `assets/` does not override that Context root. The same names are Skill-local
 only inside `skills/**` or `.agents/skills/**`, where they establish a structural
 parent candidate. Local metadata overrides remain supported where valid, but
 are not required. `tools/**` is shared repository implementation, and a Skill

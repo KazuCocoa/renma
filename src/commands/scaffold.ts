@@ -223,8 +223,8 @@ function validateScaffoldTargetPath(
 
   throw new CliUserError(
     kind === "context"
-      ? "Context scaffolds require a Markdown target under contexts/** or the supported legacy context/** root so normal discovery classifies it as a Context Asset."
-      : "Context Lens scaffolds require a Markdown target under lenses/**, contexts/**, or the supported legacy context/** root so normal discovery classifies it as a Context Lens.",
+      ? "Context scaffolds require a Markdown target under contexts/** so normal discovery classifies it as a Context Asset."
+      : "Context Lens scaffolds require a Markdown target under lenses/** or contexts/** so normal discovery classifies it as a Context Lens.",
   );
 }
 

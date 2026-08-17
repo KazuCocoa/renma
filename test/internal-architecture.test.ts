@@ -154,7 +154,7 @@ test("one snapshot keeps catalog ownership and target parent governance aligned"
     {
       label: "historical parent",
       parents: ["skills/demo/skill.md"],
-      parentState: "resolved",
+      parentState: "missing",
       owner: "qa-platform",
       expectedOwnership: "unowned",
     },
@@ -166,11 +166,11 @@ test("one snapshot keeps catalog ownership and target parent governance aligned"
       expectedOwnership: "unowned",
     },
     {
-      label: "ambiguous parent",
+      label: "canonical parent plus ignored historical entrypoint",
       parents: ["skills/demo/SKILL.md", "skills/demo.skill.md"],
-      parentState: "ambiguous",
+      parentState: "resolved",
       owner: "qa-platform",
-      expectedOwnership: "unowned",
+      expectedOwnership: "inherited",
     },
   ] as const;
 

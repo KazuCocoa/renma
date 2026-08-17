@@ -107,13 +107,14 @@ renma is most useful when agent knowledge is stored in predictable places:
   canonical Agent Skills roots and exact filename. A path crossing a reserved
   Skill-support directory is support, not an entrypoint; see the precise
   [entrypoint path contract](agent-skills-compatibility.md#entrypoint-paths).
-  Renma still discovers historical `skill.md` and `*.skill.md` spellings under
-  those roots for migration diagnostics.
-  Historical spellings are not Agent Skills-compatible.
+  Repository walking reports historical `skill.md` and `*.skill.md` spellings
+  with migration guidance, but they are not operational Skills. Only an
+  explicit `suggest-metadata` target produces a migration candidate.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
 - `renma.config.jsonc` is the recommended repository configuration filename;
-  existing `renma.config.json` and `.renma.json` files remain supported.
+  `renma.config.json` is also supported, while `.renma.json` is rejected with
+  rename guidance.
 
 Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
 
@@ -292,8 +293,8 @@ implementation-owned registries.
 | `renma.review-cycle`                  | `review_cycle`                  | `P<positive integer>D`                                                                                | Skill and cataloged non-Skill assets                                                         | Conditional on cycle-based freshness review; meaningful with `last-reviewed-at`                                | Review-due calculation, freshness diagnostics, catalog, Readiness, BOM, diff, and CI reporting                                                                                                                                                    |
 | `renma.expires-at`                    | `expires_at`                    | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Expiration findings, lifecycle/dependency review, catalog, Readiness, BOM, diff, and CI reporting                                                                                                                                                 |
 | `renma.tags`                          | `tags`                          | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Catalog, ownership grouping, graph/BOM/Trust Graph asset projections, semantic diff, and CI reporting                                                                                                                                             |
-| `renma.when-to-use`                   | `when_to_use`                   | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Skill: recognized but deprecated for new authoring; active shared Context: recommended                         | Catalog usage-boundary evidence and Context diagnostics; canonical Skill discovery belongs in portable `description`                                                                                                                              |
-| `renma.when-not-to-use`               | `when_not_to_use`               | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Skill: recognized but deprecated for new authoring; active shared Context: recommended                         | Catalog negative-boundary evidence and Context diagnostics; canonical Skill selection exclusions belong in portable `description`                                                                                                                 |
+| —                                     | `when_to_use`                   | YAML list or comma-separated scalar                                                                   | Cataloged non-Skill assets                                                                   | Recommended for active shared Context                                                                         | Catalog usage-boundary evidence and Context diagnostics; Skill discovery belongs in portable `description`                                                                                                                                         |
+| —                                     | `when_not_to_use`               | YAML list or comma-separated scalar                                                                   | Cataloged non-Skill assets                                                                   | Recommended for active shared Context                                                                         | Catalog negative-boundary evidence and Context diagnostics; Skill selection exclusions belong in portable `description`                                                                                                                            |
 | `renma.requires-context`              | `requires_context`              | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional; required only when the declared relationship exists                                                  | Required catalog dependency, graph/composition/impact, Readiness, BOM, Trust Graph, semantic diff, and CI reporting                                                                                                                               |
 | `renma.optional-context`              | `optional_context`              | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Optional catalog dependency and the same static relationship projections                                                                                                                                                                          |
 | `renma.requires-lens`                 | `requires_lens`                 | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar                              | Skill and cataloged non-Skill assets                                                         | Optional; required only when the declared Lens relationship exists                                             | Required Lens dependency, Lens usage diagnostics, graph/composition/impact, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                                   |
@@ -319,12 +320,15 @@ implementation-owned registries.
 | `renma.allowed-floating-dependencies` | `allowed_floating_dependencies` | Skill: JSON-array string; non-Skill: YAML list or JSON-array scalar of valid `npm:`/`pypi:` selectors | Canonical Skill or parser-eligible non-Skill Markdown                                        | Optional, exceptional asset-local allowance                                                                    | Suppresses matching npm/PyPI floating-dependency findings only; recorded as local evidence but excluded from inheritance, effective-policy fingerprints/counts, and owning-Skill inheritance                                                      |
 | `renma.security-profile`              | `security_profile`              | Trimmed non-empty profile name                                                                        | Canonical Skill or parser-eligible non-Skill Markdown                                        | Optional reusable-policy selection                                                                             | Profile-chain resolution and diagnostics, effective policy/inventory, BOM, Trust Graph, semantic diff, and CI reporting                                                                                                                           |
 | —                                     | `scope`                         | Exact `context` when present; omission defaults to `context`                                          | Context Lens only                                                                            | Optional                                                                                                       | Context Lens scope validation and summary only                                                                                                                                                                                                    |
-| —                                     | `target`                        | Presence is recognized; value is not selected as a target                                             | Context Lens only                                                                            | Deprecated; use `applies_to`                                                                                   | Deprecation diagnostic only                                                                                                                                                                                                                       |
-| —                                     | `targets`                       | Presence is recognized; value is not selected as targets                                              | Context Lens only                                                                            | Deprecated; use `applies_to`                                                                                   | Deprecation diagnostic only                                                                                                                                                                                                                       |
-| —                                     | `output`                        | Presence is recognized; value is not selected as output metadata                                      | Context Lens only                                                                            | Deprecated; use `expected_outputs`                                                                             | Deprecation diagnostic only                                                                                                                                                                                                                       |
-| —                                     | `outputs`                       | Presence is recognized; value is not selected as output metadata                                      | Context Lens only                                                                            | Deprecated; use `expected_outputs`                                                                             | Deprecation diagnostic only                                                                                                                                                                                                                       |
-| —                                     | `canonical_context`             | Comma-separated scalar of Context paths                                                               | Skill-local Reference only                                                                   | Recognized compatibility-only; do not add for new assets                                                       | Maintenance diagnosis for a deprecated local reference promoted to shared Context; not catalog metadata or a general dependency                                                                                                                   |
 <!-- renma-operational-metadata:end -->
+
+Removed compatibility fields are deliberately outside this operational table.
+Skill `metadata.renma.when-to-use` and `metadata.renma.when-not-to-use`, Context
+Lens `target`/`targets`/`output`/`outputs`, and non-Skill
+`canonical_context` produce explicit diagnostics and their values are not
+interpreted. Use portable Skill `description`, Lens `applies_to` and
+`expected_outputs`, and existing `superseded_by` plus reviewed Skill Context
+relationships or placement respectively.
 
 ### Repository-required metadata policy
 
@@ -348,8 +352,8 @@ tests.
 | `review_cycle` | `metadata.renma.review-cycle` | `review_cycle` | Text |
 | `expires_at` | `metadata.renma.expires-at` | `expires_at` | Text |
 | `tags` | `metadata.renma.tags` | `tags` | List |
-| `when_to_use` | `metadata.renma.when-to-use` | `when_to_use` | List |
-| `when_not_to_use` | `metadata.renma.when-not-to-use` | `when_not_to_use` | List |
+| `when_to_use` | — | `when_to_use` | List |
+| `when_not_to_use` | — | `when_not_to_use` | List |
 | `requires_context` | `metadata.renma.requires-context` | `requires_context` | List |
 | `optional_context` | `metadata.renma.optional-context` | `optional_context` | List |
 | `requires_lens` | `metadata.renma.requires-lens` | `requires_lens` | List |
@@ -383,8 +387,8 @@ value does not satisfy `metadata.required: ["owner"]`; the support file must
 declare its own valid top-level `owner`.
 
 Intentionally unsupported policy names include arbitrary custom metadata,
-security-policy fields, token-budget decision metadata, Context Lens aliases,
-deprecated aliases, `id`, Skill-only `title`/`continues_with`, and unrelated
+security-policy fields, token-budget decision metadata, removed compatibility
+fields, `id`, Skill-only `title`/`continues_with`, and unrelated
 non-Skill-only fields. Unknown or unsupported names are configuration errors.
 
 The table intentionally has no top-level non-Skill equivalent for
@@ -467,11 +471,12 @@ transition rules for upload permission and human approval.
   is suspended.
 - A security profile is a non-empty selected name. The name must resolve in
   `security.profiles`; a missing or cyclic chain is diagnosed rather than
-  silently substituted. Profile configuration uses the canonical camelCase
-  field names documented in the
-  [Security Policy Guide](security-policy.md#reusable-security-profiles).
-  Legacy aliases remain accepted individually, but conflicting aliases for one
-  semantic profile field are rejected as a configuration error.
+  silently substituted. Profile configuration uses the exact canonical fields
+  documented in the
+  [Security Policy Guide](security-policy.md#reusable-security-profiles),
+  including snake_case governance fields and the retained
+  `approvedDomains`, `approvedUploadDomains`, and `disallowedCommands` names.
+  Historical aliases are rejected with their replacement and are never merged.
 - Floating-dependency allowances have an exact lowercase `npm:` or `pypi:`
   prefix followed by one supported package name and a selector classified as
   bare, dist-tag, range, or wildcard. They do not accept exact versions,
@@ -691,16 +696,14 @@ claim and introduce no unresolved Lens or continuation target.
   `metadata.renma.*` fields; supported non-Skill assets use the mapped top-level
   fields. Field omission remains allowed unless the table marks it required or
   conditional.
-- **Recognized but discouraged:** `renma.when-to-use` and
-  `renma.when-not-to-use` remain operational and preserved, but new canonical
-  Skills should put portable discovery and exclusion semantics in
-  `description`. Their top-level Context forms remain current and recommended
-  for active shared Context usage boundaries. `canonical_context` is a narrow
-  compatibility input to one maintenance diagnostic, not general metadata for
-  new References.
-- **Deprecated but retained operationally:** Context Lens `target`, `targets`,
-  `output`, and `outputs` produce deprecation diagnostics and do not substitute
-  for `applies_to` or `expected_outputs`.
+- **Unsupported legacy fields:** Skill `renma.when-to-use` and
+  `renma.when-not-to-use`, Context Lens `target`, `targets`, `output`, and
+  `outputs`, and non-Skill `canonical_context` produce diagnostics and are not
+  interpreted. Put Skill selection semantics in portable `description`, use
+  Lens `applies_to`/`expected_outputs`, and use the existing `superseded_by`
+  relationship plus reviewed Skill Context relationships or placement. The
+  top-level non-Skill `when_to_use` and `when_not_to_use` fields remain current
+  for shared Context usage boundaries.
 - **Migration-only:** pre-0.16 top-level Skill governance and security fields
   are accepted only as one-way `suggest-metadata` input. They never merge with,
   override, or fall back from canonical metadata.
@@ -814,8 +817,9 @@ the initial preflight. Repository-wide work should normally start with `scan`.
 
 ## Context Asset Discovery Boundary
 
-`contexts/**` is the preferred independent Context Asset root and `context/**`
-remains supported. Nested directory names never override a recognized root.
+`contexts/**` is the only independent Context Asset root. A `context/**` path
+produces migration guidance and remains operationally unknown. Nested directory
+names never override a recognized root.
 Files under canonical Skill `references/`, `profiles/`, `examples/`, `scripts/`,
 and `assets/` directories are structurally Skill-local. Renma claims one parent
 and possible inherited governance only after repository evidence resolves
@@ -1326,12 +1330,13 @@ Each suppression includes `id`, `paths`, required `reason`, and optional
 
 Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exception is intentionally permanent. Permanent suppressions should still use narrow path patterns and a clear reason. Suppression path patterns are repository-relative and support exact paths, directory-prefix matches for non-glob patterns, `*` within one path segment, and `**` across directories.
 
-If `--config` is not provided, Renma checks the repository root in this order:
-`renma.config.jsonc`, `renma.config.json`, then `.renma.json`. More than one
-conventional file is an error because Renma does not choose, parse, or merge
-ambiguous repository configuration. An explicit `--config <path>` selects that
-`.json` or `.jsonc` file even when conventional files coexist; other extensions
-are rejected.
+If `--config` is not provided, Renma checks the repository root for exactly
+`renma.config.jsonc` and `renma.config.json`. Both present is an ambiguity error
+because Renma does not choose, parse, or merge them. A legacy `.renma.json` is
+not a third supported candidate and instead fails with rename guidance. An
+explicit `--config <path>` selects a supported `.json` or `.jsonc` file even
+when conventional files coexist; an explicit `.renma.json` and other
+extensions are rejected.
 
 Canonical Agent Skills entrypoints are:
 
@@ -1342,19 +1347,16 @@ apply after a glob matches:
 - `skills/**/SKILL.md`
 - `.agents/skills/**/SKILL.md`
 
-Renma also discovers these historical spellings for migration diagnostics:
-
-- `skills/**/skill.md`
-- `skills/**/*.skill.md`
-- `.agents/skills/**/skill.md`
-- `.agents/skills/**/*.skill.md`
+The repository walk reports historical `skill.md` and `*.skill.md` forms under
+either Skill root with migration guidance. They are not default scan globs,
+not operational Skills, and only become migration candidates when passed
+explicitly to `suggest-metadata`.
 
 Other default scan glob families are:
 
 - `.agents/**/*.md`
 - `AGENTS.md`
 - `README.md`
-- `context/**/*.md`
 - `contexts/**/*.md`
 - `lenses/**/*.md`
 - `skills/**/profiles/**/*.md`
@@ -1499,9 +1501,10 @@ When no conventional configuration file exists, `init` creates a concise
 `renma.config.jsonc` containing the initial `fail_on` and `format` policy plus
 one comment demonstrating where to preserve the rationale for a temporary
 policy exception. The command never overwrites, parses, normalizes, migrates,
-or validates an existing `renma.config.jsonc`, `renma.config.json`, or
-`.renma.json`. If multiple conventional files exist, `init` reports the
-ambiguity and changes none of them.
+or validates an existing `renma.config.jsonc` or `renma.config.json`. If both
+supported files exist, `init` reports the ambiguity and changes neither. If
+`.renma.json` exists without that supported ambiguity, `init` exits with rename
+guidance and does not create another configuration file.
 
 Use `init` when a repository wants to record explicit Renma adoption. Existing
 repositories can continue directly to `scan` because Renma operates with
@@ -3042,9 +3045,12 @@ directory is not assumed to contain the target.
 
 For Skill targets using the legacy pre-0.16 Renma Skill format, metadata
 migration is one-way: recognized governance and security frontmatter becomes
-Agent Skills identity plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets
-report any required entrypoint rename or move, even when their frontmatter
-already uses Agent Skills fields. For a canonical Agent Skill, `--owner` may
+Agent Skills identity plus supported `metadata.renma.*`. Historical
+`when_to_use` and `when_not_to_use` may inform recovery of portable
+`description` text but are never emitted as Renma routing metadata. Separately,
+explicit `skill.md` and `*.skill.md` targets report any required entrypoint
+rename or move, even when their frontmatter already uses Agent Skills fields.
+For a canonical Agent Skill, `--owner` may
 instead propose an owner metadata retrofit; it never causes reverse migration.
 Skill migration `sourcePath` and `targetPath` values are repository-relative,
 including when the user invokes Renma from the parent of a nested repository.

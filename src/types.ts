@@ -1,6 +1,6 @@
 /**
- * Compatibility facade for the established `renma/dist/types.js` deep import.
- * Internal modules import the cohesive type owners below directly.
+ * Cohesive public type barrel for the intentional `renma/types` export.
+ * Internal modules import the focused type owners below directly.
  */
 export * from "./types/artifact.js";
 export * from "./types/classification.js";

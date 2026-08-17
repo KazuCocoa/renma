@@ -541,7 +541,7 @@ test("suggest-metadata works for context assets", async () => {
   assert.match(promptResult.stdout, /renma scan \. --fail-on high/);
 });
 
-test("scan commands execute historical Skill entrypoint migrations end to end", async () => {
+test("explicit suggest-metadata migrates historical Skill entrypoints without operational discovery", async () => {
   const root = await fixture();
   const fixtures = [
     {
@@ -585,16 +585,8 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
     main(["scan", root, "--format", "json"]),
   );
   const report = JSON.parse(jsonScan.stdout) as {
-    agentSkills: {
-      results: Array<{
-        path: string;
-        migrationCommand?: {
-          command: string;
-          args: [string, string];
-          display: string;
-        };
-      }>;
-    };
+    agentSkills: { results: Array<{ path: string }> };
+    diagnostics: Array<{ code?: string; path: string; message: string }>;
   };
 
   for (const entry of fixtures) {
@@ -605,14 +597,17 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
       ),
       entry.source,
     );
-    assert.deepEqual(
-      report.agentSkills.results.find((item) => item.path === entry.source)
-        ?.migrationCommand,
-      {
-        command: "renma",
-        args: ["suggest-metadata", entry.source],
-        display: `renma suggest-metadata ${entry.source}`,
-      },
+    assert.equal(
+      report.agentSkills.results.some((item) => item.path === entry.source),
+      false,
+      entry.source,
+    );
+    assert.ok(
+      report.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+          diagnostic.path === entry.source,
+      ),
       entry.source,
     );
 
@@ -657,7 +652,7 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
   }
 });
 
-test("scan recommends historical filename migration without legacy Renma fields", async () => {
+test("historical Agent Skills filenames remain migration-only", async () => {
   const root = await fixture();
   const fixtures = [
     ["skills/demo/skill.md", "demo"],
@@ -680,37 +675,26 @@ description: Review ${name} inputs. Use when ${name} inputs need review.
     );
   }
 
-  const textResult = await withCapturedConsole(() =>
-    main(["scan", root, "--format", "text"]),
-  );
   const jsonResult = await withCapturedConsole(() =>
     main(["scan", root, "--format", "json"]),
   );
   const report = JSON.parse(jsonResult.stdout) as {
-    agentSkills: {
-      results: Array<{
-        path: string;
-        migrationRecommended: boolean;
-        migrationCommand?: {
-          command: string;
-          args: [string, string];
-          display: string;
-        };
-      }>;
-    };
+    agentSkills: { results: Array<{ path: string }> };
+    diagnostics: Array<{ code?: string; path: string }>;
   };
 
   for (const [source] of fixtures) {
-    const validation = report.agentSkills.results.find(
-      (item) => item.path === source,
-    );
-    assert.equal(validation?.migrationRecommended, true, source);
-    assert.deepEqual(validation?.migrationCommand?.args, [
-      "suggest-metadata",
+    assert.equal(
+      report.agentSkills.results.some((item) => item.path === source),
+      false,
       source,
-    ]);
+    );
     assert.ok(
-      textResult.stdout.includes(`renma suggest-metadata ${source}`),
+      report.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+          diagnostic.path === source,
+      ),
       source,
     );
 

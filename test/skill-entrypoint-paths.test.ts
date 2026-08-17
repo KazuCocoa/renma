@@ -16,11 +16,14 @@ import {
   SKILL_ROOTS,
   SKILL_SUPPORT_DISCOVERY_MODE,
 } from "../src/discovery.js";
+import {
+  classifyAbsoluteSkillMigrationEntrypointPath,
+  classifyRepositorySkillMigrationEntrypointPath,
+} from "../src/skill-path-contract.js";
 
 test("repository-relative Skill paths normalize dots without escaping roots", () => {
   const accepted = [
     ["./skills/demo/SKILL.md", "skills/demo/SKILL.md", "canonical"],
-    ["./skills/demo/skill.md", "skills/demo/skill.md", "lowercase-entrypoint"],
     ["skills/demo/./SKILL.md", "skills/demo/SKILL.md", "canonical"],
     ["skills/demo/../demo/SKILL.md", "skills/demo/SKILL.md", "canonical"],
   ] as const;
@@ -30,6 +33,20 @@ test("repository-relative Skill paths normalize dots without escaping roots", ()
     assert.equal(classified?.currentPath, normalized, input);
     assert.equal(classified?.kind, kind, input);
   }
+
+  assert.equal(
+    normalizeRepositoryRelativePath("./skills/demo/skill.md"),
+    "skills/demo/skill.md",
+  );
+  assert.equal(
+    classifyRepositorySkillEntrypointPath("./skills/demo/skill.md"),
+    undefined,
+  );
+  assert.equal(
+    classifyRepositorySkillMigrationEntrypointPath("./skills/demo/skill.md")
+      ?.kind,
+    "lowercase-entrypoint",
+  );
 
   for (const rejected of [
     "skills/../docs/SKILL.md",
@@ -114,14 +131,14 @@ test("directory-based Skill entrypoints require a Skill directory below either r
     );
     assert.equal(
       classifyRepositorySkillEntrypointPath(lowercaseEntrypoint)?.kind,
-      "lowercase-entrypoint",
+      undefined,
       lowercaseEntrypoint,
     );
     assert.equal(
       classifyAbsoluteSkillEntrypointPath(
         `/tmp/repository/${lowercaseEntrypoint}`,
       )?.kind,
-      "lowercase-entrypoint",
+      undefined,
       lowercaseEntrypoint,
     );
     assert.equal(
@@ -132,12 +149,13 @@ test("directory-based Skill entrypoints require a Skill directory below either r
       canonicalEntrypoint,
     );
     assert.equal(
-      classifyRepositorySkillEntrypointPath(historicalFlatEntrypoint)?.kind,
+      classifyRepositorySkillMigrationEntrypointPath(historicalFlatEntrypoint)
+        ?.kind,
       "flat-legacy-entrypoint",
       historicalFlatEntrypoint,
     );
     assert.equal(
-      classifyAbsoluteSkillEntrypointPath(
+      classifyAbsoluteSkillMigrationEntrypointPath(
         `/tmp/repository/${historicalFlatEntrypoint}`,
       )?.kind,
       "flat-legacy-entrypoint",
@@ -262,6 +280,12 @@ test("absolute Skill paths require one unambiguous repository root", () => {
   assert.equal(
     classifyAbsoluteSkillEntrypointPath("/tmp/repository/skills/demo/skill.md")
       ?.kind,
+    undefined,
+  );
+  assert.equal(
+    classifyAbsoluteSkillMigrationEntrypointPath(
+      "/tmp/repository/skills/demo/skill.md",
+    )?.kind,
     "lowercase-entrypoint",
   );
   assert.equal(
@@ -342,6 +366,39 @@ test("artifact classification preserves nested support and outside-root kinds", 
       reservedPath,
     );
   }
+});
+
+test("historical Skill filenames are migration-only even under custom globs", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-skill-migration-only-"),
+  );
+  for (const relativePath of ["skills/demo/skill.md", "skills/flat.skill.md"]) {
+    const target = path.join(root, ...relativePath.split("/"));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, "# Historical\n");
+  }
+
+  const result = await discoverArtifacts(root, {
+    ...DEFAULT_CONFIG,
+    globs: ["skills/**/*.md"],
+  });
+
+  assert.deepEqual(
+    result.artifacts.map((artifact) => [artifact.path, artifact.kind]),
+    [
+      ["skills/demo/skill.md", "unknown"],
+      ["skills/flat.skill.md", "unknown"],
+    ],
+  );
+  assert.deepEqual(
+    result.diagnostics
+      .filter(
+        (diagnostic) =>
+          diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT",
+      )
+      .map((diagnostic) => diagnostic.path),
+    ["skills/demo/skill.md", "skills/flat.skill.md"],
+  );
 });
 
 test("DEFAULT_CONFIG discovers Markdown and non-Markdown references equivalently at both Skill roots", async () => {
