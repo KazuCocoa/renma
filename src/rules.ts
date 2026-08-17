@@ -7,6 +7,7 @@ import {
   isIsoDate,
   todayIsoDate,
 } from "./freshness.js";
+import { YAML_FRONTMATTER_MARKER } from "./frontmatter-envelope.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   classifyRepositorySkillEntrypointPath,
@@ -3083,7 +3084,11 @@ function compareStableText(left: string, right: string): number {
 
 function isMeaningfulScopeLine(line: string): boolean {
   const trimmed = line.trim();
-  return trimmed.length > 0 && trimmed !== "---" && trimmed !== "...";
+  return (
+    trimmed.length > 0 &&
+    trimmed !== YAML_FRONTMATTER_MARKER &&
+    trimmed !== "..."
+  );
 }
 
 function evidence(

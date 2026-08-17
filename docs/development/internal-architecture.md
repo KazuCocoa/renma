@@ -207,6 +207,16 @@ receive a prepared semantic analysis through this path. An expected target
 that was not parsed remains inspection evidence only and never gains a
 synthetic `renma.security-analysis-coverage.v1` artifact row.
 
+`src/frontmatter-envelope.ts` owns the shared YAML marker, one-leading-BOM
+operation, and the intentionally distinct opener and closer predicates. Agent
+Skills retain their established surrounding-whitespace and column-zero closer
+rules; non-Skill Renma frontmatter retains its exact marker rules after one
+optional absolute leading encoding BOM. Parser consumers select one of those
+contracts instead of spelling delimiters independently. Security integrity
+checks may compare an invalid opener projection with the same contract only to
+produce fail-closed evidence; projected delimiters, contents, and values never
+gain parser or policy authority.
+
 `src/yaml-frontmatter.ts` owns YAML-comment extraction eligibility as well as
 the extracted comment surfaces. `parseAgentSkillFrontmatter()` retains Agent
 Skills envelope semantics, while eligible non-Skill Markdown—including
