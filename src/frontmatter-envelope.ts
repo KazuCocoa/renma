@@ -30,11 +30,16 @@ export function agentSkillFrontmatterEnvelope(
   };
 }
 
-/** Locate the exact delimiter contract used by general Renma metadata. */
+/**
+ * Locate the general Renma metadata envelope after consuming one absolute
+ * leading Unicode BOM. The delimiter itself remains exact: visible whitespace
+ * and any remaining characters are noncanonical.
+ */
 export function renmaFrontmatterEnvelope(
   lines: readonly string[],
 ): FrontmatterEnvelope {
-  if (lines[0] !== "---") {
+  const firstLine = lines[0]?.replace(/^\uFEFF/u, "");
+  if (firstLine !== "---") {
     return { present: false, closingIndex: undefined };
   }
 

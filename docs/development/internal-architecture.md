@@ -182,6 +182,14 @@ canonical repository path states and emits exact blocking evidence with source
 provenance. Parsed-to-blocked support transitions consequently use the existing
 inspection-coverage diff and strict-scan paths.
 
+For Markdown sources, `staticSupportReferences()` consumes positioned resolved
+targets from the primary `MarkdownSyntax` parse. The same evidence supplies
+inline and reference-style target identity, while parser-recognized unresolved
+uses and definition ranges are masked from the remaining basename and explicit
+path grammar. Definition nodes therefore never create support edges on their
+own. Non-Markdown plain text retains the bounded explicit-path and basename
+grammar; it does not gain a local Markdown parser.
+
 The security eligibility projection selects only discovered UTF-8 `.txt`
 support outside `scripts/`. Security orchestration consumes that map without
 reparsing references. Eligible plain-text support is prepared with body line
@@ -195,13 +203,23 @@ synthetic `renma.security-analysis-coverage.v1` artifact row.
 
 `src/yaml-frontmatter.ts` owns YAML-comment extraction eligibility as well as
 the extracted comment surfaces. `parseAgentSkillFrontmatter()` retains Agent
-Skills envelope semantics, while eligible known non-Skill Markdown supplies a
-closed envelope from the existing Renma delimiter contract to the same
-parser-owned extraction. Its `commentsAnalyzable` evidence is true only after
+Skills envelope semantics, while eligible non-Skill Markdown—including
+`unknown` Markdown with an exact recognized envelope—supplies the existing
+Renma delimiter contract to the same parser-owned extraction without gaining
+new metadata or policy authority from comment eligibility. Its
+`commentsAnalyzable` evidence is true only after
 both semantic YAML parsing and CST token extraction complete without errors.
 Security coverage consumes that exact extraction state directly, so zero
 comments can mean `analyzed` only when the extractor actually ran
 successfully.
+
+`src/security-identifier-integrity.ts` owns the single reviewed
+default-ignorable vocabulary used at registered security-authority boundaries.
+Policy resolution compares parser-owned keys and artifact-selected opener
+syntax only against exact trusted spellings after that bounded projection. A
+matching corrupted opener or canonical `metadata` container produces invalid
+declaration evidence for every potentially hidden security field, but the
+projected delimiter, container, contents, and values never gain authority.
 
 `src/security-diagnostics.ts` owns semantic-surface eligibility, effective
 policy, guard application, fallback selection, evidence projection, ordering,
@@ -379,6 +397,16 @@ candidates once, masks candidate text once, and records network and upload
 associations in one intermediate representation. Policy checks and command
 sink classification derive their network and upload views from that result
 instead of reclassifying raw text.
+
+When the primary Markdown parse resolves a link or reference target,
+`MarkdownSecurityView` maps that positioned target into the governing line or
+paragraph clause. Destination classification uses the parsed target identity
+while action association masks the original Markdown use span, so evidence
+remains the original source rather than synthetic Markdown. The parser-visible
+label text is classified separately by the established destination grammar: a
+distinct destination-shaped label is additive evidence, while an identical
+normalized label/target pair is deduplicated before association. Definition
+lines are non-operational and unresolved references supply no target.
 
 `src/security-prose-vocabulary.ts` owns only exact lexical sources shared by
 multiple prose-oriented detectors. Each owning detector still controls regex

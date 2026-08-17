@@ -3,7 +3,10 @@ import { isIP } from "node:net";
 import { parse as parseDomain } from "tldts";
 
 import { normalizeNetworkDestination } from "./matching.js";
-import type { DestinationCandidate } from "./types.js";
+import type {
+  DestinationCandidate,
+  ResolvedDestinationEvidence,
+} from "./types.js";
 
 const DNS_HOST_SOURCE = String.raw`(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?`;
 const IPV4_HOST_SOURCE = String.raw`(?:\d{1,3}\.){3}\d{1,3}`;
@@ -18,7 +21,11 @@ const TRAILING_DESTINATION_PUNCTUATION_RE = /[),.;:!?]+$/;
 
 export function classifyDestinationCandidates(
   line: string,
+  resolvedDestinations: readonly ResolvedDestinationEvidence[] = [],
 ): DestinationCandidate[] {
+  const resolvedCandidates = resolvedDestinations.flatMap((evidence) =>
+    resolvedDestinationCandidates(line, evidence),
+  );
   const candidates: DestinationCandidate[] = [];
 
   for (const match of line.matchAll(EXPLICIT_URL_CANDIDATE_RE)) {
@@ -26,6 +33,11 @@ export function classifyDestinationCandidates(
     const start = match.index ?? 0;
     const destination = normalizeNetworkDestination(raw);
     const explicitTransport = explicitNetworkTransport(raw);
+    if (
+      overlapsResolvedDestination(resolvedCandidates, start, start + raw.length)
+    ) {
+      continue;
+    }
     candidates.push({
       raw,
       start,
@@ -40,7 +52,11 @@ export function classifyDestinationCandidates(
     const raw = match[0] ?? "";
     const start = match.index ?? 0;
     const end = start + raw.length;
-    if (overlapsDestinationCandidate(candidates, start, end)) continue;
+    if (
+      overlapsResolvedDestination(resolvedCandidates, start, end) ||
+      overlapsDestinationCandidate(candidates, start, end)
+    )
+      continue;
     const destination = normalizeNetworkDestination(raw);
     candidates.push({
       raw,
@@ -55,7 +71,11 @@ export function classifyDestinationCandidates(
     const raw = match[0] ?? "";
     const start = match.index ?? 0;
     const end = start + raw.length;
-    if (overlapsDestinationCandidate(candidates, start, end)) continue;
+    if (
+      overlapsResolvedDestination(resolvedCandidates, start, end) ||
+      overlapsDestinationCandidate(candidates, start, end)
+    )
+      continue;
 
     if (isCommandFileArgument(line, start)) {
       candidates.push({ raw, start, end, kind: "command-file-argument" });
@@ -107,9 +127,87 @@ export function classifyDestinationCandidates(
     candidates.push({ raw, start, end, kind: "local-filename" });
   }
 
-  return candidates.sort(
+  return [...resolvedCandidates, ...candidates].sort(
     (a, b) => a.start - b.start || b.end - b.start - (a.end - a.start),
   );
+}
+
+function resolvedDestinationCandidates(
+  input: string,
+  evidence: ResolvedDestinationEvidence,
+): DestinationCandidate[] {
+  if (
+    !Number.isSafeInteger(evidence.startOffset) ||
+    !Number.isSafeInteger(evidence.endOffset) ||
+    evidence.startOffset < 0 ||
+    evidence.endOffset <= evidence.startOffset ||
+    evidence.endOffset > input.length
+  ) {
+    throw new RangeError(
+      "Resolved destination evidence falls outside analyzed input",
+    );
+  }
+  const targetCandidate = semanticDestinationCandidate(evidence.target);
+  const semanticCandidates = dedupeDestinationCandidates([
+    targetCandidate,
+    ...classifyDestinationCandidates(evidence.text),
+  ]);
+  return semanticCandidates.map((candidate) => ({
+    ...candidate,
+    raw: input.slice(evidence.startOffset, evidence.endOffset),
+    start: evidence.startOffset,
+    end: evidence.endOffset,
+  }));
+}
+
+function semanticDestinationCandidate(target: string): DestinationCandidate {
+  const semantic = classifyDestinationCandidates(target).find(
+    (candidate) => candidate.start === 0 && candidate.end === target.length,
+  );
+  if (semantic !== undefined) return semantic;
+  const destination = normalizeNetworkDestination(target);
+  return {
+    raw: target,
+    start: 0,
+    end: target.length,
+    kind: destination === undefined ? "local-path" : "bare-host",
+    ...(destination === undefined ? {} : { destination }),
+  };
+}
+
+function dedupeDestinationCandidates(
+  candidates: readonly DestinationCandidate[],
+): DestinationCandidate[] {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const identity = destinationCandidateIdentity(candidate);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
+function destinationCandidateIdentity(candidate: DestinationCandidate): string {
+  if (candidate.destination !== undefined) {
+    return [
+      candidate.explicitTransport ?? "",
+      candidate.destination.host,
+      candidate.destination.path,
+    ].join("\u0000");
+  }
+  return [
+    candidate.kind,
+    candidate.explicitTransport ?? "",
+    candidate.raw.toLowerCase(),
+  ].join("\u0000");
+}
+
+function overlapsResolvedDestination(
+  candidates: readonly DestinationCandidate[],
+  start: number,
+  end: number,
+): boolean {
+  return overlapsDestinationCandidate(candidates, start, end);
 }
 
 export function maskDestinationCandidates(
@@ -124,7 +222,7 @@ export function maskDestinationCandidates(
 }
 
 function overlapsDestinationCandidate(
-  candidates: DestinationCandidate[],
+  candidates: readonly DestinationCandidate[],
   start: number,
   end: number,
 ): boolean {

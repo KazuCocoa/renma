@@ -248,10 +248,10 @@ approved_network_destinations:
   ]);
 });
 
-test("non-Skill policy parsing preserves exact Renma delimiter semantics", () => {
+test("non-Skill policy parsing preserves Renma delimiter semantics after one leading BOM", () => {
   const nonCanonicalEnvelopes = [
     " ---\nnetwork_allowed: true\n---\n",
-    "\uFEFF---\nnetwork_allowed: true\n---\n",
+    "--- \nnetwork_allowed: true\n---\n",
     "---\nnetwork_allowed: true\n--- \n",
   ];
 
@@ -260,6 +260,12 @@ test("non-Skill policy parsing preserves exact Renma delimiter semantics", () =>
     assert.equal(policy.networkAllowed, undefined, JSON.stringify(content));
     assert.equal(policy.declared.size, 0, JSON.stringify(content));
   }
+
+  const bomPolicy = parseSecurityPolicy(
+    "\uFEFF---\nnetwork_allowed: true\n---\n",
+  );
+  assert.equal(bomPolicy.networkAllowed, true);
+  assert.equal(bomPolicy.declared.has("networkAllowed"), true);
 });
 
 test("unclosed non-Skill frontmatter withholds all local policy authority", () => {

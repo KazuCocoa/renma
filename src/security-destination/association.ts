@@ -13,6 +13,7 @@ import type {
   DestinationCandidate,
   NetworkDestination,
   OperationalDestination,
+  ResolvedDestinationEvidence,
   ShellProjection,
 } from "./types.js";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../security-prose-vocabulary.js";
 
 type OffsetSpan = { start: number; end: number };
+type AssociationGroup = OffsetSpan & { associated: boolean };
 type Association = Pick<
   OperationalDestination,
   "actionKind" | "tool" | "commandSpan" | "transferSpan"
@@ -55,17 +57,35 @@ const CLOUD_UPLOAD_RE = new RegExp(
   "i",
 );
 
-export function analyzeDestinations(input: string): DestinationAnalysis {
+export function analyzeDestinations(
+  input: string,
+  resolvedDestinations: readonly ResolvedDestinationEvidence[] = [],
+): DestinationAnalysis {
   const shellProjection = projectShellContinuations(input);
-  return analyzeDestinationsFromProjection(input, shellProjection);
+  return analyzeDestinationsFromProjection(
+    input,
+    shellProjection,
+    resolvedDestinations,
+  );
 }
 
 export function analyzeDestinationsFromProjection(
   originalInput: string,
   shellProjection: ShellProjection,
+  resolvedDestinations: readonly ResolvedDestinationEvidence[] = [],
 ): DestinationAnalysis {
   validateShellProjection(originalInput, shellProjection);
-  const candidates = classifyDestinationCandidates(shellProjection.projection);
+  const projectedResolvedDestinations = resolvedDestinations.map((evidence) =>
+    projectResolvedDestinationEvidence(
+      evidence,
+      shellProjection,
+      originalInput.length,
+    ),
+  );
+  const candidates = classifyDestinationCandidates(
+    shellProjection.projection,
+    projectedResolvedDestinations,
+  );
   const maskedProjection = maskDestinationCandidates(
     shellProjection.projection,
     candidates,
@@ -86,6 +106,53 @@ export function analyzeDestinationsFromProjection(
       ...associatedOperationalDestinations(context, "network"),
       ...associatedOperationalDestinations(context, "upload"),
     ],
+  };
+}
+
+function projectResolvedDestinationEvidence(
+  evidence: ResolvedDestinationEvidence,
+  projection: ShellProjection,
+  inputLength: number,
+): ResolvedDestinationEvidence {
+  if (
+    !Number.isSafeInteger(evidence.startOffset) ||
+    !Number.isSafeInteger(evidence.endOffset) ||
+    evidence.startOffset < 0 ||
+    evidence.endOffset <= evidence.startOffset ||
+    evidence.endOffset > inputLength
+  ) {
+    throw new RangeError(
+      "Resolved destination evidence falls outside original input",
+    );
+  }
+  const startOffset = projection.sourceOffsetByProjectionOffset.findIndex(
+    (sourceOffset) => sourceOffset >= evidence.startOffset,
+  );
+  if (startOffset < 0) {
+    throw new RangeError(
+      "Resolved destination evidence is absent from destination projection",
+    );
+  }
+  let endOffset = projection.sourceOffsetByProjectionOffset.length;
+  for (let index = startOffset; index < endOffset; index += 1) {
+    if (
+      (projection.sourceOffsetByProjectionOffset[index] ?? Infinity) >=
+      evidence.endOffset
+    ) {
+      endOffset = index;
+      break;
+    }
+  }
+  if (endOffset <= startOffset) {
+    throw new RangeError(
+      "Resolved destination evidence is absent from destination projection",
+    );
+  }
+  return {
+    target: evidence.target,
+    text: evidence.text,
+    startOffset,
+    endOffset,
   };
 }
 
@@ -125,10 +192,13 @@ function associatedOperationalDestinations(
   intent: "network" | "upload",
 ): OperationalDestination[] {
   const associated: OperationalDestination[] = [];
-  let previousCandidate: DestinationCandidate | undefined;
-  let previousAssociated = false;
+  let previousGroup: AssociationGroup | undefined;
 
   for (const candidate of context.candidates) {
+    const overlapsPreviousGroup =
+      previousGroup !== undefined &&
+      candidate.start < previousGroup.end &&
+      previousGroup.start < candidate.end;
     const canRepresentDestination =
       candidate.destination !== undefined ||
       candidate.explicitTransport !== undefined;
@@ -143,11 +213,11 @@ function associatedOperationalDestinations(
           : uploadDestinationAssociation(context, candidate, clause);
       if (
         association === undefined &&
-        previousAssociated &&
-        previousCandidate !== undefined &&
+        previousGroup?.associated === true &&
+        !overlapsPreviousGroup &&
         isDestinationListContinuation(
           context.shellProjection.projection,
-          previousCandidate,
+          previousGroup,
           candidate,
         )
       ) {
@@ -180,8 +250,19 @@ function associatedOperationalDestinations(
             : { kind: "evaluated" },
       });
     }
-    previousCandidate = candidate;
-    previousAssociated = association !== undefined;
+    if (overlapsPreviousGroup && previousGroup !== undefined) {
+      previousGroup = {
+        start: Math.min(previousGroup.start, candidate.start),
+        end: Math.max(previousGroup.end, candidate.end),
+        associated: previousGroup.associated || association !== undefined,
+      };
+    } else {
+      previousGroup = {
+        start: candidate.start,
+        end: candidate.end,
+        associated: association !== undefined,
+      };
+    }
   }
 
   return associated;
@@ -328,12 +409,14 @@ function destinationClauseSpans(
 
 function isDestinationListContinuation(
   line: string,
-  previous: DestinationCandidate,
+  previous: OffsetSpan,
   candidate: DestinationCandidate,
 ): boolean {
-  const trailingPunctuation = previous.raw.match(/[),.;:!?]+$/u)?.[0] ?? "";
+  if (candidate.start < previous.end) return false;
+  const previousRaw = line.slice(previous.start, previous.end);
+  const trailingPunctuation = previousRaw.match(/[),.;:!?]+$/u)?.[0] ?? "";
   if (/[.;:!?]/u.test(trailingPunctuation)) return false;
-  const trailingComma = previous.raw.match(/,+$/u)?.[0] ?? "";
+  const trailingComma = previousRaw.match(/,+$/u)?.[0] ?? "";
   const separator = `${trailingComma}${line.slice(previous.end, candidate.start)}`;
   return (
     /^(?:\s|,|\band\b|\bor\b)+$/iu.test(separator) &&

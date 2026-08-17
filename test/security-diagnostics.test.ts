@@ -1507,7 +1507,7 @@ Review the local evidence.
   );
 });
 
-test("malformed, unclosed, and unknown Markdown frontmatter produce no guessed comment evidence", () => {
+test("malformed and unclosed frontmatter stay fail-closed while exact unknown frontmatter is analyzed", () => {
   const artifacts = [
     rawMarkdownSecurityArtifact(
       "contexts/security/malformed.md",
@@ -1541,7 +1541,7 @@ id: arbitrary
     ),
   ];
 
-  for (const artifact of artifacts) {
+  for (const artifact of artifacts.slice(0, 2)) {
     const findings = securityDiagnosticFindings([artifact]);
     assert.equal(
       findings.some(
@@ -1551,6 +1551,15 @@ id: arbitrary
       artifact.path,
     );
   }
+  const unknownFindings = securityDiagnosticFindings([artifacts[2]!]);
+  assert.ok(
+    unknownFindings.some(
+      (finding) =>
+        finding.id === "SEC-HIDDEN-FRONTMATTER-INSTRUCTION" &&
+        finding.evidence.path === "notes/arbitrary.md" &&
+        finding.evidence.startLine === 3,
+    ),
+  );
 });
 
 test("Skill and non-Skill comment extraction retain distinct envelope rules", () => {

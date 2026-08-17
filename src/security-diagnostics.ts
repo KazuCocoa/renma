@@ -78,6 +78,7 @@ import {
   type DestinationAnalysis,
   type LogicalShellCommand,
   type NetworkDestination,
+  type ResolvedDestinationEvidence,
 } from "./security-destination/index.js";
 import {
   CLOUD_UPLOAD_ACTION_TERMS,
@@ -1190,6 +1191,7 @@ interface SecurityParagraphClauseRange {
 interface PreparedSecurityParagraphContext {
   readonly paragraph: SecurityParagraphContext;
   readonly clauseRanges: readonly SecurityParagraphClauseRange[];
+  readonly resolvedDestinations: readonly ResolvedDestinationEvidence[];
   readonly structurallyEligible: boolean;
 }
 
@@ -1707,10 +1709,6 @@ function frontmatterCommentAnalysisForDocument(
   if (document.artifact.kind === "skill") {
     return skillFrontmatter;
   }
-  // Unknown repository Markdown has semantic analysis for visible text, but
-  // does not gain a new hidden-frontmatter surface merely from a delimiter.
-  if (document.artifact.kind === "unknown") return undefined;
-
   const frontmatter = ensureYamlFrontmatterForDocument(document);
   return frontmatter.present ? frontmatter : undefined;
 }
@@ -1837,6 +1835,10 @@ function prepareSecurityParagraphContexts(
         0,
         paragraph.text.length,
       ),
+      resolvedDestinations: paragraphResolvedDestinationEvidence(
+        paragraph,
+        markdownView,
+      ),
       structurallyEligible: isStructurallyEligibleProseParagraph(
         paragraph,
         markdownView,
@@ -1861,6 +1863,64 @@ function prepareSecurityParagraphContexts(
     }
   }
   return { paragraphs, contextByLine };
+}
+
+function paragraphResolvedDestinationEvidence(
+  paragraph: SecurityParagraphContext,
+  markdownView: MarkdownSecurityView,
+): ResolvedDestinationEvidence[] {
+  const lineByIndex = new Map(
+    paragraph.lines.map((line) => [line.lineIndex, line]),
+  );
+  return markdownView.resolvedDestinations.flatMap(
+    (destination): ResolvedDestinationEvidence[] => {
+      const first = lineByIndex.get(destination.startLine - 1);
+      const last = lineByIndex.get(destination.endLine - 1);
+      if (first === undefined || last === undefined) return [];
+      const startOffset =
+        first.startOffset +
+        paragraphLineOffsetForSourceColumn(
+          first,
+          destination.startColumn,
+          markdownView,
+        );
+      const endOffset =
+        last.startOffset +
+        paragraphLineOffsetForSourceColumn(
+          last,
+          destination.endColumn,
+          markdownView,
+        );
+      if (endOffset <= startOffset || endOffset > paragraph.text.length) {
+        return [];
+      }
+      return [
+        {
+          target: destination.target,
+          text: destination.text,
+          startOffset,
+          endOffset,
+        },
+      ];
+    },
+  );
+}
+
+function paragraphLineOffsetForSourceColumn(
+  line: SecurityParagraphSourceLine,
+  sourceColumn: number,
+  markdownView: MarkdownSecurityView,
+): number {
+  const visible = markdownView.visibleLine(line.lineIndex);
+  const leadingWhitespace = visible.length - visible.trimStart().length;
+  return Math.max(
+    0,
+    Math.min(
+      line.text.length,
+      markdownView.visibleOffsetForSourceColumn(line.lineIndex, sourceColumn) -
+        leadingWhitespace,
+    ),
+  );
 }
 
 function paragraphClauseIntersectingLine(
@@ -1909,7 +1969,19 @@ function cachedParagraphClauseDestinationAnalysis(
   const key = `${clause.startOffset}:${clause.endOffset}`;
   let analysis = analyses.get(key);
   if (analysis === undefined) {
-    analysis = analyzeDestinations(clause.text);
+    const resolvedDestinations = context.preparedParagraph.resolvedDestinations
+      .filter(
+        (destination) =>
+          destination.startOffset >= clause.startOffset &&
+          destination.endOffset <= clause.endOffset,
+      )
+      .map((destination) => ({
+        target: destination.target,
+        text: destination.text,
+        startOffset: destination.startOffset - clause.startOffset,
+        endOffset: destination.endOffset - clause.startOffset,
+      }));
+    analysis = analyzeDestinations(clause.text, resolvedDestinations);
     analyses.set(key, analysis);
   }
   return analysis;
@@ -2139,6 +2211,7 @@ function prepareSecurityLineContext(
   const lineNumber = index + 1;
   const line = markdownView.instructionLine(index);
   if (markdownView.isNonOperationalExampleLine(index)) return undefined;
+  if (markdownView.isLinkDefinitionLine(index)) return undefined;
   if (
     !markdownView.usesRawAgentVisibleEligibility() &&
     isShellCommentLine(line, index, markdownView)
@@ -2219,6 +2292,14 @@ function prepareSecurityLineContext(
   const paragraphClauseContextAvailable =
     preparedParagraph?.structurallyEligible ?? false;
   let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
+  let cachedLineDestinationAnalysis: DestinationAnalysis | undefined;
+  const lineDestinationAnalysis = (): DestinationAnalysis => {
+    cachedLineDestinationAnalysis ??= analyzeDestinations(
+      line,
+      lineResolvedDestinationEvidence(markdownView, index, line.length),
+    );
+    return cachedLineDestinationAnalysis;
+  };
   const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
     const language = markdownView.languageAt(index);
     cachedLineSecurityAnalysis ??= analyzeSecurityCommand({
@@ -2232,11 +2313,9 @@ function prepareSecurityLineContext(
       guards: markdownView.associatedGuardEvidence(index),
       allowedFloatingDependencies:
         prepared.parsedPolicy.allowedFloatingDependencies,
+      destinationAnalysis: lineDestinationAnalysis(),
     });
     return cachedLineSecurityAnalysis;
-  };
-  const lineDestinationAnalysis = (): DestinationAnalysis => {
-    return lineSecurityAnalysis().destinationAnalysis;
   };
   const paragraphClauseDestinationAnalysis = ():
     DestinationAnalysis | undefined => {
@@ -2269,6 +2348,46 @@ function prepareSecurityLineContext(
     lineDestinationAnalysis,
     paragraphClauseDestinationAnalysis,
   };
+}
+
+function lineResolvedDestinationEvidence(
+  markdownView: MarkdownSecurityView,
+  lineIndex: number,
+  lineLength: number,
+): ResolvedDestinationEvidence[] {
+  return markdownView.resolvedDestinations.flatMap(
+    (destination): ResolvedDestinationEvidence[] => {
+      if (
+        destination.startLine !== lineIndex + 1 ||
+        destination.endLine !== lineIndex + 1
+      ) {
+        return [];
+      }
+      const startOffset = markdownView.visibleOffsetForSourceColumn(
+        lineIndex,
+        destination.startColumn,
+      );
+      const endOffset = markdownView.visibleOffsetForSourceColumn(
+        lineIndex,
+        destination.endColumn,
+      );
+      if (
+        startOffset < 0 ||
+        endOffset <= startOffset ||
+        endOffset > lineLength
+      ) {
+        return [];
+      }
+      return [
+        {
+          target: destination.target,
+          text: destination.text,
+          startOffset,
+          endOffset,
+        },
+      ];
+    },
+  );
 }
 
 function securityLineDetections(
@@ -4103,7 +4222,10 @@ function invalidCanonicalSecurityDetections(
   issues: readonly CanonicalSecurityMetadataIssue[],
 ): Detection[] {
   return issues.map((issue) => {
-    const canonical = issue.key.startsWith("renma.");
+    const canonical =
+      issue.identifierAuthority === "canonical" ||
+      (issue.identifierAuthority === undefined &&
+        issue.key.startsWith("renma."));
     return {
       metadata: {
         ...(canonical

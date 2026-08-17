@@ -42,6 +42,15 @@ export type DestinationCandidate = {
   destination?: NetworkDestination;
 };
 
+/** Parser-owned target identity positioned inside the analyzed input. */
+export type ResolvedDestinationEvidence = {
+  target: string;
+  /** Parser-visible label/alt text, classified only by the existing grammar. */
+  text: string;
+  startOffset: number;
+  endOffset: number;
+};
+
 export type DestinationEvaluation =
   | { kind: "evaluated" }
   | {
