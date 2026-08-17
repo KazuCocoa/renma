@@ -608,15 +608,17 @@ function corruptedFrontmatterAuthorityOpener(
   firstLine: string,
   authority: SecurityIdentifierAuthority,
 ): string | undefined {
+  let authorityLine = firstLine;
   if (authority === "canonical") {
     if (firstLine.replace(/^\uFEFF/u, "").trim() === "---") return undefined;
   } else {
-    if (firstLine === "---" || firstLine === "\uFEFF---") {
+    authorityLine = firstLine.replace(/^\uFEFF/u, "");
+    if (authorityLine === "---") {
       return undefined;
     }
   }
 
-  const projection = reviewedDefaultIgnorableProjection(firstLine);
+  const projection = reviewedDefaultIgnorableProjection(authorityLine);
   if (projection.removedCodePoints.length === 0) return undefined;
   const sanitized =
     authority === "canonical"

@@ -600,6 +600,14 @@ external_upload_allowed: false
         finding.severity === "high",
     ),
   );
+  assert.match(
+    bomThenCorruptedResolution.issues[0]?.reason ?? "",
+    /code point U\+200E;/u,
+  );
+  assert.doesNotMatch(
+    bomThenCorruptedResolution.issues[0]?.reason ?? "",
+    /U\+FEFF/u,
+  );
 
   const doubleBomArtifact = contextArtifact(`\uFEFF\uFEFF---
 external_upload_allowed: false
@@ -618,6 +626,14 @@ external_upload_allowed: false
         finding.id === "SEC-INVALID-RENMA-POLICY-METADATA" &&
         finding.severity === "high",
     ),
+  );
+  assert.match(
+    doubleBomResolution.issues[0]?.reason ?? "",
+    /code point U\+FEFF;/u,
+  );
+  assert.doesNotMatch(
+    doubleBomResolution.issues[0]?.reason ?? "",
+    /U\+FEFF, U\+FEFF/u,
   );
 
   for (const firstLine of [" ---", "--- "]) {

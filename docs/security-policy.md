@@ -850,10 +850,11 @@ frontmatter receive a parallel, additive projection for syntactic YAML comments.
 Skills retain the Agent Skills envelope rules; non-Skills retain the exact
 Renma `---` envelope rules after consuming one optional absolute leading
 encoding BOM. This includes `unknown` Markdown only when that same non-Skill
-parser recognizes the envelope; this comment eligibility does not grant new
-metadata or security-policy authority to the artifact. A recognized instruction
-emits `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`, preserves the underlying diagnostic
-ID, and maps evidence back to the exact full-line or inline comment span.
+parser recognizes the envelope; this comment eligibility
+does not grant new metadata or security-policy authority to the artifact. A
+recognized instruction emits `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`, preserves the
+underlying diagnostic ID, and maps evidence back to the exact full-line or inline
+comment span.
 Comment tokens come from the YAML parser's concrete syntax tree: quoted `#` text
 and block-scalar content are not comments, while malformed or unclosed
 frontmatter is not heuristically recovered. If the recognized envelope is
