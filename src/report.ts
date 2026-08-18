@@ -42,7 +42,7 @@ export function formatJson(result: ScanResult): string {
   const document = Object.assign(
     { schemaVersion: SCAN_JSON_SCHEMA_VERSION },
     result,
-    { schemaVersion: SCAN_JSON_SCHEMA_VERSION },
+    { format: "json" as const, schemaVersion: SCAN_JSON_SCHEMA_VERSION },
   ) satisfies ScanJsonDocument;
   return formatJsonDocument(document);
 }

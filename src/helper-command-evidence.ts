@@ -101,11 +101,13 @@ export function helperScriptPath(command: string): string | undefined {
   ) {
     return undefined;
   }
-  const startsAtSupportedRoot = /^(?:(?:\.\.?\/)+)?(?:scripts|tools)\//u.test(
-    normalizedSeparators,
-  );
-  const isExplicitSkillScript = /(?:^|\/)scripts\//u.test(normalizedSeparators);
-  return startsAtSupportedRoot || isExplicitSkillScript ? target : undefined;
+  const isExplicitStaticPath =
+    /^(?:(?:\.\.?\/)+)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+$/u.test(
+      normalizedSeparators,
+    ) ||
+    (path.posix.isAbsolute(normalizedSeparators) &&
+      /(?:^|\/)scripts\//u.test(normalizedSeparators));
+  return isExplicitStaticPath ? target : undefined;
 }
 
 function parseHelperCommand(command: string): ParsedHelperCommand | undefined {
@@ -159,7 +161,17 @@ export function resolveHelperScriptPath(
   const rawPath = scriptPath.replace(/\\/g, "/");
   const skillDirectory = logicalSkillDirectory(sourcePath);
   const sourceSkill = skillDirectory ? { skillDirectory } : undefined;
-  const isSkillRelative = /^(?:\.\/)?scripts\//.test(rawPath);
+  if (path.posix.isAbsolute(rawPath)) {
+    return sourceSkill
+      ? { kind: "unsafe", path: rawPath }
+      : { kind: "unscoped", path: rawPath };
+  }
+  const isRepositoryRootPath =
+    /^(?:\.\/)?(?:tools|skills|\.agents|contexts?|lenses)\//.test(rawPath);
+  const isCanonicalSkillRelative = /^(?:\.\/)?scripts\//.test(rawPath);
+  const isSkillRelative =
+    isCanonicalSkillRelative ||
+    (sourceSkill !== undefined && !isRepositoryRootPath);
   const hasTraversal = rawPath.split("/").includes("..");
 
   if (isSkillRelative) {

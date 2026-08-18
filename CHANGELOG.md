@@ -9,9 +9,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Added
 
 - Added the public `ScanJsonDocument` type for the serialized
-  `renma.scan.v1` wire contract while retaining `ScanResult` as the core scan
-  result, plus an internal stable/experimental registry synchronized with the
+  `renma.scan.v1` wire contract while retaining `ScanResult` as the internal
+  core scan result, plus an internal stable/experimental registry synchronized with the
   documented public top-level JSON schema inventory.
+- Added bounded inspection evidence for explicitly referenced noncanonical
+  Agent Skills package files. Exact local targets remain separate from
+  canonical Renma support/governance, while excluded, oversized, depth-limited,
+  symlinked, and unreadable targets now block strict completeness.
 
 ### Changed
 
@@ -24,6 +28,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   severity, authoring category, Skill validity, or non-operational semantics.
 - Kept `SecurityAnalysisCoverage` on the cohesive `renma/types` facade without
   adding a separate focused package subpath.
+- Narrowed `ScanJsonDocument.format` to the literal `"json"` and made the JSON
+  serializer enforce that wire invariant without changing `renma.scan.v1` CLI
+  output.
+- Reduced the pre-1.0 npm type surface to contracts with supported producers:
+  scan JSON, diagnostics, classification/discovery, and composed security
+  coverage. Low-level parser/runtime models remain available to Renma source
+  modules but are no longer package exports.
+
+### Fixed
+
+- Rejected conventional and explicit configuration paths that are symlinks,
+  cross a symlinked parent, are outside the repository, or are not regular
+  files. Broken conventional config symlinks now fail as caller-correctable
+  configuration errors instead of silently selecting defaults.
 
 ### Removed
 
@@ -31,6 +49,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   `tool_namespace`, `workflow_aliases`, `LayoutPolicyConfig`, and normalized
   `ScanConfig` layout state. Authored `layout` objects now fail with explicit
   pre-1.0 deletion guidance and no replacement key.
+- Removed package subpaths for raw artifacts, parsed metadata, normalized
+  runtime configuration, internal decision/governance projections, and the
+  producerless core `ScanResult` type before 1.0.
 
 ## [0.33.0] - 2026-08-18
 

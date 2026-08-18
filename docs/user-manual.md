@@ -828,6 +828,16 @@ local metadata remains valid but is not required. See
 [classification evidence](diagnostics.md#how-to-read-classification-evidence)
 for the detailed contract.
 
+An Agent Skills package may also contain other directories. An explicit static
+reference from `SKILL.md` or already-inspected support makes a repository-local
+target such as `templates/prompt.md`, `docs/instructions.txt`, or `bin/run.py`
+visible as `explicit-noncanonical` package evidence. That does not make the
+target canonical support and does not grant inherited ownership or security
+policy. Renma inspects the exact referenced path without recursively admitting
+the directory; exclusion, oversize, depth, symlink, and unreadable states remain
+strict-completeness blockers. Unreferenced noncanonical package content remains
+outside discovery.
+
 Top-level `references/**` is not a Context root. `tools/**` contains shared
 repository implementation, not Context knowledge, and `skills/**/tools/**` is
 not a canonical local support directory. Skill-local executable support belongs
@@ -1164,6 +1174,10 @@ the human rationale for temporary governance exceptions, and are discarded
 during parsing rather than exposed to Renma diagnostics or reports. Renma does
 not execute configuration as JavaScript: `.js`, `.mjs`, and `.ts` configuration
 files are not supported. Existing `.json` configuration remains valid.
+Both conventional config discovery and `--config` require a non-symlink regular
+file inside the scanned repository. Renma checks every repository-relative path
+component without following symlinks; internal, external, and broken config
+symlinks are caller-correctable errors rather than policy or default fallback.
 
 For example:
 
@@ -1300,8 +1314,11 @@ policy independently, and `ci-report` retains those revision-local semantic
 findings while separately applying its established CI status model.
 
 Within a canonical Skill entrypoint or one of its classified support documents,
-helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma
-resolves these paths against the owning Skill directory. `tools/helper.mjs` and
+helper commands may use `scripts/helper.mjs`, `./scripts/helper.mjs`, or an
+explicit noncanonical package path such as `bin/helper.py`; Renma resolves these
+paths against the owning Skill directory. Noncanonical executable targets stay
+visible as noncanonical inventory/invocation evidence and do not inherit Skill
+governance. `tools/helper.mjs` and
 `./tools/helper.mjs` resolve from the repository root. Explicit repository-root
 paths such as `skills/testing/demo/scripts/helper.mjs`,
 `.agents/skills/testing/demo/scripts/helper.mjs`, and
@@ -1341,7 +1358,9 @@ because Renma does not choose, parse, or merge them. A legacy `.renma.json` is
 not a third supported candidate and instead fails with rename guidance. An
 explicit `--config <path>` selects a supported `.json` or `.jsonc` file even
 when conventional files coexist; an explicit `.renma.json` and other
-extensions are rejected.
+extensions are rejected. The explicit path must still identify a non-symlink
+regular file inside the scanned repository; external configuration is not
+treated as repository-owned policy authority.
 
 Canonical Agent Skills entrypoints are:
 
@@ -1461,10 +1480,10 @@ branch on that identifier rather than the package version or incidental field
 order. See [Machine-Readable JSON Compatibility](machine-readable-json.md) for
 the complete identifier inventory, 1.x additive/breaking rules, and the exact
 environment-derived values excluded from portable deterministic comparisons.
-In the npm type surface, `ScanResult` models the core scan result before
-serialization, while `ScanJsonDocument` composes that shape with the literal
-`schemaVersion: "renma.scan.v1"` emitted by `formatJson()` and
-`scan --format json`.
+In the npm type surface, `ScanJsonDocument` models the serialized scan wire
+shape with literal `schemaVersion: "renma.scan.v1"` and `format: "json"`, as
+emitted by `formatJson()` and `scan --format json`. The producerless
+pre-serialization core scan model remains internal.
 
 Use `trust-graph` when a reviewer asks: "Why should this asset be considered safe, owned, current, and usable enough for an agent-facing repository?" The command does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
 

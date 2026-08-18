@@ -3,38 +3,65 @@ import test from "node:test";
 
 import {
   ASSET_CLASSIFICATION_RULES,
-  ASSET_DECISION_REASON_CODES,
   SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION,
-  type Artifact,
+  type ArtifactKind,
   type Diagnostic,
-  type ScanConfig,
   type ScanJsonDocument,
-  type ScanResult,
-} from "../src/types.js";
+} from "../src/public-types.js";
 import { ASSET_CLASSIFICATION_RULES as directClassificationRules } from "../src/types/classification.js";
-import { ASSET_DECISION_REASON_CODES as directDecisionReasons } from "../src/types/decision.js";
 import { SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION as directSecurityAnalysisCoverageSchemaVersion } from "../src/types/security-analysis-coverage.js";
+import type { ScanResult } from "../src/types/scan-result.js";
+import type * as PublicTypes from "../src/public-types.js";
+import type * as PublicScanTypes from "../src/public-types/scan-result.js";
 
-type EstablishedTypesFacade =
-  Artifact | Diagnostic | ScanConfig | ScanJsonDocument | ScanResult;
+type EstablishedTypesFacade = ArtifactKind | Diagnostic | ScanJsonDocument;
 const establishedTypesFacade: EstablishedTypesFacade | undefined = undefined;
 void establishedTypesFacade;
 
 test("the established types deep import re-exports cohesive runtime registries", () => {
   assert.equal(ASSET_CLASSIFICATION_RULES, directClassificationRules);
-  assert.equal(ASSET_DECISION_REASON_CODES, directDecisionReasons);
   assert.equal(
     SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION,
     directSecurityAnalysisCoverageSchemaVersion,
   );
 });
 
-function assertRemovedConfigurationSurface(config: ScanConfig): void {
+function assertRemovedConfigurationSurface(
+  config: import("../src/types/configuration.js").ScanConfig,
+): void {
   // @ts-expect-error Compatibility-only layout policy is not part of ScanConfig.
   void config.layout;
 }
 void assertRemovedConfigurationSurface;
 
 // @ts-expect-error LayoutPolicyConfig was removed from the public type surface.
-type RemovedLayoutPolicyConfig = import("../src/types.js").LayoutPolicyConfig;
+type RemovedLayoutPolicyConfig = PublicTypes.LayoutPolicyConfig;
 void (undefined as unknown as RemovedLayoutPolicyConfig);
+
+// Low-level internal models have no supported public producer.
+// @ts-expect-error Raw repository artifacts are not in the public facade.
+type RemovedArtifact = PublicTypes.Artifact;
+// @ts-expect-error Parsed documents are parser implementation details.
+type RemovedParsedDocument = PublicTypes.ParsedDocument;
+// @ts-expect-error Normalized runtime configuration is not authored config.
+type RemovedScanConfig = PublicTypes.ScanConfig;
+// @ts-expect-error Internal suggestion decisions are not a public contract.
+type RemovedDecision = PublicTypes.AssetDecisionEvidence;
+// @ts-expect-error Internal governance projections are not a public contract.
+type RemovedGovernance = PublicTypes.AssetGovernanceEvidence;
+// @ts-expect-error ScanResult has no supported public library producer.
+type RemovedScanResult = PublicTypes.ScanResult;
+void (undefined as unknown as RemovedArtifact);
+void (undefined as unknown as RemovedParsedDocument);
+void (undefined as unknown as RemovedScanConfig);
+void (undefined as unknown as RemovedDecision);
+void (undefined as unknown as RemovedGovernance);
+void (undefined as unknown as RemovedScanResult);
+
+// Internal orchestration continues using the core result through source imports.
+type InternalCoreResult = ScanResult;
+void (undefined as unknown as InternalCoreResult);
+
+// @ts-expect-error The focused scan subpath exposes only the wire document.
+type RemovedFocusedScanResult = PublicScanTypes.ScanResult;
+void (undefined as unknown as RemovedFocusedScanResult);

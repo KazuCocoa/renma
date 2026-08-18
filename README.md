@@ -209,7 +209,7 @@ Renma v1 intentionally exposes only the stable type surface and pure discovery
 helpers to TypeScript or JavaScript consumers. For example:
 
 ```ts
-import type { ScanJsonDocument, ScanResult } from "renma/types";
+import type { ScanJsonDocument } from "renma/types";
 import {
   classifyAssetPath,
   normalizeRepositorySkillRelativePath,
@@ -217,20 +217,20 @@ import {
 } from "renma/discovery";
 ```
 
-`ScanResult` is the core result returned before serialization.
 `ScanJsonDocument` is the public wire document emitted by `formatJson()` and
-`scan --format json`; it adds the literal
-`schemaVersion: "renma.scan.v1"`. Public discovery recognizes only exact
+`scan --format json`; it has the literal `schemaVersion: "renma.scan.v1"` and
+`format: "json"`. Public discovery recognizes only exact
 canonical `SKILL.md` entrypoints. Historical lowercase and flat entrypoints
 remain available only to explicit CLI migration tooling.
 
-The allowlist is `renma/types`, its documented focused type subpaths, and
-`renma/discovery`. Commands, renderers, guidance builders, and migration
-helpers are CLI implementation details because their result shapes and
-workflow policy must be free to evolve before 1.0. Every `renma/dist/...`
-specifier and removed semantic command, renderer, or migration subpath is
-rejected with `ERR_PACKAGE_PATH_NOT_EXPORTED`. The package root remains a CLI
-entrypoint rather than a library import.
+The allowlist is `renma/types`, the focused `renma/types/classification`,
+`renma/types/diagnostics`, and `renma/types/scan-result` contracts, plus
+`renma/discovery`. Raw artifacts, parsed documents, normalized runtime config,
+internal decision/governance projections, and the producerless core scan model
+remain implementation details. Commands, renderers, guidance builders, and
+migration helpers are also private. Every other semantic or `renma/dist/...`
+specifier is rejected with `ERR_PACKAGE_PATH_NOT_EXPORTED`. The package root
+remains a CLI entrypoint rather than a library import.
 
 `SecurityAnalysisCoverage` and its schema constant are available from
 `renma/types` as part of the composed scan contract. There is intentionally no

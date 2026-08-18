@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   getNodeValue,
@@ -26,6 +26,7 @@ import {
   REQUIRED_METADATA_POLICY_FIELDS,
   type RequiredMetadataPolicyField,
 } from "./metadata-definitions.js";
+import { safeRepositoryPath } from "./repository-boundary.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
@@ -162,7 +163,9 @@ export async function loadConfig(
   ) {
     throw legacyConfigError(explicitConfigPath);
   }
-  const discoveredPath = explicitConfigPath ?? (await findDefaultConfig(root));
+  const discoveredPath = explicitConfigPath
+    ? await resolveExplicitConfig(root, explicitConfigPath)
+    : await findDefaultConfig(root);
   const fileConfig = discoveredPath ? await readConfigFile(discoveredPath) : {};
   const config = normalizeConfig(fileConfig, discoveredPath);
 
@@ -182,14 +185,11 @@ export async function loadConfig(
 }
 
 async function findDefaultConfig(root: string): Promise<string | undefined> {
-  const candidates = CONFIG_FILENAMES.map((name) => path.join(root, name));
-  const existing = (
-    await Promise.all(
-      candidates.map(async (candidate) =>
-        (await pathExists(candidate)) ? candidate : undefined,
-      ),
-    )
-  ).filter((candidate) => candidate !== undefined);
+  const existing: string[] = [];
+  for (const filename of CONFIG_FILENAMES) {
+    const candidate = await resolveRepositoryConfig(root, filename, false);
+    if (candidate) existing.push(candidate);
+  }
 
   if (existing.length > 1) {
     throw new ConfigError(
@@ -200,9 +200,74 @@ async function findDefaultConfig(root: string): Promise<string | undefined> {
         )}. Renma requires one unambiguous repository configuration and does not parse or merge multiple files. Keep renma.config.jsonc when comments are desired and remove the other supported configuration file.`,
     );
   }
-  const legacyPath = path.join(root, LEGACY_CONFIG_FILENAME);
-  if (await pathExists(legacyPath)) throw legacyConfigError(legacyPath);
+  const legacyPath = await resolveRepositoryConfig(
+    root,
+    LEGACY_CONFIG_FILENAME,
+    false,
+  );
+  if (legacyPath) throw legacyConfigError(legacyPath);
   return existing[0];
+}
+
+async function resolveExplicitConfig(
+  root: string,
+  configPath: string,
+): Promise<string> {
+  const absoluteRoot = path.resolve(root);
+  const absolutePath = path.resolve(configPath);
+  const relativePath = toPosix(path.relative(absoluteRoot, absolutePath));
+  if (
+    !relativePath ||
+    relativePath === ".." ||
+    relativePath.startsWith("../") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new ConfigError(
+      `Explicit config file ${configPath} must be a regular file inside repository root ${absoluteRoot}. External configuration is not repository policy authority.`,
+    );
+  }
+  const resolved = await resolveRepositoryConfig(
+    absoluteRoot,
+    relativePath,
+    true,
+  );
+  if (!resolved) {
+    throw new ConfigError(`Config file ${configPath} does not exist.`);
+  }
+  return resolved;
+}
+
+async function resolveRepositoryConfig(
+  root: string,
+  relativePath: string,
+  required: boolean,
+): Promise<string | undefined> {
+  const inspected = await safeRepositoryPath(root, relativePath);
+  const displayPath = path.join(root, relativePath);
+  switch (inspected.state) {
+    case "absent":
+      if (!required) return undefined;
+      throw new ConfigError(`Config file ${displayPath} does not exist.`);
+    case "outside":
+      throw new ConfigError(
+        `Config file ${displayPath} is outside the repository configuration boundary.`,
+      );
+    case "symlink":
+      throw new ConfigError(
+        `Config file ${displayPath} crosses symbolic link ${inspected.boundaryPath}. Renma configuration must be a non-symlink regular file inside the repository.`,
+      );
+    case "unreadable":
+      throw new ConfigError(
+        `Could not safely inspect config file ${displayPath}. Check its path and permissions.`,
+      );
+    case "present":
+      if (!inspected.stats.isFile()) {
+        throw new ConfigError(
+          `Config path ${displayPath} must be a regular file inside the repository.`,
+        );
+      }
+      return inspected.absolutePath;
+  }
 }
 
 function legacyConfigError(configPath: string): ConfigError {
@@ -323,15 +388,6 @@ function sourceLocation(
     line: prefix.split("\n").length,
     column: offset - lastLineBreak,
   };
-}
-
-async function pathExists(targetPath: string): Promise<boolean> {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function normalizeConfig(

@@ -32,7 +32,9 @@ import type {
 } from "./security-policy-inventory.js";
 import {
   localSupportReachabilityDepth,
+  staticallyExpectedSupportInspection,
   staticSupportReferences,
+  type StaticSupportReachabilityEvidence,
 } from "./static-support.js";
 import type { Artifact, ArtifactKind } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -260,12 +262,30 @@ export function buildExecutableSurfaceInventory(
   input: ExecutableSurfaceInventoryInput,
 ): ExecutableSurfaceInventory {
   const invocations = inventoryInvocations(input);
+  const expectedSupport = staticallyExpectedSupportInspection(
+    input.documents,
+    [
+      ...new Set([
+        ...input.repositoryPaths,
+        ...input.repositoryPathStates.keys(),
+      ]),
+    ],
+    input.skillParents,
+    [...(input.incompleteSupportDirectories ?? [])],
+  );
+  const explicitlyReferencedPaths = new Set(
+    expectedSupport.paths.map((expectation) => expectation.targetPath),
+  );
   const surfaceArtifacts = executableSurfaceArtifacts(
     input.artifacts,
     input.documents,
+    explicitlyReferencedPaths,
   );
 
-  const staticReferences = collectStaticSurfaceReferences(input);
+  const staticReferences = collectStaticSurfaceReferences(
+    input,
+    expectedSupport.paths,
+  );
   const policiesByPath = new Map(
     input.securityPolicies.map((policy) => [policy.path, policy]),
   );
@@ -754,8 +774,18 @@ function invocationPolicyRelationCount(
 
 function collectStaticSurfaceReferences(
   input: ExecutableSurfaceInventoryInput,
+  expectedSupport: readonly StaticSupportReachabilityEvidence[] = [],
 ): StaticSurfaceReference[] {
   const references = new Map<string, StaticSurfaceReference>();
+  for (const expectation of expectedSupport) {
+    if (!hasSupportedHelperExtension(expectation.targetPath)) continue;
+    const row = {
+      sourcePath: expectation.sourcePath,
+      targetPath: expectation.targetPath,
+      line: expectation.sourceLine,
+    };
+    references.set(`${row.sourcePath}\0${row.line}\0${row.targetPath}`, row);
+  }
   const skillDirectories = new Set(
     input.documents
       .map((document) => logicalSkillDirectory(document.artifact.path))

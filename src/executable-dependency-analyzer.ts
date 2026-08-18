@@ -52,6 +52,7 @@ export const BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS: readonly ExecutableDepend
 export function executableSurfaceArtifacts(
   artifacts: readonly Artifact[],
   documents: readonly ParsedDocument[],
+  explicitlyReferencedPaths: ReadonlySet<string> = new Set(),
 ): Artifact[] {
   const artifactsByPath = new Map(
     artifacts.map((artifact) => [artifact.path, artifact]),
@@ -72,6 +73,14 @@ export function executableSurfaceArtifacts(
       paths.add(evidence.pathResolution.path);
     }
   }
+  for (const artifactPath of explicitlyReferencedPaths) {
+    if (
+      hasSupportedHelperExtension(artifactPath) &&
+      artifactsByPath.has(artifactPath)
+    ) {
+      paths.add(artifactPath);
+    }
+  }
   return [...paths]
     .sort((left, right) => left.localeCompare(right))
     .flatMap((artifactPath) => {
@@ -84,9 +93,14 @@ export function executableSurfaceArtifacts(
 export function collectExecutableDependencyCandidates(
   artifacts: readonly Artifact[],
   documents: readonly ParsedDocument[],
+  explicitlyReferencedPaths: ReadonlySet<string> = new Set(),
 ): ExecutableDependencyCandidate[] {
   const occurrences = new Map<string, ExecutableDependencyCandidate>();
-  for (const artifact of executableSurfaceArtifacts(artifacts, documents)) {
+  for (const artifact of executableSurfaceArtifacts(
+    artifacts,
+    documents,
+    explicitlyReferencedPaths,
+  )) {
     for (const analyzer of BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS) {
       if (
         !analyzer.supports({

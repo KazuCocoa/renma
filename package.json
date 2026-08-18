@@ -27,49 +27,24 @@
   "exports": {
     "./package.json": "./package.json",
     "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js",
-      "default": "./dist/types.js"
-    },
-    "./types/artifact": {
-      "types": "./dist/types/artifact.d.ts",
-      "import": "./dist/types/artifact.js",
-      "default": "./dist/types/artifact.js"
+      "types": "./dist/public-types.d.ts",
+      "import": "./dist/public-types.js",
+      "default": "./dist/public-types.js"
     },
     "./types/classification": {
       "types": "./dist/types/classification.d.ts",
       "import": "./dist/types/classification.js",
       "default": "./dist/types/classification.js"
     },
-    "./types/configuration": {
-      "types": "./dist/types/configuration.d.ts",
-      "import": "./dist/types/configuration.js",
-      "default": "./dist/types/configuration.js"
-    },
-    "./types/decision": {
-      "types": "./dist/types/decision.d.ts",
-      "import": "./dist/types/decision.js",
-      "default": "./dist/types/decision.js"
-    },
     "./types/diagnostics": {
       "types": "./dist/types/diagnostics.d.ts",
       "import": "./dist/types/diagnostics.js",
       "default": "./dist/types/diagnostics.js"
     },
-    "./types/governance": {
-      "types": "./dist/types/governance.d.ts",
-      "import": "./dist/types/governance.js",
-      "default": "./dist/types/governance.js"
-    },
-    "./types/metadata": {
-      "types": "./dist/types/metadata.d.ts",
-      "import": "./dist/types/metadata.js",
-      "default": "./dist/types/metadata.js"
-    },
     "./types/scan-result": {
-      "types": "./dist/types/scan-result.d.ts",
-      "import": "./dist/types/scan-result.js",
-      "default": "./dist/types/scan-result.js"
+      "types": "./dist/public-types/scan-result.d.ts",
+      "import": "./dist/public-types/scan-result.js",
+      "default": "./dist/public-types/scan-result.js"
     },
     "./discovery": {
       "types": "./dist/public-discovery.d.ts",

@@ -453,6 +453,7 @@ test("transitive reference links retain source and depth provenance", () => {
   );
   assert.deepEqual(runtimeEvidence, {
     targetPath: "skills/demo/references/runtime.txt",
+    packageContentKind: "canonical-support",
     owningSkillPath: "skills/demo/SKILL.md",
     sourcePath: "skills/demo/references/index.md",
     sourceLine: 1,

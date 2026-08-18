@@ -14,13 +14,8 @@ import type { SkillParentIndex } from "./catalog.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
-const SUPPORT_ROOTS = [
-  "references",
-  "scripts",
-  "assets",
-  "profiles",
-  "examples",
-] as const;
+export type StaticSkillPackageContentKind =
+  "canonical-support" | "explicit-noncanonical";
 
 export interface StaticSupportReference {
   sourcePath: string;
@@ -37,6 +32,7 @@ export interface PlainTextSupportSecurityReachability {
 
 export interface StaticSupportReachabilityEvidence {
   targetPath: string;
+  packageContentKind: StaticSkillPackageContentKind;
   owningSkillPath: string;
   sourcePath: string;
   sourceLine: number;
@@ -131,7 +127,7 @@ function analyzeStaticSupportReferences(
     );
     const quotedMatches: string[] = [];
     for (const match of unquotedLine.matchAll(
-      /([`'"])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/.*?)\1/g,
+      /([`'"])((?:\.\/)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_. -]+)+)\1/g,
     )) {
       if (match[2]) {
         explicitValues.push({ raw: match[0], value: match[2] });
@@ -140,7 +136,7 @@ function analyzeStaticSupportReferences(
     }
     unquotedLine = maskRawMatches(unquotedLine, quotedMatches);
     for (const match of unquotedLine.matchAll(
-      /(?:^|[\s([])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/[^\s)`'"\],;]+)/g,
+      /(?:^|[\s([])((?:\.\/)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+[^\s)`'"\],;:]*)/g,
     )) {
       if (match[1]) {
         explicitValues.push({ raw: match[0].trim(), value: match[1] });
@@ -292,20 +288,14 @@ export function staticallyExpectedSupportInspection(
     if (parents.length !== 1) continue;
     const skill = documentsByPath.get(parents[0]!.sourcePath);
     if (!skill) continue;
-    const localSupportDocs = documents.filter((document) => {
-      const classified = classifyRepositorySkillPath(document.artifact.path);
-      return (
-        classified?.kind === "support" &&
-        classified.skillDirectory === skillDirectory
-      );
-    });
-    const localCandidatePaths = candidatePaths.filter((candidate) => {
-      const classified = classifyRepositorySkillPath(candidate);
-      return (
-        classified?.kind === "support" &&
-        classified.skillDirectory === skillDirectory
-      );
-    });
+    const localSupportDocs = documents.filter(
+      (document) =>
+        document.artifact.path !== skill.artifact.path &&
+        isWithinSkillPackage(document.artifact.path, skillDirectory),
+    );
+    const localCandidatePaths = candidatePaths.filter((candidate) =>
+      isWithinSkillPackage(candidate, skillDirectory),
+    );
     const localIncompleteDirectories = incompleteCandidateDirectories.filter(
       (candidate) => {
         const classified = classifyRepositorySkillPath(candidate);
@@ -471,6 +461,10 @@ function localSupportReferenceReachability(
       for (const reference of analysis?.references ?? []) {
         const evidence: StaticSupportReachabilityEvidence = {
           targetPath: reference.targetPath,
+          packageContentKind: staticSkillPackageContentKind(
+            reference.targetPath,
+            skillDirectory,
+          ),
           owningSkillPath: skill.artifact.path,
           sourcePath: reference.sourcePath,
           sourceLine: reference.line,
@@ -522,6 +516,24 @@ function compareReachabilityEvidence(
     left.sourceLine - right.sourceLine ||
     left.sourceRaw.localeCompare(right.sourceRaw)
   );
+}
+
+function staticSkillPackageContentKind(
+  targetPath: string,
+  skillDirectory: string,
+): StaticSkillPackageContentKind {
+  const classified = classifyRepositorySkillPath(targetPath);
+  return classified?.kind === "support" &&
+    classified.skillDirectory === skillDirectory
+    ? "canonical-support"
+    : "explicit-noncanonical";
+}
+
+function isWithinSkillPackage(
+  candidate: string,
+  skillDirectory: string,
+): boolean {
+  return candidate.startsWith(`${skillDirectory}/`);
 }
 
 function maskRawMatches(line: string, matches: string[]): string {
@@ -652,7 +664,14 @@ function normalizeStaticSupportReference(
     .replace(/^<|>$/g, "")
     .replace(/[),.;:]+$/, "")
     .replace(/^\.\//, "");
-  if (!cleaned || path.posix.isAbsolute(cleaned)) return undefined;
+  if (
+    !cleaned ||
+    !cleaned.includes("/") ||
+    path.posix.isAbsolute(cleaned) ||
+    cleaned.startsWith("#") ||
+    /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(cleaned)
+  )
+    return undefined;
   if (cleaned.split("/").includes("..")) return undefined;
   const repositoryRelative = cleaned.startsWith(`${skillDirectory}/`)
     ? cleaned
@@ -662,9 +681,6 @@ function normalizeStaticSupportReference(
   if (
     relativePath.startsWith("../") ||
     relativePath === ".." ||
-    !SUPPORT_ROOTS.includes(
-      relativePath.split("/")[0] as (typeof SUPPORT_ROOTS)[number],
-    ) ||
     relativePath.endsWith("/")
   ) {
     return undefined;

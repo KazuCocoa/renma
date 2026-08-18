@@ -923,6 +923,147 @@ export async function discoverArtifacts(
   };
 }
 
+export interface ExplicitArtifactInspectionResult {
+  artifacts: Artifact[];
+  diagnostics: Diagnostic[];
+  skippedPathStates: ReadonlyMap<string, RepositoryPathState>;
+  blockedTraversalPaths: ReadonlySet<string>;
+}
+
+/** Inspect only statically referenced repository files, without recursive discovery. */
+export async function inspectExplicitRepositoryArtifacts(
+  root: string,
+  config: ScanConfig,
+  candidatePaths: readonly string[],
+): Promise<ExplicitArtifactInspectionResult> {
+  const candidates = [
+    ...new Set(
+      candidatePaths
+        .map(normalizeAssetRepositoryRelativePath)
+        .filter((candidate): candidate is string => candidate !== undefined),
+    ),
+  ].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  const inspections = await mapLimit(
+    candidates,
+    config.concurrency,
+    async (
+      relativePath,
+    ): Promise<{
+      artifact?: Artifact;
+      diagnostic?: Diagnostic;
+      state?: RepositoryPathState;
+      blockedPath?: string;
+    }> => {
+      if (isExcluded(relativePath, config.exclude)) {
+        return { state: "excluded" };
+      }
+      if (repositoryPathDepth(relativePath) > config.maxDepth) {
+        return { state: "deep", blockedPath: relativePath };
+      }
+      const inspected = await safeRepositoryPath(root, relativePath);
+      if (inspected.state === "symlink") {
+        return {
+          state: "symlink",
+          blockedPath: inspected.boundaryPath,
+          ...(inspected.boundaryPath === relativePath
+            ? {
+                diagnostic: {
+                  code: DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
+                  severity: "warning" as const,
+                  path: relativePath,
+                  message:
+                    "Skipping explicitly referenced path reached through a symbolic link; repository inspection never follows symlink targets.",
+                  details: {
+                    state: "symlink",
+                    boundaryPath: inspected.boundaryPath,
+                  },
+                },
+              }
+            : {}),
+        };
+      }
+      if (inspected.state === "unreadable") {
+        return {
+          state: "unreadable",
+          blockedPath: relativePath,
+          diagnostic: {
+            severity: "error",
+            path: relativePath,
+            message: "Could not safely inspect explicitly referenced file.",
+          },
+        };
+      }
+      if (inspected.state !== "present") {
+        return {
+          state: inspected.state === "absent" ? "absent" : "unsupported",
+        };
+      }
+      if (!inspected.stats.isFile()) return { state: "unsupported" };
+      if (inspected.stats.size > config.maxFileSizeBytes) {
+        return {
+          state: "oversize",
+          diagnostic: {
+            severity: "warning",
+            path: relativePath,
+            message: `Skipping explicitly referenced file larger than max_file_size_bytes (${config.maxFileSizeBytes}).`,
+          },
+        };
+      }
+      try {
+        const bytes = await readFile(inspected.absolutePath);
+        const contentClassification = classifyContent(bytes, relativePath);
+        return {
+          artifact: {
+            path: relativePath,
+            absolutePath: inspected.absolutePath,
+            kind: classifyAssetPath(relativePath).kind,
+            sizeBytes: inspected.stats.size,
+            contentHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+            contentClassification,
+            markdownParserEligible:
+              contentClassification === "text" &&
+              /(?:^|\/)(?:[^/]+\.)?mdx?$/i.test(relativePath),
+            content:
+              contentClassification === "text" ? bytes.toString("utf8") : "",
+          },
+          state: "parsed",
+        };
+      } catch (error) {
+        return {
+          state: "unreadable",
+          blockedPath: relativePath,
+          diagnostic: {
+            severity: "error",
+            path: relativePath,
+            message: `Could not read explicitly referenced file: ${errorMessage(error)}`,
+          },
+        };
+      }
+    },
+  );
+  const skippedPathStates = new Map<string, RepositoryPathState>();
+  const blockedTraversalPaths = new Set<string>();
+  const artifacts: Artifact[] = [];
+  const diagnostics: Diagnostic[] = [];
+  for (const [index, inspection] of inspections.entries()) {
+    const candidate = candidates[index]!;
+    if (inspection.artifact) artifacts.push(inspection.artifact);
+    if (inspection.diagnostic) diagnostics.push(inspection.diagnostic);
+    if (inspection.state && inspection.state !== "parsed") {
+      skippedPathStates.set(candidate, inspection.state);
+    }
+    if (inspection.blockedPath) {
+      blockedTraversalPaths.add(inspection.blockedPath);
+    }
+  }
+  return {
+    artifacts,
+    diagnostics,
+    skippedPathStates,
+    blockedTraversalPaths,
+  };
+}
+
 const OPAQUE_EXTENSIONS = new Set([
   ".avif",
   ".bmp",

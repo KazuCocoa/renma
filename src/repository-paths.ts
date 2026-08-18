@@ -78,28 +78,32 @@ export function repositoryPathCandidates(
 }
 
 function staticSupportPathCandidates(documents: ParsedDocument[]): string[] {
-  return documents.flatMap((document) => {
+  const skillDirectories = new Map<string, number>();
+  for (const document of documents) {
     const classified = classifyRepositorySkillPath(document.artifact.path);
-    if (classified?.kind !== "entrypoint" && classified?.kind !== "support") {
-      return [];
-    }
-    const localCandidates = documents
-      .filter((candidate) => {
-        const candidatePath = classifyRepositorySkillPath(
-          candidate.artifact.path,
-        );
-        return (
-          candidatePath?.kind === "support" &&
-          candidatePath.skillDirectory === classified.skillDirectory
-        );
-      })
-      .map((candidate) => candidate.artifact.path);
-    return staticSupportReferences(
-      document,
+    if (classified?.kind !== "entrypoint") continue;
+    skillDirectories.set(
       classified.skillDirectory,
-      localCandidates,
-    ).map((reference) => reference.targetPath);
-  });
+      (skillDirectories.get(classified.skillDirectory) ?? 0) + 1,
+    );
+  }
+  return [...skillDirectories]
+    .filter(([, count]) => count === 1)
+    .flatMap(([skillDirectory]) => {
+      const localDocuments = documents.filter(
+        (document) =>
+          document.artifact.path === `${skillDirectory}/SKILL.md` ||
+          document.artifact.path.startsWith(`${skillDirectory}/`),
+      );
+      const localCandidates = localDocuments.map(
+        (document) => document.artifact.path,
+      );
+      return localDocuments.flatMap((document) =>
+        staticSupportReferences(document, skillDirectory, localCandidates).map(
+          (reference) => reference.targetPath,
+        ),
+      );
+    });
 }
 
 /** Capture exact lstat-based states once without following symbolic links. */

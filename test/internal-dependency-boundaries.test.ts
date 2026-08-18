@@ -58,6 +58,10 @@ const DIRECTORY_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
     { layer: "foundation", reason: "cohesive low-level type contracts" },
   ],
   [
+    "src/public-types",
+    { layer: "analysis", reason: "narrow composed public type contracts" },
+  ],
+  [
     "src/security-destination",
     {
       layer: "analysis",
@@ -122,6 +126,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "metadata-definitions.ts",
         "model.ts",
         "quality-profile.ts",
+        "repository-boundary.ts",
         "scaffold-placeholders.ts",
         "security-identifier-integrity.ts",
         "skill-path-contract.ts",
@@ -164,7 +169,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "metadata.ts",
         "metadata-policy.ts",
         "public-discovery.ts",
-        "repository-boundary.ts",
         "repository-evidence.ts",
         "repository-paths.ts",
         "scan-boundary.ts",
@@ -188,6 +192,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "metadata-policy-diff.ts",
       "quality-policy-ci-policy.ts",
       "quality-policy-diff.ts",
+      "public-types.ts",
       "repeated-context.ts",
       "rule-engine.ts",
       "rules.ts",
