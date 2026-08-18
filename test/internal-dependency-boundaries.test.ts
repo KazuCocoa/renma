@@ -163,6 +163,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "inspection-coverage.ts",
         "metadata.ts",
         "metadata-policy.ts",
+        "public-discovery.ts",
         "repository-boundary.ts",
         "repository-evidence.ts",
         "repository-paths.ts",
