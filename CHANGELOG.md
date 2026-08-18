@@ -54,9 +54,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   aliases, and `canonical_context` now produce explicit migration diagnostics
   or configuration errors without operational interpretation.
 - Made portable Agent Skills `description` the sole Skill capability and
-  selection-boundary source. `renma.when-to-use` and
-  `renma.when-not-to-use` are rejected; pre-0.16 top-level routing fields
-  remain one-way migration evidence only and may help recover `description`.
+  selection-boundary source. `renma.when-to-use` and `renma.when-not-to-use`
+  are unsupported and ignored operationally with migration-oriented authoring
+  warnings; pre-0.16 top-level routing fields remain one-way migration evidence
+  only and may help recover `description`.
 - Restricted non-Skill local security-policy authority to canonical, closed
   Renma frontmatter envelopes. Policy-looking Markdown body text remains
   visible instruction evidence and can no longer authorize network, secret,
