@@ -7,26 +7,21 @@
     "configPath": "renma.config.json",
     "globs": [
       ".agents/**/*.md",
-      ".agents/skills/**/*.skill.md",
       ".agents/skills/**/assets/**/*",
       ".agents/skills/**/examples/**/*.md",
       ".agents/skills/**/profiles/**/*.md",
       ".agents/skills/**/references/**/*",
       ".agents/skills/**/scripts/**/*",
-      ".agents/skills/**/skill.md",
       ".agents/skills/**/SKILL.md",
       "AGENTS.md",
-      "context/**/*.md",
       "contexts/**/*.md",
       "lenses/**/*.md",
       "README.md",
-      "skills/**/*.skill.md",
       "skills/**/assets/**/*",
       "skills/**/examples/**/*.md",
       "skills/**/profiles/**/*.md",
       "skills/**/references/**/*",
       "skills/**/scripts/**/*",
-      "skills/**/skill.md",
       "skills/**/SKILL.md",
       "tools/**/*"
     ],
@@ -1788,7 +1783,7 @@
         "Run renma catalog.",
         "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
       ],
-      "llmHint": "Inspect \"contexts/inactive.md\" for superseded_by or canonical context metadata. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
+      "llmHint": "Inspect \"contexts/inactive.md\" for a reviewed superseded_by relationship or replacement guidance. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
       "details": {
         "source": "skill.review",
         "target": "context.inactive",
@@ -1873,7 +1868,7 @@
         },
         {
           "kind": "allowed_change",
-          "text": "Retarget the reference to a reviewed replacement when superseded_by or canonical metadata provides one."
+          "text": "Retarget the reference when a reviewed superseded_by relationship or replacement guidance provides a destination."
         },
         {
           "kind": "requires_human_decision",
@@ -1911,7 +1906,7 @@
           "text": "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
         }
       ],
-      "llmHint": "Inspect \"contexts/inactive.md\" for superseded_by or canonical context metadata. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
+      "llmHint": "Inspect \"contexts/inactive.md\" for a reviewed superseded_by relationship or replacement guidance. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
       "details": {
         "target": "context.inactive",
         "referenceKind": "requires",

@@ -1710,7 +1710,7 @@ function edgeTargetsKind(
     return target.startsWith("lens.") || target.startsWith("lenses/");
   }
   if (kind === "context") {
-    return target.startsWith("context/") || target.startsWith("contexts/");
+    return target.startsWith("contexts/");
   }
   return false;
 }

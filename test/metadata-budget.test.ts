@@ -63,15 +63,13 @@ test("scan reports overlong block-list metadata items", async () => {
     "Use this when reviewing product specifications that involve many services, implicit ownership boundaries, nested exception cases, downstream QA planning details, release risk tradeoffs, and ambiguous acceptance criteria that should live in the body instead, with additional prose that intentionally exceeds the Renma metadata advisory.";
   await writeAsset(
     root,
-    "skills/metadata-list/SKILL.md",
+    "contexts/metadata-list.md",
     `---
-name: metadata-list
-description: Review metadata list length. Use when routing metadata needs deterministic budget checks.
-metadata:
-  renma.id: skill.metadata-list
-  renma.owner: qa-platform
-  renma.status: stable
-  renma.when-to-use: '${JSON.stringify([longRoutingItem])}'
+id: context.metadata-list
+owner: qa-platform
+status: stable
+when_to_use:
+  - ${longRoutingItem}
 ---
 # Metadata List
 
@@ -96,8 +94,8 @@ Run renma scan.
 
   assert.equal(finding?.severity, "low");
   assert.equal(finding?.confidence, "high");
-  assert.equal(finding?.evidence.path, "skills/metadata-list/SKILL.md");
-  assert.equal(finding?.evidence.startLine, 8);
+  assert.equal(finding?.evidence.path, "contexts/metadata-list.md");
+  assert.equal(finding?.evidence.startLine, 6);
   assert.match(
     finding?.evidence.snippet ?? "",
     /reviewing product specifications/,
@@ -119,7 +117,6 @@ metadata:
   renma.owner: qa-platform
   renma.status: stable
   renma.tags: '["qa"]'
-  renma.when-to-use: '["Metadata budget review"]'
 ---
 # Metadata Compact
 

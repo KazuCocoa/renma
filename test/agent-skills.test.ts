@@ -668,7 +668,7 @@ description: |
   );
 });
 
-test("scan migration commands preserve argv and safely quote shell metacharacters", async () => {
+test("scan does not operationalize historical Skill entrypoints", async () => {
   const root = await fixture();
   const cases = [
     {
@@ -708,23 +708,25 @@ description: Review demo inputs. Use when demo inputs need review.
   }
 
   const result = await scan(root, { failOn: "critical" });
-  const text = formatText(result);
   for (const fixtureCase of cases) {
     const skillPath = `skills/${fixtureCase.directory}/skill.md`;
-    const command = result.agentSkills.results.find(
-      (item) => item.path === skillPath,
-    )?.migrationCommand;
-
-    assert.deepEqual(command, {
-      command: "renma",
-      args: ["suggest-metadata", skillPath],
-      display: fixtureCase.display,
-    });
-    assert.ok(text.includes(fixtureCase.display), skillPath);
+    assert.equal(
+      result.agentSkills.results.some((item) => item.path === skillPath),
+      false,
+      skillPath,
+    );
+    assert.ok(
+      result.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
+          diagnostic.path === skillPath,
+      ),
+      skillPath,
+    );
   }
 });
 
-test("relative path normalization preserves exact migration command argv", () => {
+test("direct validation does not advertise migration for a historical path", () => {
   const validation = validateAgentSkill(
     skill(
       "./skills/demo/skill.md",
@@ -737,12 +739,8 @@ description: Review demo inputs. Use when demo inputs need review.
     ),
   );
 
-  assert.equal(validation.migrationRecommended, true);
-  assert.deepEqual(validation.migrationCommand, {
-    command: "renma",
-    args: ["suggest-metadata", "./skills/demo/skill.md"],
-    display: "renma suggest-metadata ./skills/demo/skill.md",
-  });
+  assert.equal(validation.migrationRecommended, false);
+  assert.equal(validation.migrationCommand, undefined);
 });
 
 test("summarizes Agent Skills inside JSON and text scan output", async () => {

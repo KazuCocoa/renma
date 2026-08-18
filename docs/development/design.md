@@ -140,10 +140,11 @@ Canonical Skills use the portable Agent Skills format plus flat,
 string-valued `metadata.renma.*` governance fields. Context Assets and other
 non-Skill assets use Renma's focused top-level metadata contract.
 
-`contexts/` is the preferred shared-Context root. `context/` remains an accepted
-compatibility alias. Historical Skill entrypoint spellings remain migration
-input where documented, but canonical Skills are directory-based `SKILL.md`
-entrypoints under the supported Skill roots.
+`contexts/` is the only shared-Context root. `context/` receives migration
+guidance but no operational interpretation. Historical Skill entrypoint
+spellings are explicit `suggest-metadata` migration input only; canonical
+Skills are directory-based, exact-case `SKILL.md` entrypoints under the
+supported Skill roots.
 
 The exact current fields, encodings, paths, and migration behavior belong in the
 [Agent Skills compatibility contract](../agent-skills-compatibility.md) and

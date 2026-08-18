@@ -54,12 +54,14 @@ export function requiredMetadataPolicyDiagnostics(
   );
   return RENMA_REQUIRED_METADATA_DEFINITIONS.flatMap((definition) => {
     if (!required.has(definition.policyKey)) return [];
+    const skill = kind === "skill";
+    if (skill && !("skillKey" in definition)) return [];
     const presence = requiredMetadataPresence(document, metadata, definition);
     if (presence.state === "valid") return [];
-    const skill = kind === "skill";
-    const serializedKey = skill
-      ? `${AGENT_SKILL_TOP_LEVEL_KEYS.metadata}.${definition.skillKey}`
-      : definition.nonSkillKey;
+    const serializedKey =
+      skill && "skillKey" in definition
+        ? `${AGENT_SKILL_TOP_LEVEL_KEYS.metadata}.${definition.skillKey}`
+        : definition.nonSkillKey;
     const valueGuidance =
       definition.policyValueKind === "list"
         ? skill
@@ -120,6 +122,7 @@ function canonicalSkillPresence(
   document: ParsedDocument,
   definition: RequiredMetadataPolicyDefinition,
 ): RequiredMetadataPresence {
+  if (!("skillKey" in definition)) return { state: "absent" };
   const frontmatter = ensureYamlFrontmatterForDocument(document);
   const metadataMappings = frontmatter.fields.filter(
     (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,

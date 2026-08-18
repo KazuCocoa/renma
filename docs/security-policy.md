@@ -304,12 +304,12 @@ Configure profiles under `security.profiles`:
   "security": {
     "profiles": {
       "local-ci-diagnostics": {
-        "allowedData": ["repo-local-files", "sanitized-ci-diagnostics"],
-        "networkAllowed": true,
-        "externalUploadAllowed": false,
-        "secretsAllowed": false,
-        "humanApprovalRequired": true,
-        "forbiddenInputs": ["secrets", "credentials", "tokens"],
+        "allowed_data": ["repo-local-files", "sanitized-ci-diagnostics"],
+        "network_allowed": true,
+        "external_upload_allowed": false,
+        "secrets_allowed": false,
+        "requires_human_approval": true,
+        "forbidden_inputs": ["secrets", "credentials", "tokens"],
         "approvedDomains": ["github.com"],
         "approvedUploadDomains": []
       }
@@ -318,27 +318,25 @@ Configure profiles under `security.profiles`:
 }
 ```
 
-Use the camelCase names in that example as the canonical profile spelling:
+Security profiles use exactly one spelling for each field:
 
-| Canonical profile field | Accepted compatibility aliases                                                |
-| ----------------------- | ----------------------------------------------------------------------------- |
-| `allowedDataClass`      | `allowed_data_class`                                                          |
-| `networkAllowed`        | `network_allowed`                                                             |
-| `externalUploadAllowed` | `external_upload_allowed`                                                     |
-| `secretsAllowed`        | `secrets_allowed`                                                             |
-| `humanApprovalRequired` | `human_approval_required`, `requiresHumanApproval`, `requires_human_approval` |
-| `securityProfile`       | `security_profile`                                                            |
-| `allowedData`           | `allowed_data`                                                                |
-| `forbiddenInputs`       | `forbidden_inputs`                                                            |
-| `approvedDomains`       | —                                                                             |
-| `approvedUploadDomains` | —                                                                             |
-| `disallowedCommands`    | —                                                                             |
+| Canonical profile field |
+| ----------------------- |
+| `allowed_data_class` |
+| `network_allowed` |
+| `external_upload_allowed` |
+| `secrets_allowed` |
+| `requires_human_approval` |
+| `security_profile` |
+| `allowed_data` |
+| `forbidden_inputs` |
+| `approvedDomains` |
+| `approvedUploadDomains` |
+| `disallowedCommands` |
 
-Compatibility aliases remain accepted when used individually. If a profile
-supplies more than one spelling for the same field, every spelling is validated
-and the normalized values must be equivalent; conflicting values are rejected
-as a configuration error. Prefer one canonical spelling and do not duplicate
-aliases in new configuration.
+Former camelCase and alternate approval spellings are rejected with migration
+guidance instead of being normalized. The existing `approvedDomains`,
+`approvedUploadDomains`, and `disallowedCommands` spellings remain canonical.
 
 Select the profile from a Skill with canonical metadata:
 

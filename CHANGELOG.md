@@ -45,6 +45,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Finalized the pre-1.0 repository contract around one operational spelling:
+  shared Context Assets use `contexts/**`; Skills use exact `SKILL.md` under a
+  supported Skill root; configuration uses `renma.config.jsonc` or
+  `renma.config.json`; Context Lenses use `applies_to` and
+  `expected_outputs`; and security-profile policy fields use their documented
+  canonical spelling. Historical paths, `.renma.json`, Lens aliases, profile
+  aliases, and `canonical_context` now produce explicit migration diagnostics
+  or configuration errors without operational interpretation.
+- Made portable Agent Skills `description` the sole Skill capability and
+  selection-boundary source. `renma.when-to-use` and `renma.when-not-to-use`
+  are unsupported and ignored operationally with migration-oriented authoring
+  warnings; pre-0.16 top-level routing fields remain one-way migration evidence
+  only and may help recover `description`.
 - Restricted non-Skill local security-policy authority to canonical, closed
   Renma frontmatter envelopes. Policy-looking Markdown body text remains
   visible instruction evidence and can no longer authorize network, secret,
@@ -83,6 +96,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   now emits blocking subtree evidence without traversing the directory or
   inventing an exact child path. Symlink targets remain unfollowed and
   uninspectable even when their path identity supplies blocking evidence.
+
+### Removed
+
+- Removed every `renma/dist/...` package export and the semantic command,
+  renderer, guidance, and migration exports. The intentional v1 library API is
+  now the focused `renma/types` surface plus `renma/discovery`; removed paths
+  fail with `ERR_PACKAGE_PATH_NOT_EXPORTED`, while the `renma` CLI remains
+  available through the package binary.
+- Removed operational compatibility for the `context/**` root, historical
+  `skill.md` and `*.skill.md` entrypoints, `.renma.json`, Context Lens
+  `target`/`targets`/`output`/`outputs`, and `canonical_context`. Explicit
+  pre-0.16 and historical-entrypoint migration through `suggest-metadata`
+  remains one-way.
 
 ## [0.32.1] - 2026-08-13
 

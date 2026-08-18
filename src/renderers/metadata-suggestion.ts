@@ -341,10 +341,7 @@ function observedRepositoryFact(
   if (classification.matchedRule === "skill-local-support") {
     return `The target is under a canonical ${classification.supportDirectory}/ directory within a recognized Skill-root path shape.`;
   }
-  if (
-    classification.matchedRule === "context-root" ||
-    classification.matchedRule === "context-root-legacy"
-  ) {
+  if (classification.matchedRule === "context-root") {
     return `The target is under ${classification.recognizedRoot}/**.`;
   }
   return classification.reason;

@@ -1,3 +1,5 @@
+import path from "node:path";
+
 /** Repository roots that may contain canonical Agent Skills entrypoints. */
 export const SKILL_ROOTS = ["skills", ".agents/skills"] as const;
 export type SkillRoot = (typeof SKILL_ROOTS)[number];
@@ -13,6 +15,26 @@ export const RESERVED_SKILL_SUPPORT_DIRS = [
 export type ReservedSkillSupportDirectory =
   (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];
 
+export type SkillEntrypointPath =
+  | {
+      kind: "canonical";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    }
+  | {
+      kind: "lowercase-entrypoint";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    }
+  | {
+      kind: "flat-legacy-entrypoint";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    };
+
 /** Default discovery breadth for each reserved Skill-support directory. */
 export const SKILL_SUPPORT_DISCOVERY_MODE = {
   assets: "all-files",
@@ -25,11 +47,9 @@ export const SKILL_SUPPORT_DISCOVERY_MODE = {
   "all-files" | "markdown"
 >;
 
-/** Canonical and historical Skill entrypoint globs used by default scans. */
+/** Canonical Skill entrypoint globs used by default operational scans. */
 export const DEFAULT_SKILL_ENTRYPOINT_GLOBS = SKILL_ROOTS.flatMap((root) => [
   `${root}/**/SKILL.md`,
-  `${root}/**/skill.md`,
-  `${root}/**/*.skill.md`,
 ]);
 
 /** Symmetric default support-resource globs for both recognized Skill roots. */
@@ -98,4 +118,121 @@ function matchSkillRootAt(
     }
   }
   return undefined;
+}
+
+/** Internal migration-only recognition for an explicit repository-relative target. */
+export function classifyRepositorySkillMigrationEntrypointPath(
+  relativePath: string,
+): SkillEntrypointPath | undefined {
+  const currentPath = normalizeMigrationRelativePath(relativePath);
+  if (!currentPath) return undefined;
+  const segments = currentPath.split("/").filter(Boolean);
+  const rootMatch = matchRepositorySkillRoot(segments);
+  if (!rootMatch) return undefined;
+  return classifySkillEntrypointAtRoot(
+    currentPath,
+    segments,
+    rootMatch.endIndex,
+    true,
+  );
+}
+
+/** Internal migration-only recognition for an explicit absolute target. */
+export function classifyAbsoluteSkillMigrationEntrypointPath(
+  absolutePath: string,
+): SkillEntrypointPath | undefined {
+  const rawPath = absolutePath.replaceAll("\\", "/");
+  if (!isAbsoluteLike(rawPath)) return undefined;
+  const rawRoots = findAbsoluteSkillRoots(rawPath.split("/").filter(Boolean));
+  if (rawRoots.length !== 1) return undefined;
+  const currentPath = path.posix.normalize(rawPath);
+  const segments = currentPath.split("/").filter(Boolean);
+  const roots = findAbsoluteSkillRoots(segments);
+  if (roots.length !== 1) return undefined;
+  return classifySkillEntrypointAtRoot(
+    currentPath,
+    segments,
+    roots[0]!.endIndex,
+    true,
+  );
+}
+
+/** Shared structural implementation; operational callers pass false. */
+export function classifySkillEntrypointAtRoot(
+  currentPath: string,
+  segments: string[],
+  rootEndIndex: number,
+  includeHistorical: boolean,
+): SkillEntrypointPath | undefined {
+  const basename = path.posix.basename(currentPath);
+  const directory = path.posix.dirname(currentPath);
+  const localDirectories = segments.slice(rootEndIndex, -1);
+  if (
+    localDirectories.some((segment) =>
+      (RESERVED_SKILL_SUPPORT_DIRS as readonly string[]).includes(segment),
+    )
+  ) {
+    return undefined;
+  }
+
+  if (
+    basename === "SKILL.md" ||
+    (includeHistorical && basename === "skill.md")
+  ) {
+    if (localDirectories.length === 0) return undefined;
+    const candidateName = path.posix.basename(directory);
+    if (!candidateName || candidateName === ".") return undefined;
+    return {
+      kind: basename === "SKILL.md" ? "canonical" : "lowercase-entrypoint",
+      currentPath,
+      targetPath:
+        basename === "SKILL.md"
+          ? currentPath
+          : path.posix.join(directory, "SKILL.md"),
+      candidateName,
+    };
+  }
+
+  if (!includeHistorical || !basename.endsWith(".skill.md")) return undefined;
+  const candidateName = basename.slice(0, -".skill.md".length);
+  if (!candidateName) return undefined;
+  return {
+    kind: "flat-legacy-entrypoint",
+    currentPath,
+    targetPath: path.posix.join(directory, candidateName, "SKILL.md"),
+    candidateName,
+  };
+}
+
+function normalizeMigrationRelativePath(filePath: string): string | undefined {
+  const normalizedSeparators = filePath.replaceAll("\\", "/");
+  if (isAbsoluteLike(normalizedSeparators)) return undefined;
+  const rawSegments = normalizedSeparators.split("/");
+  while (rawSegments[0] === "" || rawSegments[0] === ".") {
+    rawSegments.shift();
+  }
+  const rootMatch = matchRepositorySkillRoot(rawSegments);
+  if (!rootMatch) return undefined;
+  const resolved = rawSegments.slice(0, rootMatch.endIndex);
+  for (const segment of rawSegments.slice(rootMatch.endIndex)) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (resolved.length <= rootMatch.endIndex) return undefined;
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+  const normalizedRoot = matchRepositorySkillRoot(resolved);
+  if (
+    normalizedRoot?.root !== rootMatch.root ||
+    normalizedRoot.endIndex !== rootMatch.endIndex
+  ) {
+    return undefined;
+  }
+  return resolved.join("/");
+}
+
+function isAbsoluteLike(filePath: string): boolean {
+  return filePath.startsWith("/") || /^[A-Za-z]:\//.test(filePath);
 }

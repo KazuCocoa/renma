@@ -617,7 +617,6 @@ test("subtree coverage is limited to every recognized first-class boundary", () 
     [
       [".agents/private", ".agents"],
       [".agents/skills/payment", ".agents/skills"],
-      ["context/private", "context"],
       ["contexts/private", "contexts"],
       ["lenses/private", "lenses"],
       ["skills/payment", "skills"],

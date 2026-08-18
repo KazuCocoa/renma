@@ -54,6 +54,57 @@ expected_outputs:
   assert.deepEqual(result.diagnostics, []);
 });
 
+test("removed Context Lens aliases are errors and never interpreted", () => {
+  const context = parseDocument(
+    artifact(
+      "contexts/testing/boundary.md",
+      "context",
+      "---\nid: context.testing.boundary\n---\n# Boundary\n",
+    ),
+  );
+  const lens = parseDocument(
+    artifact(
+      "lenses/testing/legacy.md",
+      "context_lens",
+      `---
+id: lens.testing.legacy
+owner: qa-platform
+purpose: spec_review
+target: context.testing.boundary
+outputs: findings
+---
+# Legacy Lens
+`,
+    ),
+  );
+  const parsed = parseAssetMetadata(lens);
+  const { catalog } = buildCatalog([context, lens]);
+  const report = summarizeContextLensGovernance([context, lens], catalog);
+
+  assert.equal(parsed.metadata.appliesTo, undefined);
+  assert.equal(parsed.metadata.expectedOutputs, undefined);
+  assert.deepEqual(report.summary.targetReferences, []);
+  assert.deepEqual(
+    report.diagnostics
+      .filter(
+        (diagnostic) =>
+          diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_LEGACY_FIELD,
+      )
+      .map((diagnostic) => diagnostic.evidence?.snippet),
+    ["target: context.testing.boundary", "outputs: findings"],
+  );
+  assert.ok(
+    report.diagnostics
+      .filter(
+        (diagnostic) =>
+          diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_LEGACY_FIELD,
+      )
+      .every((diagnostic) => diagnostic.severity === "error"),
+  );
+});
+
 test("buildCatalog catalogs context lens assets and applies_to edges", () => {
   const { catalog, diagnostics } = buildCatalog([
     parseDocument(

@@ -16,11 +16,14 @@ import {
   walkRepositoryFiles,
 } from "./repository-boundary.js";
 import {
+  classifyRepositorySkillMigrationEntrypointPath,
+  classifySkillEntrypointAtRoot,
   findAbsoluteSkillRoots,
   matchRepositorySkillRoot,
   RESERVED_SKILL_SUPPORT_DIRS,
   SKILL_SUPPORT_EXISTENCE_GLOBS,
   type ReservedSkillSupportDirectory,
+  type SkillEntrypointPath,
   type SkillRoot,
 } from "./skill-path-contract.js";
 
@@ -29,6 +32,7 @@ export {
   SKILL_SUPPORT_DISCOVERY_MODE,
   SKILL_ROOTS,
   type ReservedSkillSupportDirectory,
+  type SkillEntrypointPath,
   type SkillRoot,
 } from "./skill-path-contract.js";
 
@@ -47,26 +51,6 @@ const SKILL_LIKE_FILE_LLM_HINT =
   "No action is required unless this file is intended to be a Renma skill. If it is intended to be a skill, move it under skills/** or .agents/skills/**.";
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_LLM_HINT =
   "Do not move or rename this file only to reduce diagnostics. Rename the skill directory only if this file is intended to define a Renma skill. For example, use `skills/example-review/SKILL.md` instead of `skills/examples/SKILL.md`.";
-
-export type SkillEntrypointPath =
-  | {
-      kind: "canonical";
-      currentPath: string;
-      targetPath: string;
-      candidateName: string;
-    }
-  | {
-      kind: "lowercase-entrypoint";
-      currentPath: string;
-      targetPath: string;
-      candidateName: string;
-    }
-  | {
-      kind: "flat-legacy-entrypoint";
-      currentPath: string;
-      targetPath: string;
-      candidateName: string;
-    };
 
 export type RepositorySkillPath =
   | {
@@ -112,8 +96,7 @@ export type RepositoryClassificationPathResolution =
       root: string;
       relativePath: string;
       absolutePath: string;
-      marker?:
-        ".git" | "renma.config.jsonc" | "renma.config.json" | ".renma.json";
+      marker?: ".git" | "renma.config.jsonc" | "renma.config.json";
     }
   | {
       state: "unresolved";
@@ -124,7 +107,7 @@ export type RepositoryClassificationPathResolution =
       candidateRoots: string[];
     };
 
-/** Classify canonical, historical, and reserved support paths at explicit Skill roots. */
+/** Classify canonical entrypoints and reserved support paths at explicit Skill roots. */
 export function classifyRepositorySkillPath(
   relativePath: string,
 ): RepositorySkillPath | undefined {
@@ -167,6 +150,7 @@ export function classifyRepositorySkillPath(
     currentPath,
     segments,
     rootEndIndex,
+    false,
   );
   if (!entrypoint) return undefined;
   const skillDirectory = path.posix.dirname(entrypoint.targetPath);
@@ -220,6 +204,7 @@ export function classifyAbsoluteSkillEntrypointPath(
     currentPath,
     segments,
     roots[0]!.endIndex,
+    false,
   );
 }
 
@@ -462,7 +447,16 @@ export function classifyAssetPath(
   // 3. Recognized top-level asset roots.
   const segments = currentPath.split("/");
   const root = segments[0] ?? "";
-  if (root === "contexts" || root === "context") {
+  if (root === "context") {
+    return classification(
+      "unknown",
+      "unknown",
+      "unknown",
+      "outside-recognized-asset-boundary",
+      "The legacy context/** root is migration evidence only; move the asset under contexts/** before relying on Renma governance.",
+    );
+  }
+  if (root === "contexts") {
     const ignoredNestedSegments = RESERVED_SKILL_SUPPORT_DIRS.filter(
       (segment) => segments.slice(1).includes(segment),
     );
@@ -472,13 +466,9 @@ export function classifyAssetPath(
       ...classification(
         kind,
         "independent",
-        root === "contexts" ? "context-root" : "context-root-legacy",
-        root === "contexts"
-          ? "under-recognized-context-root"
-          : "under-legacy-context-root",
-        root === "contexts"
-          ? "The file is under the recognized contexts/** root."
-          : "The file is under the supported legacy context/** root.",
+        "context-root",
+        "under-recognized-context-root",
+        "The file is under the recognized contexts/** root.",
       ),
       recognizedRoot: root,
     };
@@ -538,17 +528,13 @@ export function classifyAssetPath(
           rule: "context-root",
           matched: false,
           reasonCode: "outside-recognized-context-root",
-          reason: "The path is not under contexts/** or context/**.",
+          reason: "The path is not under contexts/**.",
         },
       ],
     };
   }
   const basename = path.posix.basename(currentPath);
-  if (
-    basename === "renma.config.jsonc" ||
-    basename === "renma.config.json" ||
-    basename === ".renma.json"
-  ) {
+  if (basename === "renma.config.jsonc" || basename === "renma.config.json") {
     return classification(
       "config",
       "repository-support",
@@ -612,8 +598,7 @@ function nearestRepositoryMarker(
 ):
   | {
       root: string;
-      marker:
-        ".git" | "renma.config.jsonc" | "renma.config.json" | ".renma.json";
+      marker: ".git" | "renma.config.jsonc" | "renma.config.json";
     }
   | undefined {
   let directory = path.resolve(startDirectory);
@@ -623,7 +608,6 @@ function nearestRepositoryMarker(
       ".git",
       "renma.config.jsonc",
       "renma.config.json",
-      ".renma.json",
     ] as const) {
       try {
         const markerStats = lstatSync(path.join(directory, marker));
@@ -658,7 +642,6 @@ function structuralRepositoryBoundary(
     ".agents",
     "skills",
     "contexts",
-    "context",
     "lenses",
     "tools",
   ]);
@@ -733,8 +716,7 @@ function structuralRepositoryBoundary(
   if (
     basename === "AGENTS.md" ||
     basename === "renma.config.jsonc" ||
-    basename === "renma.config.json" ||
-    basename === ".renma.json"
+    basename === "renma.config.json"
   ) {
     const root = path.dirname(absolutePath);
     const relativePath = normalizeAssetRepositoryRelativePath(basename);
@@ -781,47 +763,6 @@ function isUnderSkillRoot(relativePath: string): boolean {
   return repositorySkillRootEndIndex(segments) !== undefined;
 }
 
-function classifySkillEntrypointAtRoot(
-  currentPath: string,
-  segments: string[],
-  rootEndIndex: number,
-): SkillEntrypointPath | undefined {
-  const basename = path.posix.basename(currentPath);
-  const directory = path.posix.dirname(currentPath);
-  const localDirectories = segments.slice(rootEndIndex, -1);
-  if (localDirectories.some(isReservedSkillSupportDirectory)) {
-    return undefined;
-  }
-
-  if (basename === "SKILL.md" || basename === "skill.md") {
-    // Directory-based canonical and lowercase entrypoints require one logical
-    // Skill directory below the recognized root. Flat *.skill.md migration
-    // sources intentionally remain valid directly below that root.
-    if (localDirectories.length === 0) return undefined;
-    const candidateName = path.posix.basename(directory);
-    if (!candidateName || candidateName === ".") return undefined;
-    return {
-      kind: basename === "SKILL.md" ? "canonical" : "lowercase-entrypoint",
-      currentPath,
-      targetPath:
-        basename === "SKILL.md"
-          ? currentPath
-          : path.posix.join(directory, "SKILL.md"),
-      candidateName,
-    };
-  }
-
-  if (!basename.endsWith(".skill.md")) return undefined;
-  const candidateName = basename.slice(0, -".skill.md".length);
-  if (!candidateName) return undefined;
-  return {
-    kind: "flat-legacy-entrypoint",
-    currentPath,
-    targetPath: path.posix.join(directory, candidateName, "SKILL.md"),
-    candidateName,
-  };
-}
-
 /** Discover and read scan artifacts according to the provided scan configuration. */
 export async function discoverArtifacts(
   root: string,
@@ -849,6 +790,7 @@ export async function discoverArtifacts(
     ),
   );
   diagnostics.push(...skillLikeLayoutDiagnostics(walked.files));
+  diagnostics.push(...legacyContextRootDiagnostics(walked.files));
   diagnostics.push(
     ...walked.symlinks.map((symlinkPath) => ({
       code: DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
@@ -1051,6 +993,27 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
       continue;
     }
 
+    const migrationEntrypoint =
+      classifyRepositorySkillMigrationEntrypointPath(relativePath);
+    if (
+      migrationEntrypoint !== undefined &&
+      migrationEntrypoint.kind !== "canonical"
+    ) {
+      diagnostics.push({
+        code: DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.HISTORICAL_SKILL_ENTRYPOINT,
+        severity: "warning",
+        path: relativePath,
+        message: `Historical Skill entrypoint ${relativePath} is migration input, not an operational Skill. Run renma suggest-metadata ${relativePath} and review the proposed move to ${migrationEntrypoint.targetPath}.`,
+        llmHint:
+          "Use suggest-metadata for the one-way migration, review collisions and metadata changes, then apply the canonical SKILL.md path and rerun the scan.",
+        details: {
+          migrationOnly: true,
+          targetPath: migrationEntrypoint.targetPath,
+        },
+      });
+      continue;
+    }
+
     if (isExplicitSkillsPath(relativePath)) continue;
 
     diagnostics.push({
@@ -1067,6 +1030,21 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
   }
 
   return diagnostics;
+}
+
+function legacyContextRootDiagnostics(walkedFiles: string[]): Diagnostic[] {
+  return walkedFiles
+    .filter((relativePath) => relativePath.startsWith("context/"))
+    .sort((left, right) => left.localeCompare(right))
+    .map((relativePath) => ({
+      code: DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.LEGACY_CONTEXT_ROOT,
+      severity: "warning" as const,
+      path: relativePath,
+      message: `Legacy Context path ${relativePath} is not operational in Renma v1. Move the asset under contexts/** before relying on discovery, governance, or policy checks.`,
+      llmHint:
+        "Move the asset from context/** to contexts/**, update references, and rerun Renma before treating it as governed.",
+      details: { migrationOnly: true, canonicalRoot: "contexts" },
+    }));
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {

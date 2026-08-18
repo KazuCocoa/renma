@@ -10,8 +10,8 @@ import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 test("parseAssetMetadata normalizes supported frontmatter", () => {
   const document = parseDocument(
     artifact(
-      "skills/demo/SKILL.md",
-      "skill",
+      "contexts/demo.md",
+      "context",
       `---
 id: demo
 version: 1.2.3
@@ -44,6 +44,32 @@ conflicts: android
     supersededBy: [],
   });
   assert.deepEqual(result.diagnostics, []);
+});
+
+test("canonical_context is diagnosed and never becomes a relationship", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/demo/references/legacy.md",
+      "reference",
+      `---
+id: reference.demo.legacy
+canonical_context: contexts/testing/canonical.md
+---
+# Legacy Reference
+`,
+    ),
+  );
+  const parsed = parseAssetMetadata(document);
+  const { catalog } = buildCatalog([document]);
+
+  assert.deepEqual(parsed.metadata.supersededBy, []);
+  assert.equal(parsed.diagnostics.length, 1);
+  assert.equal(
+    parsed.diagnostics[0]?.code,
+    "META-UNSUPPORTED-CANONICAL-CONTEXT",
+  );
+  assert.match(parsed.diagnostics[0]?.message ?? "", /not interpreted/);
+  assert.deepEqual(catalog.dependencies, []);
 });
 
 test("parseAssetMetadata parses freshness metadata", () => {

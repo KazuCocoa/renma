@@ -177,7 +177,8 @@ test("required metadata policy vocabulary exactly matches the registry", () => {
     rows,
     RENMA_REQUIRED_METADATA_DEFINITIONS.map((definition) => ({
       policyKey: definition.policyKey,
-      skillSerialization: `metadata.${definition.skillKey}`,
+      skillSerialization:
+        "skillKey" in definition ? `metadata.${definition.skillKey}` : "—",
       nonSkillSerialization: definition.nonSkillKey,
       valueKind: definition.policyValueKind === "text" ? "Text" : "List",
     })),
@@ -253,23 +254,29 @@ test("metadata table markers must be present exactly once and bound one table", 
   );
 });
 
-test("machine-checked compatibility labels remain explicit", () => {
+test("removed compatibility fields stay outside the operational table", () => {
   const rows = parseOperationalMetadataTable(MANUAL);
   for (const key of ["renma.when-to-use", "renma.when-not-to-use"]) {
-    assert.match(
-      rowFor(rows, "skillKey", key).authoringStatus,
-      /recognized but deprecated for new authoring/i,
+    assert.equal(
+      rows.some((row) => row.skillKey === key),
+      false,
     );
   }
-  for (const key of ["target", "targets", "output", "outputs"]) {
-    assert.match(
-      rowFor(rows, "nonSkillKey", key).authoringStatus,
-      /^Deprecated;/,
+  for (const key of [
+    "target",
+    "targets",
+    "output",
+    "outputs",
+    "canonical_context",
+  ]) {
+    assert.equal(
+      rows.some((row) => row.nonSkillKey === key),
+      false,
     );
   }
   assert.match(
-    rowFor(rows, "nonSkillKey", "canonical_context").authoringStatus,
-    /^Recognized compatibility-only;/,
+    MANUAL,
+    /produce explicit diagnostics and their values are not\s+interpreted/,
   );
 });
 
@@ -445,7 +452,10 @@ function parseRequiredMetadataPolicyTable(
     );
     return {
       policyKey: codeFormattedKey(cells[0]!, "policy field"),
-      skillSerialization: codeFormattedKey(cells[1]!, "Skill serialization"),
+      skillSerialization:
+        cells[1] === "—"
+          ? "—"
+          : codeFormattedKey(cells[1]!, "Skill serialization"),
       nonSkillSerialization: codeFormattedKey(
         cells[2]!,
         "non-Skill serialization",

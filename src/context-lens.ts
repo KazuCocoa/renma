@@ -5,14 +5,13 @@ import type { ParsedDocument } from "./types/metadata.js";
 import {
   CONTEXT_LENS_SUPPORTED_SCOPES,
   CONTEXT_LENS_SUPPORTED_VERSIONS,
-  NON_SKILL_AUXILIARY_METADATA_DEFINITIONS,
   NON_SKILL_AUXILIARY_METADATA_KEYS,
   NON_SKILL_CATALOG_METADATA_KEYS,
 } from "./metadata-definitions.js";
 import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
 
 export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
-  DEPRECATED_FIELD: "CONTEXT-LENS-DEPRECATED-FIELD",
+  UNSUPPORTED_LEGACY_FIELD: "CONTEXT-LENS-UNSUPPORTED-LEGACY-FIELD",
   DUPLICATE_ID: "CONTEXT-LENS-DUPLICATE-ID",
   EMPTY_DEFINITION: "CONTEXT-LENS-EMPTY-DEFINITION",
   GOVERNANCE_MEANINGLESS: "CONTEXT-LENS-GOVERNANCE-MEANINGLESS",
@@ -30,13 +29,12 @@ const SUPPORTED_LENS_SCOPES = new Set<string>(CONTEXT_LENS_SUPPORTED_SCOPES);
 const SUPPORTED_LENS_VERSIONS = new Set<string>(
   CONTEXT_LENS_SUPPORTED_VERSIONS,
 );
-const DEPRECATED_LENS_FIELDS = new Map(
-  NON_SKILL_AUXILIARY_METADATA_DEFINITIONS.filter(
-    (definition) =>
-      definition.consumer === "context-lens" &&
-      definition.authoringStatus === "deprecated",
-  ).map((definition) => [definition.nonSkillKey, definition.replacement!]),
-);
+const UNSUPPORTED_LENS_FIELDS = new Map([
+  ["target", NON_SKILL_CATALOG_METADATA_KEYS.applies_to],
+  ["targets", NON_SKILL_CATALOG_METADATA_KEYS.applies_to],
+  ["output", NON_SKILL_CATALOG_METADATA_KEYS.expected_outputs],
+  ["outputs", NON_SKILL_CATALOG_METADATA_KEYS.expected_outputs],
+]);
 const REQUIRED_LENS_FIELDS = [
   NON_SKILL_CATALOG_METADATA_KEYS.id,
   NON_SKILL_CATALOG_METADATA_KEYS.owner,
@@ -145,7 +143,7 @@ export function summarizeContextLensGovernance(
       ...frontmatterDiagnostics(lens.document),
       ...requiredFieldDiagnostics(lens.document),
       ...unsupportedValueDiagnostics(lens.document),
-      ...deprecatedFieldDiagnostics(lens.document),
+      ...unsupportedLegacyFieldDiagnostics(lens.document),
       ...targetDiagnostics(lens.document, resolver),
       ...definitionBodyDiagnostics(lens.document),
     );
@@ -254,7 +252,7 @@ function unsupportedKindDiagnostics(document: ParsedDocument): Diagnostic[] {
       severity: "warning",
       path: document.artifact.path,
       message:
-        "Context lens type metadata is only supported under lenses/**, context/**, or contexts/**.",
+        "Context lens type metadata is only supported under lenses/** or contexts/**.",
       evidence: fieldEvidence(document, "type"),
     },
   ];
@@ -391,17 +389,23 @@ function unsupportedValueDiagnostics(document: ParsedDocument): Diagnostic[] {
   return diagnostics;
 }
 
-function deprecatedFieldDiagnostics(document: ParsedDocument): Diagnostic[] {
-  return [...DEPRECATED_LENS_FIELDS.entries()].flatMap(
+function unsupportedLegacyFieldDiagnostics(
+  document: ParsedDocument,
+): Diagnostic[] {
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  return [...UNSUPPORTED_LENS_FIELDS.entries()].flatMap(
     ([field, replacement]) => {
-      if (document.metadata[field] === undefined) return [];
+      const declaration = frontmatter.fields.find(
+        (candidate) => candidate.key === field,
+      );
+      if (!declaration) return [];
       return [
         {
-          code: CONTEXT_LENS_DIAGNOSTIC_CODES.DEPRECATED_FIELD,
-          severity: "warning",
+          code: CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_LEGACY_FIELD,
+          severity: "error",
           path: document.artifact.path,
-          message: `Context lens field "${field}" is deprecated. Use "${replacement}" instead.`,
-          evidence: fieldEvidence(document, field),
+          message: `Context lens field "${field}" is not supported in Renma v1. Replace it with "${replacement}"; the historical value is not interpreted.`,
+          evidence: lineEvidence(document, declaration.startLine),
         },
       ];
     },

@@ -33,10 +33,10 @@ test("shared asset classifier locks documented precedence and boundaries", () =>
     ],
     [
       "context/foo/references/policy.md",
-      "context",
-      "independent",
-      "context-root-legacy",
-      "context",
+      "unknown",
+      "unknown",
+      "unknown",
+      undefined,
       undefined,
     ],
     [
@@ -238,7 +238,6 @@ test("repository boundaries recognize every supported marker and prefer the near
     ".git",
     "renma.config.jsonc",
     "renma.config.json",
-    ".renma.json",
   ] as const) {
     const workspace = await mkdtemp(
       path.join(os.tmpdir(), `renma-${marker.replaceAll(".", "-")}-marker-`),
@@ -411,11 +410,7 @@ test("guard directories never establish a structural repository boundary", async
   const base = await mkdtemp(path.join(os.tmpdir(), "renma-guard-structure-"));
   const cases = [
     ["references/policy.md", "repository-boundary-unresolved", []],
-    [
-      "references/context/policy.md",
-      "repository-boundary-ambiguous",
-      [base, path.join(base, "references")],
-    ],
+    ["references/context/policy.md", "repository-boundary-unresolved", []],
     [
       "examples/skills/foo/SKILL.md",
       "repository-boundary-ambiguous",
@@ -627,7 +622,7 @@ test("missing Skill parent blocks inheritance and metadata suggestions", async (
   assert.doesNotMatch(renderMetadataPrompt(suggestion), /governed by:/);
 });
 
-test("ambiguous Skill parents fail closed in inspect and suggest-metadata", async () => {
+test("historical flat entrypoints do not compete with a canonical Skill parent", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-ambiguous-parent-"));
   await mkdir(path.join(root, ".git"));
   const skillDirectory = path.join(root, "skills", "foo");
@@ -649,14 +644,16 @@ test("ambiguous Skill parents fail closed in inspect and suggest-metadata", asyn
 
   const suggestion = await buildMetadataSuggestion(target);
   const inspect = await buildInspectOutline(target);
-  assert.equal(suggestion.decisionStatus, "blocked");
-  assert.equal(suggestion.classification.parentResolution, "ambiguous");
-  assert.deepEqual(suggestion.classification.parentAssetCandidates, [
-    "skills/foo.skill.md",
+  assert.equal(suggestion.decisionStatus, "no-change-recommended");
+  assert.equal(suggestion.classification.parentResolution, "resolved");
+  assert.equal(
+    suggestion.classification.parentAssetPath,
     "skills/foo/SKILL.md",
-  ]);
-  assert.equal(inspect.classification.parentResolution, "ambiguous");
-  assert.equal(inspect.governance?.ownership.source, "unowned");
+  );
+  assert.equal(suggestion.classification.parentAssetCandidates, undefined);
+  assert.equal(inspect.classification.parentResolution, "resolved");
+  assert.equal(inspect.governance?.ownership.source, "inherited");
+  assert.equal(inspect.governance?.ownership.effectiveOwner, "qa-platform");
 });
 
 test("explicit local governance is preserved without an inheritance claim", async () => {
@@ -861,7 +858,7 @@ test("inspect separates Skill-local classification from inherited governance", a
   assert.match(text, /Ownership source: inherited/);
 });
 
-test("historical Skill parents resolve exactly once without operationalizing their metadata", async () => {
+test("historical Skill entrypoints never resolve as support parents", async () => {
   const cases = [
     {
       label: "skills lowercase entrypoint",
@@ -956,17 +953,12 @@ test("historical Skill parents resolve exactly once without operationalizing the
     );
     assert.equal(
       inspect.classification.parentAssetPath,
-      fixture.parentPath,
-      fixture.label,
-    );
-    assert.notEqual(
-      inspect.classification.parentAssetPath,
-      inspect.classification.parentAssetCandidatePath,
+      undefined,
       fixture.label,
     );
     assert.equal(
       inspect.classification.parentResolution,
-      "resolved",
+      "missing",
       fixture.label,
     );
     assert.equal(
@@ -1001,22 +993,13 @@ test("historical Skill parents resolve exactly once without operationalizing the
     );
     assert.equal(
       suggestion.decision.reasonCode,
-      "skill-local-unowned",
+      "skill-local-parent-unresolved",
       fixture.label,
     );
-    assert.equal(
-      suggestion.decisionStatus,
-      "no-change-recommended",
-      fixture.label,
-    );
+    assert.equal(suggestion.decisionStatus, "blocked", fixture.label);
     assert.deepEqual(
       suggestion.nextActions[0]?.invocation.args,
-      [
-        "inspect",
-        path.join(repository, fixture.parentPath),
-        "--format",
-        "json",
-      ],
+      ["scan", repository, "--fail-on", "high", "--format", "json"],
       fixture.label,
     );
   }

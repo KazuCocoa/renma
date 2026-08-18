@@ -63,12 +63,13 @@ new unclassified `src/**/*.ts` file fails CI. Runtime imports, type-only
 imports, and re-exports all count as dependencies; lateral imports within one
 layer are valid.
 
-Compatibility exceptions name one exact source, target, and reason. The
-current list contains the established `src/types.ts` facade re-export of the
+Architecture exceptions name one exact source, target, and reason. The current
+list contains the internal `src/types.ts` facade re-export of the
 composed scan result and snapshot construction's classification-index path.
-The public deep-import type re-exports from `src/commands/inspect.ts` and
+Internal type re-exports from `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` are also listed and checked exactly rather
-than allowing command modules to re-export arbitrary lower-layer contracts.
+than allowing command modules to re-export arbitrary lower-layer contracts;
+those command modules are not package exports.
 
 ## Repository-Required Metadata Policy
 
@@ -125,9 +126,9 @@ use the generic fail-closed catalog Finding definition.
 
 ## Cohesive Type Ownership
 
-`src/types.ts` is a compatibility facade for the established
-`renma/dist/types.js` deep import. Internal modules do not use that facade; they
-import the cohesive owner under `src/types/`:
+`src/types.ts` is the implementation facade behind the semantic `renma/types`
+export. Internal modules do not use that facade; they import the cohesive owner
+under `src/types/`:
 
 - artifact and parsed metadata contracts remain low-level;
 - classification, governance, decision, diagnostic, and configuration
@@ -139,8 +140,8 @@ import the cohesive owner under `src/types/`:
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
 the `analysis` layer and must not become a dependency of parsing, repository,
-or other foundation modules. Compatibility re-exports preserve established
-TypeScript deep imports without making the facade an internal dependency hub.
+or other foundation modules. Focused semantic type exports preserve cohesive
+consumer imports without making the facade an internal dependency hub.
 
 ## Security Command and Destination Analysis
 
@@ -997,10 +998,10 @@ Resolution stages answer different questions and must remain separate.
 relative to one safe repository root. Evidence is considered in this order:
 
 1. an explicit repository root;
-2. the nearest valid `.git`, `renma.config.jsonc`, `renma.config.json`, or
-   `.renma.json` marker;
+2. the nearest valid `.git`, `renma.config.jsonc`, or `renma.config.json`
+   marker;
 3. an unambiguous strong structural boundary such as `skills`, `.agents`,
-   `contexts`, `context`, `lenses`, or `tools`, plus recognized root files such
+   `contexts`, `lenses`, or `tools`, plus recognized root files such
    as `AGENTS.md`;
 4. an unresolved or ambiguous result.
 
@@ -1252,26 +1253,23 @@ serialized contract is unchanged.
 
 Inspect renderer DTOs live in `src/evidence/inspect.ts`, so renderers do not
 depend on command modules. `src/commands/inspect.ts` and
-`src/commands/suggest-metadata.ts` re-export established result types as
-compatibility facades. `src/types.ts`,
-`src/context-language-diagnostics.ts`, and the destination-analysis exports
-from `src/security-diagnostics.ts` serve the same bounded purpose.
+`src/commands/suggest-metadata.ts` re-export their result types for colocated
+command consumers. `src/types.ts` is the intentional public semantic type
+barrel. `src/context-language-diagnostics.ts` and the destination-analysis
+exports from `src/security-diagnostics.ts` are narrow internal entrypoints.
 
-The package publishes the compiled `dist` tree but uses an explicit `exports`
-allowlist. Semantic subpaths such as `renma/types`, `renma/discovery`,
-`renma/inspect`, `renma/skill-index`, and `renma/guide` are the preferred public
-API. Every established `renma/dist/...` command, guidance, discovery,
-migration, renderer, and type subpath remains as a compatibility alias to the
-same module; none was withheld from a semantic alias before 1.0. The package
-root and `dist/index.js` are not library imports: `dist/index.js` remains
-available exclusively through the `bin.renma` CLI contract. Package-internal
-relative imports continue to resolve normally. Other emitted modules,
-including `security-body-policy/*` and `security-command/*`, remain
-implementation details and package-specifier imports are rejected. Clean
-consumer verification imports both semantic and legacy subpaths, resolves
-their declarations, rejects the two CLI-only module paths, exercises the
-installed CLI, and requires private body-policy runtime and declaration
-subpaths to remain unavailable.
+The package publishes the compiled `dist` tree for the executable, but its
+explicit `exports` allowlist exposes only `renma/types`, the focused
+`renma/types/*` modules, and `renma/discovery` (plus `package.json`). Commands,
+renderers, guide builders, and migration helpers remain CLI implementation
+details: their workflows and result DTOs are not stable v1 library contracts.
+Every `renma/dist/...` package specifier and every removed semantic command,
+renderer, guidance, or migration specifier is rejected with
+`ERR_PACKAGE_PATH_NOT_EXPORTED`. `dist/index.js` remains reachable exclusively
+through the `bin.renma` CLI contract, while package-internal relative imports
+continue to resolve normally. Clean-consumer verification imports every
+allowed semantic runtime and declaration path, verifies representative removed
+paths reject, and exercises the installed CLI.
 
 Human-readable reasons and prompts may evolve unless a test intentionally
 protects exact wording. Stable branching must use typed fields such as

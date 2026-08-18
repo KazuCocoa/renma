@@ -56,8 +56,6 @@ const CANONICAL_SKILL_KEY_TO_OPERATIONAL = new Map<string, string>(
 
 const CANONICAL_LIST_KEYS = new Set<CanonicalSkillOperationalKey>([
   "tags",
-  "when_to_use",
-  "when_not_to_use",
   "requires_context",
   "optional_context",
   "requires_lens",
@@ -426,6 +424,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
+  diagnostics.push(...unsupportedCompatibilityMetadataDiagnostics(document));
   const source = operationalMetadataSource(document, diagnostics);
   const rawStatusText = metadataText(source.values.status);
   const rawStatus = source.canonicalSkill
@@ -641,6 +640,26 @@ export function parseAssetMetadata(document: ParsedDocument): {
     metadataListItems: source.listItems,
     diagnostics,
   };
+}
+
+function unsupportedCompatibilityMetadataDiagnostics(
+  document: ParsedDocument,
+): Diagnostic[] {
+  if (document.artifact.kind === "skill") return [];
+  const frontmatter = ensureYamlFrontmatterForDocument(document);
+  const field = frontmatter.fields.find(
+    (candidate) => candidate.key === "canonical_context",
+  );
+  if (!field) return [];
+  return [
+    withDiagnosticId(DIAGNOSTIC_IDS.META_UNSUPPORTED_CANONICAL_CONTEXT, {
+      severity: "warning",
+      path: document.artifact.path,
+      message:
+        'Metadata field "canonical_context" is not supported in Renma v1 and is not interpreted. Use the existing superseded_by relationship when this asset has a reviewed canonical replacement, then update Skill Context relationships or placement as appropriate.',
+      evidence: fieldEvidence(document, field),
+    }),
+  ];
 }
 
 /** Parse the explicit canonical Skill continuation field without selecting legacy fallbacks. */

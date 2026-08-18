@@ -91,9 +91,11 @@ The `**` notation is shorthand, not an unconditional path grammar: no segment
 between the Skill root and `SKILL.md` may be a reserved Skill-support directory.
 See the precise [entrypoint path contract](docs/agent-skills-compatibility.md#entrypoint-paths).
 
-Renma also discovers historical `skill.md` and `*.skill.md` spellings under
-those roots for migration diagnostics. Discovery does not make those spellings
-Agent Skills-compatible. Canonical Skills use specification-valid Agent Skills
+Repository walking reports historical `skill.md` and `*.skill.md` spellings
+with migration guidance, but they are never operational Skills and do not
+participate in ownership, policy inheritance, catalog relationships, or Skill
+Discovery. Run `suggest-metadata` explicitly on one of those paths to obtain a
+reviewable rename or move candidate. Canonical Skills use specification-valid Agent Skills
 frontmatter plus flat, string-valued `metadata.renma.*` governance and security
 fields. See
 [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
@@ -203,22 +205,21 @@ node dist/index.js scan . --fail-on high
 
 ### Library imports
 
-Use semantic package exports for new TypeScript or JavaScript consumers. For
-example:
+Renma v1 intentionally exposes only the stable type surface and pure discovery
+helpers to TypeScript or JavaScript consumers. For example:
 
 ```ts
 import type { ScanResult } from "renma/types";
 import { classifyAssetPath } from "renma/discovery";
-import { buildInspectOutline } from "renma/inspect";
-import { buildSkillIndexReport } from "renma/skill-index";
-import { runGuideCommand } from "renma/guide";
 ```
 
-The complete allowlist also includes focused type subpaths plus
-`renma/skill-authoring`, `renma/guide-renderer`, `renma/suggest-metadata`, and
-`renma/skill-migration`. Existing documented `renma/dist/...` specifiers remain
-compatibility aliases, but new consumers should not depend on build-directory
-names. The package root is the CLI entrypoint and is not a library import.
+The allowlist is `renma/types`, its documented focused type subpaths, and
+`renma/discovery`. Commands, renderers, guidance builders, and migration
+helpers are CLI implementation details because their result shapes and
+workflow policy must be free to evolve before 1.0. Every `renma/dist/...`
+specifier and removed semantic command, renderer, or migration subpath is
+rejected with `ERR_PACKAGE_PATH_NOT_EXPORTED`. The package root remains a CLI
+entrypoint rather than a library import.
 
 ## Command Overview
 
@@ -271,8 +272,9 @@ renma.config.jsonc
 `renma.config.jsonc` is the recommended repository configuration filename.
 JSONC is JSON with comments, so maintainers can preserve why a governance
 policy is temporarily relaxed without introducing executable configuration.
-Existing `renma.config.json` and `.renma.json` files remain supported; Renma
-does not support or execute `.mjs` configuration.
+`renma.config.json` is the other supported v1 filename. A legacy `.renma.json`
+is rejected with guidance to rename it; Renma does not support or execute
+`.mjs` configuration.
 
 Repositories can promote supported optional catalog metadata to an explicit
 repository requirement without changing portable Agent Skills validity or
@@ -325,14 +327,14 @@ is visible and non-blocking. See the User Manual's
 [authoritative configuration contract](docs/user-manual.md#configuration) for
 defaults, validation, and independent fallback behavior.
 
-`contexts/**` is the canonical independently governed Context Asset root;
-`context/**` remains accepted for compatibility. Canonical Skill-local support
-directories are `references/`, `profiles/`, `examples/`, `scripts/`, and
-`assets/`. Their placement supplies only a parent candidate. Cataloged local
-support may inherit effective ownership only when repository evidence resolves
-exactly one owning Skill. Of those support kinds, only `script` and `asset`
-artifacts inherit the owning Skill's effective security policy by placement.
-Missing or ambiguous parents fail closed.
+`contexts/**` is the only independently governed Context Asset root;
+`context/**` receives migration guidance and is not interpreted. Canonical
+Skill-local support directories are `references/`, `profiles/`, `examples/`,
+`scripts/`, and `assets/`. Their placement supplies only a parent candidate.
+Cataloged local support may inherit effective ownership only when repository
+evidence resolves exactly one owning Skill. Of those support kinds, only
+`script` and `asset` artifacts inherit the owning Skill's effective security
+policy by placement. Missing or ambiguous parents fail closed.
 
 Top-level `tools/**` is repository implementation, not Context. Top-level
 `references/**` is not a Context root, and `skills/**/tools/**` is not canonical

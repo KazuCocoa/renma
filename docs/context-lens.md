@@ -94,8 +94,7 @@ projections; this guide retains the Lens requirements and semantics.
 
 - `id`: required stable Lens ID. Prefer a `lens.<domain>.<purpose>` style.
 - `type`: recommended `context_lens` discriminator. It is optional under
-  `lenses/**` and required when a Lens is stored under `context/**` or
-  `contexts/**`.
+  `lenses/**` and required when a Lens is stored under `contexts/**`.
 - `owner`: required accountable owner.
 - `status`: optional lifecycle state: `experimental`, `stable`, `deprecated`,
   or `archived`.
@@ -116,8 +115,9 @@ questions, important risks, evidence expectations, prioritization rules, and
 the expected output. It should not copy the Context or take over the Skill's
 ordered workflow and completion contract.
 
-Deprecated aliases such as `target`, `targets`, `output`, and `outputs` produce
-warnings. Use `applies_to` and `expected_outputs`.
+Removed aliases `target`, `targets`, `output`, and `outputs` produce blocking
+migration diagnostics and their values are not interpreted. Use reviewed
+`applies_to` and `expected_outputs` declarations.
 
 ## Minimal Structural Example
 

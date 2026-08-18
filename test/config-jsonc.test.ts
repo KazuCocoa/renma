@@ -498,33 +498,43 @@ test("invalid quality configuration is a caller-correctable CLI error", async (t
   ]);
 });
 
-test("continues discovering legacy JSON configuration filenames", async (t) => {
-  for (const filename of ["renma.config.json", ".renma.json"] as const) {
-    await t.test(filename, async (caseContext) => {
-      const root = await fixture(caseContext);
-      await writeFile(path.join(root, filename), '{"fail_on":"critical"}\n');
+test("continues discovering the comment-free v1 JSON filename", async (t) => {
+  const root = await fixture(t);
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    '{"fail_on":"critical"}\n',
+  );
 
-      const loaded = await loadConfig(root, {});
+  const loaded = await loadConfig(root, {});
 
-      assert.equal(loaded.configPath, filename);
-      assert.equal(loaded.config.failOn, "critical");
-    });
-  }
+  assert.equal(loaded.configPath, "renma.config.json");
+  assert.equal(loaded.config.failOn, "critical");
+});
+
+test("legacy .renma.json fails with migration guidance", async (t) => {
+  const root = await fixture(t);
+  await writeFile(path.join(root, ".renma.json"), '{"fail_on":"critical"}\n');
+
+  await assert.rejects(
+    loadConfig(root, {}),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      /\.renma\.json is not supported in v1/.test(error.message) &&
+      /renma\.config\.json/.test(error.message) &&
+      /renma\.config\.jsonc/.test(error.message),
+  );
 });
 
 test("rejects ambiguous conventional configuration without parsing files", async (t) => {
   const root = await fixture(t);
   await writeFile(path.join(root, "renma.config.jsonc"), "{ malformed\n");
   await writeFile(path.join(root, "renma.config.json"), "{}\n");
-  await writeFile(path.join(root, ".renma.json"), "{}\n");
 
   await assert.rejects(
     loadConfig(root, {}),
     (error: unknown) =>
       error instanceof ConfigError &&
-      /renma\.config\.jsonc, renma\.config\.json, \.renma\.json/.test(
-        error.message,
-      ) &&
+      /renma\.config\.jsonc, renma\.config\.json/.test(error.message) &&
       /one unambiguous repository configuration/.test(error.message) &&
       /Keep renma\.config\.jsonc when comments are desired/.test(error.message),
   );
@@ -617,7 +627,7 @@ test("JSONC retains unknown-field and semantic validation", async (t) => {
   }
 });
 
-test("JSONC rejects conflicting security profile aliases", async (t) => {
+test("JSONC rejects historical security profile aliases", async (t) => {
   const root = await fixture(t);
   await writeFile(
     path.join(root, "renma.config.jsonc"),
@@ -625,7 +635,7 @@ test("JSONC rejects conflicting security profile aliases", async (t) => {
   "security": {
     "profiles": {
       "restricted": {
-        // These aliases express one security boundary and must agree.
+        // Historical spellings must be migrated before v1 policy is trusted.
         "networkAllowed": false,
         "network_allowed": true
       }
@@ -640,9 +650,8 @@ test("JSONC rejects conflicting security profile aliases", async (t) => {
     (error: unknown) =>
       error instanceof ConfigError &&
       /security\.profiles\.restricted/.test(error.message) &&
-      /conflicting aliases for networkAllowed/.test(error.message) &&
-      /networkAllowed=false/.test(error.message) &&
-      /network_allowed=true/.test(error.message),
+      /Historical security profile key "networkAllowed"/.test(error.message) &&
+      /Use "network_allowed" instead/.test(error.message),
   );
 });
 

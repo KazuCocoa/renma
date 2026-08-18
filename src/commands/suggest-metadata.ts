@@ -103,9 +103,9 @@ export async function buildMetadataSuggestion(
     metadata,
   } = targetEvidence;
   let { classification } = targetEvidence;
-  const kind = classification.kind;
+  const kind = entrypoint ? "skill" : classification.kind;
   const explicitOwner = optionalText(options.owner);
-  if (kind === "skill") {
+  if (entrypoint || kind === "skill") {
     const collisionBlock =
       entrypoint && repositoryRoot
         ? await pathMigrationCollision(entrypoint, absolutePath, repositoryRoot)

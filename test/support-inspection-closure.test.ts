@@ -636,7 +636,7 @@ test("inline command tokens do not become incomplete basename evidence", async (
   assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
 });
 
-test("ambiguous Skill ownership cannot authorize expected support inspection", async (t) => {
+test("historical flat entrypoints do not block canonical support authority", async (t) => {
   const fixture = await referencedSupportFixture(
     t,
     { max_file_size_bytes: 1_000 },
@@ -650,7 +650,7 @@ test("ambiguous Skill ownership cannot authorize expected support inspection", a
 
   const result = await scan(fixture.root, { failOn: "high" });
 
-  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 1);
 });
 
 test("duplicate basename ambiguity does not select an oversized target", async (t) => {
