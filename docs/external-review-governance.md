@@ -206,7 +206,7 @@ manufacture facts omitted by a producer. In particular, Renma content hashes
 do not become producer-observed component hashes merely because the same path
 appears in both systems.
 
-Generated external-review evidence remains separate from BOM v2, the Trust
+Generated external-review evidence remains separate from BOM v3, the Trust
 Graph, Readiness, diagnostics, and CI policy. This direction does not create a
 catalog asset kind, dependency edge, coverage relationship, security finding
 family, or runtime input.

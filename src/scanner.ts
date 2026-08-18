@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { catalogDiagnosticFindings } from "./catalog-findings.js";
 import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
@@ -119,7 +120,7 @@ export function scanFromRepositorySnapshot(
   ]
     .map((finding) => attachFindingClassification(finding, classifications))
     .sort((a, b) => {
-      const byPath = a.evidence.path.localeCompare(b.evidence.path);
+      const byPath = compareUtf16CodeUnits(a.evidence.path, b.evidence.path);
       if (byPath !== 0) return byPath;
       return a.evidence.startLine - b.evidence.startLine;
     });

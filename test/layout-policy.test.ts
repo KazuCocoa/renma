@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { formatReadiness, readiness } from "../src/commands/readiness.js";
+import { readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
 
 test("valid Skill-local support is not categorically disallowed", async () => {
@@ -65,17 +65,14 @@ test("valid Skill-local support is not categorically disallowed", async () => {
   const result = await scan(root);
   const ids = result.findings.map((finding) => finding.id);
 
-  assert(!ids.includes("LAYOUT-DISALLOWED-SKILL-ASSET"));
-  assert(!ids.includes("PATH-HELPER-COMMAND-SKILL-SCRIPTS"));
   assert(!ids.includes("LAYOUT-HELPER-NON_TOOLS"));
-  assert(!ids.includes("LAYOUT-SKILL-EXECUTABLE-COMMAND"));
   assert(ids.includes("DOCS-LAYOUT-INCONSISTENT"));
 
   const report = await readiness(root);
   assert.notEqual(report.level, "ready");
   assert(report.score < 100);
   assert.equal(
-    report.checks.find((check) => check.id === "layout.disallowed_skill_assets")
+    report.checks.find((check) => check.id === "skills.support_integrity")
       ?.status,
     "pass",
   );
@@ -333,7 +330,7 @@ test("canonical layout passes refactored appium repository shape", async () => {
   assert.equal(report.level, "ready");
   assert.equal(report.score, 100);
   assert.equal(
-    report.checks.find((check) => check.id === "layout.disallowed_skill_assets")
+    report.checks.find((check) => check.id === "skills.support_integrity")
       ?.status,
     "pass",
   );
@@ -416,12 +413,6 @@ test("valid local support is not forced into shared roots", async () => {
 
   const result = await scan(root);
   assert.equal(
-    result.findings.some(
-      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
-    ),
-    false,
-  );
-  assert.equal(
     result.findings.some((finding) => finding.id === "LAYOUT-HELPER-NON_TOOLS"),
     false,
   );
@@ -442,50 +433,9 @@ test("workflow-named local support remains valid", async () => {
 
   const result = await scan(root);
   assert.equal(
-    result.findings.some(
-      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
-    ),
-    false,
-  );
-  assert.equal(
     result.findings.some((finding) => finding.id === "LAYOUT-HELPER-NON_TOOLS"),
     false,
   );
-});
-
-test("readiness markdown includes layout findings as a repair brief", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-markdown-"));
-  await writeMarkdown(
-    root,
-    "skills/setup/SKILL.md",
-    [
-      "# Appium Setup",
-      "",
-      "Run the environment check:",
-      "",
-      "```bash",
-      "node skills/setup/scripts/check-node-env.mjs",
-      "```",
-    ].join("\n"),
-  );
-  await writeMarkdown(
-    root,
-    "skills/setup/references/node/node-decision-logic.md",
-    context("old.node.reference", "Node decision logic."),
-  );
-  await writeMarkdown(
-    root,
-    "skills/setup/scripts/check-node-env.mjs",
-    "#!/usr/bin/env node\n",
-  );
-
-  const report = await readiness(root);
-  const markdown = formatReadiness(report, "markdown");
-
-  assert.match(markdown, /## Findings/);
-  assert.doesNotMatch(markdown, /LAYOUT-SKILL-EXECUTABLE-COMMAND/);
-  assert.doesNotMatch(markdown, /LAYOUT-DISALLOWED-SKILL-ASSET/);
-  assert.doesNotMatch(markdown, /PATH-HELPER-COMMAND-SKILL-SCRIPTS/);
 });
 
 function isStrictLayoutFinding(id: string): boolean {

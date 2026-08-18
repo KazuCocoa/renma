@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 
 import {
@@ -412,10 +413,10 @@ async function discoverWithBoundarySources(
   }
   return {
     artifacts: [...artifacts.values()].sort((left, right) =>
-      left.path.localeCompare(right.path),
+      compareUtf16CodeUnits(left.path, right.path),
     ),
     diagnostics: [...diagnostics.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareUtf16CodeUnits(left, right))
       .map(([, diagnostic]) => diagnostic),
     discoveredPaths,
     skippedPathStates,
@@ -510,7 +511,9 @@ function boundaryConfig(
 }
 
 function sortedExactPatterns(values: readonly string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort((left, right) =>
+    compareUtf16CodeUnits(left, right),
+  );
 }
 
 /** Explicitly prepare the named pure projections from one collected core. */

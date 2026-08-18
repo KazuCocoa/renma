@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { EffectiveCiScanBoundaryEvidence } from "./scan-boundary.js";
 import type {
   ScanBoundaryChange,
@@ -66,7 +67,9 @@ export function evaluateScanBoundaryCiPolicy(
   const matches = diff.changes
     .filter((change) => change.direction === "weakening")
     .map((change) => toMatch(change))
-    .sort((left, right) => matchKey(left).localeCompare(matchKey(right)));
+    .sort((left, right) =>
+      compareUtf16CodeUnits(matchKey(left), matchKey(right)),
+    );
   return {
     schemaVersion: SCAN_BOUNDARY_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import type { ConfigOverrides } from "../config.js";
 import { formatJsonDocument } from "../report.js";
 import { scan } from "../scanner.js";
@@ -178,14 +179,16 @@ function compareFindingsForReview(
     REVIEW_SEVERITY_ORDER.indexOf(left.severity) -
     REVIEW_SEVERITY_ORDER.indexOf(right.severity);
   if (bySeverity !== 0) return bySeverity;
-  const byPath = (left.path ?? "").localeCompare(right.path ?? "");
+  const byPath = compareUtf16CodeUnits(left.path ?? "", right.path ?? "");
   if (byPath !== 0) return byPath;
   const byLine =
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0);
   if (byLine !== 0) return byLine;
   return (
-    (left.id ?? left.code ?? "").localeCompare(right.id ?? right.code ?? "") ||
-    left.message.localeCompare(right.message)
+    compareUtf16CodeUnits(
+      left.id ?? left.code ?? "",
+      right.id ?? right.code ?? "",
+    ) || compareUtf16CodeUnits(left.message, right.message)
   );
 }
 

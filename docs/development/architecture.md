@@ -173,7 +173,7 @@ The main report families answer different questions:
 - Skill Index describes static Discovery publication, routes, and coverage;
 - Trust Graph v2 connects trust-relevant static evidence without assigning a
   subjective trust score;
-- Repository Context BOM v2 is a declared repository manifest, not consumed
+- Repository Context BOM v3 is a declared repository manifest, not consumed
   runtime Context.
 
 Catalog JSON keeps dependencies and diagnostics at report level. Catalog

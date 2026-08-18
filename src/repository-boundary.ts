@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { Stats } from "node:fs";
 import { lstat, opendir } from "node:fs/promises";
 import path from "node:path";
@@ -72,7 +73,7 @@ export async function walkRepositoryFiles(
         isFile: entry.isFile(),
       });
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareUtf16CodeUnits(left.name, right.name));
     for (const entry of entries) {
       const relativePath = relativeDirectory
         ? `${relativeDirectory}/${entry.name}`

@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { compareUtf16CodeUnits } from "../src/canonical-json.js";
 import { main } from "../src/cli.js";
 import { COMMAND_HELP, commandOptionNames } from "../src/cli-help.js";
 import { buildInspectOutline } from "../src/commands/inspect.js";
@@ -255,7 +256,7 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
         file === "skill.md" ||
         file.endsWith(".skill.md"),
     )
-    .sort((left, right) => left.localeCompare(right));
+    .sort(compareUtf16CodeUnits);
   assert.deepEqual(
     guidanceDiagnostics.map((diagnostic) => diagnostic.path),
     actualSkillLikePaths,

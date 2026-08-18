@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { RiskClass, Severity } from "./types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
@@ -111,7 +112,7 @@ export function summarizeSecurityPosture(
         left.maxSeverity,
       );
       if (severityComparison !== 0) return severityComparison;
-      return left.id.localeCompare(right.id);
+      return compareUtf16CodeUnits(left.id, right.id);
     })
     .slice(0, DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap);
 

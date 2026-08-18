@@ -22,7 +22,8 @@ agent owns the interaction and tool use.
 
 ## Required Inputs And Preflight
 
-- The example files and write permission for `workspace/output.txt`.
+- The example files and write permission for the disposable output described by
+  the local tool guide.
 - One user value matching `[A-Za-z0-9_-]{1,32}`, initially missing.
 
 ## Clarify-Before-Act Workflow

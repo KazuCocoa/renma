@@ -54,12 +54,6 @@ test("canonical Skill-local support remains valid", async () => {
   await writeSkillSupport(root, "setup", "Demo");
 
   const report = await scan(root);
-  assert.equal(
-    report.findings.some(
-      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
-    ),
-    false,
-  );
 });
 
 test("readiness markdown limits findings while JSON stays complete", () => {

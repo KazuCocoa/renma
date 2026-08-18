@@ -15,7 +15,7 @@ import { bom } from "../src/commands/bom.js";
 import { trustGraph } from "../src/commands/trust-graph.js";
 import type { TrustGraph, TrustGraphEdgeType } from "../src/trust-graph.js";
 
-const BOM_SCHEMA_PATH = "docs/schemas/repository-context-bom-v2.schema.json";
+const BOM_SCHEMA_PATH = "docs/schemas/repository-context-bom-v3.schema.json";
 const TRUST_GRAPH_SCHEMA_PATH = "docs/schemas/trust-graph-v2.schema.json";
 const FIXED_GENERATED_AT = "2026-07-10T12:00:00.000Z";
 

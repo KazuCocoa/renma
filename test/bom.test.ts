@@ -30,7 +30,7 @@ import { RepositoryFixture } from "./repository-fixture.js";
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
 
-  assert.equal(report.schemaVersion, "renma.repository-context-bom.v2");
+  assert.equal(report.schemaVersion, "renma.repository-context-bom.v3");
   assert.equal(report.outputMode, "default");
   assert.equal(report.generator.name, "renma");
   assert.equal(report.generator.version, packageJson.version);
@@ -47,13 +47,13 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
   });
 
   const parsed = JSON.parse(formatBomJson(report)) as BomReport;
-  assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v2");
+  assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v3");
   assert.equal(parsed.outputMode, "default");
   assert.equal(parsed.scope.runtimeUsage, false);
   assert.equal(parsed.scope.telemetryCollected, false);
 });
 
-test("bom v2 normalized contract shape is stable", async () => {
+test("bom v3 normalized contract shape is stable", async () => {
   const report = buildBomReport(
     await collectRepositorySnapshot(await bomContractFixture()),
     {
@@ -564,7 +564,7 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   assert.equal(defaultJson.code, 0);
   assert.equal(
     JSON.parse(defaultJson.stdout).schemaVersion,
-    "renma.repository-context-bom.v2",
+    "renma.repository-context-bom.v3",
   );
   assert.equal(explicitJson.code, 0);
   assert.equal(JSON.parse(explicitJson.stdout).scope.runtimeUsage, false);
@@ -806,7 +806,7 @@ async function bomContractFixture(): Promise<string> {
         "Input: BOM fixture. Output: deterministic manifest evidence.",
         "",
         "## Completion criteria",
-        "The workflow is complete when BOM output contains the expected v2 contract shape.",
+        "The workflow is complete when BOM output contains the expected v3 contract shape.",
         "",
         "## Verification",
         "Verify by running the BOM command and checking JSON output.",
@@ -827,7 +827,7 @@ async function bomContractFixture(): Promise<string> {
       "last_reviewed_at: 2026-06-28",
       "review_cycle: P180D",
       "expires_at: 2026-12-31",
-      "when_to_use: Review BOM v2 contract shape in deterministic fixtures.",
+      "when_to_use: Review BOM v3 contract shape in deterministic fixtures.",
       "when_not_to_use: Do not use as runtime prompt assembly instructions.",
       "allowed_data: repository test fixtures only",
       "network_allowed: false",
@@ -1239,7 +1239,7 @@ function normalizeBomContract(report: BomReport): BomReport {
 
 function expectedBomContract(): BomReport {
   return {
-    schemaVersion: "renma.repository-context-bom.v2",
+    schemaVersion: "renma.repository-context-bom.v3",
     outputMode: "default",
     generatedAt: "2026-07-10T12:00:00.000Z",
     generator: {
@@ -1461,12 +1461,12 @@ function expectedBomContract(): BomReport {
             "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately.",
         },
         {
-          id: "layout.disallowed_skill_assets",
-          title: "Skill-local support policy",
+          id: "skills.support_integrity",
+          title: "Skill support integrity",
           status: "pass",
           severity: "info",
           summary:
-            "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it.",
+            "Explicitly referenced Skill support exists and is inspectable as regular repository content.",
         },
         {
           id: "layout.context_root",

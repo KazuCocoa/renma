@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import {
   SCAN_JSON_SCHEMA_VERSION,
   type ScanJsonDocument,
@@ -232,7 +233,7 @@ function executableSurfaceTextReview(
     }
   }
   const orderedSurfacePaths = [...surfacePaths].sort((left, right) =>
-    left.localeCompare(right),
+    compareUtf16CodeUnits(left, right),
   );
   return {
     requiresReview:
@@ -298,13 +299,12 @@ function compareExecutableSurfaceReviewDependencies(
   right: ExecutableSurfaceDependency,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.analyzer.localeCompare(right.analyzer) ||
-    left.relation.localeCompare(right.relation) ||
-    (
-      left.normalizedTarget ?? left.normalizedTargetCandidates.join("\0")
-    ).localeCompare(
+    compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
+    compareUtf16CodeUnits(left.relation, right.relation) ||
+    compareUtf16CodeUnits(
+      left.normalizedTarget ?? left.normalizedTargetCandidates.join("\0"),
       right.normalizedTarget ?? right.normalizedTargetCandidates.join("\0"),
     )
   );
@@ -315,10 +315,11 @@ function compareExecutableSurfaceReviewInvocations(
   right: ExecutableSurfaceInvocation,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.launcher.localeCompare(right.launcher) ||
-    (left.normalizedTarget ?? left.rawTarget).localeCompare(
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(
+      left.normalizedTarget ?? left.rawTarget,
       right.normalizedTarget ?? right.rawTarget,
     ) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal

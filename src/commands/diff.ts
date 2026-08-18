@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -1674,6 +1675,11 @@ function projectDiffSnapshot(
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
+    undefined,
+    {
+      inspectionCoverage: scanResult.inspectionCoverage,
+      suppressedFindings: scanResult.suppressedFindings,
+    },
   );
   return {
     snapshot: {
@@ -2092,7 +2098,9 @@ function stringErrorField(error: Error, field: "stdout" | "stderr"): string {
 }
 
 function stableMap<T>(entries: Array<readonly [string, T]>): Map<string, T> {
-  return new Map(entries.sort(([left], [right]) => left.localeCompare(right)));
+  return new Map(
+    entries.sort(([left], [right]) => compareUtf16CodeUnits(left, right)),
+  );
 }
 
 function counts(values: string[]): Map<string, number> {
@@ -2143,7 +2151,8 @@ function markdownList<T>(items: T[], render: (item: T) => string): string[] {
 function compareBy<T>(
   selector: (item: T) => string,
 ): (left: T, right: T) => number {
-  return (left, right) => selector(left).localeCompare(selector(right));
+  return (left, right) =>
+    compareUtf16CodeUnits(selector(left), selector(right));
 }
 
 function firstString(value: unknown, fields: string[]): string {

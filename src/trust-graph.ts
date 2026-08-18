@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import {
   normalizeDependencyReference,
@@ -606,7 +607,7 @@ function stableTrustGraphFindings(
   diagnostics: TrustGraphFinding[],
 ): TrustGraphFinding[] {
   return [...findings, ...diagnostics].sort((left, right) => {
-    const byPath = (left.path ?? "").localeCompare(right.path ?? "");
+    const byPath = compareUtf16CodeUnits(left.path ?? "", right.path ?? "");
     if (byPath !== 0) return byPath;
     const byLine =
       (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0);
@@ -616,9 +617,10 @@ function stableTrustGraphFindings(
       FINDING_SEVERITIES.indexOf(right.severity);
     if (bySeverity !== 0) return bySeverity;
     return (
-      (left.id ?? left.code ?? "").localeCompare(
+      compareUtf16CodeUnits(
+        left.id ?? left.code ?? "",
         right.id ?? right.code ?? "",
-      ) || left.message.localeCompare(right.message)
+      ) || compareUtf16CodeUnits(left.message, right.message)
     );
   });
 }
@@ -664,23 +666,23 @@ function zeroCounts<const T extends string>(
 
 function stableAssets(assets: Asset[]): Asset[] {
   return [...assets].sort((left, right) => {
-    const byKind = left.kind.localeCompare(right.kind);
+    const byKind = compareUtf16CodeUnits(left.kind, right.kind);
     if (byKind !== 0) return byKind;
-    const byPath = left.sourcePath.localeCompare(right.sourcePath);
+    const byPath = compareUtf16CodeUnits(left.sourcePath, right.sourcePath);
     if (byPath !== 0) return byPath;
-    return left.id.localeCompare(right.id);
+    return compareUtf16CodeUnits(left.id, right.id);
   });
 }
 
 function stableDependencies(dependencies: Dependency[]): Dependency[] {
   return [...dependencies].sort((left, right) => {
-    const byFrom = left.from.localeCompare(right.from);
+    const byFrom = compareUtf16CodeUnits(left.from, right.from);
     if (byFrom !== 0) return byFrom;
-    const byKind = left.kind.localeCompare(right.kind);
+    const byKind = compareUtf16CodeUnits(left.kind, right.kind);
     if (byKind !== 0) return byKind;
-    const byTo = left.to.localeCompare(right.to);
+    const byTo = compareUtf16CodeUnits(left.to, right.to);
     if (byTo !== 0) return byTo;
-    return left.sourcePath.localeCompare(right.sourcePath);
+    return compareUtf16CodeUnits(left.sourcePath, right.sourcePath);
   });
 }
 
@@ -689,13 +691,13 @@ function stableEvidence(evidence: Evidence[]): Evidence[] {
     evidence.map((item) => [evidenceKey(item), item]),
   );
   return [...evidenceByKey.values()].sort((left, right) => {
-    const byPath = left.path.localeCompare(right.path);
+    const byPath = compareUtf16CodeUnits(left.path, right.path);
     if (byPath !== 0) return byPath;
     const byStart = left.startLine - right.startLine;
     if (byStart !== 0) return byStart;
     const byEnd = left.endLine - right.endLine;
     if (byEnd !== 0) return byEnd;
-    return left.snippet.localeCompare(right.snippet);
+    return compareUtf16CodeUnits(left.snippet, right.snippet);
   });
 }
 
@@ -711,15 +713,15 @@ function evidenceKey(evidence: Evidence): string {
 function compareNodes(left: TrustGraphNode, right: TrustGraphNode): number {
   const byType = NODE_TYPES.indexOf(left.type) - NODE_TYPES.indexOf(right.type);
   if (byType !== 0) return byType;
-  return left.id.localeCompare(right.id);
+  return compareUtf16CodeUnits(left.id, right.id);
 }
 
 function compareEdges(left: TrustGraphEdge, right: TrustGraphEdge): number {
-  const byFrom = left.from.localeCompare(right.from);
+  const byFrom = compareUtf16CodeUnits(left.from, right.from);
   if (byFrom !== 0) return byFrom;
   const byType = EDGE_TYPES.indexOf(left.type) - EDGE_TYPES.indexOf(right.type);
   if (byType !== 0) return byType;
-  const byTo = left.to.localeCompare(right.to);
+  const byTo = compareUtf16CodeUnits(left.to, right.to);
   if (byTo !== 0) return byTo;
-  return left.id.localeCompare(right.id);
+  return compareUtf16CodeUnits(left.id, right.id);
 }

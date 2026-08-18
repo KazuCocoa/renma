@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { compareUtf16CodeUnits } from "../src/canonical-json.js";
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import {
@@ -35,7 +36,7 @@ test("scan JSON exposes deterministic security-analysis coverage for discovered 
     coverage.artifacts.map((artifact) => artifact.path),
     [...coverage.artifacts]
       .map((artifact) => artifact.path)
-      .sort((left, right) => left.localeCompare(right)),
+      .sort(compareUtf16CodeUnits),
   );
 
   const clean = coverageArtifact(coverage.artifacts, "skills/clean/SKILL.md");

@@ -544,7 +544,7 @@ export const COMMAND_HELP = [
       "renma bom . --format json --omit-generated-at",
     ],
     interpretation: [
-      "Repository Context BOM v2 is the only supported contract; there is no v1 compatibility mode.",
+      "Repository Context BOM v3 is the current contract; v2 consumers must migrate the embedded Readiness check collection.",
       "The BOM is a declared repository manifest, not a runtime usage report or telemetry.",
       "--omit-generated-at only removes the run-time generation timestamp.",
       "With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated --omit-generated-at JSON runs should be byte-identical.",

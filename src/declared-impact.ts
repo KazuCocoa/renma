@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { normalizeDependencyReference } from "./dependency-resolution.js";
 import type {
   CompositionKindMismatch,
@@ -296,8 +297,8 @@ function impactAsset(asset: Asset, direct: boolean): ImpactAsset {
 
 function compareImpactAssets(left: ImpactAsset, right: ImpactAsset): number {
   return (
-    left.id.localeCompare(right.id) ||
-    left.sourcePath.localeCompare(right.sourcePath)
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath)
   );
 }
 
@@ -308,13 +309,17 @@ function compareIncomingDeclarations(
   const leftDependency = left.dependency;
   const rightDependency = right.dependency;
   return (
-    left.source.id.localeCompare(right.source.id) ||
-    left.target.id.localeCompare(right.target.id) ||
-    (leftDependency.declaration ?? leftDependency.kind).localeCompare(
+    compareUtf16CodeUnits(left.source.id, right.source.id) ||
+    compareUtf16CodeUnits(left.target.id, right.target.id) ||
+    compareUtf16CodeUnits(
+      leftDependency.declaration ?? leftDependency.kind,
       rightDependency.declaration ?? rightDependency.kind,
     ) ||
-    leftDependency.to.localeCompare(rightDependency.to) ||
-    leftDependency.sourcePath.localeCompare(rightDependency.sourcePath) ||
+    compareUtf16CodeUnits(leftDependency.to, rightDependency.to) ||
+    compareUtf16CodeUnits(
+      leftDependency.sourcePath,
+      rightDependency.sourcePath,
+    ) ||
     (leftDependency.evidence?.startLine ?? 0) -
       (rightDependency.evidence?.startLine ?? 0) ||
     (leftDependency.declarationIndex ?? -1) -
@@ -327,11 +332,14 @@ function compareImpactEdges(
   right: ImpactProvenanceEdge,
 ): number {
   return (
-    left.from.localeCompare(right.from) ||
-    left.to.localeCompare(right.to) ||
-    left.relationship.localeCompare(right.relationship) ||
-    left.dependentMembership.localeCompare(right.dependentMembership) ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.from, right.from) ||
+    compareUtf16CodeUnits(left.to, right.to) ||
+    compareUtf16CodeUnits(left.relationship, right.relationship) ||
+    compareUtf16CodeUnits(
+      left.dependentMembership,
+      right.dependentMembership,
+    ) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
   );
@@ -342,11 +350,11 @@ function compareImpactMismatches(
   right: ImpactInvalidIncomingDeclaration,
 ): number {
   return (
-    left.sourceId.localeCompare(right.sourceId) ||
-    left.declaredTarget.localeCompare(right.declaredTarget) ||
-    left.relationship.localeCompare(right.relationship) ||
-    left.membership.localeCompare(right.membership) ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourceId, right.sourceId) ||
+    compareUtf16CodeUnits(left.declaredTarget, right.declaredTarget) ||
+    compareUtf16CodeUnits(left.relationship, right.relationship) ||
+    compareUtf16CodeUnits(left.membership, right.membership) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
   );

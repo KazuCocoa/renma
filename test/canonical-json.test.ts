@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canonicalJson, canonicalSha256 } from "../src/canonical-json.js";
+import {
+  canonicalJson,
+  canonicalSha256,
+  compareUtf16CodeUnits,
+} from "../src/canonical-json.js";
 
 const UNICODE_ORDER_FIXTURE = {
   中: "cjk",
@@ -20,6 +24,15 @@ const EXPECTED_CANONICAL_JSON =
 
 test("canonical JSON uses explicit locale-independent UTF-16 key order", () => {
   assert.equal(canonicalJson(UNICODE_ORDER_FIXTURE), EXPECTED_CANONICAL_JSON);
+});
+
+test("the shared comparator fixes one Unicode order for every machine projection", () => {
+  assert.deepEqual(
+    ["ö", "A", "é", "e\u0301", "ä", "日本", "a", "å"].sort(
+      compareUtf16CodeUnits,
+    ),
+    ["A", "a", "e\u0301", "ä", "å", "é", "ö", "日本"],
+  );
 });
 
 test("canonical JSON preserves recursive object ordering and array order", () => {

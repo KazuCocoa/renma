@@ -1,9 +1,12 @@
 # Repository Context BOM
 
 `renma bom` emits a declared repository manifest for review and CI consumers.
-Renma supports only the v2 BOM schema; it does not provide a v1 compatibility
-mode. V2 is the first supported long-term contract. Earlier v1 output was an
-experimental pre-contract surface removed before broader adoption.
+Renma currently emits only the v3 BOM schema. V2 was the first supported
+long-term contract; v3 changes the embedded Readiness check contract described
+below. Earlier v1 output was an experimental pre-contract surface removed
+before broader adoption. Renma does not provide a legacy output mode, although
+the published v2 schema remains available for consumers validating archived
+artifacts.
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
@@ -21,7 +24,7 @@ flowchart TD
   Diagnostics["Diagnostics and Readiness"]
   Governance["Lifecycle and ownership evidence"]
   Security["Security posture and policy inventory"]
-  Bom["Repository Context BOM v2"]
+  Bom["Repository Context BOM v3"]
   Json["Authoritative JSON"]
   Markdown["Markdown review projection"]
   Revision["Git, CI, or PR context supplies revision identity"]
@@ -63,7 +66,10 @@ Renma does not freeze the working tree while another process is modifying it. If
 
 JSON is the authoritative BOM output. Markdown is a compact review projection for pull requests and humans; it is not the canonical serialization.
 
-Array ordering is deterministic and part of Renma's output contract. Asset `sourcePath` values remain repository-relative. `root` and `configPath` remain absolute paths from the current environment.
+Array ordering is deterministic, locale-independent ECMAScript UTF-16
+code-unit order and is part of Renma's output contract. Asset `sourcePath`
+values remain repository-relative. `root` and `configPath` remain absolute
+paths from the current environment.
 
 Assets use `ownership.declaredOwner`, `ownership.effectiveOwner`,
 `ownership.source`, and optional `ownership.inheritedFrom`. Readiness uses the
@@ -90,16 +96,17 @@ Supported guarantee:
 
 > With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON.
 
-Freshness evaluation uses the UTC calendar date. Metadata dates remain part of the snapshot and must not be removed as timestamp noise. A real file move is a meaningful BOM change because `sourcePath` is repository evidence. Portable byte-for-byte output across different runners is not a v2 guarantee.
+Freshness evaluation uses the UTC calendar date. Metadata dates remain part of the snapshot and must not be removed as timestamp noise. A real file move is a meaningful BOM change because `sourcePath` is repository evidence. Portable byte-for-byte output across different checkout paths is not a v3 guarantee; locale differences alone do not change ordering.
 
 ## Schema Evolution
 
 `schemaVersion` represents the consumer-facing BOM schema. `generator.version` represents the Renma implementation version and is not the schema version.
 
-V2 is the first supported long-term contract for normalized ownership,
-first-class support assets, and static support relationships. Consumers must
-inspect `schemaVersion` independently from `generator.version`. An incompatible
-contract must use a new schema version.
+V2 was the first supported long-term contract for normalized ownership,
+first-class support assets, and static support relationships. V3 carries those
+fields forward and changes the embedded Readiness check collection. Consumers
+must inspect `schemaVersion` independently from `generator.version`. An
+incompatible contract must use a new schema version.
 
 Within a schema, changes should be backward-compatible and additive:
 
@@ -112,24 +119,25 @@ Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
 `inherits_policy` as static repository evidence, not runtime behavior. Branch
 on `schemaVersion`; `generator.version` is provenance only.
 
-The published [BOM v2 JSON Schema](schemas/repository-context-bom-v2.schema.json)
+The published [BOM v3 JSON Schema](schemas/repository-context-bom-v3.schema.json)
 is the machine-readable contract. `generatedAt` is required when `outputMode`
 is `default` and forbidden when `outputMode` is `omit_generated_at`.
 `configPath` remains optional and is absent when no configuration file was
-loaded. `executableSurfaceInventory` is also optional at the BOM v2
-schema-compatibility boundary. Current Renma versions emit it unconditionally,
-but older valid BOM v2 documents without it remain valid. All other top-level
+loaded. `executableSurfaceInventory` remains optional at the BOM v3 schema
+boundary, preserving the v2 field requirements. Current Renma versions emit it
+unconditionally. All other top-level
 fields are required. Optional lifecycle, version, status, target-resolution,
 and inherited-ownership fields appear only when their evidence exists. Owner
 values are explicitly nullable; missing optional fields are omitted rather
 than serialized as `null`.
 
-BOM v2 additively accepts `suspended` in lifecycle status enums. Asset and
+BOM v3 carries forward v2's `suspended` lifecycle status. Asset and
 `lifecycle` projections may include optional `statusReason` and
 `statusChangedAt` strings adjacent to status. These are current declaration
 evidence only: BOM does not store transition history, infer dates, schedule
-expiry, or restore an asset. Existing v2 documents without the optional fields
-remain valid, and the BOM schema version stays unchanged.
+expiry, or restore an asset. Archived v2 documents without the optional fields
+remain valid under the published v2 schema; the same fields remain optional in
+v3.
 
 Arrays are deterministically ordered by their identity/path keys, and count
 fields are non-negative integers. Count maps contain every declared enum
@@ -152,8 +160,8 @@ dependency evidence.
 The inventory's closed analyzer enum additively includes `powershell` and
 `batch`, and its launcher enum additively includes `pwsh`, `powershell`, `cmd`,
 and their `.exe` spellings. Existing fields, analyzer values, launcher values,
-relation meanings, and ordering are unchanged. BOM v2 and executable-surface
-inventory v1 identifiers do not change. Consumers that exhaustively switch on
+relation meanings, and ordering are unchanged from v2. The nested
+executable-surface inventory remains v1. Consumers that exhaustively switch on
 closed enum values must accept these additions before processing repositories
 with newly recognized Windows evidence.
 
@@ -175,7 +183,7 @@ structurally textual cue, and outside blockquotes. Text plus text-only emphasis
 or strong formatting may form the cue; links, images, inline code, non-comment
 HTML, reference-like nodes, and unsupported descendants may not. Both forms use
 the same launcher, target resolution, occurrence ordinal, governance, and
-direct/transitive reachability semantics. BOM v2 adds no syntax-origin field
+direct/transitive reachability semantics. BOM v3 adds no syntax-origin field
 and does not distinguish fenced from inline presentation. Ordinary inline code,
 quoted examples, broader prose, other verbs or languages, and chained secondary
 code spans do not create invocation rows.
@@ -196,8 +204,8 @@ pair therefore stays auditable without multiplying graph topology.
 
 BOM consumers must first branch on the presence of
 `executableSurfaceInventory`, then inspect its nested `schema` identifier
-before consuming its nested fields. The inventory remains additive v1 and BOM
-remains v2. For compatibility with Renma 0.27.0, the new summary counts,
+before consuming its nested fields. The inventory remains additive v1. V3
+carries forward the optional field boundaries introduced for Renma 0.27.0: the summary counts,
 surface `invocationGovernance`, and invocation `governance` fields are optional
 in the published schema. Executable `dependencies`, new dependency summary
 counts, and surface `dependencyEvidence` are likewise optional for earlier
@@ -217,16 +225,35 @@ Current output additively emits `externalUploadGovernance` in each security
 policy inventory. Its five required counts distinguish denied upload, upload
 allowed with approval required, upload allowed with approval not required,
 upload allowed with the approval requirement unspecified, and unspecified
-upload permission. The field is optional at the BOM v2 schema compatibility
-boundary so older v2 documents remain valid; when present, its nested shape is
-closed and all five counts are required. BOM v2 is unchanged.
+upload permission. The field remains optional in v3; archived v2 documents are
+validated against the retained v2 schema. When present, its nested shape is
+closed and all five counts are required.
+
+### V2 to v3 migration
+
+V3 removes the producerless `layout.disallowed_skill_assets` Readiness check
+and adds `skills.support_integrity`. The new check represents explicitly
+referenced Skill support that cannot be resolved or inspected. It uses
+authoritative `inspectionCoverage` issues whose `expectationSource` is
+`static-support-reference` for excluded, symlinked, unreadable, oversized,
+depth-limited, and unsupported support, plus missing-reference Finding evidence
+where inspection coverage intentionally has no missing-path issue. Suppression
+may remove an ordinary Finding from the active Finding list, but cannot make
+the embedded Readiness check claim that authoritative support inspection is
+complete. Unrelated repository inspection issues and unreferenced Skill-local
+files do not affect this check, and it creates no placement policy. Consumers
+that key, count, compare, or allowlist embedded Readiness checks must migrate to
+the new ID and meaning. No other BOM field, type, or nested schema identifier
+changes. Locale-independent ordering fixes restore the already documented
+deterministic ordering contract and therefore do not independently require
+another schema version.
 
 Representative top-level JSON (nested objects are shortened for readability;
 the schema defines every nested field):
 
 ```json
 {
-  "schemaVersion": "renma.repository-context-bom.v2",
+  "schemaVersion": "renma.repository-context-bom.v3",
   "outputMode": "omit_generated_at",
   "generator": { "name": "renma", "version": "<installed-version>" },
   "root": "/checkout/repository",
@@ -249,7 +276,7 @@ the contract test suite.
 
 ## Source Provenance
 
-BOM v2 provenance is deliberately repository-local:
+BOM v3 provenance is deliberately repository-local:
 
 - repository-relative source paths;
 - per-asset content hashes;
@@ -271,7 +298,7 @@ artifact, or pull-request context.
 
 ## Consumed-Context Evidence
 
-The BOM v2 schema describes declared repository state. Consumed-context evidence
+The BOM v3 schema describes declared repository state. Consumed-context evidence
 must not redefine or mutate that meaning.
 
 Runtime evidence should be a separate artifact or explicitly separate

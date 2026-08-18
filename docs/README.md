@@ -65,8 +65,8 @@ They describe implementation rationale and are not normative user guidance.
   publication, route resolution, reachability, coverage,
   `renma.skill-index.v1`, Discovery diff, and warn-only CI policy without
   describing runtime routing.
-- [Repository Context BOM v2](repository-context-bom.md) defines
-  `renma.repository-context-bom.v2`, deterministic ordering, reproducibility,
+- [Repository Context BOM v3](repository-context-bom.md) defines
+  `renma.repository-context-bom.v3`, deterministic ordering, reproducibility,
   and the declared-manifest boundary.
 - [Machine-Readable JSON Compatibility](machine-readable-json.md) inventories
   top-level command contracts, defines the 1.x additive/breaking policy, and
@@ -78,7 +78,7 @@ They describe implementation rationale and are not normative user guidance.
 - [Trust Graph v2](trust-graph.md) defines `renma.trustGraph.v2`, node and edge
   provenance, ordering, and the distinction between evidence and a trust score.
 - [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas)
-  contains the machine-readable BOM v2, Trust Graph v2, and Skill Authoring
+  contains the machine-readable BOM v3, Trust Graph v2, and Skill Authoring
   Handoff v1 contracts shipped in the npm package.
 
 The development architecture, design, and roadmap documents below are

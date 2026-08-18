@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   DeclaredSecurityPolicyEvidence,
   EffectiveSecurityPolicyEvidence,
@@ -193,7 +194,7 @@ export function buildSecurityPolicyChanges(input: SecurityPolicyDiffInput): {
   const fromAssets = keyedAssets(fromPrepared, fromIdCounts, toIdCounts);
   const toAssets = keyedAssets(toPrepared, toIdCounts, fromIdCounts);
   const keys = [...new Set([...fromAssets.keys(), ...toAssets.keys()])].sort(
-    (left, right) => left.localeCompare(right),
+    (left, right) => compareUtf16CodeUnits(left, right),
   );
   const sharedImpacts = new Map<
     string,
@@ -1170,7 +1171,7 @@ function samePolicyValue(
 
 function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort(
-    (left, right) => left.localeCompare(right),
+    (left, right) => compareUtf16CodeUnits(left, right),
   );
 }
 
@@ -1190,7 +1191,7 @@ function compareSources(
   left: SecurityPolicyChangeSource,
   right: SecurityPolicyChangeSource,
 ): number {
-  return sourceKey(left).localeCompare(sourceKey(right));
+  return compareUtf16CodeUnits(sourceKey(left), sourceKey(right));
 }
 
 function compareAssets(
@@ -1198,9 +1199,9 @@ function compareAssets(
   right: SecurityPolicyAffectedAsset,
 ): number {
   return (
-    left.id.localeCompare(right.id) ||
-    left.path.localeCompare(right.path) ||
-    left.kind.localeCompare(right.kind)
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.path, right.path) ||
+    compareUtf16CodeUnits(left.kind, right.kind)
   );
 }
 

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 import { logicalSkillDirectory } from "./discovery.js";
 
@@ -141,7 +142,7 @@ export function validateAgentSkills(
   const results = documents
     .filter((document) => document.artifact.kind === "skill")
     .map(validateAgentSkill)
-    .sort((left, right) => left.path.localeCompare(right.path));
+    .sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
 
   return {
     specification: AGENT_SKILLS_SPECIFICATION,
@@ -337,7 +338,7 @@ function validateAgentSkillFrontmatter(
 
   issues.sort((left, right) => {
     const lineOrder = left.startLine - right.startLine;
-    return lineOrder || left.code.localeCompare(right.code);
+    return lineOrder || compareUtf16CodeUnits(left.code, right.code);
   });
   const errorCount = issues.filter(
     (issue) => issue.severity === "error",
@@ -964,7 +965,9 @@ function nonEmptyString(value: unknown): string | undefined {
 }
 
 function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort((left, right) =>
+    compareUtf16CodeUnits(left, right),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

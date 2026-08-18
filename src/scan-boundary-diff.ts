@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   CanonicalSuppressionEvidence,
   ScanBoundaryEvidence,
@@ -127,7 +128,7 @@ function suppressionChanges(
   const fromScopes = suppressionScopes(from);
   const toScopes = suppressionScopes(to);
   const keys = [...new Set([...fromScopes.keys(), ...toScopes.keys()])].sort(
-    (left, right) => left.localeCompare(right),
+    (left, right) => compareUtf16CodeUnits(left, right),
   );
   return keys.flatMap((key): ScanBoundaryChange[] => {
     const previous = fromScopes.get(key);
@@ -208,7 +209,7 @@ function compareChanges(
   left: ScanBoundaryChange,
   right: ScanBoundaryChange,
 ): number {
-  return changeKey(left).localeCompare(changeKey(right));
+  return compareUtf16CodeUnits(changeKey(left), changeKey(right));
 }
 
 function changeKey(change: ScanBoundaryChange): string {

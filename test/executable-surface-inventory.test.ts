@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { bom, formatBomMarkdown } from "../src/commands/bom.js";
+import { compareUtf16CodeUnits } from "../src/canonical-json.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import {
   buildExecutableSurfaceInventory,
@@ -36,7 +37,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
     inventory.surfaces.map((surface) => surface.path),
     [...inventory.surfaces]
       .map((surface) => surface.path)
-      .sort((left, right) => left.localeCompare(right)),
+      .sort(compareUtf16CodeUnits),
   );
 
   const direct = requiredSurface(inventory, "skills/demo/scripts/direct.sh");
@@ -129,11 +130,11 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
       "resolved",
       "resolved",
       "resolved",
-      "resolved",
       "missing",
       "unsafe",
       "noncanonical",
       "unsupported",
+      "resolved",
     ],
   );
   assert.deepEqual(
@@ -142,7 +143,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
         (invocation) => invocation.normalizedTarget === "tools/invoked.mjs",
       )
       .map((invocation) => invocation.occurrenceOrdinal),
-    [1, 1, 2],
+    [1, 2, 1],
   );
   const directInvocation = inventory.invocations.find(
     (invocation) =>

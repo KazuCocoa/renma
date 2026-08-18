@@ -273,7 +273,7 @@ Report families remain separate because they answer different questions:
 - diff and CI compare two states;
 - Skill Index describes static Discovery topology and coverage;
 - Trust Graph v2 connects trust-relevant evidence without a subjective score;
-- Repository Context BOM v2 records declared repository evidence, not runtime
+- Repository Context BOM v3 records declared repository evidence, not runtime
   consumption.
 
 Exact command usage belongs in the [User Manual](../user-manual.md). Exact

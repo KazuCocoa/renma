@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 import {
@@ -130,7 +131,7 @@ export function buildScaffoldBundle(
       : ["authoring"];
   const resources = suppliedSkill
     ? [...suppliedSkill.resources]
-    : [...new Set(options.resources ?? [])].sort();
+    : [...new Set(options.resources ?? [])].sort(compareUtf16CodeUnits);
   if (options.kind !== "skill" && resources.length > 0) {
     throw new CliUserError(
       "--resources is supported only for skill scaffolds.",

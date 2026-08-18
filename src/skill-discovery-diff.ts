@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 
 import {
@@ -316,14 +317,14 @@ function routeMap(
     const duplicateKey = duplicateRouteGroupKey(route);
     if (duplicateKey) {
       const current = stableRepresentativeByDuplicateGroup.get(duplicateKey);
-      if (!current || key.localeCompare(current) < 0) {
+      if (!current || compareUtf16CodeUnits(key, current) < 0) {
         stableRepresentativeByDuplicateGroup.set(duplicateKey, key);
       }
     }
   }
   return new Map(
     [...groups.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareUtf16CodeUnits(left, right))
       .map(([key, routes]) => [
         key,
         routeState(
@@ -486,7 +487,7 @@ function cycleMap(
     resolveSkillDiscoveryRouteCycles(index.routes)
       .map((cycle) => {
         const skillIds = [...cycle.cycleSkillIds].sort((left, right) =>
-          left.localeCompare(right),
+          compareUtf16CodeUnits(left, right),
         );
         const projected: SkillDiscoveryCycleDiff = {
           skillIds,
@@ -495,7 +496,7 @@ function cycleMap(
         };
         return [skillIds.join("\0"), projected] as const;
       })
-      .sort(([left], [right]) => left.localeCompare(right)),
+      .sort(([left], [right]) => compareUtf16CodeUnits(left, right)),
   );
 }
 
@@ -531,7 +532,10 @@ function compareSkills(
   left: SkillDiscoveryDiffSkill,
   right: SkillDiscoveryDiffSkill,
 ): number {
-  return left.path.localeCompare(right.path) || left.id.localeCompare(right.id);
+  return (
+    compareUtf16CodeUnits(left.path, right.path) ||
+    compareUtf16CodeUnits(left.id, right.id)
+  );
 }
 
 function compareCandidates(
@@ -539,9 +543,9 @@ function compareCandidates(
   right: SkillDiscoveryRouteDiffCandidate,
 ): number {
   return (
-    left.path.localeCompare(right.path) ||
-    left.id.localeCompare(right.id) ||
-    left.kind.localeCompare(right.kind)
+    compareUtf16CodeUnits(left.path, right.path) ||
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.kind, right.kind)
   );
 }
 

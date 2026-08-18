@@ -82,3 +82,33 @@ test("suppression application omits active findings but retains structured evide
     },
   ]);
 });
+
+test("suppression selection uses UTF-16 order when matching reasons contain non-ASCII text", () => {
+  const finding: Finding = {
+    id: "SEC-LITERAL-SECRET",
+    title: "Literal secret",
+    category: "safety",
+    severity: "high",
+    confidence: "high",
+    evidence: {
+      path: "skills/demo/SKILL.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: 'api_key = "fake"',
+    },
+    whyItMatters: "test",
+    remediation: "test",
+  };
+  const result = applySuppressions(
+    [finding],
+    ["é reviewed", "ä reviewed"].map((reason) => ({
+      id: finding.id,
+      paths: ["skills/demo/**"],
+      reason,
+      expires: "never" as const,
+    })),
+    new Date("2026-08-07T00:00:00.000Z"),
+  );
+
+  assert.equal(result.suppressedFindings[0]?.suppression.reason, "ä reviewed");
+});

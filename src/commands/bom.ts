@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import { graphFromRepositorySnapshot, type GraphEdge } from "./graph.js";
 import {
@@ -30,7 +31,7 @@ import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
 export const REPOSITORY_CONTEXT_BOM_SCHEMA_VERSION =
-  "renma.repository-context-bom.v2" as const;
+  "renma.repository-context-bom.v3" as const;
 
 export type BomFormat = "json" | "markdown";
 export type BomOutputMode = "default" | "omit_generated_at";
@@ -209,6 +210,11 @@ export function buildBomReport(
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
+    undefined,
+    {
+      inspectionCoverage: scanResult.inspectionCoverage,
+      suppressedFindings: scanResult.suppressedFindings,
+    },
   );
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
@@ -446,7 +452,7 @@ function toBomAsset(asset: Asset, associations: BomAssociationIndex): BomAsset {
       : {}),
     ...(asset.metadata.version ? { version: asset.metadata.version } : {}),
     tags: [...asset.metadata.tags].sort((left, right) =>
-      left.localeCompare(right),
+      compareUtf16CodeUnits(left, right),
     ),
     ...(lifecycle ? { lifecycle } : {}),
     dependencies: (associations.dependenciesBySource.get(asset.id) ?? []).map(
@@ -540,9 +546,9 @@ function toAssetDependent(dependency: BomDependency): BomAssetDependent {
 function stableAssets(assets: Asset[]): Asset[] {
   return [...assets].sort(
     (left, right) =>
-      left.kind.localeCompare(right.kind) ||
-      left.sourcePath.localeCompare(right.sourcePath) ||
-      left.id.localeCompare(right.id),
+      compareUtf16CodeUnits(left.kind, right.kind) ||
+      compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+      compareUtf16CodeUnits(left.id, right.id),
   );
 }
 
@@ -552,10 +558,10 @@ function stableEdges(edges: GraphEdge[]): GraphEdge[] {
 
 function compareEdges(left: GraphEdge, right: GraphEdge): number {
   return (
-    left.from.localeCompare(right.from) ||
-    left.kind.localeCompare(right.kind) ||
-    left.to.localeCompare(right.to) ||
-    left.sourcePath.localeCompare(right.sourcePath)
+    compareUtf16CodeUnits(left.from, right.from) ||
+    compareUtf16CodeUnits(left.kind, right.kind) ||
+    compareUtf16CodeUnits(left.to, right.to) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath)
   );
 }
 
@@ -645,7 +651,7 @@ function stableJsonValue(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareUtf16CodeUnits(left, right))
       .map(([key, item]) => [key, stableJsonValue(item)]),
   );
 }
@@ -666,10 +672,10 @@ function countDiagnostics(
 
 function compareDiagnostics(left: Diagnostic, right: Diagnostic): number {
   return (
-    (left.path ?? "").localeCompare(right.path ?? "") ||
+    compareUtf16CodeUnits(left.path ?? "", right.path ?? "") ||
     diagnosticSeverityOrder(left.severity) -
       diagnosticSeverityOrder(right.severity) ||
-    left.message.localeCompare(right.message)
+    compareUtf16CodeUnits(left.message, right.message)
   );
 }
 
@@ -833,7 +839,7 @@ function dependencyResolutionSummary(
     [...counts]
       .sort(
         ([leftName, leftCount], [rightName, rightCount]) =>
-          rightCount - leftCount || leftName.localeCompare(rightName),
+          rightCount - leftCount || compareUtf16CodeUnits(leftName, rightName),
       )
       .map(([resolution, count]) => `${resolution} ${count}`)
       .join(", ") || "none"

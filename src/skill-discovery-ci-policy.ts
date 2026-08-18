@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { SkillDiscoveryDiff } from "./skill-discovery-diff.js";
 import type { SkillDiscoveryCiPolicyMode } from "./types/configuration.js";
 
@@ -172,13 +173,15 @@ function comparePolicyMatches(
   return (
     (MATCH_ID_ORDER.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
       (MATCH_ID_ORDER.get(right.id) ?? Number.MAX_SAFE_INTEGER) ||
-    (left.skill?.path ?? "").localeCompare(right.skill?.path ?? "") ||
-    (left.route?.sourcePath ?? "").localeCompare(
+    compareUtf16CodeUnits(left.skill?.path ?? "", right.skill?.path ?? "") ||
+    compareUtf16CodeUnits(
+      left.route?.sourcePath ?? "",
       right.route?.sourcePath ?? "",
     ) ||
-    (left.route?.normalizedTarget ?? "").localeCompare(
+    compareUtf16CodeUnits(
+      left.route?.normalizedTarget ?? "",
       right.route?.normalizedTarget ?? "",
     ) ||
-    (left.skill?.id ?? "").localeCompare(right.skill?.id ?? "")
+    compareUtf16CodeUnits(left.skill?.id ?? "", right.skill?.id ?? "")
   );
 }

@@ -1,6 +1,10 @@
 import packageJson from "../../package.json" with { type: "json" };
 
-import { canonicalSha256 } from "../canonical-json.js";
+import {
+  canonicalJson,
+  canonicalSha256,
+  compareUtf16CodeUnits,
+} from "../canonical-json.js";
 import { CliUserError } from "../cli-errors.js";
 import type { ConfigOverrides } from "../config.js";
 import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
@@ -288,18 +292,22 @@ export function buildExecutionContract(
   const surfaces = snapshot.executableSurfaceInventory.surfaces
     .filter((surface) => visibleSurfacePaths.has(surface.path))
     .map((surface) => projectSurface(surface, depths.get(surface.path)))
-    .sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
+    .sort((left, right) =>
+      compareUtf16CodeUnits(left.sourcePath, right.sourcePath),
+    );
   const relevantPaths = new Set([
     subject.sourcePath,
     ...surfaces.map((surface) => surface.sourcePath),
     ...unresolvedEvidence.map((evidence) => evidence.sourcePath),
   ]);
-  const diagnostics = (executableGraph.diagnostics ?? []).filter(
-    (diagnostic) =>
-      (diagnostic.path !== undefined && relevantPaths.has(diagnostic.path)) ||
-      (diagnostic.evidence !== undefined &&
-        relevantPaths.has(diagnostic.evidence.path)),
-  );
+  const diagnostics = (executableGraph.diagnostics ?? [])
+    .filter(
+      (diagnostic) =>
+        (diagnostic.path !== undefined && relevantPaths.has(diagnostic.path)) ||
+        (diagnostic.evidence !== undefined &&
+          relevantPaths.has(diagnostic.evidence.path)),
+    )
+    .sort(compareExecutionDiagnostics);
   const topologicalInvocationEvidenceCount = relationships.reduce(
     (count, relationship) =>
       count +
@@ -434,7 +442,7 @@ function assertExecutableSubjectIdentityIsSafe(
   const duplicatePaths = snapshot.catalog.assets
     .filter((asset) => asset.kind === "skill" && asset.id === subject.id)
     .map((asset) => asset.sourcePath)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   if (duplicatePaths.length > 1) {
     throw new CliUserError(
       `execution-contract cannot build a safe executable projection for ${subject.sourcePath} because Skill ID ${subject.id} is duplicated at: ${duplicatePaths.join(", ")}`,
@@ -458,10 +466,10 @@ function assertExecutableGraphIdentityNamespaceIsSafe(
     .map(([value, sourcePaths]) => ({
       value,
       sourcePaths: [...sourcePaths].sort((left, right) =>
-        left.localeCompare(right),
+        compareUtf16CodeUnits(left, right),
       ),
     }))
-    .sort((left, right) => left.value.localeCompare(right.value));
+    .sort((left, right) => compareUtf16CodeUnits(left.value, right.value));
   if (collisions.length === 0) return;
   throw new CliUserError(
     `execution-contract cannot build a safe executable projection because Skill IDs collide with repository-script paths: ${collisions
@@ -505,7 +513,7 @@ function invocationDepths(
     adjacency.set(edge.from, targets);
   }
   for (const targets of adjacency.values()) {
-    targets.sort((left, right) => left.localeCompare(right));
+    targets.sort((left, right) => compareUtf16CodeUnits(left, right));
   }
   const depths = new Map<string, number>([[subjectId, 0]]);
   const queue = [subjectId];
@@ -601,7 +609,7 @@ function projectStructuralRelationships(
       meaning: "structural_placement_only" as const,
     }))
     .sort((left, right) =>
-      left.to.sourcePath.localeCompare(right.to.sourcePath),
+      compareUtf16CodeUnits(left.to.sourcePath, right.to.sourcePath),
     );
 }
 
@@ -615,7 +623,7 @@ function projectSurface(
     scope: surface.scope,
     ...(surface.contentHash ? { contentHash: surface.contentHash } : {}),
     fingerprint: surface.fingerprint,
-    interpreterHints: [...surface.interpreterHints],
+    interpreterHints: [...surface.interpreterHints].sort(compareUtf16CodeUnits),
     reachableFromSubject: minimumInvocationDepth !== undefined,
     ...(minimumInvocationDepth === undefined ? {} : { minimumInvocationDepth }),
     inventoryDependencyEvidence: { ...surface.dependencyEvidence },
@@ -693,7 +701,9 @@ function projectDependencyEvidence(
     analyzer: dependency.analyzer,
     relation: dependency.relation,
     rawSpecifier: dependency.rawSpecifier,
-    normalizedTargetCandidates: [...dependency.normalizedTargetCandidates],
+    normalizedTargetCandidates: [...dependency.normalizedTargetCandidates].sort(
+      compareUtf16CodeUnits,
+    ),
     ...(dependency.normalizedTarget
       ? { normalizedTarget: dependency.normalizedTarget }
       : {}),
@@ -769,8 +779,8 @@ function normalizeSourcePath(value: string): string {
 
 function compareAssets(left: Asset, right: Asset): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.id.localeCompare(right.id)
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.id, right.id)
   );
 }
 
@@ -780,8 +790,8 @@ function compareRelationships(
 ): number {
   return (
     left.minimumTargetDepth - right.minimumTargetDepth ||
-    left.from.sourcePath.localeCompare(right.from.sourcePath) ||
-    left.to.sourcePath.localeCompare(right.to.sourcePath)
+    compareUtf16CodeUnits(left.from.sourcePath, right.from.sourcePath) ||
+    compareUtf16CodeUnits(left.to.sourcePath, right.to.sourcePath)
   );
 }
 
@@ -790,13 +800,21 @@ function compareExecutionEvidence(
   right: ExecutionContractEvidence,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.type.localeCompare(right.type) ||
-    evidenceAnalyzer(left).localeCompare(evidenceAnalyzer(right)) ||
-    evidenceTarget(left).localeCompare(evidenceTarget(right)) ||
-    left.occurrenceOrdinal - right.occurrenceOrdinal
+    compareUtf16CodeUnits(left.type, right.type) ||
+    compareUtf16CodeUnits(evidenceAnalyzer(left), evidenceAnalyzer(right)) ||
+    compareUtf16CodeUnits(evidenceTarget(left), evidenceTarget(right)) ||
+    left.occurrenceOrdinal - right.occurrenceOrdinal ||
+    compareUtf16CodeUnits(canonicalJson(left), canonicalJson(right))
   );
+}
+
+function compareExecutionDiagnostics(
+  left: Diagnostic,
+  right: Diagnostic,
+): number {
+  return compareUtf16CodeUnits(canonicalJson(left), canonicalJson(right));
 }
 
 function evidenceAnalyzer(evidence: ExecutionContractEvidence): string {

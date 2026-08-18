@@ -3,6 +3,7 @@ import {
   type GraphEdge,
   type GraphReport,
 } from "./graph.js";
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
@@ -24,7 +25,11 @@ import {
   type RepositorySnapshot,
 } from "../repository-evidence.js";
 import { formatVersionedJsonDocument } from "../report.js";
-import type { Diagnostic, Finding } from "../types/diagnostics.js";
+import type {
+  Diagnostic,
+  Finding,
+  SuppressedFindingEvidence,
+} from "../types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
 import {
@@ -34,9 +39,13 @@ import {
   type SkillRouteUsabilityReason,
 } from "../skill-discovery.js";
 import { CLI_EXIT } from "../cli-errors.js";
+import type {
+  InspectionCoverage,
+  InspectionCoverageIssue,
+} from "../inspection-coverage.js";
 
 export type ReadinessFormat = "json" | "markdown";
-export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v1" as const;
+export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v2" as const;
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const MARKDOWN_FINDINGS_LIMIT =
@@ -155,6 +164,11 @@ interface ReadinessProjectionOptions {
   includeSkillDiscovery?: boolean;
 }
 
+interface ReadinessInspectionEvidence {
+  inspectionCoverage?: InspectionCoverage;
+  suppressedFindings?: readonly SuppressedFindingEvidence[];
+}
+
 export async function runReadinessCommand(
   targetPath: string,
   options: { format: ReadinessFormat; overrides?: ConfigOverrides },
@@ -199,6 +213,10 @@ export function readinessFromRepositorySnapshot(
     projectionOptions.includeSkillDiscovery === false
       ? undefined
       : snapshot.skillDiscovery,
+    {
+      inspectionCoverage: scanResult.inspectionCoverage,
+      suppressedFindings: scanResult.suppressedFindings,
+    },
   );
 }
 
@@ -229,6 +247,7 @@ export function buildReadinessReport(
   securityPolicyInventory: SecurityPolicyInventorySummary = zeroSecurityPolicyInventorySummary(),
   agentSkills?: AgentSkillsValidationSummary,
   skillDiscovery?: SkillDiscoveryIndex,
+  inspectionEvidence: ReadinessInspectionEvidence = {},
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
   const totalAssets = graphReport.nodes.length;
@@ -291,13 +310,10 @@ export function buildReadinessReport(
       "warn",
       "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately.",
     ),
-    findingCheck(
-      "layout.disallowed_skill_assets",
-      "Skill-local support policy",
+    skillSupportIntegrityCheck(
       findings,
-      [DIAGNOSTIC_IDS.LAYOUT_DISALLOWED_SKILL_ASSET],
-      "fail",
-      "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it.",
+      inspectionEvidence.inspectionCoverage,
+      inspectionEvidence.suppressedFindings,
     ),
     findingCheck(
       "layout.context_root",
@@ -1285,7 +1301,7 @@ function selectMarkdownFindings(findings: Finding[]): Finding[] {
     selected.length < MARKDOWN_FINDINGS_LIMIT &&
     [...repeatedBuckets.values()].some((bucket) => bucket.length > 0)
   ) {
-    for (const id of [...repeatedBuckets.keys()].sort()) {
+    for (const id of [...repeatedBuckets.keys()].sort(compareUtf16CodeUnits)) {
       const bucket = repeatedBuckets.get(id);
       const finding = bucket?.shift();
       if (!finding) continue;
@@ -1862,6 +1878,107 @@ function findingCheck(
       message: finding.remediation,
     })),
   };
+}
+
+function skillSupportIntegrityCheck(
+  findings: readonly Finding[],
+  inspectionCoverage?: InspectionCoverage,
+  suppressedFindings: readonly SuppressedFindingEvidence[] = [],
+): ReadinessCheck {
+  const coverageIssues = (inspectionCoverage?.blockingIssues ?? []).filter(
+    isStaticSupportInspectionIssue,
+  );
+  const findingEvidence = [
+    ...findings,
+    ...suppressedFindings.map(({ finding }) => finding),
+  ]
+    .filter(
+      (finding) =>
+        finding.id === DIAGNOSTIC_IDS.SUPPORT_MISSING_PATH ||
+        finding.id === DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
+    )
+    .filter((finding) => {
+      const target = supportFindingTarget(finding);
+      return !coverageIssues.some((issue) =>
+        inspectionIssueCoversPath(issue, target),
+      );
+    })
+    .map((finding) => ({
+      id: finding.id,
+      path: supportFindingTarget(finding),
+      message: `[${
+        finding.id === DIAGNOSTIC_IDS.SUPPORT_MISSING_PATH
+          ? "missing"
+          : "symlink"
+      }] ${finding.remediation}`,
+    }));
+  const coverageEvidence = coverageIssues.map((issue) => ({
+    path: issue.path,
+    message: `[${issue.state}] ${issue.reason}`,
+  }));
+  const evidence = dedupeSupportIntegrityEvidence([
+    ...coverageEvidence,
+    ...findingEvidence,
+  ]);
+
+  if (evidence.length === 0) {
+    return {
+      id: "skills.support_integrity",
+      title: "Skill support integrity",
+      status: "pass",
+      severity: "info",
+      summary:
+        "Explicitly referenced Skill support exists and is inspectable as regular repository content.",
+    };
+  }
+
+  return {
+    id: "skills.support_integrity",
+    title: "Skill support integrity",
+    status: "fail",
+    severity: "error",
+    summary: `${evidence.length} explicitly referenced Skill support inspection problem${evidence.length === 1 ? " prevents" : "s prevent"} complete static inspection.`,
+    evidence,
+  };
+}
+
+function isStaticSupportInspectionIssue(
+  issue: InspectionCoverageIssue,
+): boolean {
+  return issue.details?.expectationSource === "static-support-reference";
+}
+
+function supportFindingTarget(finding: Finding): string {
+  return typeof finding.details?.target === "string"
+    ? finding.details.target
+    : finding.evidence.path;
+}
+
+function inspectionIssueCoversPath(
+  issue: InspectionCoverageIssue,
+  candidate: string,
+): boolean {
+  return issue.scope === "subtree"
+    ? candidate === issue.path || candidate.startsWith(`${issue.path}/`)
+    : candidate === issue.path;
+}
+
+function dedupeSupportIntegrityEvidence(
+  evidence: NonNullable<ReadinessCheck["evidence"]>,
+): NonNullable<ReadinessCheck["evidence"]> {
+  const sorted = [...evidence].sort(
+    (left, right) =>
+      compareUtf16CodeUnits(left.path ?? "", right.path ?? "") ||
+      compareUtf16CodeUnits(left.id ?? "", right.id ?? "") ||
+      compareUtf16CodeUnits(left.message ?? "", right.message ?? ""),
+  );
+  const seen = new Set<string>();
+  return sorted.filter((item) => {
+    const key = `${item.path ?? ""}\0${item.id ?? ""}\0${item.message ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function layoutReadinessPenalty(checks: ReadinessCheck[]): number {

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import { lstatSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -839,7 +840,7 @@ export async function discoverArtifacts(
     .filter(
       (relativePath) => repositoryPathDepth(relativePath) <= config.maxDepth,
     )
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => compareUtf16CodeUnits(a, b));
 
   const artifacts = await mapLimit(
     candidates,
@@ -1114,7 +1115,9 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
     }
   }
 
-  for (const relativePath of [...paths].sort((a, b) => a.localeCompare(b))) {
+  for (const relativePath of [...paths].sort((a, b) =>
+    compareUtf16CodeUnits(a, b),
+  )) {
     const reservedSupportSegment = skillSupportPathSegment(relativePath);
     if (reservedSupportSegment !== undefined) {
       diagnostics.push({
@@ -1174,7 +1177,7 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
 function legacyContextRootDiagnostics(walkedFiles: string[]): Diagnostic[] {
   return walkedFiles
     .filter((relativePath) => relativePath.startsWith("context/"))
-    .sort((left, right) => left.localeCompare(right))
+    .sort((left, right) => compareUtf16CodeUnits(left, right))
     .map((relativePath) => ({
       code: DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.LEGACY_CONTEXT_ROOT,
       severity: "warning" as const,
