@@ -495,18 +495,27 @@ test("CLI reports concise JSONC syntax locations without stack traces", async ()
   assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
-test("commands fail closed on historical security profile aliases", async () => {
+test("commands fail closed with one aggregate across config scopes", async () => {
   const root = await fixture();
   await writeFile(
     path.join(root, "renma.config.json"),
     JSON.stringify({
+      layout: { tool_namespace: "appium" },
+      quality: { wrongQualityKey: 1, anotherWrongQualityKey: 2 },
+      metadata: { unexpected: true },
+      scan_boundary: { foo: true },
+      executable_surface: { bar: true },
       security: {
         profiles: {
           restricted: {
             humanApprovalRequired: true,
           },
+          release: {
+            allowedData: ["repo-local-files"],
+          },
         },
       },
+      skill_discovery: { enabled: true, mystery: true },
     }),
   );
   const commands = [
@@ -520,13 +529,66 @@ test("commands fail closed on historical security profile aliases", async () => 
 
     assert.equal(result.code, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
+    assert.equal(
+      result.stderr.match(/Unsupported configuration keys found in /gu)?.length,
+      1,
+      args.join(" "),
+    );
+    assert.ok(
+      result.stderr.includes(
+        `Unsupported configuration keys found in ${path.join(root, "renma.config.json")}:`,
+      ),
+      args.join(" "),
+    );
+    assert.match(result.stderr, /Top-level configuration:[\s\S]*"layout"/);
+    assert.match(result.stderr, /quality:[\s\S]*"anotherWrongQualityKey"/);
+    assert.match(result.stderr, /metadata:[\s\S]*"unexpected"/);
+    assert.match(result.stderr, /scan_boundary:[\s\S]*"foo"/);
+    assert.match(result.stderr, /executable_surface:[\s\S]*"bar"/);
+    assert.match(result.stderr, /security\.profiles\.release/);
     assert.match(result.stderr, /security\.profiles\.restricted/);
-    assert.match(result.stderr, /Historical security profile key/);
     assert.match(result.stderr, /humanApprovalRequired/);
     assert.match(result.stderr, /requires_human_approval/);
-    assert.doesNotMatch(result.stderr, /strict_scan\.|SEC-|QUAL-/);
+    assert.match(result.stderr, /"allowedData" -> use "allowed_data"/);
+    assert.match(result.stderr, /skill_discovery:[\s\S]*"enabled"/);
+    assert.doesNotMatch(
+      result.stderr,
+      /Renma scan|Findings:|strict_scan\.|SEC-|QUAL-/,
+    );
     assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
   }
+});
+
+test("CLI attributes aggregate key errors to an explicit config path", async () => {
+  const root = await fixture();
+  const configPath = path.join(root, "review-policy.jsonc");
+  await writeFile(
+    configPath,
+    `{
+  // Explicit review configuration.
+  "layout": {},
+  "quality": { "wrongQualityKey": 1 }
+}\n`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["scan", root, "--config", configPath, "--json"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.ok(
+    result.stderr.includes(
+      `Unsupported configuration keys found in ${configPath}:`,
+    ),
+  );
+  assert.match(result.stderr, /Top-level configuration:[\s\S]*"layout"/);
+  assert.match(result.stderr, /quality:[\s\S]*"wrongQualityKey"/);
+  assert.doesNotMatch(
+    result.stderr,
+    /Renma scan|Findings:|strict_scan\.|SEC-|QUAL-/,
+  );
+  assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
 test("CLI rejects executable explicit config extensions", async () => {
@@ -784,7 +846,7 @@ test("invalid suppression configs are rejected", async () => {
         reason: "No extra keys.",
         ticket: "SEC-123",
       },
-      pattern: /Unknown suppression config key "ticket"/,
+      pattern: /suppressions\[0\]:[\s\S]*"ticket" \(unknown\)/,
     },
     {
       name: "invalid expires",
@@ -932,7 +994,7 @@ test("invalid config field is a usage error in CLI", async () => {
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
 
   assert.equal(exitCode.code, 2);
-  assert.match(exitCode.stderr, /Unknown config field "failOn"/);
+  assert.match(exitCode.stderr, /"failOn" \(unknown\)/);
 });
 
 test("CLI reports JSON and fail-on exit code", async () => {

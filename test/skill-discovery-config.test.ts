@@ -53,7 +53,7 @@ test("Skill Discovery CI policy validation is strict and actionable", async (t) 
   const cases: Array<[unknown, RegExp]> = [
     [
       { skill_discovery: { adopted: true, unknown: true } },
-      /Unknown skill_discovery config key "unknown".*adopted, ci_policy/,
+      /skill_discovery:[\s\S]*"unknown" \(unknown\)[\s\S]*Allowed skill_discovery keys: adopted, ci_policy/,
     ],
     [
       { skill_discovery: { adopted: true, ci_policy: true } },

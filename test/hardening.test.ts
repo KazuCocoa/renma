@@ -43,7 +43,7 @@ test("removed layout config exits with caller-correctable guidance", async () =>
     assert.equal(result.code, 2, item.name);
     assert.match(
       result.stderr,
-      /compatibility-only "layout" configuration.*removed before Renma 1\.0.*Delete the authored layout object; there is no replacement configuration key\./,
+      /Top-level configuration:[\s\S]*"layout" -> remove this field; there is no replacement \(removed\)[\s\S]*removed configuration keys/,
       item.name,
     );
   }

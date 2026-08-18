@@ -445,8 +445,8 @@ test("quality configuration rejects unknown keys", async (t) => {
     loadConfig(root, {}),
     (error: unknown) =>
       error instanceof ConfigError &&
-      error.message ===
-        'Unknown quality config key "unknown". Allowed keys: ci_policy, skill_token_warning, skill_token_high, context_token_warning, context_token_high, reference_token_warning, reference_token_high, profile_token_warning, profile_token_high, example_token_warning, example_token_high.',
+      /quality:[\s\S]*"unknown" \(unknown\)/.test(error.message) &&
+      /Allowed quality keys:/.test(error.message),
   );
 });
 
@@ -680,8 +680,8 @@ test("explicit config is repository-contained and rejects symlink traversal", as
 
 test("JSONC retains unknown-field and semantic validation", async (t) => {
   const cases: Array<[string, RegExp]> = [
-    ['{"unknown": true}', /Unknown config field "unknown"/],
-    ['{"__proto__": {"polluted": true}}', /Unknown config field "__proto__"/],
+    ['{"unknown": true}', /"unknown" \(unknown\)/],
+    ['{"__proto__": {"polluted": true}}', /"__proto__" \(unknown\)/],
     ['{"max_depth": 0}', /max_depth must be a positive integer/],
     [
       '{"skill_discovery":{"adopted":false,"ci_policy":"warn"}}',
@@ -698,11 +698,19 @@ test("JSONC retains unknown-field and semantic validation", async (t) => {
   }
 });
 
-test("JSONC rejects historical security profile aliases", async (t) => {
+test("JSONC aggregates removed and historical configuration keys", async (t) => {
   const root = await fixture(t);
   await writeFile(
     path.join(root, "renma.config.jsonc"),
     `{
+  "layout": {
+    "tool_namespace": "appium"
+  },
+  "quality": {
+    // Both unsupported keys should join the same JSONC error.
+    "wrongQualityKey": 1,
+    "anotherWrongQualityKey": 2
+  },
   "security": {
     "profiles": {
       "restricted": {
@@ -720,9 +728,16 @@ test("JSONC rejects historical security profile aliases", async (t) => {
     loadConfig(root, {}),
     (error: unknown) =>
       error instanceof ConfigError &&
+      /Top-level configuration:[\s\S]*"layout".*\(removed\)/.test(
+        error.message,
+      ) &&
+      /quality:[\s\S]*"anotherWrongQualityKey"[\s\S]*"wrongQualityKey"/.test(
+        error.message,
+      ) &&
       /security\.profiles\.restricted/.test(error.message) &&
-      /Historical security profile key "networkAllowed"/.test(error.message) &&
-      /Use "network_allowed" instead/.test(error.message),
+      /"networkAllowed" -> use "network_allowed" \(historical\)/.test(
+        error.message,
+      ),
   );
 });
 

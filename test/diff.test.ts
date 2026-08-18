@@ -1441,19 +1441,21 @@ test("diff collects and prepares each archived ref exactly once", async () => {
 test("diff rejects historical aliases in either archived endpoint", async () => {
   const repo = await createArchivedAliasConflictRepo();
   try {
-    for (const [fromRef, toRef] of [
-      ["valid-profile", "conflicting-profile"],
-      ["conflicting-profile", "fixed-profile"],
+    for (const [fromRef, toRef, invalidEndpoint] of [
+      ["valid-profile", "conflicting-profile", "to"],
+      ["conflicting-profile", "fixed-profile", "from"],
     ] as const) {
       await assert.rejects(
         diff(repo, { fromRef, toRef }),
         (error: unknown) =>
           error instanceof ConfigError &&
+          new RegExp(
+            `Unsupported configuration keys found in .*[/\\\\]${invalidEndpoint}[/\\\\]renma\\.config\\.json:`,
+          ).test(error.message) &&
           /security\.profiles\.restricted/.test(error.message) &&
-          /Historical security profile key "networkAllowed"/.test(
+          /"networkAllowed" -> use "network_allowed" \(historical\)/.test(
             error.message,
-          ) &&
-          /Use "network_allowed" instead/.test(error.message),
+          ),
       );
     }
   } finally {

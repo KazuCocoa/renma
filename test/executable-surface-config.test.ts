@@ -39,7 +39,7 @@ test("executable-surface CI policy validation is strict", async (t) => {
     ],
     [
       { executable_surface: { unknown: true } },
-      /Unknown executable_surface config key "unknown"\. Allowed keys: ci_policy\./,
+      /executable_surface:[\s\S]*"unknown" \(unknown\)[\s\S]*Allowed executable_surface keys: ci_policy\./,
     ],
   ] as const) {
     await t.test(JSON.stringify(config), async (caseContext) => {

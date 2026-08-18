@@ -3239,16 +3239,19 @@ test("coverage regression stays WARN and --fail-on-status warn blocks it", async
 test("ci-report rejects historical aliases in either archived endpoint", async () => {
   const repo = await createArchivedAliasConflictRepo();
   try {
-    for (const [fromRef, toRef] of [
-      ["valid-profile", "conflicting-profile"],
-      ["conflicting-profile", "fixed-profile"],
+    for (const [fromRef, toRef, invalidEndpoint] of [
+      ["valid-profile", "conflicting-profile", "to"],
+      ["conflicting-profile", "fixed-profile", "from"],
     ] as const) {
       await assert.rejects(
         ciReport(repo, { fromRef, toRef }),
         (error: unknown) =>
           error instanceof ConfigError &&
+          new RegExp(
+            `Unsupported configuration keys found in .*[/\\\\]${invalidEndpoint}[/\\\\]renma\\.config\\.json:`,
+          ).test(error.message) &&
           /security\.profiles\.restricted/.test(error.message) &&
-          /Historical security profile key "networkAllowed"/.test(
+          /"networkAllowed" -> use "network_allowed" \(historical\)/.test(
             error.message,
           ),
       );
@@ -3269,9 +3272,15 @@ test("ci-report rejects historical aliases in either archived endpoint", async (
 
     assert.equal(command.code, 2);
     assert.equal(command.stdout, "");
+    assert.match(
+      command.stderr,
+      /Unsupported configuration keys found in .*[/\\]to[/\\]renma\.config\.json:/,
+    );
     assert.match(command.stderr, /security\.profiles\.restricted/);
-    assert.match(command.stderr, /Historical security profile key/);
-    assert.match(command.stderr, /Use "network_allowed" instead/);
+    assert.match(
+      command.stderr,
+      /"networkAllowed" -> use "network_allowed" \(historical\)/,
+    );
     assert.doesNotMatch(command.stderr, /SEC-|QUAL-|strict_scan\./);
   } finally {
     await rm(repo, { force: true, recursive: true });
