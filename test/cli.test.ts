@@ -495,15 +495,19 @@ test("CLI reports concise JSONC syntax locations without stack traces", async ()
   assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
-test("commands fail closed on historical security profile aliases", async () => {
+test("commands fail closed with one aggregate for removed and historical keys", async () => {
   const root = await fixture();
   await writeFile(
     path.join(root, "renma.config.json"),
     JSON.stringify({
+      layout: { tool_namespace: "appium" },
       security: {
         profiles: {
           restricted: {
             humanApprovalRequired: true,
+          },
+          release: {
+            allowedData: ["repo-local-files"],
           },
         },
       },
@@ -520,11 +524,21 @@ test("commands fail closed on historical security profile aliases", async () => 
 
     assert.equal(result.code, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
+    assert.equal(
+      result.stderr.match(/Unsupported configuration keys found:/gu)?.length,
+      1,
+      args.join(" "),
+    );
+    assert.match(result.stderr, /Top-level configuration:[\s\S]*"layout"/);
+    assert.match(result.stderr, /security\.profiles\.release/);
     assert.match(result.stderr, /security\.profiles\.restricted/);
-    assert.match(result.stderr, /Unsupported historical security profile keys/);
     assert.match(result.stderr, /humanApprovalRequired/);
     assert.match(result.stderr, /requires_human_approval/);
-    assert.doesNotMatch(result.stderr, /strict_scan\.|SEC-|QUAL-/);
+    assert.match(result.stderr, /"allowedData" -> use "allowed_data"/);
+    assert.doesNotMatch(
+      result.stderr,
+      /Renma scan|Findings:|strict_scan\.|SEC-|QUAL-/,
+    );
     assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
   }
 });
@@ -932,7 +946,7 @@ test("invalid config field is a usage error in CLI", async () => {
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
 
   assert.equal(exitCode.code, 2);
-  assert.match(exitCode.stderr, /Unknown config field "failOn"/);
+  assert.match(exitCode.stderr, /"failOn" \(unknown\)/);
 });
 
 test("CLI reports JSON and fail-on exit code", async () => {

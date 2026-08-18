@@ -52,6 +52,29 @@ const QUALITY_CONFIG_KEYS = [
     `${kind}_token_high`,
   ]),
 ] as const;
+const TOP_LEVEL_CONFIG_KEYS = [
+  "fail_on",
+  "format",
+  "globs",
+  "exclude",
+  "max_file_size_bytes",
+  "max_depth",
+  "concurrency",
+  "suppressions",
+  "scan_boundary",
+  "executable_surface",
+  "quality",
+  "metadata",
+  "security",
+  "skill_discovery",
+] as const;
+const SECURITY_CONFIG_KEYS = [
+  "approvedDomains",
+  "approvedUploadDomains",
+  "disallowedCommands",
+  "profiles",
+  "ci_policy",
+] as const;
 const SECURITY_PROFILE_KEYS = {
   allowedDataClass: "allowed_data_class",
   networkAllowed: "network_allowed",
@@ -83,6 +106,14 @@ const SECURITY_PROFILE_CANONICAL_KEYS = Object.values(
 ).sort(compareUtf16CodeUnits);
 const SECURITY_PROFILE_CANONICAL_KEY_SET = new Set<string>(
   SECURITY_PROFILE_CANONICAL_KEYS,
+);
+const TOP_LEVEL_CONFIG_KEY_SET = new Set<string>(TOP_LEVEL_CONFIG_KEYS);
+const SECURITY_CONFIG_KEY_SET = new Set<string>(SECURITY_CONFIG_KEYS);
+const SORTED_TOP_LEVEL_CONFIG_KEYS = [...TOP_LEVEL_CONFIG_KEYS].sort(
+  compareUtf16CodeUnits,
+);
+const SORTED_SECURITY_CONFIG_KEYS = [...SECURITY_CONFIG_KEYS].sort(
+  compareUtf16CodeUnits,
 );
 
 /** Conventional repository configuration filenames in loading precedence. */
@@ -405,36 +436,7 @@ function normalizeConfig(
   if (!isRecord(value)) {
     throw new ConfigError(`Config${label(configPath)} must be a JSON object.`);
   }
-
-  if (Object.hasOwn(value, "layout")) {
-    throw new ConfigError(
-      `The compatibility-only "layout" configuration${label(configPath)} was removed before Renma 1.0 because it had no operational effect. Delete the authored layout object; there is no replacement configuration key.`,
-    );
-  }
-
-  const allowed = new Set([
-    "fail_on",
-    "format",
-    "globs",
-    "exclude",
-    "max_file_size_bytes",
-    "max_depth",
-    "concurrency",
-    "suppressions",
-    "scan_boundary",
-    "executable_surface",
-    "quality",
-    "metadata",
-    "security",
-    "skill_discovery",
-  ]);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown config field "${key}"${label(configPath)}.`,
-      );
-    }
-  }
+  validateConfigurationKeys(value);
 
   const config: Partial<ScanConfig> = {};
   if (value.fail_on !== undefined)
@@ -778,26 +780,10 @@ function toPosix(value: string): string {
   return value.split(path.sep).join(path.posix.sep);
 }
 function securityPolicy(value: unknown): ScanConfig["security"] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new ConfigError("security must be an object.");
   }
-  const security = value as Record<string, unknown>;
-  const allowed = new Set([
-    "approvedDomains",
-    "approvedUploadDomains",
-    "disallowedCommands",
-    "profiles",
-    "ci_policy",
-  ]);
-  for (const key of Object.keys(security)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown security config key "${key}". Allowed keys: ${[
-          ...allowed,
-        ].join(", ")}.`,
-      );
-    }
-  }
+  const security = value;
 
   return {
     approvedDomains:
@@ -843,7 +829,6 @@ function securityProfiles(
       throw new ConfigError(`security.profiles.${name} must be an object.`);
     }
   }
-  validateSecurityProfileKeys(profiles);
 
   for (const [name, profile] of Object.entries(profiles)) {
     const source = profile as Record<string, unknown>;
@@ -898,86 +883,179 @@ function securityProfiles(
   return normalized;
 }
 
-interface SecurityProfileKeyIssue {
-  profileName: string;
+type ConfigurationKeyScope = "top-level" | "security" | "security-profile";
+type ConfigurationKeyIssueKind = "historical" | "removed" | "unknown";
+
+interface ConfigurationKeyIssueBase {
+  scope: ConfigurationKeyScope;
   key: string;
-  replacement?: string;
+  profileName?: string;
 }
 
-function validateSecurityProfileKeys(profiles: Record<string, unknown>): void {
-  const issues: SecurityProfileKeyIssue[] = [];
-  for (const [profileName, profile] of Object.entries(profiles)) {
-    const source = profile as Record<string, unknown>;
-    for (const key of Object.keys(source)) {
-      if (SECURITY_PROFILE_CANONICAL_KEY_SET.has(key)) continue;
-      const replacement = SECURITY_PROFILE_LEGACY_KEYS.get(key);
+type ConfigurationKeyIssue = ConfigurationKeyIssueBase &
+  (
+    | { kind: "historical"; replacement: string }
+    | { kind: "removed" | "unknown"; replacement?: never }
+  );
+
+const CONFIGURATION_KEY_SCOPE_ORDER: Record<ConfigurationKeyScope, number> = {
+  "top-level": 0,
+  security: 1,
+  "security-profile": 2,
+};
+
+function validateConfigurationKeys(config: Record<string, unknown>): void {
+  const issues: ConfigurationKeyIssue[] = [];
+  for (const key of Object.keys(config)) {
+    if (TOP_LEVEL_CONFIG_KEY_SET.has(key)) continue;
+    issues.push({
+      scope: "top-level",
+      key,
+      kind: key === "layout" ? "removed" : "unknown",
+    });
+  }
+
+  const security = config.security;
+  if (isRecord(security)) {
+    for (const key of Object.keys(security)) {
+      if (SECURITY_CONFIG_KEY_SET.has(key)) continue;
       issues.push({
-        profileName,
+        scope: "security",
         key,
-        ...(replacement ? { replacement } : {}),
+        kind: "unknown",
       });
+    }
+    const profiles = security.profiles;
+    if (isRecord(profiles)) {
+      collectSecurityProfileKeyIssues(profiles, issues);
     }
   }
   if (issues.length === 0) return;
 
-  issues.sort(
-    (left, right) =>
-      compareUtf16CodeUnits(left.profileName, right.profileName) ||
-      compareUtf16CodeUnits(left.key, right.key),
-  );
-  throw new ConfigError(formatSecurityProfileKeyIssues(issues));
+  issues.sort(compareConfigurationKeyIssues);
+  throw new ConfigError(formatConfigurationKeyIssues(issues));
 }
 
-function formatSecurityProfileKeyIssues(
-  issues: readonly SecurityProfileKeyIssue[],
+function collectSecurityProfileKeyIssues(
+  profiles: Record<string, unknown>,
+  issues: ConfigurationKeyIssue[],
+): void {
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    if (!isRecord(profile)) continue;
+    for (const key of Object.keys(profile)) {
+      if (SECURITY_PROFILE_CANONICAL_KEY_SET.has(key)) continue;
+      const replacement = SECURITY_PROFILE_LEGACY_KEYS.get(key);
+      if (replacement) {
+        issues.push({
+          scope: "security-profile",
+          profileName,
+          key,
+          kind: "historical",
+          replacement,
+        });
+      } else {
+        issues.push({
+          scope: "security-profile",
+          profileName,
+          key,
+          kind: "unknown",
+        });
+      }
+    }
+  }
+}
+
+function compareConfigurationKeyIssues(
+  left: ConfigurationKeyIssue,
+  right: ConfigurationKeyIssue,
+): number {
+  return (
+    CONFIGURATION_KEY_SCOPE_ORDER[left.scope] -
+      CONFIGURATION_KEY_SCOPE_ORDER[right.scope] ||
+    compareUtf16CodeUnits(left.profileName ?? "", right.profileName ?? "") ||
+    compareUtf16CodeUnits(left.key, right.key)
+  );
+}
+
+function formatConfigurationKeyIssues(
+  issues: readonly ConfigurationKeyIssue[],
 ): string {
-  const hasHistorical = issues.some((issue) => issue.replacement !== undefined);
-  const hasUnknown = issues.some((issue) => issue.replacement === undefined);
-  const lines = [
-    hasHistorical && hasUnknown
-      ? "Unsupported security profile keys found:"
-      : hasHistorical
-        ? "Unsupported historical security profile keys found:"
-        : "Unknown security profile keys found:",
-  ];
-  let previousProfileName: string | undefined;
+  const lines = ["Unsupported configuration keys found:"];
+  let previousGroup: string | undefined;
   for (const issue of issues) {
-    if (issue.profileName !== previousProfileName) {
-      lines.push("", `security.profiles.${issue.profileName}:`);
-      previousProfileName = issue.profileName;
+    const group = configurationKeyIssueGroup(issue);
+    if (group !== previousGroup) {
+      lines.push("", `${group}:`);
+      previousGroup = group;
     }
-    if (issue.replacement !== undefined) {
-      lines.push(
-        `- ${JSON.stringify(issue.key)} -> use ${JSON.stringify(issue.replacement)}${hasUnknown ? " (historical)" : ""}`,
-      );
-    } else {
-      lines.push(
-        `- ${JSON.stringify(issue.key)}${hasHistorical ? " (unknown)" : ""}`,
-      );
-    }
+    lines.push(formatConfigurationKeyIssue(issue));
   }
 
-  if (hasUnknown) {
-    lines.push(
-      "",
-      `Allowed canonical keys: ${SECURITY_PROFILE_CANONICAL_KEYS.join(", ")}.`,
-    );
+  const unknownScopes = new Set(
+    issues
+      .filter((issue) => issue.kind === "unknown")
+      .map((issue) => issue.scope),
+  );
+  for (const scope of ["top-level", "security", "security-profile"] as const) {
+    if (!unknownScopes.has(scope)) continue;
+    lines.push("", allowedConfigurationKeys(scope));
   }
-  lines.push("", securityProfileKeyIssueAction(hasHistorical, hasUnknown));
+  lines.push("", configurationKeyIssueAction(issues));
   return lines.join("\n");
 }
 
-function securityProfileKeyIssueAction(
-  hasHistorical: boolean,
-  hasUnknown: boolean,
+function configurationKeyIssueGroup(issue: ConfigurationKeyIssue): string {
+  switch (issue.scope) {
+    case "top-level":
+      return "Top-level configuration";
+    case "security":
+      return "security";
+    case "security-profile":
+      return `security.profiles.${issue.profileName}`;
+  }
+}
+
+function formatConfigurationKeyIssue(issue: ConfigurationKeyIssue): string {
+  switch (issue.kind) {
+    case "historical":
+      return `- ${JSON.stringify(issue.key)} -> use ${JSON.stringify(issue.replacement)} (historical)`;
+    case "removed":
+      return `- ${JSON.stringify(issue.key)} -> remove this field; there is no replacement (removed)`;
+    case "unknown":
+      return `- ${JSON.stringify(issue.key)} (unknown)`;
+  }
+}
+
+function allowedConfigurationKeys(scope: ConfigurationKeyScope): string {
+  switch (scope) {
+    case "top-level":
+      return `Allowed top-level keys: ${SORTED_TOP_LEVEL_CONFIG_KEYS.join(", ")}.`;
+    case "security":
+      return `Allowed security keys: ${SORTED_SECURITY_CONFIG_KEYS.join(", ")}.`;
+    case "security-profile":
+      return `Allowed security profile keys: ${SECURITY_PROFILE_CANONICAL_KEYS.join(", ")}.`;
+  }
+}
+
+function configurationKeyIssueAction(
+  issues: readonly ConfigurationKeyIssue[],
 ): string {
-  if (hasHistorical && hasUnknown) {
-    return "Renma v1 does not interpret historical or unknown security profile keys. Replace all listed historical keys, remove all listed unknown keys, and rerun `renma scan .`.";
-  }
-  if (hasHistorical) {
-    return "Renma v1 does not interpret historical security profile keys. Update all listed keys and rerun `renma scan .`.";
-  }
-  return "Renma v1 does not interpret unknown security profile keys. Remove all listed keys and rerun `renma scan .`.";
+  const kinds = new Set(issues.map((issue) => issue.kind));
+  const descriptions = ["removed", "historical", "unknown"].filter((kind) =>
+    kinds.has(kind as ConfigurationKeyIssueKind),
+  );
+  const action = kinds.has("historical")
+    ? kinds.size === 1
+      ? "Update every listed key"
+      : "Apply every listed replacement and remove every listed key without one"
+    : "Remove every listed key";
+  return `Renma v1 does not interpret these ${joinWithOr(descriptions)} configuration keys. ${action} and rerun \`renma scan .\`.`;
+}
+
+function joinWithOr(values: readonly string[]): string {
+  if (values.length === 1) return values[0] ?? "unsupported";
+  if (values.length === 2) return `${values[0]} or ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, or ${values.at(-1)}`;
 }
 
 function optionalString(name: string, value: unknown): string | undefined {

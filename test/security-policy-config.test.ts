@@ -114,11 +114,9 @@ test("historical security profile spellings fail with canonical replacements", a
         loadConfig(root, {}),
         (error: unknown) =>
           error instanceof ConfigError &&
+          error.message.includes("Unsupported configuration keys found:") &&
           error.message.includes(
-            "Unsupported historical security profile keys found:",
-          ) &&
-          error.message.includes(
-            `- ${JSON.stringify(legacy)} -> use ${JSON.stringify(canonical)}`,
+            `- ${JSON.stringify(legacy)} -> use ${JSON.stringify(canonical)} (historical)`,
           ),
       );
     });
@@ -141,28 +139,32 @@ test("multiple historical security profile keys produce one actionable error", a
   const error = await configError(root);
   assert.equal(
     error.message,
-    `Unsupported historical security profile keys found:
+    `Unsupported configuration keys found:
 
 security.profiles.appium-local-workflows:
-- "allowedData" -> use "allowed_data"
-- "humanApprovalRequired" -> use "requires_human_approval"
-- "networkAllowed" -> use "network_allowed"
+- "allowedData" -> use "allowed_data" (historical)
+- "humanApprovalRequired" -> use "requires_human_approval" (historical)
+- "networkAllowed" -> use "network_allowed" (historical)
 
-Renma v1 does not interpret historical security profile keys. Update all listed keys and rerun \`renma scan .\`.`,
+Renma v1 does not interpret these historical configuration keys. Update every listed key and rerun \`renma scan .\`.`,
   );
 });
 
-test("historical security profile keys are stable across profiles and author order", async (t) => {
+test("layout and historical aliases aggregate across profiles in stable order", async (t) => {
   const firstRoot = await configFixture(t, {
+    fail_on: "high",
+    layout: { tool_namespace: "appium" },
     security: {
       profiles: {
-        release: {
-          requiresHumanApproval: true,
-          allowedDataClass: "restricted",
-        },
         "appium-local-workflows": {
-          networkAllowed: false,
           allowedData: ["repo-local-files"],
+          externalUploadAllowed: false,
+          secretsAllowed: false,
+        },
+        "appium-real-device-workflows": {
+          allowedData: ["repo-local-files"],
+          networkAllowed: true,
+          externalUploadAllowed: false,
         },
       },
     },
@@ -170,54 +172,152 @@ test("historical security profile keys are stable across profiles and author ord
   const secondRoot = await configFixture(t, {
     security: {
       profiles: {
-        "appium-local-workflows": {
+        "appium-real-device-workflows": {
+          externalUploadAllowed: false,
+          networkAllowed: true,
           allowedData: ["repo-local-files"],
-          networkAllowed: false,
         },
-        release: {
-          allowedDataClass: "restricted",
-          requiresHumanApproval: true,
+        "appium-local-workflows": {
+          secretsAllowed: false,
+          externalUploadAllowed: false,
+          allowedData: ["repo-local-files"],
+        },
+      },
+    },
+    layout: { tool_namespace: "appium" },
+    fail_on: "high",
+  });
+
+  const firstError = await configError(firstRoot);
+  const secondError = await configError(secondRoot);
+  const expected = `Unsupported configuration keys found:
+
+Top-level configuration:
+- "layout" -> remove this field; there is no replacement (removed)
+
+security.profiles.appium-local-workflows:
+- "allowedData" -> use "allowed_data" (historical)
+- "externalUploadAllowed" -> use "external_upload_allowed" (historical)
+- "secretsAllowed" -> use "secrets_allowed" (historical)
+
+security.profiles.appium-real-device-workflows:
+- "allowedData" -> use "allowed_data" (historical)
+- "externalUploadAllowed" -> use "external_upload_allowed" (historical)
+- "networkAllowed" -> use "network_allowed" (historical)
+
+Renma v1 does not interpret these removed or historical configuration keys. Apply every listed replacement and remove every listed key without one and rerun \`renma scan .\`.`;
+  assert.equal(firstError.message, expected);
+  assert.equal(secondError.message, expected);
+});
+
+test("removed historical and unknown keys remain visibly distinct", async (t) => {
+  const root = await configFixture(t, {
+    mysteryTop: true,
+    layout: {},
+    security: {
+      mysterySecurity: true,
+      profiles: {
+        restricted: {
+          totallyUnknownField: true,
+          allowedData: ["repo-local-files"],
         },
       },
     },
   });
 
-  const firstError = await configError(firstRoot);
-  const secondError = await configError(secondRoot);
-  const expected = `Unsupported historical security profile keys found:
-
-security.profiles.appium-local-workflows:
-- "allowedData" -> use "allowed_data"
-- "networkAllowed" -> use "network_allowed"
-
-security.profiles.release:
-- "allowedDataClass" -> use "allowed_data_class"
-- "requiresHumanApproval" -> use "requires_human_approval"
-
-Renma v1 does not interpret historical security profile keys. Update all listed keys and rerun \`renma scan .\`.`;
-  assert.equal(firstError.message, expected);
-  assert.equal(secondError.message, expected);
-});
-
-test("historical and unknown security profile keys are reported together", async (t) => {
-  const root = await profileConfigFixture(t, {
-    totallyUnknownField: true,
-    allowedData: ["repo-local-files"],
-  });
-
   const error = await configError(root);
   assert.equal(
     error.message,
-    `Unsupported security profile keys found:
+    `Unsupported configuration keys found:
+
+Top-level configuration:
+- "layout" -> remove this field; there is no replacement (removed)
+- "mysteryTop" (unknown)
+
+security:
+- "mysterySecurity" (unknown)
 
 security.profiles.restricted:
 - "allowedData" -> use "allowed_data" (historical)
 - "totallyUnknownField" (unknown)
 
-Allowed canonical keys: allowed_data, allowed_data_class, approvedDomains, approvedUploadDomains, disallowedCommands, external_upload_allowed, forbidden_inputs, network_allowed, requires_human_approval, secrets_allowed, security_profile.
+Allowed top-level keys: concurrency, exclude, executable_surface, fail_on, format, globs, max_depth, max_file_size_bytes, metadata, quality, scan_boundary, security, skill_discovery, suppressions.
 
-Renma v1 does not interpret historical or unknown security profile keys. Replace all listed historical keys, remove all listed unknown keys, and rerun \`renma scan .\`.`,
+Allowed security keys: approvedDomains, approvedUploadDomains, ci_policy, disallowedCommands, profiles.
+
+Allowed security profile keys: allowed_data, allowed_data_class, approvedDomains, approvedUploadDomains, disallowedCommands, external_upload_allowed, forbidden_inputs, network_allowed, requires_human_approval, secrets_allowed, security_profile.
+
+Renma v1 does not interpret these removed, historical, or unknown configuration keys. Apply every listed replacement and remove every listed key without one and rerun \`renma scan .\`.`,
   );
+});
+
+test("unknown configuration keys aggregate across every inspectable scope", async (t) => {
+  const root = await configFixture(t, {
+    zTopUnknown: true,
+    aTopUnknown: true,
+    security: {
+      zSecurityUnknown: true,
+      aSecurityUnknown: true,
+      profiles: {
+        "z-profile": { zUnknown: true },
+        "a-profile": { zUnknown: true, aUnknown: true },
+      },
+    },
+  });
+
+  const error = await configError(root);
+  assert.equal(
+    error.message,
+    `Unsupported configuration keys found:
+
+Top-level configuration:
+- "aTopUnknown" (unknown)
+- "zTopUnknown" (unknown)
+
+security:
+- "aSecurityUnknown" (unknown)
+- "zSecurityUnknown" (unknown)
+
+security.profiles.a-profile:
+- "aUnknown" (unknown)
+- "zUnknown" (unknown)
+
+security.profiles.z-profile:
+- "zUnknown" (unknown)
+
+Allowed top-level keys: concurrency, exclude, executable_surface, fail_on, format, globs, max_depth, max_file_size_bytes, metadata, quality, scan_boundary, security, skill_discovery, suppressions.
+
+Allowed security keys: approvedDomains, approvedUploadDomains, ci_policy, disallowedCommands, profiles.
+
+Allowed security profile keys: allowed_data, allowed_data_class, approvedDomains, approvedUploadDomains, disallowedCommands, external_upload_allowed, forbidden_inputs, network_allowed, requires_human_approval, secrets_allowed, security_profile.
+
+Renma v1 does not interpret these unknown configuration keys. Remove every listed key and rerun \`renma scan .\`.`,
+  );
+});
+
+test("malformed configuration containers retain strict structural errors", async (t) => {
+  const cases: Array<[string, unknown, RegExp]> = [
+    ["top-level array", [], /Config.*must be a JSON object/],
+    ["security null", { security: null }, /security must be an object/],
+    ["security array", { security: [] }, /security must be an object/],
+    [
+      "profiles scalar",
+      { security: { profiles: "restricted" } },
+      /security\.profiles must be an object/,
+    ],
+    [
+      "profile array",
+      { security: { profiles: { restricted: [] } } },
+      /security\.profiles\.restricted must be an object/,
+    ],
+  ];
+
+  for (const [name, config, expected] of cases) {
+    await t.test(name, async (caseContext) => {
+      const root = await configFixture(caseContext, config);
+      await assert.rejects(loadConfig(root, {}), expected);
+    });
+  }
 });
 
 test("canonical security profile values remain strictly typed", async (t) => {
@@ -271,7 +371,7 @@ test("security CI policy validation is strict and actionable", async (t) => {
     ],
     [
       { security: { unknown: true } },
-      /Unknown security config key "unknown".*ci_policy/,
+      /security:[\s\S]*"unknown" \(unknown\)[\s\S]*Allowed security keys:.*ci_policy/,
     ],
   ];
 
