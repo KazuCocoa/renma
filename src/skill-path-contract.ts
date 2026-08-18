@@ -15,20 +15,20 @@ export const RESERVED_SKILL_SUPPORT_DIRS = [
 export type ReservedSkillSupportDirectory =
   (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];
 
-interface SkillEntrypointPathFields {
+/** Exact operational Agent Skills entrypoint recognized by Renma discovery. */
+export interface CanonicalSkillEntrypointPath {
+  kind: "canonical";
   currentPath: string;
-  targetPath: string;
   candidateName: string;
 }
 
-/** Exact operational Agent Skills entrypoint recognized by Renma discovery. */
-export interface CanonicalSkillEntrypointPath extends SkillEntrypointPathFields {
-  kind: "canonical";
+interface CanonicalSkillMigrationEntrypointPath extends CanonicalSkillEntrypointPath {
+  targetPath: string;
 }
 
 /** Historical entrypoint states recognized only by explicit migration tooling. */
 export type SkillMigrationEntrypointPath =
-  | CanonicalSkillEntrypointPath
+  | CanonicalSkillMigrationEntrypointPath
   | {
       kind: "lowercase-entrypoint";
       currentPath: string;
@@ -176,7 +176,12 @@ export function classifyCanonicalSkillEntrypointAtRoot(
     rootEndIndex,
     false,
   );
-  return classified?.kind === "canonical" ? classified : undefined;
+  if (classified?.kind !== "canonical") return undefined;
+  return {
+    kind: classified.kind,
+    currentPath: classified.currentPath,
+    candidateName: classified.candidateName,
+  };
 }
 
 function classifySkillEntrypointAtRoot(

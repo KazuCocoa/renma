@@ -46,10 +46,14 @@ test("repository-relative Skill paths normalize dots without escaping roots", ()
     classifyRepositorySkillEntrypointPath("./skills/demo/skill.md"),
     undefined,
   );
-  assert.equal(
-    classifyRepositorySkillMigrationEntrypointPath("./skills/demo/skill.md")
-      ?.kind,
-    "lowercase-entrypoint",
+  assert.deepEqual(
+    classifyRepositorySkillMigrationEntrypointPath("./skills/demo/skill.md"),
+    {
+      kind: "lowercase-entrypoint",
+      currentPath: "skills/demo/skill.md",
+      targetPath: "skills/demo/SKILL.md",
+      candidateName: "demo",
+    },
   );
 
   for (const rejected of [
@@ -152,10 +156,14 @@ test("directory-based Skill entrypoints require a Skill directory below either r
       "canonical",
       canonicalEntrypoint,
     );
-    assert.equal(
-      classifyRepositorySkillMigrationEntrypointPath(historicalFlatEntrypoint)
-        ?.kind,
-      "flat-legacy-entrypoint",
+    assert.deepEqual(
+      classifyRepositorySkillMigrationEntrypointPath(historicalFlatEntrypoint),
+      {
+        kind: "flat-legacy-entrypoint",
+        currentPath: historicalFlatEntrypoint,
+        targetPath: `${root}/demo/SKILL.md`,
+        candidateName: "demo",
+      },
       historicalFlatEntrypoint,
     );
     assert.equal(

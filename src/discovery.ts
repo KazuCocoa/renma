@@ -152,7 +152,7 @@ export function classifyRepositorySkillPath(
     rootEndIndex,
   );
   if (!entrypoint) return undefined;
-  const skillDirectory = path.posix.dirname(entrypoint.targetPath);
+  const skillDirectory = path.posix.dirname(entrypoint.currentPath);
   const skillDirectorySegments = skillDirectory.split("/").filter(Boolean);
   const skillSegments = skillDirectorySegments.slice(rootEndIndex);
   const skillName = skillSegments.at(-1);
