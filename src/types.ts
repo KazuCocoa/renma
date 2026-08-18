@@ -1,7 +1,4 @@
-/**
- * Cohesive public type barrel for the intentional `renma/types` export.
- * Internal modules import the focused type owners below directly.
- */
+/** Internal compatibility facade; package consumers use `public-types.ts`. */
 export * from "./types/artifact.js";
 export * from "./types/classification.js";
 export * from "./types/configuration.js";

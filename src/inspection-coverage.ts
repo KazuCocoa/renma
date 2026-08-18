@@ -8,8 +8,10 @@ import {
   repositoryPathDepth,
   RESERVED_SKILL_SUPPORT_DIRS,
 } from "./discovery.js";
+import { hasSupportedHelperExtension } from "./helper-command-evidence.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 import type {
+  StaticSkillPackageContentKind,
   StaticSupportBoundaryReachabilityEvidence,
   StaticSupportReachabilityEvidence,
 } from "./static-support.js";
@@ -49,6 +51,7 @@ export interface StaticSupportInspectionDetails {
   sourcePath: string;
   sourceLine: number;
   reachabilityDepth: number;
+  packageContentKind?: StaticSkillPackageContentKind;
   inspectionKind: SupportInspectionKind;
   scanBoundaryDisposition?: "explicitly-excluded";
 }
@@ -219,6 +222,7 @@ export function buildInspectionCoverage(
         observedRepositoryState,
         artifact,
         supportBoundaryConfig,
+        expectation.packageContentKind,
       );
       const inspectionKind = supportInspectionKind(expectation.targetPath);
       const coverageState = supportCoverageState(
@@ -232,6 +236,9 @@ export function buildInspectionCoverage(
         sourcePath: expectation.sourcePath,
         sourceLine: expectation.sourceLine,
         reachabilityDepth: expectation.depth,
+        ...(expectation.packageContentKind === "explicit-noncanonical"
+          ? { packageContentKind: expectation.packageContentKind }
+          : {}),
         inspectionKind,
         ...(repositoryState === "excluded"
           ? { scanBoundaryDisposition: "explicitly-excluded" as const }
@@ -245,6 +252,7 @@ export function buildInspectionCoverage(
           reason: supportInspectionCoverageReason(
             coverageState,
             inspectionKind,
+            expectation.packageContentKind,
           ),
           classification: classifyAssetPath(expectation.targetPath),
           strictBlocking: coverageState !== "parsed",
@@ -434,6 +442,7 @@ function supportInspectionKind(candidate: string): SupportInspectionKind {
   ) {
     return "executable-surface";
   }
+  if (hasSupportedHelperExtension(candidate)) return "executable-surface";
   const extension = path.posix.extname(candidate).toLowerCase();
   if (extension === ".txt") return "semantic-plain-text";
   if (extension === ".md" || extension === ".mdx") {
@@ -450,6 +459,7 @@ function expectedSupportRepositoryState(
   config:
     | Pick<ScanConfig, "globs" | "exclude" | "maxDepth" | "maxFileSizeBytes">
     | undefined,
+  packageContentKind: StaticSkillPackageContentKind,
 ): Exclude<RepositoryPathState, "absent"> {
   if (
     observedState === "symlink" ||
@@ -463,7 +473,10 @@ function expectedSupportRepositoryState(
   if (artifact && artifact.sizeBytes > config.maxFileSizeBytes) {
     return "oversize";
   }
-  if (!config.globs.some((pattern) => path.matchesGlob(candidate, pattern))) {
+  if (
+    packageContentKind === "canonical-support" &&
+    !config.globs.some((pattern) => path.matchesGlob(candidate, pattern))
+  ) {
     return "unsupported";
   }
   return observedState;
@@ -488,23 +501,28 @@ function supportCoverageState(
 function supportInspectionCoverageReason(
   state: InspectionCoverageState,
   inspectionKind: SupportInspectionKind,
+  packageContentKind: StaticSkillPackageContentKind,
 ): string {
   const expectedSurface = supportInspectionSurfaceName(inspectionKind);
+  const subject =
+    packageContentKind === "explicit-noncanonical"
+      ? "explicitly referenced noncanonical Skill-package resource"
+      : "statically expected Skill support resource";
   switch (state) {
     case "parsed":
-      return `The statically expected Skill support resource was read and represented as ${expectedSurface}.`;
+      return `The ${subject} was read and represented as ${expectedSurface}.`;
     case "excluded":
-      return `The statically expected Skill support resource is explicitly excluded by the scan boundary, so Renma could not inspect it as ${expectedSurface}.`;
+      return `The ${subject} is explicitly excluded by the scan boundary, so Renma could not inspect it as ${expectedSurface}.`;
     case "symlink":
-      return `The statically expected Skill support resource is a symbolic link; Renma does not follow repository symlinks and could not inspect it as ${expectedSurface}.`;
+      return `The ${subject} is a symbolic link; Renma does not follow repository symlinks and could not inspect it as ${expectedSurface}.`;
     case "unreadable":
-      return `The statically expected Skill support resource could not be read safely as ${expectedSurface}.`;
+      return `The ${subject} could not be read safely as ${expectedSurface}.`;
     case "oversize":
-      return `The statically expected Skill support resource exceeds max_file_size_bytes and was skipped before inspection as ${expectedSurface}.`;
+      return `The ${subject} exceeds max_file_size_bytes and was skipped before inspection as ${expectedSurface}.`;
     case "deep":
-      return `The statically expected Skill support resource exceeds max_depth and was skipped before inspection as ${expectedSurface}.`;
+      return `The ${subject} exceeds max_depth and was skipped before inspection as ${expectedSurface}.`;
     case "unsupported":
-      return `The statically expected Skill support resource was present but could not be represented as ${expectedSurface}.`;
+      return `The ${subject} was present but could not be represented as ${expectedSurface}.`;
   }
 }
 

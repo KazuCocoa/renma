@@ -18,10 +18,37 @@ test("scan JSON serialization adds the typed renma.scan.v1 wire boundary", async
   const expectedDocument = {
     schemaVersion: SCAN_JSON_SCHEMA_VERSION,
     ...result,
+    format: "json" as const,
   } satisfies ScanJsonDocument;
   const document = JSON.parse(formatJson(result)) as ScanJsonDocument;
 
   assert.equal("schemaVersion" in result, false);
+  assert.equal(result.format, "json");
   assert.equal(document.schemaVersion, "renma.scan.v1");
+  assert.equal(document.format, "json");
   assert.deepEqual(document, expectedDocument);
+});
+
+test("the JSON wire type is narrower than the core scan result", () => {
+  function acceptCoreFormat(format: ScanResult["format"]): void {
+    void format;
+  }
+  function acceptWireFormat(format: ScanJsonDocument["format"]): void {
+    void format;
+  }
+
+  acceptCoreFormat("text");
+  acceptCoreFormat("json");
+  acceptWireFormat("json");
+  // @ts-expect-error The serialized scan document never reports text format.
+  acceptWireFormat("text");
+});
+
+test("formatJson enforces JSON format even for a text-configured core result", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-json-core-"));
+  const result = await scan(root, { format: "text" });
+  const document = JSON.parse(formatJson(result)) as ScanJsonDocument;
+
+  assert.equal(result.format, "text");
+  assert.equal(document.format, "json");
 });

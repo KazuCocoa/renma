@@ -41,6 +41,7 @@ export interface ScanResult {
 }
 
 /** Public JSON document emitted by `formatJson()` and `scan --format json`. */
-export interface ScanJsonDocument extends ScanResult {
+export type ScanJsonDocument = Omit<ScanResult, "format"> & {
   schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION;
-}
+  format: "json";
+};

@@ -14,7 +14,11 @@ import {
   summarizeContextLensGovernance,
   type ContextLensSummary,
 } from "./context-lens.js";
-import { discoverArtifacts } from "./discovery.js";
+import {
+  discoverArtifacts,
+  inspectExplicitRepositoryArtifacts,
+  type ExplicitArtifactInspectionResult,
+} from "./discovery.js";
 import {
   buildExecutableSurfaceInventory,
   type ExecutableSurfaceInventory,
@@ -49,6 +53,7 @@ import {
   scanBoundarySource,
   type ScanBoundarySource,
 } from "./scan-boundary.js";
+import { staticallyExpectedSupportInspection } from "./static-support.js";
 
 export interface RepositorySnapshotCore {
   readonly root: string;
@@ -197,21 +202,97 @@ export async function collectRepositorySnapshotCore(
     ? evidenceBoundary.sources
     : [scanBoundarySource(config, configPath)];
   instrumentation?.onDiscovery?.(root);
-  const {
-    artifacts,
-    diagnostics: discoveryDiagnostics,
-    discoveredPaths,
-    skippedPathStates,
-    blockedTraversalPaths,
-    excludedSupportDirectoryPaths,
-  } = await discoverWithBoundarySources(root, config, evidenceBoundarySources);
+  const discovery = await discoverWithBoundarySources(
+    root,
+    config,
+    evidenceBoundarySources,
+  );
+  const artifacts = [...discovery.artifacts];
+  const discoveryDiagnostics = [...discovery.diagnostics];
+  const skippedPathStates = new Map(discovery.skippedPathStates);
+  const blockedTraversalPaths = new Set(discovery.blockedTraversalPaths);
   const documents = artifacts.map((artifact) => {
     instrumentation?.onDocumentParse?.(artifact.path);
     return parseDocument(artifact);
   });
+  const attemptedExplicitPaths = new Set<string>();
+  while (true) {
+    const expected = staticallyExpectedSupportInspection(
+      documents,
+      [
+        ...new Set([
+          ...discovery.discoveredPaths,
+          ...artifacts.map((artifact) => artifact.path),
+          ...skippedPathStates.keys(),
+        ]),
+      ],
+      buildSkillParentIndex(documents),
+      [...discovery.excludedSupportDirectoryPaths],
+    );
+    const knownArtifactPaths = new Set(
+      artifacts.map((artifact) => artifact.path),
+    );
+    const candidates = expected.paths
+      .map((expectation) => expectation.targetPath)
+      .filter(
+        (candidate) =>
+          !attemptedExplicitPaths.has(candidate) &&
+          !knownArtifactPaths.has(candidate) &&
+          !skippedPathStates.has(candidate),
+      );
+    if (candidates.length === 0) break;
+    for (const candidate of candidates) attemptedExplicitPaths.add(candidate);
+    const explicit = await inspectExplicitWithBoundarySources(
+      root,
+      config,
+      evidenceBoundarySources,
+      candidates,
+    );
+    discoveryDiagnostics.push(...explicit.diagnostics);
+    for (const [candidate, state] of explicit.skippedPathStates) {
+      skippedPathStates.set(candidate, state);
+    }
+    for (const candidate of explicit.blockedTraversalPaths) {
+      blockedTraversalPaths.add(candidate);
+    }
+    const addedArtifacts = explicit.artifacts.filter(
+      (artifact) => !knownArtifactPaths.has(artifact.path),
+    );
+    if (addedArtifacts.length === 0) continue;
+    for (const artifact of addedArtifacts) {
+      artifacts.push(artifact);
+      instrumentation?.onDocumentParse?.(artifact.path);
+      documents.push(parseDocument(artifact));
+    }
+  }
+  artifacts.sort((left, right) =>
+    left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+  );
+  documents.sort((left, right) =>
+    left.artifact.path < right.artifact.path
+      ? -1
+      : left.artifact.path > right.artifact.path
+        ? 1
+        : 0,
+  );
+  const finalExpectedSupport = staticallyExpectedSupportInspection(
+    documents,
+    [
+      ...new Set([
+        ...discovery.discoveredPaths,
+        ...artifacts.map((artifact) => artifact.path),
+        ...skippedPathStates.keys(),
+      ]),
+    ],
+    buildSkillParentIndex(documents),
+    [...discovery.excludedSupportDirectoryPaths],
+  );
   const executableDependencyCandidates = collectExecutableDependencyCandidates(
     artifacts,
     documents,
+    new Set(
+      finalExpectedSupport.paths.map((expectation) => expectation.targetPath),
+    ),
   );
   return immutableEvidenceGraph({
     root,
@@ -224,10 +305,10 @@ export async function collectRepositorySnapshotCore(
     ),
     artifacts,
     documents,
-    discoveredPaths,
+    discoveredPaths: discovery.discoveredPaths,
     skippedPathStates,
     blockedTraversalPaths,
-    excludedSupportDirectoryPaths,
+    excludedSupportDirectoryPaths: discovery.excludedSupportDirectoryPaths,
     discoveryDiagnostics,
     executableDependencyCandidates,
   });
@@ -255,6 +336,7 @@ export async function collectRepositorySnapshot(
     catalog.catalog,
     core.discoveredPaths,
     core.executableDependencyCandidates,
+    [...core.excludedSupportDirectoryPaths],
   );
   const repositoryPathStates = await collectRepositoryPathStates(
     core.root,
@@ -265,6 +347,7 @@ export async function collectRepositorySnapshot(
         core.documents,
         catalog.catalog,
         core.executableDependencyCandidates,
+        [...core.excludedSupportDirectoryPaths],
       ),
     ],
     core.artifacts,
@@ -339,6 +422,54 @@ async function discoverWithBoundarySources(
     blockedTraversalPaths,
     traversedDirectoryPaths,
     excludedSupportDirectoryPaths,
+  };
+}
+
+async function inspectExplicitWithBoundarySources(
+  root: string,
+  semanticConfig: ScanConfig,
+  sources: readonly ScanBoundarySource[],
+  candidatePaths: readonly string[],
+): Promise<ExplicitArtifactInspectionResult> {
+  const inspections = await Promise.all(
+    sources.map((source) =>
+      inspectExplicitRepositoryArtifacts(
+        root,
+        boundaryConfig(semanticConfig, source),
+        candidatePaths,
+      ),
+    ),
+  );
+  const artifacts = new Map<string, Artifact>();
+  const diagnostics = new Map<string, Diagnostic>();
+  const skippedPathStates = new Map<string, RepositoryPathState>();
+  const blockedTraversalPaths = new Set<string>();
+  for (const inspection of inspections) {
+    for (const artifact of inspection.artifacts) {
+      artifacts.set(artifact.path, artifact);
+    }
+    for (const diagnostic of inspection.diagnostics) {
+      diagnostics.set(JSON.stringify(diagnostic), diagnostic);
+    }
+    for (const [candidate, state] of inspection.skippedPathStates) {
+      skippedPathStates.set(candidate, state);
+    }
+    for (const candidate of inspection.blockedTraversalPaths) {
+      blockedTraversalPaths.add(candidate);
+    }
+  }
+  for (const artifactPath of artifacts.keys()) {
+    skippedPathStates.delete(artifactPath);
+  }
+  return {
+    artifacts: [...artifacts.values()].sort((left, right) =>
+      left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+    ),
+    diagnostics: [...diagnostics.entries()]
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([, diagnostic]) => diagnostic),
+    skippedPathStates,
+    blockedTraversalPaths,
   };
 }
 

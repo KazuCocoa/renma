@@ -22,7 +22,8 @@ export type CommandOptionHelp =
 const OPTION_HELP = {
   config: {
     flags: "-c, --config <path>",
-    description: "Read Renma .json or .jsonc config from path.",
+    description:
+      "Read a repository-contained, non-symlink Renma .json or .jsonc config file.",
   },
   "fail-on": {
     flags: "--fail-on <level>",

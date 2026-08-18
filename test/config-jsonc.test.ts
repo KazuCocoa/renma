@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -604,6 +604,77 @@ test("rejects unsupported explicit config extensions", async (t) => {
       /executable \.js, \.mjs, and \.ts configuration is not supported/.test(
         error.message,
       ),
+  );
+});
+
+test("conventional JSON and JSONC config symlinks fail instead of becoming policy", async (t) => {
+  for (const filename of ["renma.config.json", "renma.config.jsonc"]) {
+    await t.test(filename, async (caseContext) => {
+      const root = await fixture(caseContext);
+      await writeFile(path.join(root, "policy.json"), '{"format":"json"}\n');
+      await symlink("policy.json", path.join(root, filename));
+
+      await assert.rejects(
+        loadConfig(root, {}),
+        (error: unknown) =>
+          error instanceof ConfigError &&
+          /crosses symbolic link/.test(error.message) &&
+          /non-symlink regular file inside the repository/.test(error.message),
+      );
+    });
+  }
+});
+
+test("conventional config symlinks fail for external, internal, and broken targets", async (t) => {
+  const cases = [
+    { name: "external", target: "outside" },
+    { name: "internal", target: "inside" },
+    { name: "broken", target: "missing" },
+  ] as const;
+  for (const fixtureCase of cases) {
+    await t.test(fixtureCase.name, async (caseContext) => {
+      const root = await fixture(caseContext);
+      const outside = await fixture(caseContext);
+      const target =
+        fixtureCase.target === "outside"
+          ? path.join(outside, "external.json")
+          : fixtureCase.target === "inside"
+            ? path.join(root, "internal.json")
+            : path.join(root, "missing.json");
+      if (fixtureCase.target !== "missing") {
+        await writeFile(target, '{"format":"json"}\n');
+      }
+      await symlink(target, path.join(root, "renma.config.json"));
+
+      await assert.rejects(loadConfig(root, {}), ConfigError);
+    });
+  }
+});
+
+test("explicit config is repository-contained and rejects symlink traversal", async (t) => {
+  const root = await fixture(t);
+  const outside = await fixture(t);
+  const externalConfig = path.join(outside, "review.json");
+  await writeFile(externalConfig, "{}\n");
+
+  await assert.rejects(
+    loadConfig(root, { configPath: externalConfig }),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      /must be a regular file inside repository root/.test(error.message),
+  );
+
+  const realDirectory = path.join(root, "real-config");
+  await mkdir(realDirectory);
+  const nestedConfig = path.join(realDirectory, "review.jsonc");
+  await writeFile(nestedConfig, "{}\n");
+  await symlink("real-config", path.join(root, "config"));
+
+  await assert.rejects(
+    loadConfig(root, { configPath: path.join(root, "config", "review.jsonc") }),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      /crosses symbolic link config/.test(error.message),
   );
 });
 

@@ -44,9 +44,10 @@ internal object does not become a public contract merely because it can be
 serialized, and internal working values do not receive `schemaVersion`
 blindly.
 
-For scan consumers, the public TypeScript `ScanResult` is the core result shape
-before serialization. `ScanJsonDocument` extends that shape with the literal
-`schemaVersion: "renma.scan.v1"`; `formatJson()` remains the authoritative
+For scan consumers, the public TypeScript `ScanJsonDocument` models the wire
+shape with literal `schemaVersion: "renma.scan.v1"` and `format: "json"`.
+Renma's pre-serialization core scan model has no supported public library
+producer and remains internal; `formatJson()` remains the authoritative
 serializer.
 
 ## Compatibility during 1.x

@@ -1523,6 +1523,292 @@ test("CI retains a referenced support size-limit regression under its effective 
   );
 });
 
+test("explicit noncanonical Skill-package references remain inspection and security evidence", async (t) => {
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    [
+      "Read [the license](LICENSE.txt).",
+      "Read [the same license](./LICENSE.txt).",
+      "Read [the template](templates/prompt.md).",
+      "Read `templates/prompt.md` as file-like code evidence.",
+      "Read `./docs/instructions.txt`.",
+      "Review [the local resource](resources/model.bin).",
+      "Review [the collector](bin/collect.py).",
+      "",
+      "Run `python helper.py`.",
+      "",
+      "Run `python bin/run.py`.",
+    ].join("\n"),
+  );
+  const targets = [
+    "skills/demo/LICENSE.txt",
+    "skills/demo/templates/prompt.md",
+    "skills/demo/docs/instructions.txt",
+    "skills/demo/resources/model.bin",
+    "skills/demo/bin/collect.py",
+    "skills/demo/helper.py",
+    "skills/demo/bin/run.py",
+  ];
+  await fixture.write(targets[0]!, "Demo license terms.\n");
+  await fixture.write(targets[1]!, "Use the prompt conservatively.\n");
+  await fixture.write(targets[2]!, "Review the instructions.\n");
+  await fixture.write(targets[3]!, new Uint8Array([0x00, 0x01, 0x02]));
+  await fixture.write(targets[4]!, "print('linked evidence only')\n");
+  await fixture.write(targets[5]!, "print('root helper evidence')\n");
+  await fixture.write(targets[6]!, "print('static evidence only')\n");
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  for (const target of targets) {
+    assert.ok(result.inspectionCoverage.inspectedPaths.includes(target));
+    assert.ok(
+      result.securityAnalysisCoverage.artifacts.some(
+        (artifact) => artifact.path === target,
+      ),
+    );
+  }
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+  const invocation = result.executableSurfaceInventory?.invocations.find(
+    (candidate) => candidate.normalizedTarget === "skills/demo/bin/run.py",
+  );
+  const rootInvocation = result.executableSurfaceInventory?.invocations.find(
+    (candidate) => candidate.normalizedTarget === "skills/demo/helper.py",
+  );
+  const surface = result.executableSurfaceInventory?.surfaces.find(
+    (candidate) => candidate.path === "skills/demo/bin/run.py",
+  );
+  const rootSurface = result.executableSurfaceInventory?.surfaces.find(
+    (candidate) => candidate.path === "skills/demo/helper.py",
+  );
+  assert.equal(invocation?.resolution, "noncanonical");
+  assert.equal(rootInvocation?.resolution, "noncanonical");
+  assert.equal(surface?.scope, "noncanonical");
+  assert.equal(surface?.securityPolicy.hasEffectivePolicy, false);
+  assert.equal(rootSurface?.scope, "noncanonical");
+  assert.equal(rootSurface?.securityPolicy.hasEffectivePolicy, false);
+  const linkedSurface = result.executableSurfaceInventory?.surfaces.find(
+    (candidate) => candidate.path === "skills/demo/bin/collect.py",
+  );
+  assert.equal(linkedSurface?.scope, "noncanonical");
+  assert.equal(linkedSurface?.staticallyReferenced, true);
+  assert.equal(linkedSurface?.invocationCount, 0);
+});
+
+test("ordinary slash-separated prose does not become repository path evidence", async (t) => {
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    [
+      "The client/server boundary must remain stable.",
+      "Compare input/output behavior.",
+      "Use the owner/repo naming convention.",
+      "Keep the frontend/backend contract documented.",
+      "Use API/V2 for requests.",
+      "Compare TLS/SSL behavior.",
+      "Support HTTP/2 clients.",
+      "Follow owner/README naming.",
+    ].join("\n"),
+  );
+
+  const snapshot = await collectRepositorySnapshot(fixture.root, {
+    failOn: "high",
+  });
+  const result = scanFromRepositorySnapshot(snapshot);
+
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(
+    !result.findings.some((finding) => finding.id === "SUPPORT-MISSING-PATH"),
+  );
+  assert.ok(
+    !snapshot.catalog.dependencies.some(
+      (dependency) => dependency.kind === "statically_references",
+    ),
+  );
+  for (const proseToken of [
+    "client/server",
+    "input/output",
+    "owner/repo",
+    "frontend/backend",
+    "API/V2",
+    "TLS/SSL",
+    "HTTP/2",
+    "owner/README",
+  ]) {
+    assert.equal(
+      snapshot.repositoryPathStates.has(`skills/demo/${proseToken}`),
+      false,
+      proseToken,
+    );
+  }
+  assert.ok(
+    !evaluateStrictScan(result).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+  );
+});
+
+test("an uninspectable Skill-root helper remains exact strict evidence", async (t) => {
+  const target = "skills/demo/helper.py";
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Run `python helper.py`.",
+  );
+  await fixture.write("outside.py", "print('outside')\n");
+  await symlink("../../outside.py", fixture.resolve(target));
+
+  const result = await scan(fixture.root, { failOn: "high" });
+  const issue = result.inspectionCoverage.blockingIssues.find(
+    (candidate) => candidate.path === target && candidate.scope === "exact",
+  );
+  const invocation = result.executableSurfaceInventory?.invocations.find(
+    (candidate) => candidate.normalizedTarget === target,
+  );
+
+  assert.equal(issue?.state, "symlink");
+  assert.equal(issue?.details?.packageContentKind, "explicit-noncanonical");
+  assert.equal(invocation?.resolution, "symlink");
+  assert.equal(invocation?.targetPathState, "symlink");
+  assert.ok(
+    evaluateStrictScan(result).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+  );
+});
+
+test("unreferenced noncanonical Skill-package files do not broaden discovery", async (t) => {
+  const target = "skills/demo/templates/unreferenced.md";
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Review repository state and report completion.",
+  );
+  await fixture.write(target, UNSAFE_INSTRUCTION);
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.ok(!result.inspectionCoverage.inspectedPaths.includes(target));
+  assert.ok(
+    !result.securityAnalysisCoverage.artifacts.some(
+      (artifact) => artifact.path === target,
+    ),
+  );
+});
+
+test("already-inspected support can explicitly reference noncanonical package evidence", async (t) => {
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Read [the index](references/index.md).",
+  );
+  await fixture.write(
+    "skills/demo/references/index.md",
+    "Read [the instructions](docs/instructions.txt).\n",
+  );
+  await fixture.write(
+    "skills/demo/docs/instructions.txt",
+    "Review repository state.\n",
+  );
+
+  const result = await scan(fixture.root, { failOn: "high" });
+
+  assert.ok(
+    result.inspectionCoverage.inspectedPaths.includes(
+      "skills/demo/references/index.md",
+    ),
+  );
+  assert.ok(
+    result.inspectionCoverage.inspectedPaths.includes(
+      "skills/demo/docs/instructions.txt",
+    ),
+  );
+});
+
+test("uninspectable explicit noncanonical package references fail strict completeness", async (t) => {
+  const cases = [
+    {
+      name: "excluded",
+      target: "skills/demo/templates/excluded.md",
+      config: {
+        exclude: [
+          "node_modules",
+          "dist",
+          ".git",
+          "skills/demo/templates/excluded.md",
+        ],
+      },
+      setup: async (fixture: RepositoryFixture, target: string) =>
+        fixture.write(target, "Review excluded evidence.\n"),
+      expected: "excluded",
+    },
+    {
+      name: "oversize",
+      target: "skills/demo/docs/oversize.txt",
+      config: { max_file_size_bytes: 1_000 },
+      setup: async (fixture: RepositoryFixture, target: string) =>
+        fixture.write(target, "x".repeat(1_100)),
+      expected: "oversize",
+    },
+    {
+      name: "symlink",
+      target: "skills/demo/templates/link.md",
+      setup: async (fixture: RepositoryFixture, target: string) => {
+        await fixture.write("outside.md", "external\n");
+        await fixture.write("skills/demo/templates/.keep", "fixture\n");
+        await symlink("../../../outside.md", fixture.resolve(target));
+      },
+      expected: "symlink",
+    },
+    {
+      name: "unreadable",
+      target: "skills/demo/docs/private.txt",
+      setup: async (fixture: RepositoryFixture, target: string) => {
+        const absolutePath = await fixture.write(target, "private\n");
+        await chmod(absolutePath, 0o000);
+      },
+      expected: "unreadable",
+    },
+    {
+      name: "deep",
+      target: "skills/demo/templates/nested/deep.md",
+      config: { max_depth: 3 },
+      setup: async (fixture: RepositoryFixture, target: string) =>
+        fixture.write(target, "deep\n"),
+      expected: "deep",
+    },
+  ] as const;
+
+  for (const fixtureCase of cases) {
+    await t.test(fixtureCase.name, async (caseContext) => {
+      const relative = fixtureCase.target.slice("skills/demo/".length);
+      const fixture = await referencedSupportFixture(
+        caseContext,
+        "config" in fixtureCase
+          ? (fixtureCase.config as unknown as Record<string, unknown>)
+          : undefined,
+        `Read [the local file](${relative}).`,
+      );
+      await fixtureCase.setup(fixture, fixtureCase.target);
+
+      const result = await scan(fixture.root, { failOn: "high" });
+      const issue = result.inspectionCoverage.blockingIssues.find(
+        (candidate) =>
+          candidate.path === fixtureCase.target && candidate.scope === "exact",
+      );
+
+      assert.equal(issue?.state, fixtureCase.expected);
+      assert.equal(issue?.details?.packageContentKind, "explicit-noncanonical");
+      assert.match(issue?.reason ?? "", /noncanonical Skill-package resource/);
+      assert.ok(
+        evaluateStrictScan(result).matches.some(
+          (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+        ),
+      );
+    });
+  }
+});
+
 async function referencedSupportFixture(
   testContext: TestContext,
   config?: Record<string, unknown>,

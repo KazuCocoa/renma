@@ -311,6 +311,17 @@ treated as nested Skill roots. The same reserved names cannot be used as
 top-level Skill names under `skills/` or `.agents/skills/` without reserved-name
 guidance.
 
+Agent Skills may contain additional package files and directories. Renma does
+not make those locations canonical Skill-local governance or inherit owner and
+security policy merely from package containment. When `SKILL.md` or already
+inspected support explicitly names a static repository-local path such as
+`templates/prompt.md`, `docs/instructions.txt`, or `bin/run.py`, Renma retains
+it as `explicit-noncanonical` package evidence. Inspection still honors the
+repository exclusion, size, depth, readability, and no-symlink boundaries; a
+present but uninspectable explicit target blocks strict completeness. Files in
+noncanonical locations that are not explicitly referenced remain outside this
+bounded evidence expansion.
+
 ## Validation During Scan
 
 Agent Skills validation is part of the existing scan workflow:

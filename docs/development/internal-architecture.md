@@ -126,23 +126,27 @@ use the generic fail-closed catalog Finding definition.
 
 ## Cohesive Type Ownership
 
-`src/types.ts` is the implementation facade behind the semantic `renma/types`
-export. Internal modules do not use that facade; they import the cohesive owner
-under `src/types/`:
+`src/public-types.ts` is the intentionally narrow facade behind the semantic
+`renma/types` export. `src/types.ts` remains an internal compatibility facade;
+production modules import the cohesive owner under `src/types/` directly:
 
-- artifact and parsed metadata contracts remain low-level;
+- artifact, parsed metadata, normalized configuration, decision, governance,
+  and the producerless core scan model remain low-level internal contracts;
 - classification, governance, decision, diagnostic, and configuration
   contracts each have one dependency-bounded owner;
 - `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
   permitted to import Agent Skills, Context Lens, Executable Surface Inventory,
-  Security Policy Inventory, and Trust Graph result types. `ScanJsonDocument`
-  composes that core result with the literal `renma.scan.v1` serializer boundary.
+  Security Policy Inventory, and Trust Graph result types. The public
+  `ScanJsonDocument` narrows that core result to the literal `renma.scan.v1`
+  serializer boundary and `format: "json"`.
 
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
 the `analysis` layer and must not become a dependency of parsing, repository,
-or other foundation modules. Focused semantic type exports preserve cohesive
-consumer imports without making the facade an internal dependency hub.
+or other foundation modules. Focused semantic type exports exist only for
+classification, diagnostics, and the scan JSON wire document. They preserve
+cohesive consumer imports without turning low-level parser or runtime models
+into 1.x commitments.
 
 `src/commands/public-json-schema-versions.ts` inventories stable and
 experimental public top-level JSON identifiers by referencing their existing

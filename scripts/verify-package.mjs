@@ -14,26 +14,11 @@ const PACKAGE_NAME = "renma";
 const PACKAGE_JSON_SPECIFIER = "renma/package.json";
 const REPOSITORY_ONLY_README_PREFIXES = ["docs/development/"];
 const SEMANTIC_PUBLIC_IMPORTS = [
-  ["renma/types", "dist/types.js", "dist/types.d.ts"],
-  [
-    "renma/types/artifact",
-    "dist/types/artifact.js",
-    "dist/types/artifact.d.ts",
-  ],
+  ["renma/types", "dist/public-types.js", "dist/public-types.d.ts"],
   [
     "renma/types/classification",
     "dist/types/classification.js",
     "dist/types/classification.d.ts",
-  ],
-  [
-    "renma/types/configuration",
-    "dist/types/configuration.js",
-    "dist/types/configuration.d.ts",
-  ],
-  [
-    "renma/types/decision",
-    "dist/types/decision.js",
-    "dist/types/decision.d.ts",
   ],
   [
     "renma/types/diagnostics",
@@ -41,19 +26,9 @@ const SEMANTIC_PUBLIC_IMPORTS = [
     "dist/types/diagnostics.d.ts",
   ],
   [
-    "renma/types/governance",
-    "dist/types/governance.js",
-    "dist/types/governance.d.ts",
-  ],
-  [
-    "renma/types/metadata",
-    "dist/types/metadata.js",
-    "dist/types/metadata.d.ts",
-  ],
-  [
     "renma/types/scan-result",
-    "dist/types/scan-result.js",
-    "dist/types/scan-result.d.ts",
+    "dist/public-types/scan-result.js",
+    "dist/public-types/scan-result.d.ts",
   ],
   ["renma/discovery", "dist/public-discovery.js", "dist/public-discovery.d.ts"],
 ];
@@ -146,6 +121,11 @@ const REMOVED_SEMANTIC_IMPORTS = [
   "renma/skill-migration",
 ];
 const INTENTIONALLY_PRIVATE_TYPE_IMPORTS = [
+  "renma/types/artifact",
+  "renma/types/configuration",
+  "renma/types/decision",
+  "renma/types/governance",
+  "renma/types/metadata",
   "renma/types/security-analysis-coverage",
 ];
 const PRIVATE_BODY_POLICY_SPECIFIERS = [
@@ -493,6 +473,31 @@ async function verifyPackageSpecifierDeclarations(consumerDirectory) {
       ([specifier], index) =>
         `type PublicDeepImport${index} = typeof import(${JSON.stringify(specifier)});`,
     ).join("\n")}
+type PublicScanJsonDocument = import("renma/types").ScanJsonDocument;
+type PublicArtifactKind = import("renma/types").ArtifactKind;
+type PublicDiagnostic = import("renma/types").Diagnostic;
+type PublicClassification = import("renma/types").AssetClassificationEvidence;
+declare const scanDocument: PublicScanJsonDocument;
+const scanFormat: "json" = scanDocument.format;
+void scanFormat;
+// @ts-expect-error Raw artifacts have no supported public producer.
+type PrivateArtifact = import("renma/types").Artifact;
+// @ts-expect-error Parsed documents are parser implementation details.
+type PrivateParsedDocument = import("renma/types").ParsedDocument;
+// @ts-expect-error Normalized runtime config is not the authored config contract.
+type PrivateScanConfig = import("renma/types").ScanConfig;
+// @ts-expect-error The core scan result has no supported public library producer.
+type PrivateScanResult = import("renma/types").ScanResult;
+// @ts-expect-error The focused scan type path exposes only the wire document.
+type PrivateFocusedScanResult = import("renma/types/scan-result").ScanResult;
+void (undefined as unknown as PublicArtifactKind);
+void (undefined as unknown as PublicDiagnostic);
+void (undefined as unknown as PublicClassification);
+void (undefined as unknown as PrivateArtifact);
+void (undefined as unknown as PrivateParsedDocument);
+void (undefined as unknown as PrivateScanConfig);
+void (undefined as unknown as PrivateScanResult);
+void (undefined as unknown as PrivateFocusedScanResult);
 export {};
 `,
   );
