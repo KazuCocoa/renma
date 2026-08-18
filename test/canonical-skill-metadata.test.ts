@@ -720,7 +720,7 @@ metadata:
   assert.deepEqual(result.metadata.whenNotToUse, []);
   assert.deepEqual(
     validation.issues
-      .filter((issue) => issue.code === "AS-SKILL-UNSUPPORTED-ROUTING-METADATA")
+      .filter((issue) => issue.code === "RN-SKILL-UNSUPPORTED-ROUTING-METADATA")
       .map((issue) => issue.field),
     ["metadata.renma.when-to-use", "metadata.renma.when-not-to-use"],
   );

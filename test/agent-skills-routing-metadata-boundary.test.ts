@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 
 test("removed Renma routing metadata does not invalidate Agent Skills", async () => {
@@ -35,11 +36,25 @@ metadata:
   assert.equal(validation.errorCount, 0);
   assert.deepEqual(
     validation.issues
-      .filter((issue) => issue.code === "AS-SKILL-UNSUPPORTED-ROUTING-METADATA")
+      .filter((issue) => issue.code === "RN-SKILL-UNSUPPORTED-ROUTING-METADATA")
       .map((issue) => [issue.severity, issue.category, issue.field]),
     [
       ["warning", "renma-authoring", "metadata.renma.when-to-use"],
       ["warning", "renma-authoring", "metadata.renma.when-not-to-use"],
+    ],
+  );
+
+  const serialized = JSON.parse(formatJson(result)) as {
+    agentSkills: { results: Array<{ issues: Array<{ code: string }> }> };
+  };
+  assert.deepEqual(
+    serialized.agentSkills.results
+      .flatMap((item) => item.issues)
+      .map((issue) => issue.code)
+      .filter((code) => code.includes("UNSUPPORTED-ROUTING-METADATA")),
+    [
+      "RN-SKILL-UNSUPPORTED-ROUTING-METADATA",
+      "RN-SKILL-UNSUPPORTED-ROUTING-METADATA",
     ],
   );
 });

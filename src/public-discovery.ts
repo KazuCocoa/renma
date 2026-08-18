@@ -14,9 +14,9 @@ export {
   classifyRepositorySkillPath,
   logicalSkillDirectory,
   normalizeAssetRepositoryRelativePath,
-  normalizeRepositoryRelativePath,
+  normalizeRepositorySkillRelativePath,
   type RepositorySkillPath,
   type ReservedSkillSupportDirectory,
-  type SkillEntrypointPath,
+  type CanonicalSkillEntrypointPath,
   type SkillRoot,
 } from "./discovery.js";

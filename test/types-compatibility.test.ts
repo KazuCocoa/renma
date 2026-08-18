@@ -8,13 +8,15 @@ import {
   type Artifact,
   type Diagnostic,
   type ScanConfig,
+  type ScanJsonDocument,
   type ScanResult,
 } from "../src/types.js";
 import { ASSET_CLASSIFICATION_RULES as directClassificationRules } from "../src/types/classification.js";
 import { ASSET_DECISION_REASON_CODES as directDecisionReasons } from "../src/types/decision.js";
 import { SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION as directSecurityAnalysisCoverageSchemaVersion } from "../src/types/security-analysis-coverage.js";
 
-type EstablishedTypesFacade = Artifact | Diagnostic | ScanConfig | ScanResult;
+type EstablishedTypesFacade =
+  Artifact | Diagnostic | ScanConfig | ScanJsonDocument | ScanResult;
 const establishedTypesFacade: EstablishedTypesFacade | undefined = undefined;
 void establishedTypesFacade;
 
@@ -26,3 +28,13 @@ test("the established types deep import re-exports cohesive runtime registries",
     directSecurityAnalysisCoverageSchemaVersion,
   );
 });
+
+function assertRemovedConfigurationSurface(config: ScanConfig): void {
+  // @ts-expect-error Compatibility-only layout policy is not part of ScanConfig.
+  void config.layout;
+}
+void assertRemovedConfigurationSurface;
+
+// @ts-expect-error LayoutPolicyConfig was removed from the public type surface.
+type RemovedLayoutPolicyConfig = import("../src/types.js").LayoutPolicyConfig;
+void (undefined as unknown as RemovedLayoutPolicyConfig);

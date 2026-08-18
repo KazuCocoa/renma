@@ -412,11 +412,9 @@ scalars does not hide body diagnostics.
 Agent Skills diagnostics use stable identifiers in the `agentSkills` portion of
 scan output. Specification errors make the Skill invalid. Renma authoring
 warnings do not affect structural validity or the existing `--fail-on`
-threshold. The historical-looking
-`AS-SKILL-UNSUPPORTED-ROUTING-METADATA` identifier is a Renma-owned v1
-compatibility warning, not an Agent Skills specification error; it remains in
-the `agentSkills` projection so maintainers get exact child-key evidence while
-the value stays non-operational.
+threshold. Renma-owned authoring warnings use the `RN-SKILL-*` namespace and
+remain in the `agentSkills` projection so maintainers get exact source evidence
+without confusing them with Agent Skills specification failures.
 
 ### Specification errors
 
@@ -455,7 +453,7 @@ not disable the ordinary English-primary authoring warnings.
 
 | Identifier                                          | Meaning                                                                                                                            |
 | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `AS-SKILL-UNSUPPORTED-ROUTING-METADATA`             | Removed `renma.when-to-use` or `renma.when-not-to-use` metadata is present and ignored by Renma; this warning does not make the Agent Skill invalid. |
+| `RN-SKILL-UNSUPPORTED-ROUTING-METADATA`             | Removed `renma.when-to-use` or `renma.when-not-to-use` metadata is present and ignored by Renma; this warning does not make the Agent Skill invalid. |
 | `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY`       | The description does not state when the Skill should be used.                                                                      |
 | `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY`           | The description does not clearly state what the Skill does. This is a Renma authoring warning, not an Agent Skills validity error. |
 | `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY`     | A body selection exclusion is absent from the description.                                                                         |

@@ -11,7 +11,7 @@ import {
   classifyRepositorySkillEntrypointPath,
   classifyRepositorySkillPath,
   discoverArtifacts,
-  normalizeRepositoryRelativePath,
+  normalizeRepositorySkillRelativePath,
   RESERVED_SKILL_SUPPORT_DIRS,
   SKILL_ROOTS,
   SKILL_SUPPORT_DISCOVERY_MODE,
@@ -28,14 +28,18 @@ test("repository-relative Skill paths normalize dots without escaping roots", ()
     ["skills/demo/../demo/SKILL.md", "skills/demo/SKILL.md", "canonical"],
   ] as const;
   for (const [input, normalized, kind] of accepted) {
-    assert.equal(normalizeRepositoryRelativePath(input), normalized, input);
+    assert.equal(
+      normalizeRepositorySkillRelativePath(input),
+      normalized,
+      input,
+    );
     const classified = classifyRepositorySkillEntrypointPath(input);
     assert.equal(classified?.currentPath, normalized, input);
     assert.equal(classified?.kind, kind, input);
   }
 
   assert.equal(
-    normalizeRepositoryRelativePath("./skills/demo/skill.md"),
+    normalizeRepositorySkillRelativePath("./skills/demo/skill.md"),
     "skills/demo/skill.md",
   );
   assert.equal(
@@ -54,7 +58,7 @@ test("repository-relative Skill paths normalize dots without escaping roots", ()
     ".agents/skills/../../docs/SKILL.md",
   ]) {
     assert.equal(
-      normalizeRepositoryRelativePath(rejected),
+      normalizeRepositorySkillRelativePath(rejected),
       undefined,
       rejected,
     );

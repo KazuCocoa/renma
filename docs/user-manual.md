@@ -1224,7 +1224,6 @@ The configuration supports the same names used by the implementation, including:
 - `concurrency`: scan concurrency.
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
 - `format`: default `scan` output format.
-- `layout`: compatibility-only `tool_namespace` and `workflow_aliases` input retained for existing configurations. These fields are validated and normalized but do not currently change findings or force Skill-local support migration.
 - `security`: command, network, upload, profile, and revision-review policy.
   `ci_policy` supports `off`, `warn`, and `fail`, defaults to `fail`, and
   governs effective boolean security-policy relaxations in `ci-report`.
@@ -1280,6 +1279,12 @@ The configuration supports the same names used by the implementation, including:
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
   `adopted: true`. Unknown keys and unsupported values are errors. `renma init`
   does not enable adoption or the CI policy.
+
+The compatibility-only top-level `layout` object and its former
+`tool_namespace` and `workflow_aliases` children were removed before Renma 1.0.
+They never changed operational findings. An authored `layout` object is now a
+caller-correctable configuration error with exit code `2`; delete it rather
+than replacing it with another key.
 
 For `scan`, `--fail-on` and `--format` override the corresponding configuration
 values. `--strict` is caller-selected execution policy and is never loaded from
@@ -1456,6 +1461,10 @@ branch on that identifier rather than the package version or incidental field
 order. See [Machine-Readable JSON Compatibility](machine-readable-json.md) for
 the complete identifier inventory, 1.x additive/breaking rules, and the exact
 environment-derived values excluded from portable deterministic comparisons.
+In the npm type surface, `ScanResult` models the core scan result before
+serialization, while `ScanJsonDocument` composes that shape with the literal
+`schemaVersion: "renma.scan.v1"` emitted by `formatJson()` and
+`scan --format json`.
 
 Use `trust-graph` when a reviewer asks: "Why should this asset be considered safe, owned, current, and usable enough for an agent-facing repository?" The command does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
 

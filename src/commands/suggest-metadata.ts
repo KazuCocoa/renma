@@ -13,7 +13,7 @@ import {
   type BlockedMetadata,
   type MetadataSuggestion,
 } from "../decisions/metadata-suggestion.js";
-import type { SkillEntrypointPath } from "../discovery.js";
+import type { SkillMigrationEntrypointPath } from "../skill-path-contract.js";
 import {
   collectTargetDocumentEvidence,
   collectTargetRepositoryEvidence,
@@ -487,7 +487,7 @@ function resolveSkillLocalContext(
 }
 
 async function pathMigrationCollision(
-  entrypoint: SkillEntrypointPath,
+  entrypoint: SkillMigrationEntrypointPath,
   sourceAbsolutePath: string,
   repositoryRoot: string,
 ): Promise<BlockedMetadata | undefined> {

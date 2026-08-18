@@ -10,45 +10,24 @@ import {
   zeroSkillDiscoveryReadinessSummary,
   type ReadinessReport,
 } from "../src/commands/readiness.js";
-import { loadConfig } from "../src/config.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import { zeroSecurityPolicyInventorySummary } from "../src/security-policy-inventory.js";
 import { zeroSecurityPostureSummary } from "../src/security-posture.js";
 import type { Finding } from "../src/types.js";
 
-test("layout config validation errors exit with usage code", async () => {
-  const cases: Array<{
-    name: string;
-    config: unknown;
-    message: RegExp;
-  }> = [
+test("removed layout config exits with caller-correctable guidance", async () => {
+  const cases = [
+    { name: "empty object", layout: {} },
+    { name: "invalid shape", layout: [] },
     {
-      name: "invalid layout shape",
-      config: { layout: [] },
-      message: /layout must be an object/,
+      name: "former compatibility fields",
+      layout: {
+        tool_namespace: "mobile",
+        workflow_aliases: { setup: "device-setup" },
+      },
     },
-    {
-      name: "unknown layout key",
-      config: { layout: { namespace: "mobile" } },
-      message: /Unknown layout config key "namespace"/,
-    },
-    {
-      name: "empty tool namespace",
-      config: { layout: { tool_namespace: "" } },
-      message: /layout\.tool_namespace must be a non-empty string/,
-    },
-    {
-      name: "non-string tool namespace",
-      config: { layout: { tool_namespace: 12 } },
-      message: /layout\.tool_namespace must be a non-empty string/,
-    },
-    {
-      name: "non-string workflow alias",
-      config: { layout: { workflow_aliases: { setup: 12 } } },
-      message: /layout\.workflow_aliases\.setup must be a string/,
-    },
-  ];
+  ] as const;
 
   for (const item of cases) {
     const root = await fixture(
@@ -56,17 +35,21 @@ test("layout config validation errors exit with usage code", async () => {
     );
     await writeFile(
       path.join(root, "renma.config.json"),
-      JSON.stringify(item.config),
+      JSON.stringify({ layout: item.layout }),
     );
 
     const result = await withCapturedConsole(() => main(["scan", root]));
 
     assert.equal(result.code, 2, item.name);
-    assert.match(result.stderr, item.message, item.name);
+    assert.match(
+      result.stderr,
+      /compatibility-only "layout" configuration.*removed before Renma 1\.0.*Delete the authored layout object; there is no replacement configuration key\./,
+      item.name,
+    );
   }
 });
 
-test("generic layout keeps valid Skill-local support in place", async () => {
+test("canonical Skill-local support remains valid", async () => {
   const root = await fixture("renma-layout-generic-");
   await writeSkillSupport(root, "setup", "Demo");
 
@@ -77,51 +60,6 @@ test("generic layout keeps valid Skill-local support in place", async () => {
     ),
     false,
   );
-});
-
-test("configured layout aliases do not force local support promotion", async () => {
-  const root = await fixture("renma-layout-namespaced-");
-  await writeFile(
-    path.join(root, "renma.config.json"),
-    JSON.stringify({
-      layout: {
-        tool_namespace: "mobile",
-        workflow_aliases: {
-          "device-setup": "real-device",
-        },
-      },
-    }),
-  );
-  await writeSkillSupport(root, "device-setup");
-
-  const report = await scan(root);
-  assert.equal(
-    report.findings.some(
-      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
-    ),
-    false,
-  );
-});
-
-test("layout fields remain normalized compatibility-only input", async () => {
-  const root = await fixture("renma-layout-compatibility-");
-  await writeFile(
-    path.join(root, "renma.config.json"),
-    JSON.stringify({
-      layout: {
-        tool_namespace: "mobile",
-        workflow_aliases: {
-          "device-setup": "real-device",
-        },
-      },
-    }),
-  );
-
-  const { config } = await loadConfig(root, {});
-  assert.equal(config.layout.toolNamespace, "mobile");
-  assert.deepEqual(config.layout.workflowAliases, {
-    "device-setup": "real-device",
-  });
 });
 
 test("readiness markdown limits findings while JSON stays complete", () => {

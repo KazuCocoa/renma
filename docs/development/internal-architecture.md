@@ -135,13 +135,20 @@ under `src/types/`:
   contracts each have one dependency-bounded owner;
 - `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
   permitted to import Agent Skills, Context Lens, Executable Surface Inventory,
-  Security Policy Inventory, and Trust Graph result types.
+  Security Policy Inventory, and Trust Graph result types. `ScanJsonDocument`
+  composes that core result with the literal `renma.scan.v1` serializer boundary.
 
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
 the `analysis` layer and must not become a dependency of parsing, repository,
 or other foundation modules. Focused semantic type exports preserve cohesive
 consumer imports without making the facade an internal dependency hub.
+
+`src/commands/public-json-schema-versions.ts` inventories stable and
+experimental public top-level JSON identifiers by referencing their existing
+owners. Its documentation synchronization test keeps the inventory aligned
+with `docs/machine-readable-json.md` without changing command dependency
+direction or promoting nested and experimental contracts.
 
 ## Security Command and Destination Analysis
 

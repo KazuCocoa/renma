@@ -16,7 +16,7 @@ import {
   CANONICAL_SKILL_METADATA_KEYS,
   RENMA_METADATA_NAMESPACE_PREFIX,
 } from "./metadata-definitions.js";
-import type { SkillEntrypointPath } from "./discovery.js";
+import type { SkillMigrationEntrypointPath } from "./skill-path-contract.js";
 import { parseDocument } from "./markdown.js";
 import { validateCanonicalSecurityMetadata } from "./security-policy.js";
 import type { Artifact } from "./types/artifact.js";
@@ -91,7 +91,7 @@ export interface AgentSkillMigrationSuggestion {
 
 export interface AgentSkillMigrationOptions {
   explicitOwner?: string;
-  entrypoint?: SkillEntrypointPath;
+  entrypoint?: SkillMigrationEntrypointPath;
   additionalBlocks?: SkillMigrationBlock[];
 }
 
