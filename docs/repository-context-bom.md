@@ -232,14 +232,21 @@ closed and all five counts are required.
 ### V2 to v3 migration
 
 V3 removes the producerless `layout.disallowed_skill_assets` Readiness check
-and adds `skills.support_integrity`. The new check fails only on current
-`SUPPORT-MISSING-PATH` or `SUPPORT-SYMLINK-PATH` findings, so it represents
-missing or uninspectable explicitly referenced Skill support rather than a
-location policy. Consumers that key, count, compare, or allowlist embedded
-Readiness checks must migrate to the new ID and meaning. No other BOM field,
-type, or nested schema identifier changes. Locale-independent ordering fixes
-restore the already documented deterministic ordering contract and therefore
-do not independently require another schema version.
+and adds `skills.support_integrity`. The new check represents explicitly
+referenced Skill support that cannot be resolved or inspected. It uses
+authoritative `inspectionCoverage` issues whose `expectationSource` is
+`static-support-reference` for excluded, symlinked, unreadable, oversized,
+depth-limited, and unsupported support, plus missing-reference Finding evidence
+where inspection coverage intentionally has no missing-path issue. Suppression
+may remove an ordinary Finding from the active Finding list, but cannot make
+the embedded Readiness check claim that authoritative support inspection is
+complete. Unrelated repository inspection issues and unreferenced Skill-local
+files do not affect this check, and it creates no placement policy. Consumers
+that key, count, compare, or allowlist embedded Readiness checks must migrate to
+the new ID and meaning. No other BOM field, type, or nested schema identifier
+changes. Locale-independent ordering fixes restore the already documented
+deterministic ordering contract and therefore do not independently require
+another schema version.
 
 Representative top-level JSON (nested objects are shortened for readability;
 the schema defines every nested field):

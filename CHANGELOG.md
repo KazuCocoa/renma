@@ -23,8 +23,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Repository Context BOM from v2 to `renma.repository-context-bom.v3`. The
   breaking migration replaces the producerless
   `layout.disallowed_skill_assets` check with `skills.support_integrity`, which
-  is backed by current `SUPPORT-MISSING-PATH` and `SUPPORT-SYMLINK-PATH`
-  findings. BOM v3 otherwise carries forward the v2 field contract.
+  is backed by authoritative static-support inspection coverage plus
+  missing-reference evidence. Excluded, symlinked, unreadable, oversized,
+  depth-limited, and unsupported explicit support now fail the check without
+  allowing finding suppression to manufacture inspection completeness. BOM v3
+  otherwise carries forward the v2 field contract.
 - Narrowed `renma/discovery` to canonical Skill entrypoint types, renamed the
   Skill-specific path helper to `normalizeRepositorySkillRelativePath`, and
   kept lowercase and flat historical entrypoint recognition inside explicit

@@ -143,7 +143,7 @@ test("high security findings remain blocking", () => {
   );
 });
 
-test("Skill support integrity fails on currently emitted missing and symlink evidence", () => {
+test("Skill support integrity finding evidence fails without a legacy layout score penalty", () => {
   const report = buildReadinessReport(securityGraphReport(), [
     readinessFinding("SUPPORT-MISSING-PATH", "high"),
     readinessFinding("SUPPORT-SYMLINK-PATH", "high"),
@@ -153,6 +153,7 @@ test("Skill support integrity fails on currently emitted missing and symlink evi
   );
 
   assert.equal(report.level, "not_ready");
+  assert.equal(report.score, 100);
   assert.equal(check?.title, "Skill support integrity");
   assert.equal(check?.status, "fail");
   assert.deepEqual(

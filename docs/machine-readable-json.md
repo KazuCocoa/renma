@@ -40,8 +40,13 @@ nested object, such as inspection coverage or a Skill Discovery diff, keeps its
 own identifier; the outer identifier does not replace or reinterpret it.
 
 Readiness v2 replaces the producerless
-`layout.disallowed_skill_assets` check with `skills.support_integrity`, backed
-by current missing-path and symlink-path support findings. Because BOM embeds
+`layout.disallowed_skill_assets` check with `skills.support_integrity`. The
+replacement uses authoritative `inspectionCoverage` issues marked as static
+Skill-support expectations, plus missing-reference Finding evidence where no
+coverage issue is intentionally created. Excluded, symlinked, unreadable,
+oversized, depth-limited, and unsupported explicit support fails the check;
+unrelated repository coverage issues do not. Finding suppression does not turn
+authoritative support-inspection incompleteness into a pass. Because BOM embeds
 the Readiness check collection, BOM v3 carries the same breaking migration.
 Consumers of Readiness v1 or BOM v2 must update check-ID allowlists, maps, and
 comparisons; the old check ID has no alias in the new contracts.

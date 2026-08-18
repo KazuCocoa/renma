@@ -1675,6 +1675,11 @@ function projectDiffSnapshot(
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
+    undefined,
+    {
+      inspectionCoverage: scanResult.inspectionCoverage,
+      suppressedFindings: scanResult.suppressedFindings,
+    },
   );
   return {
     snapshot: {

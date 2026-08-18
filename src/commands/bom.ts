@@ -210,6 +210,11 @@ export function buildBomReport(
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
+    undefined,
+    {
+      inspectionCoverage: scanResult.inspectionCoverage,
+      suppressedFindings: scanResult.suppressedFindings,
+    },
   );
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
