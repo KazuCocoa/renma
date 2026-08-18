@@ -674,7 +674,7 @@ function validateMetadata(
     issues.push(
       createIssue(
         document,
-        IDS.AS_UNSUPPORTED_ROUTING_METADATA,
+        IDS.RN_UNSUPPORTED_ROUTING_METADATA,
         "warning",
         "renma-authoring",
         `Skill metadata key "${field.key}" is not supported in Renma v1. Put portable discovery and selection boundaries in the Agent Skills description.`,

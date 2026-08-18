@@ -6,6 +6,32 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added the public `ScanJsonDocument` type for the serialized
+  `renma.scan.v1` wire contract while retaining `ScanResult` as the core scan
+  result, plus an internal stable/experimental registry synchronized with the
+  documented public top-level JSON schema inventory.
+
+### Changed
+
+- Narrowed `renma/discovery` to canonical Skill entrypoint types, renamed the
+  Skill-specific path helper to `normalizeRepositorySkillRelativePath`, and
+  kept lowercase and flat historical entrypoint recognition inside explicit
+  migration tooling.
+- Renamed the Renma-owned unsupported routing metadata warning to
+  `RN-SKILL-UNSUPPORTED-ROUTING-METADATA` without changing its warning
+  severity, authoring category, Skill validity, or non-operational semantics.
+- Kept `SecurityAnalysisCoverage` on the cohesive `renma/types` facade without
+  adding a separate focused package subpath.
+
+### Removed
+
+- Removed the compatibility-only `layout` configuration surface, including
+  `tool_namespace`, `workflow_aliases`, `LayoutPolicyConfig`, and normalized
+  `ScanConfig` layout state. Authored `layout` objects now fail with explicit
+  pre-1.0 deletion guidance and no replacement key.
+
 ## [0.33.0] - 2026-08-18
 
 ### Added

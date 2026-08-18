@@ -10,9 +10,11 @@ import {
   classifyAssetPath,
   repositoryClassificationPath,
   type RepositoryClassificationPathResolution,
-  type SkillEntrypointPath,
 } from "../discovery.js";
-import { classifyRepositorySkillMigrationEntrypointPath } from "../skill-path-contract.js";
+import {
+  classifyRepositorySkillMigrationEntrypointPath,
+  type SkillMigrationEntrypointPath,
+} from "../skill-path-contract.js";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
 import type { AssetMetadata, CatalogEntry } from "../model.js";
@@ -35,7 +37,7 @@ export interface TargetDocumentEvidence {
   repositoryBoundary: RepositoryClassificationPathResolution;
   repositoryRoot?: string;
   repositoryRelativePath: string;
-  entrypoint?: SkillEntrypointPath;
+  entrypoint?: SkillMigrationEntrypointPath;
   classification: AssetClassificationEvidence;
 }
 

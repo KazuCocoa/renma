@@ -17,13 +17,13 @@ import {
 } from "./repository-boundary.js";
 import {
   classifyRepositorySkillMigrationEntrypointPath,
-  classifySkillEntrypointAtRoot,
+  classifyCanonicalSkillEntrypointAtRoot,
   findAbsoluteSkillRoots,
   matchRepositorySkillRoot,
   RESERVED_SKILL_SUPPORT_DIRS,
   SKILL_SUPPORT_EXISTENCE_GLOBS,
   type ReservedSkillSupportDirectory,
-  type SkillEntrypointPath,
+  type CanonicalSkillEntrypointPath,
   type SkillRoot,
 } from "./skill-path-contract.js";
 
@@ -32,7 +32,7 @@ export {
   SKILL_SUPPORT_DISCOVERY_MODE,
   SKILL_ROOTS,
   type ReservedSkillSupportDirectory,
-  type SkillEntrypointPath,
+  type CanonicalSkillEntrypointPath,
   type SkillRoot,
 } from "./skill-path-contract.js";
 
@@ -61,7 +61,7 @@ export type RepositorySkillPath =
       skillName: string;
       domainPath: string[];
       relativeToSkillDirectory: string;
-      entrypoint: SkillEntrypointPath;
+      entrypoint: CanonicalSkillEntrypointPath;
     }
   | {
       kind: "support";
@@ -111,7 +111,7 @@ export type RepositoryClassificationPathResolution =
 export function classifyRepositorySkillPath(
   relativePath: string,
 ): RepositorySkillPath | undefined {
-  const currentPath = normalizeRepositoryRelativePath(relativePath);
+  const currentPath = normalizeRepositorySkillRelativePath(relativePath);
   if (!currentPath) return undefined;
   const segments = currentPath.split("/").filter(Boolean);
   const rootMatch = matchRepositorySkillRoot(segments);
@@ -146,14 +146,13 @@ export function classifyRepositorySkillPath(
     };
   }
 
-  const entrypoint = classifySkillEntrypointAtRoot(
+  const entrypoint = classifyCanonicalSkillEntrypointAtRoot(
     currentPath,
     segments,
     rootEndIndex,
-    false,
   );
   if (!entrypoint) return undefined;
-  const skillDirectory = path.posix.dirname(entrypoint.targetPath);
+  const skillDirectory = path.posix.dirname(entrypoint.currentPath);
   const skillDirectorySegments = skillDirectory.split("/").filter(Boolean);
   const skillSegments = skillDirectorySegments.slice(rootEndIndex);
   const skillName = skillSegments.at(-1);
@@ -183,7 +182,7 @@ export function logicalSkillDirectory(
 /** Classify a repository-relative Skill entrypoint only at an explicit root. */
 export function classifyRepositorySkillEntrypointPath(
   relativePath: string,
-): SkillEntrypointPath | undefined {
+): CanonicalSkillEntrypointPath | undefined {
   const classified = classifyRepositorySkillPath(relativePath);
   return classified?.kind === "entrypoint" ? classified.entrypoint : undefined;
 }
@@ -191,7 +190,7 @@ export function classifyRepositorySkillEntrypointPath(
 /** Classify an absolute Skill path only when it contains one unambiguous root. */
 export function classifyAbsoluteSkillEntrypointPath(
   absolutePath: string,
-): SkillEntrypointPath | undefined {
+): CanonicalSkillEntrypointPath | undefined {
   const rawPath = toPosix(absolutePath);
   if (!isAbsoluteLike(rawPath)) return undefined;
   const rawRoots = findAbsoluteSkillRoots(rawPath.split("/").filter(Boolean));
@@ -200,16 +199,15 @@ export function classifyAbsoluteSkillEntrypointPath(
   const segments = currentPath.split("/").filter(Boolean);
   const roots = findAbsoluteSkillRoots(segments);
   if (roots.length !== 1) return undefined;
-  return classifySkillEntrypointAtRoot(
+  return classifyCanonicalSkillEntrypointAtRoot(
     currentPath,
     segments,
     roots[0]!.endIndex,
-    false,
   );
 }
 
 /** Normalize a repository-relative Skill path without allowing root escape. */
-export function normalizeRepositoryRelativePath(
+export function normalizeRepositorySkillRelativePath(
   filePath: string,
 ): string | undefined {
   const normalizedSeparators = toPosix(filePath);
@@ -1048,7 +1046,7 @@ function legacyContextRootDiagnostics(walkedFiles: string[]): Diagnostic[] {
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {
-  return normalizeRepositoryRelativePath(relativePath) !== undefined;
+  return normalizeRepositorySkillRelativePath(relativePath) !== undefined;
 }
 
 function skillSupportPathSegment(relativePath: string): string | undefined {

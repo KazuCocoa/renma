@@ -209,9 +209,20 @@ Renma v1 intentionally exposes only the stable type surface and pure discovery
 helpers to TypeScript or JavaScript consumers. For example:
 
 ```ts
-import type { ScanResult } from "renma/types";
-import { classifyAssetPath } from "renma/discovery";
+import type { ScanJsonDocument, ScanResult } from "renma/types";
+import {
+  classifyAssetPath,
+  normalizeRepositorySkillRelativePath,
+  type CanonicalSkillEntrypointPath,
+} from "renma/discovery";
 ```
+
+`ScanResult` is the core result returned before serialization.
+`ScanJsonDocument` is the public wire document emitted by `formatJson()` and
+`scan --format json`; it adds the literal
+`schemaVersion: "renma.scan.v1"`. Public discovery recognizes only exact
+canonical `SKILL.md` entrypoints. Historical lowercase and flat entrypoints
+remain available only to explicit CLI migration tooling.
 
 The allowlist is `renma/types`, its documented focused type subpaths, and
 `renma/discovery`. Commands, renderers, guidance builders, and migration
@@ -220,6 +231,11 @@ workflow policy must be free to evolve before 1.0. Every `renma/dist/...`
 specifier and removed semantic command, renderer, or migration subpath is
 rejected with `ERR_PACKAGE_PATH_NOT_EXPORTED`. The package root remains a CLI
 entrypoint rather than a library import.
+
+`SecurityAnalysisCoverage` and its schema constant are available from
+`renma/types` as part of the composed scan contract. There is intentionally no
+separate `renma/types/security-analysis-coverage` package subpath; the focused
+subpaths are reserved for independently useful cohesive contracts.
 
 ## Command Overview
 

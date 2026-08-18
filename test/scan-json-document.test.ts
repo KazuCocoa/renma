@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+import { formatJson } from "../src/report.js";
+import { scan } from "../src/scanner.js";
+import {
+  SCAN_JSON_SCHEMA_VERSION,
+  type ScanJsonDocument,
+  type ScanResult,
+} from "../src/types/scan-result.js";
+
+test("scan JSON serialization adds the typed renma.scan.v1 wire boundary", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-json-type-"));
+  const result: ScanResult = await scan(root, { format: "json" });
+  const expectedDocument = {
+    schemaVersion: SCAN_JSON_SCHEMA_VERSION,
+    ...result,
+  } satisfies ScanJsonDocument;
+  const document = JSON.parse(formatJson(result)) as ScanJsonDocument;
+
+  assert.equal("schemaVersion" in result, false);
+  assert.equal(document.schemaVersion, "renma.scan.v1");
+  assert.deepEqual(document, expectedDocument);
+});

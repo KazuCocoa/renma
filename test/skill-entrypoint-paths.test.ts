@@ -11,7 +11,7 @@ import {
   classifyRepositorySkillEntrypointPath,
   classifyRepositorySkillPath,
   discoverArtifacts,
-  normalizeRepositoryRelativePath,
+  normalizeRepositorySkillRelativePath,
   RESERVED_SKILL_SUPPORT_DIRS,
   SKILL_ROOTS,
   SKILL_SUPPORT_DISCOVERY_MODE,
@@ -28,24 +28,32 @@ test("repository-relative Skill paths normalize dots without escaping roots", ()
     ["skills/demo/../demo/SKILL.md", "skills/demo/SKILL.md", "canonical"],
   ] as const;
   for (const [input, normalized, kind] of accepted) {
-    assert.equal(normalizeRepositoryRelativePath(input), normalized, input);
+    assert.equal(
+      normalizeRepositorySkillRelativePath(input),
+      normalized,
+      input,
+    );
     const classified = classifyRepositorySkillEntrypointPath(input);
     assert.equal(classified?.currentPath, normalized, input);
     assert.equal(classified?.kind, kind, input);
   }
 
   assert.equal(
-    normalizeRepositoryRelativePath("./skills/demo/skill.md"),
+    normalizeRepositorySkillRelativePath("./skills/demo/skill.md"),
     "skills/demo/skill.md",
   );
   assert.equal(
     classifyRepositorySkillEntrypointPath("./skills/demo/skill.md"),
     undefined,
   );
-  assert.equal(
-    classifyRepositorySkillMigrationEntrypointPath("./skills/demo/skill.md")
-      ?.kind,
-    "lowercase-entrypoint",
+  assert.deepEqual(
+    classifyRepositorySkillMigrationEntrypointPath("./skills/demo/skill.md"),
+    {
+      kind: "lowercase-entrypoint",
+      currentPath: "skills/demo/skill.md",
+      targetPath: "skills/demo/SKILL.md",
+      candidateName: "demo",
+    },
   );
 
   for (const rejected of [
@@ -54,7 +62,7 @@ test("repository-relative Skill paths normalize dots without escaping roots", ()
     ".agents/skills/../../docs/SKILL.md",
   ]) {
     assert.equal(
-      normalizeRepositoryRelativePath(rejected),
+      normalizeRepositorySkillRelativePath(rejected),
       undefined,
       rejected,
     );
@@ -148,10 +156,14 @@ test("directory-based Skill entrypoints require a Skill directory below either r
       "canonical",
       canonicalEntrypoint,
     );
-    assert.equal(
-      classifyRepositorySkillMigrationEntrypointPath(historicalFlatEntrypoint)
-        ?.kind,
-      "flat-legacy-entrypoint",
+    assert.deepEqual(
+      classifyRepositorySkillMigrationEntrypointPath(historicalFlatEntrypoint),
+      {
+        kind: "flat-legacy-entrypoint",
+        currentPath: historicalFlatEntrypoint,
+        targetPath: `${root}/demo/SKILL.md`,
+        candidateName: "demo",
+      },
       historicalFlatEntrypoint,
     );
     assert.equal(

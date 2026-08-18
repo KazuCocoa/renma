@@ -218,20 +218,8 @@ test("non-Skill documents do not guess a Skill-relative helper base", async () =
   );
 });
 
-test("supported layout passes refactored appium repository shape", async () => {
+test("canonical layout passes refactored appium repository shape", async () => {
   const root = await fixture();
-  await writeFile(
-    path.join(root, "renma.config.json"),
-    JSON.stringify({
-      layout: {
-        tool_namespace: "appium",
-        workflow_aliases: {
-          "appium-troubleshooting": "troubleshooting",
-          "xcuitest-real-device-config": "real-device",
-        },
-      },
-    }),
-  );
   await writeMarkdown(
     root,
     "skills/setup/SKILL.md",
@@ -413,19 +401,8 @@ function helperCommandDocument(skillDirectory: string): string {
   ].join("\n");
 }
 
-test("layout aliases do not force valid local support into shared roots", async () => {
+test("valid local support is not forced into shared roots", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-config-"));
-  await writeFile(
-    path.join(root, "renma.config.json"),
-    JSON.stringify({
-      layout: {
-        tool_namespace: "mobile",
-        workflow_aliases: {
-          "device-setup": "real-device",
-        },
-      },
-    }),
-  );
   await writeMarkdown(
     root,
     "skills/device-setup/references/setup.md",
@@ -450,20 +427,8 @@ test("layout aliases do not force valid local support into shared roots", async 
   );
 });
 
-test("appium aliases preserve valid local support", async () => {
+test("workflow-named local support remains valid", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-appium-"));
-  await writeFile(
-    path.join(root, "renma.config.json"),
-    JSON.stringify({
-      layout: {
-        tool_namespace: "appium",
-        workflow_aliases: {
-          "appium-troubleshooting": "troubleshooting",
-          "xcuitest-real-device-config": "real-device",
-        },
-      },
-    }),
-  );
   await writeMarkdown(
     root,
     "skills/appium-troubleshooting/references/session-startup.md",

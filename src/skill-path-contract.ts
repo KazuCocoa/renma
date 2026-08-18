@@ -15,13 +15,20 @@ export const RESERVED_SKILL_SUPPORT_DIRS = [
 export type ReservedSkillSupportDirectory =
   (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];
 
-export type SkillEntrypointPath =
-  | {
-      kind: "canonical";
-      currentPath: string;
-      targetPath: string;
-      candidateName: string;
-    }
+/** Exact operational Agent Skills entrypoint recognized by Renma discovery. */
+export interface CanonicalSkillEntrypointPath {
+  kind: "canonical";
+  currentPath: string;
+  candidateName: string;
+}
+
+interface CanonicalSkillMigrationEntrypointPath extends CanonicalSkillEntrypointPath {
+  targetPath: string;
+}
+
+/** Historical entrypoint states recognized only by explicit migration tooling. */
+export type SkillMigrationEntrypointPath =
+  | CanonicalSkillMigrationEntrypointPath
   | {
       kind: "lowercase-entrypoint";
       currentPath: string;
@@ -123,7 +130,7 @@ function matchSkillRootAt(
 /** Internal migration-only recognition for an explicit repository-relative target. */
 export function classifyRepositorySkillMigrationEntrypointPath(
   relativePath: string,
-): SkillEntrypointPath | undefined {
+): SkillMigrationEntrypointPath | undefined {
   const currentPath = normalizeMigrationRelativePath(relativePath);
   if (!currentPath) return undefined;
   const segments = currentPath.split("/").filter(Boolean);
@@ -140,7 +147,7 @@ export function classifyRepositorySkillMigrationEntrypointPath(
 /** Internal migration-only recognition for an explicit absolute target. */
 export function classifyAbsoluteSkillMigrationEntrypointPath(
   absolutePath: string,
-): SkillEntrypointPath | undefined {
+): SkillMigrationEntrypointPath | undefined {
   const rawPath = absolutePath.replaceAll("\\", "/");
   if (!isAbsoluteLike(rawPath)) return undefined;
   const rawRoots = findAbsoluteSkillRoots(rawPath.split("/").filter(Boolean));
@@ -157,13 +164,32 @@ export function classifyAbsoluteSkillMigrationEntrypointPath(
   );
 }
 
-/** Shared structural implementation; operational callers pass false. */
-export function classifySkillEntrypointAtRoot(
+/** Classify one exact canonical entrypoint after its supported root is known. */
+export function classifyCanonicalSkillEntrypointAtRoot(
+  currentPath: string,
+  segments: string[],
+  rootEndIndex: number,
+): CanonicalSkillEntrypointPath | undefined {
+  const classified = classifySkillEntrypointAtRoot(
+    currentPath,
+    segments,
+    rootEndIndex,
+    false,
+  );
+  if (classified?.kind !== "canonical") return undefined;
+  return {
+    kind: classified.kind,
+    currentPath: classified.currentPath,
+    candidateName: classified.candidateName,
+  };
+}
+
+function classifySkillEntrypointAtRoot(
   currentPath: string,
   segments: string[],
   rootEndIndex: number,
   includeHistorical: boolean,
-): SkillEntrypointPath | undefined {
+): SkillMigrationEntrypointPath | undefined {
   const basename = path.posix.basename(currentPath);
   const directory = path.posix.dirname(currentPath);
   const localDirectories = segments.slice(rootEndIndex, -1);

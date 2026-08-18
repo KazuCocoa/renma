@@ -127,9 +127,6 @@ export const DEFAULT_CONFIG: ScanConfig = {
     required: [],
     requiredSource: "renma_default",
   },
-  layout: {
-    workflowAliases: {},
-  },
   security: {
     approvedDomains: [],
     approvedUploadDomains: [],
@@ -346,6 +343,12 @@ function normalizeConfig(
     throw new ConfigError(`Config${label(configPath)} must be a JSON object.`);
   }
 
+  if (Object.hasOwn(value, "layout")) {
+    throw new ConfigError(
+      `The compatibility-only "layout" configuration${label(configPath)} was removed before Renma 1.0 because it had no operational effect. Delete the authored layout object; there is no replacement configuration key.`,
+    );
+  }
+
   const allowed = new Set([
     "fail_on",
     "format",
@@ -359,7 +362,6 @@ function normalizeConfig(
     "executable_surface",
     "quality",
     "metadata",
-    "layout",
     "security",
     "skill_discovery",
   ]);
@@ -403,7 +405,6 @@ function normalizeConfig(
   if (value.metadata !== undefined)
     config.metadata = metadataPolicy(value.metadata);
 
-  if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
     config.security = securityPolicy(value.security);
   if (value.skill_discovery !== undefined)
@@ -713,38 +714,6 @@ function errorMessage(error: unknown): string {
 function toPosix(value: string): string {
   return value.split(path.sep).join(path.posix.sep);
 }
-function layoutPolicy(value: unknown): ScanConfig["layout"] {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new ConfigError("layout must be an object.");
-  const layout = value as Record<string, unknown>;
-  const allowed = new Set(["tool_namespace", "workflow_aliases"]);
-  for (const key of Object.keys(layout)) {
-    if (!allowed.has(key))
-      throw new ConfigError(
-        `Unknown layout config key "${key}". Allowed keys: ${[...allowed].join(
-          ", ",
-        )}.`,
-      );
-  }
-
-  const toolNamespace =
-    layout.tool_namespace === undefined
-      ? undefined
-      : stringValue("layout.tool_namespace", layout.tool_namespace);
-  const workflowAliases =
-    layout.workflow_aliases === undefined
-      ? DEFAULT_CONFIG.layout.workflowAliases
-      : stringRecord("layout.workflow_aliases", layout.workflow_aliases);
-
-  return {
-    ...(toolNamespace === undefined ? {} : { toolNamespace }),
-    workflowAliases: {
-      ...DEFAULT_CONFIG.layout.workflowAliases,
-      ...workflowAliases,
-    },
-  };
-}
-
 function securityPolicy(value: unknown): ScanConfig["security"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ConfigError("security must be an object.");
@@ -894,17 +863,6 @@ function objectRecord(name: string, value: unknown): Record<string, unknown> {
     throw new ConfigError(`${name} must be an object.`);
   }
   return value as Record<string, unknown>;
-}
-
-function stringRecord(name: string, value: unknown): Record<string, string> {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new ConfigError(`${name} must be an object of string values.`);
-  const record = value as Record<string, unknown>;
-  for (const [key, item] of Object.entries(record)) {
-    if (typeof item !== "string")
-      throw new ConfigError(`${name}.${key} must be a string.`);
-  }
-  return record as Record<string, string>;
 }
 
 function stringValue(name: string, value: unknown): string {

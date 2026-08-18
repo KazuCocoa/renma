@@ -145,6 +145,9 @@ const REMOVED_SEMANTIC_IMPORTS = [
   "renma/suggest-metadata",
   "renma/skill-migration",
 ];
+const INTENTIONALLY_PRIVATE_TYPE_IMPORTS = [
+  "renma/types/security-analysis-coverage",
+];
 const PRIVATE_BODY_POLICY_SPECIFIERS = [
   "renma/dist/security-body-policy/clause-facts.js",
   "renma/dist/security-body-policy/model.js",
@@ -169,6 +172,7 @@ const PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS = [
 const PRIVATE_PACKAGE_SPECIFIERS = [
   ...REMOVED_DIST_IMPORTS.map(([specifier]) => specifier),
   ...REMOVED_SEMANTIC_IMPORTS,
+  ...INTENTIONALLY_PRIVATE_TYPE_IMPORTS,
   ...PRIVATE_BODY_POLICY_SPECIFIERS,
   ...PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS,
 ];

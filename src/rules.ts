@@ -13,7 +13,7 @@ import {
   classifyRepositorySkillEntrypointPath,
   classifyRepositorySkillPath,
   logicalSkillDirectory,
-  normalizeRepositoryRelativePath,
+  normalizeRepositorySkillRelativePath,
 } from "./discovery.js";
 import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import { parseAssetMetadata } from "./metadata.js";
@@ -2808,7 +2808,7 @@ function declaredDependencyLayoutFindings(
     }
     if (
       target.startsWith("contexts/") ||
-      normalizeRepositoryRelativePath(target) !== undefined ||
+      normalizeRepositorySkillRelativePath(target) !== undefined ||
       target.startsWith("tools/")
     ) {
       continue;

@@ -15,7 +15,10 @@ import type {
   SuppressedFindingEvidence,
 } from "./diagnostics.js";
 
-/** Complete result returned by a scan operation. */
+/** Stable schema identifier for the serialized scan JSON document. */
+export const SCAN_JSON_SCHEMA_VERSION = "renma.scan.v1" as const;
+
+/** Core result returned by a scan operation before wire-format serialization. */
 export interface ScanResult {
   root: string;
   configPath?: string;
@@ -35,4 +38,9 @@ export interface ScanResult {
   diagnosticsV2: DiagnosticV2[];
   reviewBundles: ReviewBundle[];
   exitThreshold: Severity;
+}
+
+/** Public JSON document emitted by `formatJson()` and `scan --format json`. */
+export interface ScanJsonDocument extends ScanResult {
+  schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION;
 }

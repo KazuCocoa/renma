@@ -1,4 +1,8 @@
-import type { ScanResult } from "./types/scan-result.js";
+import {
+  SCAN_JSON_SCHEMA_VERSION,
+  type ScanJsonDocument,
+  type ScanResult,
+} from "./types/scan-result.js";
 import type {
   ExecutableSurfaceEntry,
   ExecutableSurfaceDependency,
@@ -33,11 +37,14 @@ export function formatVersionedJsonDocument(
   );
 }
 
-export const SCAN_JSON_SCHEMA_VERSION = "renma.scan.v1" as const;
-
 /** Format a scan result as pretty-printed JSON. */
 export function formatJson(result: ScanResult): string {
-  return formatVersionedJsonDocument(SCAN_JSON_SCHEMA_VERSION, result);
+  const document = Object.assign(
+    { schemaVersion: SCAN_JSON_SCHEMA_VERSION },
+    result,
+    { schemaVersion: SCAN_JSON_SCHEMA_VERSION },
+  ) satisfies ScanJsonDocument;
+  return formatJsonDocument(document);
 }
 
 /** Format a scan result as human-readable terminal text. */

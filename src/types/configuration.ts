@@ -1,12 +1,6 @@
 import type { Severity, SuppressionConfig } from "./diagnostics.js";
 import type { RequiredMetadataPolicyField } from "../metadata-definitions.js";
 
-/** Compatibility-only layout input retained without forcing local migration. */
-export interface LayoutPolicyConfig {
-  toolNamespace?: string;
-  workflowAliases: Record<string, string>;
-}
-
 /** Normalized runtime projection; authored config uses the exact v1 keys documented in the Security Policy Guide. */
 export interface SecurityProfileConfig {
   allowedDataClass?: string | undefined;
@@ -108,7 +102,6 @@ export interface ScanConfig {
   executableSurface: ExecutableSurfaceConfig;
   quality: QualityConfig;
   metadata: MetadataConfig;
-  layout: LayoutPolicyConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;
 }

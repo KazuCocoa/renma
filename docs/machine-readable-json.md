@@ -27,6 +27,12 @@ path.
 | `bom`                    | `renma.repository-context-bom.v2`          |
 | `execution-contract`     | `renma.experimental-execution-contract.v1` |
 
+The internal `PUBLIC_JSON_SCHEMA_VERSIONS` registry mirrors this table and
+separates stable identifiers from the explicitly experimental execution
+contract. A repository test compares the registry and this documentation so a
+public top-level document cannot be added, removed, or renamed on only one
+side.
+
 The execution contract remains explicitly experimental under its documented
 compatibility policy. Published BOM, Trust Graph, and Skill Authoring Handoff
 JSON Schemas remain the normative schemas for those artifacts. A versioned
@@ -37,6 +43,11 @@ own identifier; the outer identifier does not replace or reinterpret it.
 internal object does not become a public contract merely because it can be
 serialized, and internal working values do not receive `schemaVersion`
 blindly.
+
+For scan consumers, the public TypeScript `ScanResult` is the core result shape
+before serialization. `ScanJsonDocument` extends that shape with the literal
+`schemaVersion: "renma.scan.v1"`; `formatJson()` remains the authoritative
+serializer.
 
 ## Compatibility during 1.x
 
