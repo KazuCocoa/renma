@@ -121,6 +121,8 @@ test("reuses the established launcher, extension, and options grammar", () => {
     "bash scripts/check.bash",
     "python scripts/check.py",
     "python3 scripts/check.py",
+    "python helper.py",
+    "python ./helper.py",
     "node --no-warnings tools/check.mjs",
     "pwsh -File tools/check.ps1",
     "pwsh.exe -File tools\\check.ps1",
@@ -326,6 +328,42 @@ test("recognized inline targets retain exact resolution states", () => {
       ? evidence[2].pathResolution.path
       : undefined,
     "skills/demo/scripts/local.py",
+  );
+});
+
+test("Skill-root helper targets resolve as explicit noncanonical evidence", () => {
+  const evidence = collect(
+    ["Run `python helper.py`.", "", "Run `python ./helper.py`."].join("\n"),
+  );
+  const states = new Map([["skills/demo/helper.py", "parsed"]] as const);
+
+  assert.deepEqual(
+    evidence.map(({ rawTarget, pathResolution }) => ({
+      rawTarget,
+      pathResolution,
+    })),
+    [
+      {
+        rawTarget: "helper.py",
+        pathResolution: {
+          kind: "candidate",
+          path: "skills/demo/helper.py",
+          source: "skill-relative",
+        },
+      },
+      {
+        rawTarget: "./helper.py",
+        pathResolution: {
+          kind: "candidate",
+          path: "skills/demo/helper.py",
+          source: "skill-relative",
+        },
+      },
+    ],
+  );
+  assert.deepEqual(
+    evidence.map((row) => resolveHelperCommandEvidence(row, states).resolution),
+    ["noncanonical", "noncanonical"],
   );
 });
 

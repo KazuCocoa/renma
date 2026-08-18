@@ -102,7 +102,7 @@ export function helperScriptPath(command: string): string | undefined {
     return undefined;
   }
   const isExplicitStaticPath =
-    /^(?:(?:\.\.?\/)+)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+$/u.test(
+    /^(?:(?:\.\.?\/)+)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/u.test(
       normalizedSeparators,
     ) ||
     (path.posix.isAbsolute(normalizedSeparators) &&

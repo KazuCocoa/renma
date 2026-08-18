@@ -84,7 +84,7 @@ test("collectRepositoryPaths normalizes repo paths without resolving traversal o
   assert.equal(paths.has(absoluteOutsideScript), false);
 });
 
-test("helper script extraction forwards plausible traversal without parsing arbitrary arguments", () => {
+test("helper script extraction forwards traversal and selects only the primary target", () => {
   for (const candidate of [
     "../tools/helper.mjs",
     "../scripts/helper.mjs",
@@ -123,11 +123,11 @@ test("helper script extraction forwards plausible traversal without parsing arbi
   );
   assert.equal(
     helperScriptPath("node runner.mjs ../tools/helper.mjs"),
-    undefined,
+    "runner.mjs",
   );
   assert.equal(
     helperScriptPath("node runner.mjs --config tools/a.mjs"),
-    undefined,
+    "runner.mjs",
   );
 });
 

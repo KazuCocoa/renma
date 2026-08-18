@@ -10,6 +10,7 @@ import {
   type MarkdownLinkTargetRecord,
   type MarkdownSourceColumnRange,
 } from "./markdown-syntax.js";
+import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import type { SkillParentIndex } from "./catalog.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -115,10 +116,18 @@ function analyzeStaticSupportReferences(
     markdownBodyStartLineForArtifact(document.artifact, document.lines) - 1;
   for (let index = 0; index < document.lines.length; index += 1) {
     const line = document.lines[index] ?? "";
-    const explicitValues: Array<{ raw: string; value: string }> =
+    const explicitValues: Array<{
+      raw: string;
+      value: string;
+      structural: boolean;
+    }> =
       markdownSyntax?.linkTargets
         .filter((target) => target.startLine === index + 1)
-        .map((target) => ({ raw: target.source, value: target.target })) ?? [];
+        .map((target) => ({
+          raw: target.source,
+          value: target.target,
+          structural: true,
+        })) ?? [];
 
     let unquotedLine = maskMarkdownStructuralEvidence(
       line,
@@ -127,28 +136,40 @@ function analyzeStaticSupportReferences(
     );
     const quotedMatches: string[] = [];
     for (const match of unquotedLine.matchAll(
-      /([`'"])((?:\.\/)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_. -]+)+)\1/g,
+      /([`'"])(\.\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_. -]+)*|[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_. -]+)+)\1/g,
     )) {
-      if (match[2]) {
-        explicitValues.push({ raw: match[0], value: match[2] });
-        quotedMatches.push(match[0]);
+      if (match[2] && hasExplicitProsePathSignal(match[2])) {
+        explicitValues.push({
+          raw: match[0],
+          value: match[2],
+          structural: false,
+        });
       }
+      quotedMatches.push(match[0]);
     }
     unquotedLine = maskRawMatches(unquotedLine, quotedMatches);
     for (const match of unquotedLine.matchAll(
-      /(?:^|[\s([])((?:\.\/)?[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+[^\s)`'"\],;:]*)/g,
+      /(?:^|[\s([])(\.\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*[^\s)`'"\],;:]*|[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+[^\s)`'"\],;:]*)/g,
     )) {
-      if (match[1]) {
-        explicitValues.push({ raw: match[0].trim(), value: match[1] });
+      if (match[1] && hasExplicitProsePathSignal(match[1])) {
+        explicitValues.push({
+          raw: match[0].trim(),
+          value: match[1],
+          structural: false,
+        });
       }
     }
 
     const explicitBasenames = new Set<string>();
     for (const value of explicitValues) {
-      const normalized = normalizeStaticSupportReference(
-        value.value,
-        skillDirectory,
-      );
+      const normalized = value.structural
+        ? normalizeMarkdownStaticSupportReference(
+            value.value,
+            skillDirectory,
+            candidatesByBasename,
+            candidateSetIncomplete,
+          )
+        : normalizeStaticSupportReference(value.value, skillDirectory);
       if (!normalized) continue;
       explicitBasenames.add(path.posix.basename(normalized.targetPath));
       addReference(normalized, value.raw, index + 1);
@@ -177,6 +198,26 @@ function analyzeStaticSupportReferences(
       );
       if (normalized) addReference(normalized, token.raw, index + 1);
     }
+  }
+
+  for (const evidence of collectHelperCommandEvidence([document])) {
+    if (
+      evidence.pathResolution.kind !== "candidate" ||
+      !isWithinSkillPackage(evidence.pathResolution.path, skillDirectory)
+    ) {
+      continue;
+    }
+    addReference(
+      {
+        targetPath: evidence.pathResolution.path,
+        relativePath: path.posix.relative(
+          skillDirectory,
+          evidence.pathResolution.path,
+        ),
+      },
+      evidence.snippet,
+      evidence.line,
+    );
   }
 
   function addReference(
@@ -666,7 +707,6 @@ function normalizeStaticSupportReference(
     .replace(/^\.\//, "");
   if (
     !cleaned ||
-    !cleaned.includes("/") ||
     path.posix.isAbsolute(cleaned) ||
     cleaned.startsWith("#") ||
     /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(cleaned)
@@ -679,6 +719,7 @@ function normalizeStaticSupportReference(
   const normalized = path.posix.normalize(repositoryRelative);
   const relativePath = path.posix.relative(skillDirectory, normalized);
   if (
+    !relativePath ||
     relativePath.startsWith("../") ||
     relativePath === ".." ||
     relativePath.endsWith("/")
@@ -686,6 +727,47 @@ function normalizeStaticSupportReference(
     return undefined;
   }
   return { targetPath: normalized, relativePath };
+}
+
+function normalizeMarkdownStaticSupportReference(
+  value: string,
+  skillDirectory: string,
+  candidatesByBasename: ReadonlyMap<string, readonly string[]>,
+  candidateSetIncomplete: boolean,
+): { targetPath: string; relativePath: string } | undefined {
+  const direct = normalizeStaticSupportReference(value, skillDirectory);
+  if (!direct || value.trim().startsWith("./")) return direct;
+
+  const basename = normalizePotentialBasename(value);
+  if (!basename) return direct;
+  const candidates = candidatesByBasename.get(basename) ?? [];
+  if (candidates.includes(direct.targetPath)) return direct;
+  if (candidates.length === 1) {
+    return normalizeStaticSupportReference(candidates[0]!, skillDirectory);
+  }
+  return candidates.length === 0 && !candidateSetIncomplete
+    ? direct
+    : undefined;
+}
+
+function hasExplicitProsePathSignal(value: string): boolean {
+  const cleaned = decodePath(stripUriSuffix(value.trim()))
+    .replace(/^<|>$/g, "")
+    .replace(/[),.;:]+$/, "");
+  if (cleaned.startsWith("./")) return true;
+
+  const firstSegment = cleaned.split("/")[0];
+  if (
+    firstSegment === "references" ||
+    firstSegment === "scripts" ||
+    firstSegment === "assets" ||
+    firstSegment === "profiles" ||
+    firstSegment === "examples"
+  ) {
+    return true;
+  }
+
+  return isStaticSupportBasename(path.posix.basename(cleaned));
 }
 
 function stripUriSuffix(value: string): string {

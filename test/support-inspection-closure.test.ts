@@ -1528,26 +1528,35 @@ test("explicit noncanonical Skill-package references remain inspection and secur
     t,
     undefined,
     [
+      "Read [the license](LICENSE.txt).",
+      "Read [the same license](./LICENSE.txt).",
       "Read [the template](templates/prompt.md).",
-      "Read [the instructions](docs/instructions.txt).",
+      "Read `templates/prompt.md` as file-like code evidence.",
+      "Read `./docs/instructions.txt`.",
       "Review [the local resource](resources/model.bin).",
       "Review [the collector](bin/collect.py).",
+      "",
+      "Run `python helper.py`.",
       "",
       "Run `python bin/run.py`.",
     ].join("\n"),
   );
   const targets = [
+    "skills/demo/LICENSE.txt",
     "skills/demo/templates/prompt.md",
     "skills/demo/docs/instructions.txt",
     "skills/demo/resources/model.bin",
     "skills/demo/bin/collect.py",
+    "skills/demo/helper.py",
     "skills/demo/bin/run.py",
   ];
-  await fixture.write(targets[0]!, "Use the prompt conservatively.\n");
-  await fixture.write(targets[1]!, "Review the instructions.\n");
-  await fixture.write(targets[2]!, new Uint8Array([0x00, 0x01, 0x02]));
-  await fixture.write(targets[3]!, "print('linked evidence only')\n");
-  await fixture.write(targets[4]!, "print('static evidence only')\n");
+  await fixture.write(targets[0]!, "Demo license terms.\n");
+  await fixture.write(targets[1]!, "Use the prompt conservatively.\n");
+  await fixture.write(targets[2]!, "Review the instructions.\n");
+  await fixture.write(targets[3]!, new Uint8Array([0x00, 0x01, 0x02]));
+  await fixture.write(targets[4]!, "print('linked evidence only')\n");
+  await fixture.write(targets[5]!, "print('root helper evidence')\n");
+  await fixture.write(targets[6]!, "print('static evidence only')\n");
 
   const result = await scan(fixture.root, { failOn: "high" });
 
@@ -1563,18 +1572,84 @@ test("explicit noncanonical Skill-package references remain inspection and secur
   const invocation = result.executableSurfaceInventory?.invocations.find(
     (candidate) => candidate.normalizedTarget === "skills/demo/bin/run.py",
   );
+  const rootInvocation = result.executableSurfaceInventory?.invocations.find(
+    (candidate) => candidate.normalizedTarget === "skills/demo/helper.py",
+  );
   const surface = result.executableSurfaceInventory?.surfaces.find(
     (candidate) => candidate.path === "skills/demo/bin/run.py",
   );
+  const rootSurface = result.executableSurfaceInventory?.surfaces.find(
+    (candidate) => candidate.path === "skills/demo/helper.py",
+  );
   assert.equal(invocation?.resolution, "noncanonical");
+  assert.equal(rootInvocation?.resolution, "noncanonical");
   assert.equal(surface?.scope, "noncanonical");
   assert.equal(surface?.securityPolicy.hasEffectivePolicy, false);
+  assert.equal(rootSurface?.scope, "noncanonical");
+  assert.equal(rootSurface?.securityPolicy.hasEffectivePolicy, false);
   const linkedSurface = result.executableSurfaceInventory?.surfaces.find(
     (candidate) => candidate.path === "skills/demo/bin/collect.py",
   );
   assert.equal(linkedSurface?.scope, "noncanonical");
   assert.equal(linkedSurface?.staticallyReferenced, true);
   assert.equal(linkedSurface?.invocationCount, 0);
+});
+
+test("ordinary slash-separated prose does not become repository path evidence", async (t) => {
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    [
+      "The client/server boundary must remain stable.",
+      "Compare input/output behavior.",
+      "Use the owner/repo naming convention.",
+      "Keep the frontend/backend contract documented.",
+    ].join("\n"),
+  );
+
+  const snapshot = await collectRepositorySnapshot(fixture.root, {
+    failOn: "high",
+  });
+  const result = scanFromRepositorySnapshot(snapshot);
+
+  assert.equal(result.inspectionCoverage.blockingIssues.length, 0);
+  assert.ok(
+    !result.findings.some((finding) => finding.id === "SUPPORT-MISSING-PATH"),
+  );
+  assert.ok(
+    !snapshot.catalog.dependencies.some(
+      (dependency) => dependency.kind === "statically_references",
+    ),
+  );
+});
+
+test("an uninspectable Skill-root helper remains exact strict evidence", async (t) => {
+  const target = "skills/demo/helper.py";
+  const fixture = await referencedSupportFixture(
+    t,
+    undefined,
+    "Run `python helper.py`.",
+  );
+  await fixture.write("outside.py", "print('outside')\n");
+  await symlink("../../outside.py", fixture.resolve(target));
+
+  const result = await scan(fixture.root, { failOn: "high" });
+  const issue = result.inspectionCoverage.blockingIssues.find(
+    (candidate) => candidate.path === target && candidate.scope === "exact",
+  );
+  const invocation = result.executableSurfaceInventory?.invocations.find(
+    (candidate) => candidate.normalizedTarget === target,
+  );
+
+  assert.equal(issue?.state, "symlink");
+  assert.equal(issue?.details?.packageContentKind, "explicit-noncanonical");
+  assert.equal(invocation?.resolution, "symlink");
+  assert.equal(invocation?.targetPathState, "symlink");
+  assert.ok(
+    evaluateStrictScan(result).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
+    ),
+  );
 });
 
 test("unreferenced noncanonical Skill-package files do not broaden discovery", async (t) => {

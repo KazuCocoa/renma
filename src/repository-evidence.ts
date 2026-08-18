@@ -336,6 +336,7 @@ export async function collectRepositorySnapshot(
     catalog.catalog,
     core.discoveredPaths,
     core.executableDependencyCandidates,
+    [...core.excludedSupportDirectoryPaths],
   );
   const repositoryPathStates = await collectRepositoryPathStates(
     core.root,
@@ -346,6 +347,7 @@ export async function collectRepositorySnapshot(
         core.documents,
         catalog.catalog,
         core.executableDependencyCandidates,
+        [...core.excludedSupportDirectoryPaths],
       ),
     ],
     core.artifacts,
