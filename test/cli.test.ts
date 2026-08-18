@@ -530,8 +530,14 @@ test("commands fail closed with one aggregate across config scopes", async () =>
     assert.equal(result.code, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
     assert.equal(
-      result.stderr.match(/Unsupported configuration keys found:/gu)?.length,
+      result.stderr.match(/Unsupported configuration keys found in /gu)?.length,
       1,
+      args.join(" "),
+    );
+    assert.ok(
+      result.stderr.includes(
+        `Unsupported configuration keys found in ${path.join(root, "renma.config.json")}:`,
+      ),
       args.join(" "),
     );
     assert.match(result.stderr, /Top-level configuration:[\s\S]*"layout"/);
@@ -551,6 +557,38 @@ test("commands fail closed with one aggregate across config scopes", async () =>
     );
     assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
   }
+});
+
+test("CLI attributes aggregate key errors to an explicit config path", async () => {
+  const root = await fixture();
+  const configPath = path.join(root, "review-policy.jsonc");
+  await writeFile(
+    configPath,
+    `{
+  // Explicit review configuration.
+  "layout": {},
+  "quality": { "wrongQualityKey": 1 }
+}\n`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["scan", root, "--config", configPath, "--json"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.ok(
+    result.stderr.includes(
+      `Unsupported configuration keys found in ${configPath}:`,
+    ),
+  );
+  assert.match(result.stderr, /Top-level configuration:[\s\S]*"layout"/);
+  assert.match(result.stderr, /quality:[\s\S]*"wrongQualityKey"/);
+  assert.doesNotMatch(
+    result.stderr,
+    /Renma scan|Findings:|strict_scan\.|SEC-|QUAL-/,
+  );
+  assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
 test("CLI rejects executable explicit config extensions", async () => {

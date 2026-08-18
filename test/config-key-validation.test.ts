@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ConfigError, loadConfig } from "../src/config.js";
+import {
+  ConfigError,
+  loadConfig,
+  type ConfigOverrides,
+} from "../src/config.js";
 
 test("multiple unknown quality keys produce one sorted aggregate", async (t) => {
   const root = await configFixture(t, {
@@ -16,8 +20,12 @@ test("multiple unknown quality keys produce one sorted aggregate", async (t) => 
 
   const error = await configError(root);
   assert.equal(
-    error.message.match(/Unsupported configuration keys found:/gu)?.length,
+    error.message.match(/Unsupported configuration keys found in /gu)?.length,
     1,
+  );
+  assert.equal(
+    error.message.split("\n", 1)[0],
+    `Unsupported configuration keys found in ${path.join(root, "renma.config.json")}:`,
   );
   assertOrderedSubstrings(error.message, [
     "quality:",
@@ -33,7 +41,18 @@ test("all inspectable config scopes aggregate independently of author order", as
 
   const firstError = await configError(firstRoot);
   const secondError = await configError(secondRoot);
-  assert.equal(firstError.message, secondError.message);
+  assert.equal(
+    aggregateBody(firstError.message),
+    aggregateBody(secondError.message),
+  );
+  assert.equal(
+    firstError.message.split("\n", 1)[0],
+    `Unsupported configuration keys found in ${path.join(firstRoot, "renma.config.json")}:`,
+  );
+  assert.equal(
+    secondError.message.split("\n", 1)[0],
+    `Unsupported configuration keys found in ${path.join(secondRoot, "renma.config.json")}:`,
+  );
   assertOrderedSubstrings(firstError.message, [
     "Top-level configuration:",
     '- "layout" -> remove this field; there is no replacement (removed)',
@@ -72,6 +91,32 @@ test("all inspectable config scopes aggregate independently of author order", as
     "Allowed security profile keys:",
     "Allowed skill_discovery keys:",
     "Renma v1 does not interpret these removed, historical, or unknown configuration keys.",
+  ]);
+});
+
+test("explicit config path identifies the exact unsupported-key source", async (t) => {
+  const root = await mkdtemp(
+    path.join(tmpdir(), "renma-config-keys-explicit-"),
+  );
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const configPath = path.join(root, "review-policy.jsonc");
+  await writeFile(
+    configPath,
+    `{
+  // Explicit review configuration.
+  "quality": { "wrongQualityKey": 1, "anotherWrongQualityKey": 2 }
+}\n`,
+  );
+
+  const error = await configError(root, { configPath });
+  assert.equal(
+    error.message.split("\n", 1)[0],
+    `Unsupported configuration keys found in ${configPath}:`,
+  );
+  assertOrderedSubstrings(error.message, [
+    "quality:",
+    '- "anotherWrongQualityKey" (unknown)',
+    '- "wrongQualityKey" (unknown)',
   ]);
 });
 
@@ -309,6 +354,10 @@ function assertOrderedSubstrings(message: string, substrings: string[]): void {
   }
 }
 
+function aggregateBody(message: string): string {
+  return message.slice(message.indexOf("\n"));
+}
+
 async function configFixture(
   t: test.TestContext,
   config: unknown,
@@ -322,9 +371,12 @@ async function configFixture(
   return root;
 }
 
-async function configError(root: string): Promise<ConfigError> {
+async function configError(
+  root: string,
+  overrides: ConfigOverrides = {},
+): Promise<ConfigError> {
   try {
-    await loadConfig(root, {});
+    await loadConfig(root, overrides);
   } catch (error) {
     assert.ok(error instanceof ConfigError);
     return error;

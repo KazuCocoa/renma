@@ -114,7 +114,7 @@ test("historical security profile spellings fail with canonical replacements", a
         loadConfig(root, {}),
         (error: unknown) =>
           error instanceof ConfigError &&
-          error.message.includes("Unsupported configuration keys found:") &&
+          error.message.startsWith(unsupportedKeyHeader(root)) &&
           error.message.includes(
             `- ${JSON.stringify(legacy)} -> use ${JSON.stringify(canonical)} (historical)`,
           ),
@@ -139,7 +139,7 @@ test("multiple historical security profile keys produce one actionable error", a
   const error = await configError(root);
   assert.equal(
     error.message,
-    `Unsupported configuration keys found:
+    `${unsupportedKeyHeader(root)}
 
 security.profiles.appium-local-workflows:
 - "allowedData" -> use "allowed_data" (historical)
@@ -190,7 +190,7 @@ test("layout and historical aliases aggregate across profiles in stable order", 
 
   const firstError = await configError(firstRoot);
   const secondError = await configError(secondRoot);
-  const expected = `Unsupported configuration keys found:
+  const expectedBody = `
 
 Top-level configuration:
 - "layout" -> remove this field; there is no replacement (removed)
@@ -206,8 +206,14 @@ security.profiles.appium-real-device-workflows:
 - "networkAllowed" -> use "network_allowed" (historical)
 
 Renma v1 does not interpret these removed or historical configuration keys. Apply every listed replacement and remove every listed key without one and rerun \`renma scan .\`.`;
-  assert.equal(firstError.message, expected);
-  assert.equal(secondError.message, expected);
+  assert.equal(
+    firstError.message,
+    `${unsupportedKeyHeader(firstRoot)}${expectedBody}`,
+  );
+  assert.equal(
+    secondError.message,
+    `${unsupportedKeyHeader(secondRoot)}${expectedBody}`,
+  );
 });
 
 test("removed historical and unknown keys remain visibly distinct", async (t) => {
@@ -228,7 +234,7 @@ test("removed historical and unknown keys remain visibly distinct", async (t) =>
   const error = await configError(root);
   assert.equal(
     error.message,
-    `Unsupported configuration keys found:
+    `${unsupportedKeyHeader(root)}
 
 Top-level configuration:
 - "layout" -> remove this field; there is no replacement (removed)
@@ -268,7 +274,7 @@ test("unknown configuration keys aggregate across every inspectable scope", asyn
   const error = await configError(root);
   assert.equal(
     error.message,
-    `Unsupported configuration keys found:
+    `${unsupportedKeyHeader(root)}
 
 Top-level configuration:
 - "aTopUnknown" (unknown)
@@ -435,4 +441,8 @@ async function configError(root: string): Promise<ConfigError> {
     return error;
   }
   assert.fail("Expected loadConfig to reject invalid security profile keys.");
+}
+
+function unsupportedKeyHeader(root: string): string {
+  return `Unsupported configuration keys found in ${join(root, "renma.config.json")}:`;
 }

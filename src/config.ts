@@ -452,7 +452,7 @@ function normalizeConfig(
     throw new ConfigError(`Config${label(configPath)} must be a JSON object.`);
   }
   validateConfigurationStructure(value);
-  validateConfigurationKeys(value);
+  validateConfigurationKeys(value, configPath);
 
   const config: Partial<ScanConfig> = {};
   if (value.fail_on !== undefined)
@@ -967,7 +967,10 @@ function validateConfigurationStructure(config: Record<string, unknown>): void {
   }
 }
 
-function validateConfigurationKeys(config: Record<string, unknown>): void {
+function validateConfigurationKeys(
+  config: Record<string, unknown>,
+  configPath?: string,
+): void {
   const issues: ConfigurationKeyIssue[] = [];
   for (const key of Object.keys(config)) {
     if (TOP_LEVEL_CONFIG_KEY_REGISTRY.acceptedKeys.has(key)) continue;
@@ -1047,7 +1050,7 @@ function validateConfigurationKeys(config: Record<string, unknown>): void {
   if (issues.length === 0) return;
 
   issues.sort(compareConfigurationKeyIssues);
-  throw new ConfigError(formatConfigurationKeyIssues(issues));
+  throw new ConfigError(formatConfigurationKeyIssues(issues, configPath));
 }
 
 function collectUnknownConfigurationKeys(
@@ -1110,8 +1113,9 @@ function compareConfigurationKeyIssues(
 
 function formatConfigurationKeyIssues(
   issues: readonly ConfigurationKeyIssue[],
+  configPath?: string,
 ): string {
-  const lines = ["Unsupported configuration keys found:"];
+  const lines = [`Unsupported configuration keys found${label(configPath)}:`];
   let previousGroup: string | undefined;
   for (const issue of issues) {
     const group = configurationKeyIssueGroup(issue);
