@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import { conflictDiagnostics } from "./catalog-conflicts.js";
 import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
@@ -102,7 +103,7 @@ export function resolveSkillSupportParent(
       state: "ambiguous",
       candidatePath,
       candidates: [...candidates].sort((left, right) =>
-        left.sourcePath.localeCompare(right.sourcePath),
+        compareUtf16CodeUnits(left.sourcePath, right.sourcePath),
       ),
     };
   }
@@ -166,7 +167,7 @@ export function buildCatalog(
         skillDirectory,
         candidatePaths: candidates
           .map((candidate) => candidate.sourcePath)
-          .sort((left, right) => left.localeCompare(right)),
+          .sort((left, right) => compareUtf16CodeUnits(left, right)),
       },
     });
   }
@@ -243,7 +244,7 @@ export function buildCatalog(
     .sort((a, b) => {
       const byKind = kindOrder(a.kind) - kindOrder(b.kind);
       if (byKind !== 0) return byKind;
-      return a.sourcePath.localeCompare(b.sourcePath);
+      return compareUtf16CodeUnits(a.sourcePath, b.sourcePath);
     });
 
   const dependencies = [
@@ -255,11 +256,11 @@ export function buildCatalog(
       incompleteSupportDirectories,
     ),
   ].sort((a, b) => {
-    const byFrom = a.from.localeCompare(b.from);
+    const byFrom = compareUtf16CodeUnits(a.from, b.from);
     if (byFrom !== 0) return byFrom;
     const byKind = dependencyKindOrder(a.kind) - dependencyKindOrder(b.kind);
     if (byKind !== 0) return byKind;
-    return a.to.localeCompare(b.to);
+    return compareUtf16CodeUnits(a.to, b.to);
   });
   diagnostics.push(...dependencyDiagnostics(entries, dependencies));
   diagnostics.push(...lifecycleDiagnostics(entries));

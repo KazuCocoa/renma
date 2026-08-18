@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { SecurityDiffSummary } from "./security-diff.js";
 import type {
   ListSecurityPolicyField,
@@ -252,10 +253,10 @@ function compareRelaxations(
       MATCH_ID_BY_PROPERTY[left.property],
       MATCH_ID_BY_PROPERTY[right.property],
     ) ||
-    left.asset.path.localeCompare(right.asset.path) ||
-    left.asset.id.localeCompare(right.asset.id) ||
-    left.asset.kind.localeCompare(right.asset.kind) ||
-    relaxationValue(left).localeCompare(relaxationValue(right))
+    compareUtf16CodeUnits(left.asset.path, right.asset.path) ||
+    compareUtf16CodeUnits(left.asset.id, right.asset.id) ||
+    compareUtf16CodeUnits(left.asset.kind, right.asset.kind) ||
+    compareUtf16CodeUnits(relaxationValue(left), relaxationValue(right))
   );
 }
 
@@ -265,10 +266,10 @@ function compareMatches(
 ): number {
   return (
     compareMatchIds(left.id, right.id) ||
-    left.asset.path.localeCompare(right.asset.path) ||
-    left.asset.id.localeCompare(right.asset.id) ||
-    left.asset.kind.localeCompare(right.asset.kind) ||
-    relaxationValue(left).localeCompare(relaxationValue(right))
+    compareUtf16CodeUnits(left.asset.path, right.asset.path) ||
+    compareUtf16CodeUnits(left.asset.id, right.asset.id) ||
+    compareUtf16CodeUnits(left.asset.kind, right.asset.kind) ||
+    compareUtf16CodeUnits(relaxationValue(left), relaxationValue(right))
   );
 }
 

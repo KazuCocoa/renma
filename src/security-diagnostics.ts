@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
 import {
@@ -1295,7 +1296,7 @@ export function analyzeSecurityDiagnostics(
       schemaVersion: SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION,
       artifacts: analyses
         .map((analysis) => analysis.coverage)
-        .sort((left, right) => left.path.localeCompare(right.path)),
+        .sort((left, right) => compareUtf16CodeUnits(left.path, right.path)),
     },
   };
 }
@@ -2771,7 +2772,9 @@ function canonicalDescriptionRoutingLiteralAuthoringDetections(
       ...evidence,
       dedupeKey: `${RULES.canonicalDescriptionHighRiskLiteral.id}:${evidence.startLine}`,
       details: {
-        underlyingDiagnosticIds: [...underlyingDiagnosticIds].sort(),
+        underlyingDiagnosticIds: [...underlyingDiagnosticIds].sort(
+          compareUtf16CodeUnits,
+        ),
       },
     },
   ];

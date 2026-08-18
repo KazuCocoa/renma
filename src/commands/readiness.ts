@@ -3,6 +3,7 @@ import {
   type GraphEdge,
   type GraphReport,
 } from "./graph.js";
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
@@ -36,7 +37,7 @@ import {
 import { CLI_EXIT } from "../cli-errors.js";
 
 export type ReadinessFormat = "json" | "markdown";
-export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v1" as const;
+export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v2" as const;
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const MARKDOWN_FINDINGS_LIMIT =
@@ -292,12 +293,15 @@ export function buildReadinessReport(
       "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately.",
     ),
     findingCheck(
-      "layout.disallowed_skill_assets",
-      "Skill-local support policy",
+      "skills.support_integrity",
+      "Skill support integrity",
       findings,
-      [DIAGNOSTIC_IDS.LAYOUT_DISALLOWED_SKILL_ASSET],
+      [
+        DIAGNOSTIC_IDS.SUPPORT_MISSING_PATH,
+        DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
+      ],
       "fail",
-      "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it.",
+      "Explicitly referenced Skill support exists and is inspectable as regular repository content.",
     ),
     findingCheck(
       "layout.context_root",
@@ -1285,7 +1289,7 @@ function selectMarkdownFindings(findings: Finding[]): Finding[] {
     selected.length < MARKDOWN_FINDINGS_LIMIT &&
     [...repeatedBuckets.values()].some((bucket) => bucket.length > 0)
   ) {
-    for (const id of [...repeatedBuckets.keys()].sort()) {
+    for (const id of [...repeatedBuckets.keys()].sort(compareUtf16CodeUnits)) {
       const bucket = repeatedBuckets.get(id);
       const finding = bucket?.shift();
       if (!finding) continue;

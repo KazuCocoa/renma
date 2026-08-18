@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { buildInspectOutline, type InspectOutline } from "./inspect.js";
 import { formatVersionedJsonDocument } from "../report.js";
 
@@ -235,7 +236,7 @@ async function collectSiblingContext(
   const files = await walk(skillDir);
   const contextFiles: ContextFile[] = [];
 
-  for (const filePath of files.sort()) {
+  for (const filePath of files.sort(compareUtf16CodeUnits)) {
     if (filePath === sourcePath || path.basename(filePath) === "SKILL.md") {
       continue;
     }

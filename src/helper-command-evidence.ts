@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 import type { PhrasingContent } from "mdast";
 
@@ -415,10 +416,10 @@ function compareHelperCommandEvidence(
   right: HelperCommandEvidence,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.launcher.localeCompare(right.launcher) ||
-    left.rawTarget.localeCompare(right.rawTarget) ||
-    left.snippet.localeCompare(right.snippet)
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(left.rawTarget, right.rawTarget) ||
+    compareUtf16CodeUnits(left.snippet, right.snippet)
   );
 }

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import path from "node:path";
 
 import { CliUserError } from "../cli-errors.js";
@@ -1051,7 +1052,7 @@ function formatCompositionMarkdown(report: GraphReport): string {
   } else {
     for (const { asset, parents } of multipleParents) {
       lines.push(
-        `- ${asset.id}: ${parents.length} retained declaration routes from ${[...new Set(parents.map((edge) => edge.from))].sort().join(", ")}.`,
+        `- ${asset.id}: ${parents.length} retained declaration routes from ${[...new Set(parents.map((edge) => edge.from))].sort(compareUtf16CodeUnits).join(", ")}.`,
       );
     }
   }
@@ -1762,14 +1763,17 @@ function unresolvedGroupId(reference: string, view: GraphView): string {
 }
 
 function compareGraphNodes(a: GraphNode, b: GraphNode): number {
-  return a.sourcePath.localeCompare(b.sourcePath) || a.id.localeCompare(b.id);
+  return (
+    compareUtf16CodeUnits(a.sourcePath, b.sourcePath) ||
+    compareUtf16CodeUnits(a.id, b.id)
+  );
 }
 
 function compareGraphEdges(a: GraphEdge, b: GraphEdge): number {
   return (
-    a.from.localeCompare(b.from) ||
-    a.kind.localeCompare(b.kind) ||
-    a.to.localeCompare(b.to)
+    compareUtf16CodeUnits(a.from, b.from) ||
+    compareUtf16CodeUnits(a.kind, b.kind) ||
+    compareUtf16CodeUnits(a.to, b.to)
   );
 }
 
@@ -1851,23 +1855,23 @@ function edgeTarget(edge: GraphEdge): string {
 
 function stableAssets(assets: Asset[]): Asset[] {
   return [...assets].sort((left, right) => {
-    const byKind = left.kind.localeCompare(right.kind);
+    const byKind = compareUtf16CodeUnits(left.kind, right.kind);
     if (byKind !== 0) return byKind;
-    const byPath = left.sourcePath.localeCompare(right.sourcePath);
+    const byPath = compareUtf16CodeUnits(left.sourcePath, right.sourcePath);
     if (byPath !== 0) return byPath;
-    return left.id.localeCompare(right.id);
+    return compareUtf16CodeUnits(left.id, right.id);
   });
 }
 
 function stableDependencies(dependencies: Dependency[]): Dependency[] {
   return [...dependencies].sort((left, right) => {
-    const byFrom = left.from.localeCompare(right.from);
+    const byFrom = compareUtf16CodeUnits(left.from, right.from);
     if (byFrom !== 0) return byFrom;
-    const byKind = left.kind.localeCompare(right.kind);
+    const byKind = compareUtf16CodeUnits(left.kind, right.kind);
     if (byKind !== 0) return byKind;
-    const byTo = left.to.localeCompare(right.to);
+    const byTo = compareUtf16CodeUnits(left.to, right.to);
     if (byTo !== 0) return byTo;
-    const byPath = left.sourcePath.localeCompare(right.sourcePath);
+    const byPath = compareUtf16CodeUnits(left.sourcePath, right.sourcePath);
     if (byPath !== 0) return byPath;
     return (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1);
   });

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
@@ -419,10 +420,10 @@ function compareTokenShingleRepresentatives(
   const rightPrimary = sortOccurrences(right.occurrences)[0];
 
   return (
-    (leftPrimary?.path ?? "").localeCompare(rightPrimary?.path ?? "") ||
+    compareUtf16CodeUnits(leftPrimary?.path ?? "", rightPrimary?.path ?? "") ||
     (leftPrimary?.startLine ?? 0) - (rightPrimary?.startLine ?? 0) ||
     (leftPrimary?.endLine ?? 0) - (rightPrimary?.endLine ?? 0) ||
-    left.key.localeCompare(right.key)
+    compareUtf16CodeUnits(left.key, right.key)
   );
 }
 
@@ -433,7 +434,7 @@ function alsoAppearsSignature(occurrences: Occurrence[]): string {
   return sorted
     .filter((occurrence) => occurrence !== primary)
     .map((occurrence) => `${occurrence.path}:L${occurrence.startLine}`)
-    .sort()
+    .sort(compareUtf16CodeUnits)
     .join("|");
 }
 
@@ -509,7 +510,8 @@ function snippet(lines: string[]): string {
 function sortOccurrences(occurrences: Occurrence[]): Occurrence[] {
   return [...occurrences].sort(
     (left, right) =>
-      left.path.localeCompare(right.path) || left.startLine - right.startLine,
+      compareUtf16CodeUnits(left.path, right.path) ||
+      left.startLine - right.startLine,
   );
 }
 
@@ -522,15 +524,15 @@ function compareGroups(left: RepeatGroup, right: RepeatGroup): number {
     distinctPaths(right.occurrences).size -
       distinctPaths(left.occurrences).size ||
     right.occurrences.length - left.occurrences.length ||
-    left.label.localeCompare(right.label) ||
-    left.key.localeCompare(right.key)
+    compareUtf16CodeUnits(left.label, right.label) ||
+    compareUtf16CodeUnits(left.key, right.key)
   );
 }
 
 function compareFindings(left: Finding, right: Finding): number {
   return (
-    left.id.localeCompare(right.id) ||
-    left.evidence.path.localeCompare(right.evidence.path) ||
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.evidence.path, right.evidence.path) ||
     left.evidence.startLine - right.evidence.startLine
   );
 }

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { catalog } from "./catalog.js";
 import type { ConfigOverrides } from "../config.js";
 import {
@@ -290,7 +291,7 @@ function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
       unownedAssets: summary.totalAssets - summary.ownedAssets,
       coveragePercent: percent(summary.ownedAssets, summary.totalAssets),
     }))
-    .sort((left, right) => left.kind.localeCompare(right.kind));
+    .sort((left, right) => compareUtf16CodeUnits(left.kind, right.kind));
 }
 
 function summarizeByOwner(assets: OwnedAsset[]): OwnershipOwnerSummary[] {
@@ -304,7 +305,7 @@ function summarizeByOwner(assets: OwnedAsset[]): OwnershipOwnerSummary[] {
   }
 
   return [...summaries.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => compareUtf16CodeUnits(left, right))
     .map(([owner, ownerAssets]) => ({
       owner,
       totalAssets: ownerAssets.length,
@@ -322,16 +323,16 @@ function summarizeOwnerByKind(
   }
   return [...summaries.entries()]
     .map(([kind, totalAssets]) => ({ kind, totalAssets }))
-    .sort((left, right) => left.kind.localeCompare(right.kind));
+    .sort((left, right) => compareUtf16CodeUnits(left.kind, right.kind));
 }
 
 function stableAssets(assets: Asset[]): Asset[] {
   return [...assets].sort((left, right) => {
-    const byKind = left.kind.localeCompare(right.kind);
+    const byKind = compareUtf16CodeUnits(left.kind, right.kind);
     if (byKind !== 0) return byKind;
-    const byPath = left.sourcePath.localeCompare(right.sourcePath);
+    const byPath = compareUtf16CodeUnits(left.sourcePath, right.sourcePath);
     if (byPath !== 0) return byPath;
-    return left.id.localeCompare(right.id);
+    return compareUtf16CodeUnits(left.id, right.id);
   });
 }
 

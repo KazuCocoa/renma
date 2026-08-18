@@ -1042,7 +1042,7 @@ renma bom . --format markdown
 renma bom . --format json
 ```
 
-The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for v2 boundaries.
+The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for v3 boundaries.
 
 ## User Story: Improve Existing Skills With Diagnostics
 
@@ -1927,9 +1927,9 @@ renma bom . --format json --omit-generated-at
 ```
 
 Use the BOM when reviewers or CI consumers need one repository evidence manifest
-that combines existing Renma evidence. Renma supports only v2, the first
-supported long-term BOM contract; there is no v1 compatibility mode. V2 includes
-normalized declared/effective ownership plus static support relationships. See
+that combines existing Renma evidence. Renma currently emits only v3; v2 was
+the first supported long-term BOM contract and v3 updates its embedded
+Readiness checks. V3 includes normalized declared/effective ownership plus static support relationships. See
 the [Repository Context BOM contract](repository-context-bom.md).
 
 The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
@@ -1938,15 +1938,14 @@ JSON is the source of truth for automation. Markdown is a compact pull-request r
 
 Renma derives each BOM from one in-memory repository snapshot: configuration, discovered artifacts, parsed documents, catalog, graph evidence, diagnostics, readiness, and security summaries all come from the same collected state.
 
-BOM v2 additively includes the complete `executableSurfaceInventory`
+BOM v3 additively includes the complete `executableSurfaceInventory`
 projection—schema, summary, surface, invocation, and dependency rows—so consumers can
 audit and diff the same evidence emitted by scan. No standalone executable BOM
 command is needed. Current output includes invocation governance and per-surface
 invocation aggregates, dependency rows, and per-surface dependency summaries
-unconditionally. The published BOM v2 schema keeps those additive fields
-optional at the compatibility boundary so earlier 0.27.x BOMs remain valid;
-each new object is strict when present. BOM v2 and executable-surface inventory
-v1 versions are unchanged.
+unconditionally. The published BOM v3 schema carries forward those optional
+field boundaries from v2; each new object is strict when present. The nested
+executable-surface inventory remains v1.
 
 By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
 
@@ -2360,6 +2359,12 @@ renma readiness . --format json
 ```
 
 Readiness combines catalog diagnostics, Context Lens governance diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, selected scan findings, and a compact projection of the prepared Skill Discovery index.
+
+JSON uses `renma.readiness.v2`. Compared with v1, v2 removes the producerless
+`layout.disallowed_skill_assets` check and adds `skills.support_integrity`,
+which fails only on emitted `SUPPORT-MISSING-PATH` or `SUPPORT-SYMLINK-PATH`
+evidence. Consumers that key or allowlist checks must migrate to the new ID and
+meaning.
 
 Readiness answers whether the repository currently passes Renma's readiness
 gates. The authoritative JSON `level` remains `ready`, `needs_attention`, or

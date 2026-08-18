@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { canonicalSha256 } from "./canonical-json.js";
+import { canonicalSha256, compareUtf16CodeUnits } from "./canonical-json.js";
 import type { SkillParentIndex } from "./catalog.js";
 import {
   classifyRepositorySkillPath,
@@ -235,8 +235,8 @@ export function canonicalExecutableInvocationGraphEdges(
   }
   return [...uniqueEdges.values()].sort(
     (left, right) =>
-      left.sourcePath.localeCompare(right.sourcePath) ||
-      left.normalizedTarget.localeCompare(right.normalizedTarget),
+      compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+      compareUtf16CodeUnits(left.normalizedTarget, right.normalizedTarget),
   );
 }
 
@@ -361,7 +361,7 @@ export function buildExecutableSurfaceInventory(
       };
       return state;
     })
-    .sort((left, right) => left.path.localeCompare(right.path));
+    .sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
   const scopesByPath = new Map(
     baseSurfaces.map((surface) => [surface.path, surface.scope]),
   );
@@ -571,7 +571,7 @@ export function summarizeExecutableSurfaceInventory(
       .sort(
         (left, right) =>
           right.count - left.count ||
-          left.interpreter.localeCompare(right.interpreter),
+          compareUtf16CodeUnits(left.interpreter, right.interpreter),
       ),
   };
 }
@@ -714,8 +714,8 @@ function compareInvocationPolicyEvidence(
   return (
     invocationPolicyRelationOrder(left.relation) -
       invocationPolicyRelationOrder(right.relation) ||
-    left.path.localeCompare(right.path) ||
-    (left.fingerprint ?? "").localeCompare(right.fingerprint ?? "")
+    compareUtf16CodeUnits(left.path, right.path) ||
+    compareUtf16CodeUnits(left.fingerprint ?? "", right.fingerprint ?? "")
   );
 }
 
@@ -792,7 +792,7 @@ function collectStaticSurfaceReferences(
       .filter((value): value is string => value !== undefined),
   );
   for (const skillDirectory of [...skillDirectories].sort((left, right) =>
-    left.localeCompare(right),
+    compareUtf16CodeUnits(left, right),
   )) {
     const sources = input.documents.filter(
       (document) =>
@@ -856,9 +856,9 @@ function collectStaticSurfaceReferences(
   }
   return [...references.values()].sort(
     (left, right) =>
-      left.sourcePath.localeCompare(right.sourcePath) ||
+      compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
       left.line - right.line ||
-      left.targetPath.localeCompare(right.targetPath),
+      compareUtf16CodeUnits(left.targetPath, right.targetPath),
   );
 }
 
@@ -974,7 +974,7 @@ function interpreterHintsFor(
   const hints = new Set<string>(launchers);
   if (shebang) hints.add(shebangInterpreter(shebang));
   if (hints.size === 0) hints.add(extensionInterpreter(surfacePath));
-  return [...hints].sort((left, right) => left.localeCompare(right));
+  return [...hints].sort((left, right) => compareUtf16CodeUnits(left, right));
 }
 
 function shebangInterpreter(shebang: string): string {
@@ -1039,14 +1039,15 @@ function compareInvocations(
   right: Omit<ExecutableSurfaceInvocation, "occurrenceOrdinal">,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.launcher.localeCompare(right.launcher) ||
-    (left.normalizedTarget ?? left.rawTarget).localeCompare(
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(
+      left.normalizedTarget ?? left.rawTarget,
       right.normalizedTarget ?? right.rawTarget,
     ) ||
-    left.rawTarget.localeCompare(right.rawTarget) ||
-    left.resolution.localeCompare(right.resolution)
+    compareUtf16CodeUnits(left.rawTarget, right.rawTarget) ||
+    compareUtf16CodeUnits(left.resolution, right.resolution)
   );
 }
 
@@ -1071,7 +1072,9 @@ function inventoryFingerprint(value: object): string {
 }
 
 function uniqueSorted<T extends string>(values: readonly T[]): T[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort((left, right) =>
+    compareUtf16CodeUnits(left, right),
+  );
 }
 
 function resolutionCount(
@@ -1106,7 +1109,7 @@ function countedDependencies(
     .sort(
       (left, right) =>
         right.count - left.count ||
-        String(left[key]).localeCompare(String(right[key])),
+        compareUtf16CodeUnits(String(left[key]), String(right[key])),
     ) as Array<Record<typeof key, string> & { count: number }>;
 }
 
@@ -1141,13 +1144,13 @@ function projectDependencyEvidence(
   const queue = surfaces
     .filter((surface) => surface.staticallyInvoked)
     .map((surface) => surface.path)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   for (const surfacePath of queue) depth.set(surfacePath, 0);
   for (let index = 0; index < queue.length; index += 1) {
     const sourcePath = queue[index]!;
     const sourceDepth = depth.get(sourcePath)!;
     const targets = [...(adjacency.get(sourcePath) ?? [])].sort((left, right) =>
-      left.localeCompare(right),
+      compareUtf16CodeUnits(left, right),
     );
     for (const targetPath of targets) {
       const nextDepth = sourceDepth + 1;

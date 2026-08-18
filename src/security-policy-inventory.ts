@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import { classifyRepositorySkillPath } from "./discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
@@ -271,7 +272,7 @@ export function summarizeSecurityPolicyAssetEvidence(
   );
   summary.topForbiddenInputs = topCounts(forbiddenInputs, "input");
   summary.assetsWithoutEffectivePolicyList.sort((left, right) =>
-    left.path.localeCompare(right.path),
+    compareUtf16CodeUnits(left.path, right.path),
   );
 
   return summary;
@@ -354,9 +355,9 @@ export function collectSecurityPolicyAssetEvidence(
     })
     .filter((row): row is SecurityPolicyAssetEvidence => row !== undefined)
     .sort((left, right) => {
-      const byPath = left.path.localeCompare(right.path);
+      const byPath = compareUtf16CodeUnits(left.path, right.path);
       if (byPath !== 0) return byPath;
-      return left.kind.localeCompare(right.kind);
+      return compareUtf16CodeUnits(left.kind, right.kind);
     });
 }
 
@@ -641,10 +642,10 @@ function normalizeDeclaredPolicy(
 ): DeclaredSecurityPolicyEvidence {
   return {
     fields: [...policy.declared].sort((left, right) =>
-      left.localeCompare(right),
+      compareUtf16CodeUnits(left, right),
     ),
     invalidDeclared: [...policy.invalidDeclared].sort((left, right) =>
-      left.localeCompare(right),
+      compareUtf16CodeUnits(left, right),
     ),
     allowedData: normalizeStringList([
       ...(policy.allowedDataClass ? [policy.allowedDataClass] : []),
@@ -689,7 +690,7 @@ function withSecurityPolicySummaryDetail(
 
 function normalizeStringList(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort(
-    (left, right) => left.localeCompare(right),
+    (left, right) => compareUtf16CodeUnits(left, right),
   );
 }
 
@@ -724,7 +725,7 @@ function policyFieldEvidenceList(
     .sort((left, right) => {
       const byStart = left.startLine - right.startLine;
       if (byStart !== 0) return byStart;
-      return left.snippet.localeCompare(right.snippet);
+      return compareUtf16CodeUnits(left.snippet, right.snippet);
     });
 }
 
@@ -764,7 +765,7 @@ function topCounts<Key extends string>(
     )
     .sort((left, right) => {
       if (left.count !== right.count) return right.count - left.count;
-      return left[key].localeCompare(right[key]);
+      return compareUtf16CodeUnits(left[key], right[key]);
     })
     .slice(0, DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap);
 }

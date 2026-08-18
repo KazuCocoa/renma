@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
@@ -82,7 +83,7 @@ export function executableSurfaceArtifacts(
     }
   }
   return [...paths]
-    .sort((left, right) => left.localeCompare(right))
+    .sort((left, right) => compareUtf16CodeUnits(left, right))
     .flatMap((artifactPath) => {
       const artifact = artifactsByPath.get(artifactPath);
       return artifact ? [artifact] : [];
@@ -141,14 +142,15 @@ function compareDependencyCandidates(
   right: ExecutableDependencyCandidate,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.analyzer.localeCompare(right.analyzer) ||
-    left.relation.localeCompare(right.relation) ||
-    left.normalizedTargetCandidates
-      .join("\0")
-      .localeCompare(right.normalizedTargetCandidates.join("\0")) ||
-    left.rawSpecifier.localeCompare(right.rawSpecifier) ||
+    compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
+    compareUtf16CodeUnits(left.relation, right.relation) ||
+    compareUtf16CodeUnits(
+      left.normalizedTargetCandidates.join("\0"),
+      right.normalizedTargetCandidates.join("\0"),
+    ) ||
+    compareUtf16CodeUnits(left.rawSpecifier, right.rawSpecifier) ||
     left.declarationOffset - right.declarationOffset
   );
 }

@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   Diagnostic,
   Finding,
@@ -58,7 +59,7 @@ function firstSuppressionMatch(
     if (finding.id !== suppression.id) continue;
     const matchedPath = [...suppression.paths]
       .map(normalizePath)
-      .sort((left, right) => left.localeCompare(right))
+      .sort((left, right) => compareUtf16CodeUnits(left, right))
       .find((pattern) => pathPatternMatches(pattern, finding.evidence.path));
     if (matchedPath !== undefined) return { suppression, matchedPath };
   }
@@ -142,13 +143,13 @@ function compareSuppressions(
   right: SuppressionConfig,
 ): number {
   return (
-    left.id.localeCompare(right.id) ||
-    [...left.paths]
-      .sort()
-      .join("\0")
-      .localeCompare([...right.paths].sort().join("\0")) ||
-    (left.expires ?? "never").localeCompare(right.expires ?? "never") ||
-    left.reason.localeCompare(right.reason)
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(
+      [...left.paths].sort(compareUtf16CodeUnits).join("\0"),
+      [...right.paths].sort(compareUtf16CodeUnits).join("\0"),
+    ) ||
+    compareUtf16CodeUnits(left.expires ?? "never", right.expires ?? "never") ||
+    compareUtf16CodeUnits(left.reason, right.reason)
   );
 }
 

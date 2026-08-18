@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { CatalogEntry } from "./model.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
@@ -78,7 +79,7 @@ function requiredConflictDiagnostics(
 }
 
 function pairKey(left: string, right: string): string {
-  return [left, right].sort().join("\u0000");
+  return [left, right].sort(compareUtf16CodeUnits).join("\u0000");
 }
 
 function metadataListEvidence(

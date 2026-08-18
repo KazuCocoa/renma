@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type {
   SuppressionConfig,
@@ -190,12 +191,14 @@ function canonicalSuppressions(
 }
 
 function sortedExactStrings(values: readonly string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort((left, right) =>
+    compareUtf16CodeUnits(left, right),
+  );
 }
 
 function normalizedSuppressionPaths(values: readonly string[]): string[] {
   return [...new Set(values.map(normalizeSuppressionPath))].sort(
-    (left, right) => left.localeCompare(right),
+    (left, right) => compareUtf16CodeUnits(left, right),
   );
 }
 
@@ -228,10 +231,10 @@ function compareCanonicalSuppressions(
   right: CanonicalSuppressionEvidence,
 ): number {
   return (
-    left.id.localeCompare(right.id) ||
-    left.paths.join("\0").localeCompare(right.paths.join("\0")) ||
-    left.expires.localeCompare(right.expires) ||
-    left.reason.localeCompare(right.reason)
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.paths.join("\0"), right.paths.join("\0")) ||
+    compareUtf16CodeUnits(left.expires, right.expires) ||
+    compareUtf16CodeUnits(left.reason, right.reason)
   );
 }
 
@@ -239,7 +242,10 @@ function compareSuppressionConfigs(
   left: SuppressionConfig,
   right: SuppressionConfig,
 ): number {
-  return suppressionSortKey(left).localeCompare(suppressionSortKey(right));
+  return compareUtf16CodeUnits(
+    suppressionSortKey(left),
+    suppressionSortKey(right),
+  );
 }
 
 interface ActiveSuppressionScope {
@@ -269,7 +275,7 @@ function activeSuppressionScopes(
         !existing ||
         expirationRank(scoped.expires) > expirationRank(existing.expires) ||
         (scoped.expires === existing.expires &&
-          scoped.reason.localeCompare(existing.reason) < 0)
+          compareUtf16CodeUnits(scoped.reason, existing.reason) < 0)
       ) {
         scopes.set(key, scoped);
       }

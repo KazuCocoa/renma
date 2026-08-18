@@ -224,6 +224,7 @@ try {
     ]),
     "docs/trust-graph.md",
     "docs/schemas/repository-context-bom-v2.schema.json",
+    "docs/schemas/repository-context-bom-v3.schema.json",
     "docs/schemas/trust-graph-v2.schema.json",
   ]) {
     requirePackagedPath(files, required);

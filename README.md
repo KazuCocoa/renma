@@ -372,7 +372,7 @@ a trust score.
 - [Declared Composition](docs/declared-composition.md)
 - [Declared Impact](docs/declared-impact.md)
 - [Skill Discovery](docs/skill-discovery.md)
-- [Repository Context BOM v2](docs/repository-context-bom.md)
+- [Repository Context BOM v3](docs/repository-context-bom.md)
 - [Experimental Execution Contract](docs/execution-contract.md)
 - [Trust Graph v2](docs/trust-graph.md)
 - [Machine-Readable JSON Compatibility](docs/machine-readable-json.md)

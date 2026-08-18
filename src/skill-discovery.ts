@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 
 import { CliUserError } from "./cli-errors.js";
@@ -408,11 +409,11 @@ export function prepareSkillDiscoveryIndex(
   const structuralRootIds = eligibleSkills
     .filter((skill) => !incoming.has(skill.id))
     .map((skill) => skill.id)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   const standaloneSkillIds = eligibleSkills
     .filter((skill) => !incoming.has(skill.id) && !outgoing.has(skill.id))
     .map((skill) => skill.id)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   const structuralRoots = new Set(structuralRootIds);
   const standaloneSkills = new Set(standaloneSkillIds);
   for (const skill of skills) {
@@ -618,9 +619,9 @@ export function resolveSkillDiscoveryReachability(
   const eligibleSkillIds = skills
     .filter((skill) => skill.routeEligible)
     .map((skill) => skill.id)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   const sourceEntrypointIds = [...new Set(publishedEntrypointIds)].sort(
-    (left, right) => left.localeCompare(right),
+    (left, right) => compareUtf16CodeUnits(left, right),
   );
   const mode =
     adoption.state === "adopted"
@@ -696,7 +697,7 @@ export function resolveSkillDiscoveryReachability(
         ? "published-entrypoint"
         : "reachable-through-usable-route",
       sourceEntrypointIds: [...(sourcesBySkillId.get(id) ?? [])].sort((a, b) =>
-        a.localeCompare(b),
+        compareUtf16CodeUnits(a, b),
       ),
       minimumDepth: minimumDepthBySkillId.get(id)!,
     });
@@ -757,7 +758,7 @@ export function resolveSkillDiscoveryRouteCycles(
         route.resolvedTarget!.id,
       ]),
     ),
-  ].sort((left, right) => left.localeCompare(right));
+  ].sort((left, right) => compareUtf16CodeUnits(left, right));
   const targetSetsBySource = new Map<string, Set<string>>(
     nodeIds.map((id) => [id, new Set<string>()]),
   );
@@ -773,7 +774,7 @@ export function resolveSkillDiscoveryRouteCycles(
     nodeIds.map((id) => [
       id,
       [...targetSetsBySource.get(id)!].sort((left, right) =>
-        left.localeCompare(right),
+        compareUtf16CodeUnits(left, right),
       ),
     ]),
   );
@@ -781,7 +782,7 @@ export function resolveSkillDiscoveryRouteCycles(
     nodeIds.map((id) => [
       id,
       [...sourceSetsByTarget.get(id)!].sort((left, right) =>
-        left.localeCompare(right),
+        compareUtf16CodeUnits(left, right),
       ),
     ]),
   );
@@ -834,7 +835,9 @@ export function resolveSkillDiscoveryRouteCycles(
         traversal.push(sourceId);
       }
     }
-    components.push(component.sort((left, right) => left.localeCompare(right)));
+    components.push(
+      component.sort((left, right) => compareUtf16CodeUnits(left, right)),
+    );
   }
 
   const componentBySkillId = new Map<string, number>();
@@ -882,7 +885,7 @@ export function resolveSkillDiscoveryRouteCycles(
           cycleSkills: cycleSkillIds.map((id) => ({
             id,
             sourcePath: [...(pathsById.get(id) ?? [])].sort((left, right) =>
-              left.localeCompare(right),
+              compareUtf16CodeUnits(left, right),
             )[0]!,
           })),
           selfLoop,
@@ -1016,10 +1019,10 @@ function usableSkillAdjacency(
   }
   return new Map(
     [...targetsBySource.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareUtf16CodeUnits(left, right))
       .map(([sourceId, targets]) => [
         sourceId,
-        [...targets].sort((left, right) => left.localeCompare(right)),
+        [...targets].sort((left, right) => compareUtf16CodeUnits(left, right)),
       ]),
   );
 }
@@ -1531,8 +1534,8 @@ function candidateIdentities(
   }
   return [...byPath.values()].sort(
     (left, right) =>
-      left.sourcePath.localeCompare(right.sourcePath) ||
-      left.id.localeCompare(right.id),
+      compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+      compareUtf16CodeUnits(left.id, right.id),
   );
 }
 
@@ -2086,8 +2089,11 @@ function uniqueDiagnosticLinks(
     })
     .sort(
       (left, right) =>
-        left.code.localeCompare(right.code) ||
-        (left.evidence?.path ?? "").localeCompare(right.evidence?.path ?? "") ||
+        compareUtf16CodeUnits(left.code, right.code) ||
+        compareUtf16CodeUnits(
+          left.evidence?.path ?? "",
+          right.evidence?.path ?? "",
+        ) ||
         (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0),
     );
 }
@@ -2109,8 +2115,8 @@ function compareVisibleSkills(
   right: VisibleSkillIdentity,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.id.localeCompare(right.id)
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.id, right.id)
   );
 }
 
@@ -2119,10 +2125,10 @@ function compareRoutes(
   right: DeclaredSkillRoute,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.declarationIndex - right.declarationIndex ||
-    left.normalizedTarget.localeCompare(right.normalizedTarget) ||
-    left.rawTarget.localeCompare(right.rawTarget)
+    compareUtf16CodeUnits(left.normalizedTarget, right.normalizedTarget) ||
+    compareUtf16CodeUnits(left.rawTarget, right.rawTarget)
   );
 }
 
@@ -2144,10 +2150,11 @@ function compareCycleRoutes(
   right: DeclaredSkillRoute & { resolvedTarget: ResolvedSkillRouteTarget },
 ): number {
   return (
-    left.sourceId.localeCompare(right.sourceId) ||
-    left.resolvedTarget.id.localeCompare(right.resolvedTarget.id) ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.resolvedTarget.sourcePath.localeCompare(
+    compareUtf16CodeUnits(left.sourceId, right.sourceId) ||
+    compareUtf16CodeUnits(left.resolvedTarget.id, right.resolvedTarget.id) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(
+      left.resolvedTarget.sourcePath,
       right.resolvedTarget.sourcePath,
     ) ||
     left.declarationIndex - right.declarationIndex
@@ -2176,7 +2183,8 @@ function compareRouteCycles(
     right.cycleSkillIds.length,
   );
   for (let index = 0; index < length; index += 1) {
-    const comparison = (left.cycleSkillIds[index] ?? "").localeCompare(
+    const comparison = compareUtf16CodeUnits(
+      left.cycleSkillIds[index] ?? "",
       right.cycleSkillIds[index] ?? "",
     );
     if (comparison !== 0) return comparison;
@@ -2195,7 +2203,7 @@ function routeKeysForDiagnostic(diagnostic: Diagnostic): string[] {
   );
   if (cycleRouteKeys.length > 0) {
     return [...new Set(cycleRouteKeys)].sort((left, right) =>
-      left.localeCompare(right),
+      compareUtf16CodeUnits(left, right),
     );
   }
   if (!diagnostic.path) return [];
@@ -2208,7 +2216,7 @@ function routeKeysForDiagnostic(diagnostic: Diagnostic): string[] {
     return diagnostic.details.declarationIndices
       .filter((item): item is number => typeof item === "number")
       .map((index) => `${diagnostic.path}\0${index.toString()}`)
-      .sort((left, right) => left.localeCompare(right));
+      .sort((left, right) => compareUtf16CodeUnits(left, right));
   }
   return [];
 }
@@ -2231,9 +2239,9 @@ function isNonEmptyString(value: unknown): value is string {
 
 function compareDiagnostics(left: Diagnostic, right: Diagnostic): number {
   return (
-    (left.code ?? "").localeCompare(right.code ?? "") ||
-    (left.path ?? "").localeCompare(right.path ?? "") ||
+    compareUtf16CodeUnits(left.code ?? "", right.code ?? "") ||
+    compareUtf16CodeUnits(left.path ?? "", right.path ?? "") ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
-    left.message.localeCompare(right.message)
+    compareUtf16CodeUnits(left.message, right.message)
   );
 }

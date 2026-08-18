@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import fc from "fast-check";
 
+import { compareUtf16CodeUnits } from "../src/canonical-json.js";
 import { main } from "../src/cli.js";
 import {
   buildExecutionContract,
@@ -171,16 +174,16 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
     })),
     [
       {
-        type: "dependency",
-        sourcePath: "skills/release-prep/scripts/prepare.ts",
-        resolution: "missing",
-        target: "../../../tools/missing.sh",
-      },
-      {
         type: "invocation",
         sourcePath: "skills/release-prep/SKILL.md",
         resolution: "unsafe",
         target: "/opt/vendor/scripts/run.js",
+      },
+      {
+        type: "dependency",
+        sourcePath: "skills/release-prep/scripts/prepare.ts",
+        resolution: "missing",
+        target: "../../../tools/missing.sh",
       },
     ],
   );
@@ -708,6 +711,47 @@ test("execution evidence digest and portable JSON are independent of absolute ch
   );
 });
 
+test("execution-contract Unicode output and evidence digest are identical under English and Swedish locales", async (t) => {
+  const fixture = await unicodeOrderingFixture(t);
+  const outputs = ["en_US.UTF-8", "sv_SE.UTF-8"].map((locale) => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.resolve("dist-test/src/index.js"),
+        "execution-contract",
+        fixture.root,
+        "--entrypoint",
+        "skill.unicode-order",
+        "--format",
+        "json",
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, LANG: locale, LC_ALL: locale },
+      },
+    );
+    assert.equal(result.status, 0, `${locale}: ${result.stderr}`);
+    assert.equal(result.stderr, "", locale);
+    return result.stdout;
+  });
+
+  assert.equal(outputs[0], outputs[1]);
+  const report = JSON.parse(outputs[0]!) as ExecutionContractReport;
+  assert.match(report.evidenceDigest.value, /^sha256:[0-9a-f]{64}$/);
+  assert.deepEqual(
+    report.executableEvidence.surfaces.map((surface) => surface.sourcePath),
+    [
+      "skills/unicode-order/scripts/A.ts",
+      "skills/unicode-order/scripts/a.ts",
+      "skills/unicode-order/scripts/ä.ts",
+      "skills/unicode-order/scripts/å.ts",
+      "skills/unicode-order/scripts/é.ts",
+      "skills/unicode-order/scripts/ö.ts",
+      "skills/unicode-order/scripts/日本.ts",
+    ],
+  );
+});
+
 test("execution contract evidence membership and coverage follow the canonical executable helpers", async (t) => {
   const fixture = await canonicalEvidenceFixture(t);
   const snapshot = await collectRepositorySnapshot(fixture.root);
@@ -741,7 +785,7 @@ test("execution contract evidence membership and coverage follow the canonical e
   const directTargets = report.executableEvidence.relationships
     .filter((relationship) => relationship.reachability === "direct")
     .map((relationship) => relationship.to.sourcePath)
-    .sort((left, right) => left.localeCompare(right));
+    .sort(compareUtf16CodeUnits);
   const transitivePairs = report.executableEvidence.relationships
     .filter((relationship) => relationship.reachability === "transitive")
     .map((relationship) =>
@@ -750,18 +794,18 @@ test("execution contract evidence membership and coverage follow the canonical e
         normalizedTarget: relationship.to.sourcePath,
       }),
     )
-    .sort((left, right) => left.localeCompare(right));
+    .sort(compareUtf16CodeUnits);
   assert.deepEqual(
     directTargets,
     invocationEdges
       .map((edge) => edge.normalizedTarget)
-      .sort((left, right) => left.localeCompare(right)),
+      .sort(compareUtf16CodeUnits),
   );
   assert.deepEqual(
     transitivePairs,
     dependencyEdges
       .map((edge) => evidencePairKey(edge))
-      .sort((left, right) => left.localeCompare(right)),
+      .sort(compareUtf16CodeUnits),
   );
 
   const relationshipEvidence = report.executableEvidence.relationships.flatMap(
@@ -794,7 +838,7 @@ test("execution contract evidence membership and coverage follow the canonical e
   assert.deepEqual(
     [
       ...new Set(relationshipEvidence.map((evidence) => evidence.resolution)),
-    ].sort((left, right) => left.localeCompare(right)),
+    ].sort(compareUtf16CodeUnits),
     ["noncanonical", "resolved"],
   );
 
@@ -807,8 +851,8 @@ test("execution contract evidence membership and coverage follow the canonical e
         : evidence.rawSpecifier,
     ]),
     [
-      ["dependency", "missing", "../../orphan/scripts/missing.ts"],
       ["invocation", "unsafe", "/opt/vendor/scripts/run.js"],
+      ["dependency", "missing", "../../orphan/scripts/missing.ts"],
     ],
   );
   assert.equal(
@@ -981,6 +1025,33 @@ async function digestFixture(
 
 function digestSkillBody(): string {
   return ["# Digest", "", "```bash", "node scripts/a.ts", "```"].join("\n");
+}
+
+async function unicodeOrderingFixture(
+  t: TestContext,
+): Promise<RepositoryFixture> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-unicode-order-",
+    testContext: t,
+  });
+  const names = ["ö", "A", "é", "ä", "日本", "a", "å"];
+  await fixture.skill("unicode-order", {
+    id: "skill.unicode-order",
+    body: [
+      "# Unicode order",
+      "",
+      "```bash",
+      ...names.map((name) => `node scripts/${name}.ts`),
+      "```",
+    ].join("\n"),
+  });
+  for (const name of names) {
+    await fixture.write(
+      `skills/unicode-order/scripts/${name}.ts`,
+      "export {};\n",
+    );
+  }
+  return fixture;
 }
 
 async function canonicalEvidenceFixture(

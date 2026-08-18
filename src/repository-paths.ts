@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 import {
   classifyRepositorySkillPath,
@@ -126,7 +127,7 @@ export async function collectRepositoryPathStates(
   const parsed = new Set(artifacts.map((artifact) => artifact.path));
   const states = new Map<string, RepositoryPathState>();
   for (const candidate of [...new Set(candidates)].sort((a, b) =>
-    a.localeCompare(b),
+    compareUtf16CodeUnits(a, b),
   )) {
     const normalized = normalizeRepositoryPath(candidate);
     if (!normalized) continue;

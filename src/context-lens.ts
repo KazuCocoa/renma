@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 import type { Catalog, CatalogEntry } from "./model.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
@@ -121,7 +122,7 @@ export function summarizeContextLensGovernance(
       const targetPaths = targets
         .map((target) => resolver.resolve(target)?.sourcePath)
         .filter((targetPath): targetPath is string => targetPath !== undefined)
-        .sort((a, b) => a.localeCompare(b));
+        .sort((a, b) => compareUtf16CodeUnits(a, b));
 
       return [
         {
@@ -135,7 +136,7 @@ export function summarizeContextLensGovernance(
       ];
     })
     .sort((a, b) =>
-      a.document.artifact.path.localeCompare(b.document.artifact.path),
+      compareUtf16CodeUnits(a.document.artifact.path, b.document.artifact.path),
     );
 
   for (const lens of lensDocuments) {
@@ -526,7 +527,7 @@ function duplicateIdDiagnostics(lenses: LensDocument[]): Diagnostic[] {
     if (duplicates.length < 2) return [];
     const paths = duplicates
       .map((lens) => lens.document.artifact.path)
-      .sort((a, b) => a.localeCompare(b));
+      .sort((a, b) => compareUtf16CodeUnits(a, b));
     return duplicates.map((lens) => ({
       code: CONTEXT_LENS_DIAGNOSTIC_CODES.DUPLICATE_ID,
       severity: "error" as const,
@@ -612,23 +613,23 @@ function summarizeScopes(
   }
   return [...counts.entries()]
     .map(([scope, count]) => ({ scope, count }))
-    .sort((a, b) => a.scope.localeCompare(b.scope));
+    .sort((a, b) => compareUtf16CodeUnits(a.scope, b.scope));
 }
 
 function stableDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
   return [...diagnostics].sort((a, b) => {
-    const byPath = (a.path ?? "").localeCompare(b.path ?? "");
+    const byPath = compareUtf16CodeUnits(a.path ?? "", b.path ?? "");
     if (byPath !== 0) return byPath;
-    const byCode = (a.code ?? "").localeCompare(b.code ?? "");
+    const byCode = compareUtf16CodeUnits(a.code ?? "", b.code ?? "");
     if (byCode !== 0) return byCode;
     const byLine = (a.evidence?.startLine ?? 0) - (b.evidence?.startLine ?? 0);
     if (byLine !== 0) return byLine;
-    return a.message.localeCompare(b.message);
+    return compareUtf16CodeUnits(a.message, b.message);
   });
 }
 
 function stableUnique(values: string[]): string[] {
-  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  return [...new Set(values)].sort((a, b) => compareUtf16CodeUnits(a, b));
 }
 
 function unresolvedReferenceFromDiagnostic(

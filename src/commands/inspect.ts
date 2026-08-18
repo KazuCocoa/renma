@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -323,11 +324,11 @@ function compareInspectRelationships(
   left: InspectRelationship,
   right: InspectRelationship,
 ): number {
-  const byFrom = left.from.localeCompare(right.from);
+  const byFrom = compareUtf16CodeUnits(left.from, right.from);
   if (byFrom !== 0) return byFrom;
-  const byKind = left.kind.localeCompare(right.kind);
+  const byKind = compareUtf16CodeUnits(left.kind, right.kind);
   if (byKind !== 0) return byKind;
-  return left.to.localeCompare(right.to);
+  return compareUtf16CodeUnits(left.to, right.to);
 }
 
 async function buildInspectSlice(

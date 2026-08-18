@@ -86,8 +86,8 @@ test("representative public JSON matches fixed compatibility baselines", async (
       catalog: "renma.catalog.v1",
       graph: "renma.graph.v1",
       "skill-index": "renma.skill-index.v1",
-      readiness: "renma.readiness.v1",
-      bom: "renma.repository-context-bom.v2",
+      readiness: "renma.readiness.v2",
+      bom: "renma.repository-context-bom.v3",
     },
   );
 

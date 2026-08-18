@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   BuiltInExecutableDependencyAnalyzerId,
   ExecutableDependencyCandidate,
@@ -105,8 +106,8 @@ export function canonicalExecutableDependencyGraphEdges(
   }
   return [...uniqueEdges.values()].sort(
     (left, right) =>
-      left.sourcePath.localeCompare(right.sourcePath) ||
-      left.normalizedTarget.localeCompare(right.normalizedTarget),
+      compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+      compareUtf16CodeUnits(left.normalizedTarget, right.normalizedTarget),
   );
 }
 
@@ -182,12 +183,12 @@ function compareDependencies(
   right: Omit<ExecutableSurfaceDependency, "occurrenceOrdinal">,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.line - right.line ||
-    left.analyzer.localeCompare(right.analyzer) ||
-    left.relation.localeCompare(right.relation) ||
-    dependencyTarget(left).localeCompare(dependencyTarget(right)) ||
-    left.rawSpecifier.localeCompare(right.rawSpecifier)
+    compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
+    compareUtf16CodeUnits(left.relation, right.relation) ||
+    compareUtf16CodeUnits(dependencyTarget(left), dependencyTarget(right)) ||
+    compareUtf16CodeUnits(left.rawSpecifier, right.rawSpecifier)
   );
 }
 

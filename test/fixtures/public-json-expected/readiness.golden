@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "renma.readiness.v1",
+  "schemaVersion": "renma.readiness.v2",
   "root": "<ROOT>",
   "configPath": "renma.config.json",
   "scannedFileCount": 7,
@@ -285,11 +285,11 @@
       "summary": "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately."
     },
     {
-      "id": "layout.disallowed_skill_assets",
-      "title": "Skill-local support policy",
+      "id": "skills.support_integrity",
+      "title": "Skill support integrity",
       "status": "pass",
       "severity": "info",
-      "summary": "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it."
+      "summary": "Explicitly referenced Skill support exists and is inspectable as regular repository content."
     },
     {
       "id": "layout.context_root",

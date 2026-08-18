@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   ExecutableInvocationGovernanceChange,
   ExecutableInvocationGovernanceDelta,
@@ -231,7 +232,7 @@ function compareMatches(
   left: ExecutableSurfaceCiMatch,
   right: ExecutableSurfaceCiMatch,
 ): number {
-  return matchKey(left).localeCompare(matchKey(right));
+  return compareUtf16CodeUnits(matchKey(left), matchKey(right));
 }
 
 function matchKey(match: ExecutableSurfaceCiMatch): string {

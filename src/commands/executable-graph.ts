@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "../canonical-json.js";
 import path from "node:path";
 
 import { CliUserError } from "../cli-errors.js";
@@ -596,7 +597,7 @@ function renderSharedExecutableTargets(
           nodesById.get(edge.from)?.executableRole === "skill",
       )
       .map((edge) => edge.from)
-      .sort((left, right) => left.localeCompare(right));
+      .sort((left, right) => compareUtf16CodeUnits(left, right));
     lines.push(`- ${node.sourcePath}: used by → ${skills.join(", ")}`);
   }
 }
@@ -634,14 +635,17 @@ function tableText(value: string): string {
 }
 
 function compareGraphNodes(a: GraphNode, b: GraphNode): number {
-  return a.sourcePath.localeCompare(b.sourcePath) || a.id.localeCompare(b.id);
+  return (
+    compareUtf16CodeUnits(a.sourcePath, b.sourcePath) ||
+    compareUtf16CodeUnits(a.id, b.id)
+  );
 }
 
 function compareGraphEdges(a: GraphEdge, b: GraphEdge): number {
   return (
-    a.from.localeCompare(b.from) ||
-    a.kind.localeCompare(b.kind) ||
-    a.to.localeCompare(b.to)
+    compareUtf16CodeUnits(a.from, b.from) ||
+    compareUtf16CodeUnits(a.kind, b.kind) ||
+    compareUtf16CodeUnits(a.to, b.to)
   );
 }
 

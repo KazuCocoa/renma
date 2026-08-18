@@ -19,6 +19,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Changed Readiness from `renma.readiness.v1` to `renma.readiness.v2` and
+  Repository Context BOM from v2 to `renma.repository-context-bom.v3`. The
+  breaking migration replaces the producerless
+  `layout.disallowed_skill_assets` check with `skills.support_integrity`, which
+  is backed by current `SUPPORT-MISSING-PATH` and `SUPPORT-SYMLINK-PATH`
+  findings. BOM v3 otherwise carries forward the v2 field contract.
 - Narrowed `renma/discovery` to canonical Skill entrypoint types, renamed the
   Skill-specific path helper to `normalizeRepositorySkillRelativePath`, and
   kept lowercase and flat historical entrypoint recognition inside explicit
@@ -38,6 +44,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Made production ordering and selection for scan, catalog, graph, Trust
+  Graph, BOM, Readiness, diff/CI, executable evidence, suppressions, and the
+  experimental execution-contract digest explicitly locale-independent by
+  using one ECMAScript UTF-16 code-unit comparator. Existing schema identifiers
+  remain unchanged for this implementation fix because those contracts already
+  promised deterministic stable ordering; Readiness and BOM change versions
+  only for their separate check-collection migration.
 - Rejected conventional and explicit configuration paths that are symlinks,
   cross a symlinked parent, are outside the repository, or are not regular
   files. Broken conventional config symlinks now fail as caller-correctable
@@ -45,6 +58,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Removed
 
+- Removed the producerless pre-1.0 diagnostic IDs
+  `LAYOUT-SKILL-EXECUTABLE-COMMAND`, `LAYOUT-SKILL-NOT-THIN`,
+  `PATH-HELPER-COMMAND-SKILL-SCRIPTS`, and
+  `LAYOUT-DISALLOWED-SKILL-ASSET`, including their compatibility-only
+  documentation and Diagnostics V2 grouping surface.
 - Removed the compatibility-only `layout` configuration surface, including
   `tool_namespace`, `workflow_aliases`, `LayoutPolicyConfig`, and normalized
   `ScanConfig` layout state. Authored `layout` objects now fail with explicit

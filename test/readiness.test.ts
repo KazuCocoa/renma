@@ -110,7 +110,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
     "workflow.skills_focused": "pass",
-    "layout.disallowed_skill_assets": "pass",
+    "skills.support_integrity": "pass",
     "paths.helper_commands": "pass",
   });
 });
@@ -140,6 +140,24 @@ test("high security findings remain blocking", () => {
   assert.equal(
     report.checks.find((check) => check.id === "security.blocking")?.status,
     "fail",
+  );
+});
+
+test("Skill support integrity fails on currently emitted missing and symlink evidence", () => {
+  const report = buildReadinessReport(securityGraphReport(), [
+    readinessFinding("SUPPORT-MISSING-PATH", "high"),
+    readinessFinding("SUPPORT-SYMLINK-PATH", "high"),
+  ]);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "skills.support_integrity",
+  );
+
+  assert.equal(report.level, "not_ready");
+  assert.equal(check?.title, "Skill support integrity");
+  assert.equal(check?.status, "fail");
+  assert.deepEqual(
+    check?.evidence?.map((item) => item.id),
+    ["SUPPORT-MISSING-PATH", "SUPPORT-SYMLINK-PATH"],
   );
 });
 
@@ -179,7 +197,7 @@ test("readiness report scores unresolved and unowned assets deterministically", 
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
     "workflow.skills_focused": "pass",
-    "layout.disallowed_skill_assets": "pass",
+    "skills.support_integrity": "pass",
     "paths.helper_commands": "pass",
   });
 });
@@ -724,7 +742,7 @@ test("readiness markdown presents ready score 100 findings as non-blocking advis
   >;
 
   assert.equal(report.score, 100);
-  assert.equal(json.schemaVersion, "renma.readiness.v1");
+  assert.equal(json.schemaVersion, "renma.readiness.v2");
   assert.equal(report.level, "ready");
   assert.equal(
     report.checks.some((check) => check.status === "fail"),

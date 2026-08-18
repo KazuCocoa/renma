@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 import { resolvedAgentSkillDescription } from "./agent-skills.js";
 import { declaredCompositionFindings } from "./declared-composition.js";
@@ -210,7 +211,7 @@ export function runRules(
     config,
   );
   return findings.sort((a, b) => {
-    const byPath = a.evidence.path.localeCompare(b.evidence.path);
+    const byPath = compareUtf16CodeUnits(a.evidence.path, b.evidence.path);
     if (byPath !== 0) return byPath;
     return a.evidence.startLine - b.evidence.startLine;
   });
@@ -454,7 +455,9 @@ function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
 
   return [...entriesById.entries()].flatMap(([assetId, duplicates]) => {
     if (duplicates.length < 2) return [];
-    const paths = duplicates.map((entry) => entry.sourcePath).sort();
+    const paths = duplicates
+      .map((entry) => entry.sourcePath)
+      .sort(compareUtf16CodeUnits);
 
     return duplicates.map((entry) => ({
       id: DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID,

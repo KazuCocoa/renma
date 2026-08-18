@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   ExecutableInvocationGovernance,
   ExecutableInvocationOwningSkillResolution,
@@ -192,10 +193,10 @@ export function buildExecutableSurfaceDiff(
 
   const addedSurfacePaths = [...toSurfaces.keys()]
     .filter((surfacePath) => !fromSurfaces.has(surfacePath))
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   const removedSurfacePaths = [...fromSurfaces.keys()]
     .filter((surfacePath) => !toSurfaces.has(surfacePath))
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
   const changedSurfaces = [...toSurfaces]
     .flatMap(([surfacePath, toSurface]) => {
       const fromSurface = fromSurfaces.get(surfacePath);
@@ -216,7 +217,7 @@ export function buildExecutableSurfaceDiff(
         },
       ];
     })
-    .sort((left, right) => left.path.localeCompare(right.path));
+    .sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
 
   const invocationResolutionChanges = [...toInvocations]
     .flatMap(([key, toInvocation]) => {
@@ -570,10 +571,10 @@ function dependencyGraphSignatures(
       surfacePath,
       JSON.stringify({
         incoming: graph.incoming.sort((left, right) =>
-          left.localeCompare(right),
+          compareUtf16CodeUnits(left, right),
         ),
         outgoing: graph.outgoing.sort((left, right) =>
-          left.localeCompare(right),
+          compareUtf16CodeUnits(left, right),
         ),
       }),
     ]),
@@ -609,10 +610,13 @@ function semanticInvocationMap(
     [...invocations]
       .sort(
         (left, right) =>
-          left.sourcePath.localeCompare(right.sourcePath) ||
+          compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
           left.line - right.line ||
-          left.launcher.localeCompare(right.launcher) ||
-          invocationTarget(left).localeCompare(invocationTarget(right)),
+          compareUtf16CodeUnits(left.launcher, right.launcher) ||
+          compareUtf16CodeUnits(
+            invocationTarget(left),
+            invocationTarget(right),
+          ),
       )
       .map((invocation) => {
         const target = invocationTarget(invocation);
@@ -643,12 +647,15 @@ function semanticDependencyMap(
     [...dependencies]
       .sort(
         (left, right) =>
-          left.sourcePath.localeCompare(right.sourcePath) ||
+          compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
           left.line - right.line ||
-          left.analyzer.localeCompare(right.analyzer) ||
-          left.relation.localeCompare(right.relation) ||
-          dependencyTarget(left).localeCompare(dependencyTarget(right)) ||
-          left.rawSpecifier.localeCompare(right.rawSpecifier),
+          compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
+          compareUtf16CodeUnits(left.relation, right.relation) ||
+          compareUtf16CodeUnits(
+            dependencyTarget(left),
+            dependencyTarget(right),
+          ) ||
+          compareUtf16CodeUnits(left.rawSpecifier, right.rawSpecifier),
       )
       .map((dependency) => {
         const target = dependencyTarget(dependency);
@@ -750,7 +757,7 @@ function reachabilityChanges(
       return current === reachable && previous !== reachable;
     })
     .map(([surfacePath]) => surfacePath)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
 }
 
 function staticReachabilityChanges(
@@ -766,7 +773,7 @@ function staticReachabilityChanges(
       return current === reachability && previous !== reachability;
     })
     .map(([surfacePath]) => surfacePath)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
 }
 
 function lostStaticReachability(
@@ -784,7 +791,7 @@ function lostStaticReachability(
       );
     })
     .map(([surfacePath]) => surfacePath)
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => compareUtf16CodeUnits(left, right));
 }
 
 function invocationDepthChanges(
@@ -827,7 +834,7 @@ function invocationDepthChanges(
         },
       ];
     })
-    .sort((left, right) => left.path.localeCompare(right.path));
+    .sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
 }
 
 function invocationTarget(invocation: ExecutableSurfaceInvocation): string {
@@ -855,7 +862,10 @@ function sameStrings(
   left: readonly string[],
   right: readonly string[],
 ): boolean {
-  return [...left].sort().join("\0") === [...right].sort().join("\0");
+  return (
+    [...left].sort(compareUtf16CodeUnits).join("\0") ===
+    [...right].sort(compareUtf16CodeUnits).join("\0")
+  );
 }
 
 function compareInvocationChanges(
@@ -863,9 +873,9 @@ function compareInvocationChanges(
   right: ExecutableSurfaceInvocationResolutionChange,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.launcher.localeCompare(right.launcher) ||
-    left.target.localeCompare(right.target) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
 }
@@ -875,9 +885,9 @@ function compareInvocationDeltas(
   right: ExecutableSurfaceInvocationDelta,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.launcher.localeCompare(right.launcher) ||
-    left.target.localeCompare(right.target) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
 }
@@ -887,10 +897,10 @@ function compareDependencyChanges(
   right: ExecutableSurfaceDependencyResolutionChange,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.analyzer.localeCompare(right.analyzer) ||
-    left.relation.localeCompare(right.relation) ||
-    left.target.localeCompare(right.target) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
+    compareUtf16CodeUnits(left.relation, right.relation) ||
+    compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
 }
@@ -900,10 +910,10 @@ function compareDependencyDeltas(
   right: ExecutableSurfaceDependencyDelta,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.analyzer.localeCompare(right.analyzer) ||
-    left.relation.localeCompare(right.relation) ||
-    left.target.localeCompare(right.target) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
+    compareUtf16CodeUnits(left.relation, right.relation) ||
+    compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
 }
@@ -913,9 +923,9 @@ function compareGovernanceChanges(
   right: ExecutableInvocationGovernanceChange,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.launcher.localeCompare(right.launcher) ||
-    left.target.localeCompare(right.target) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
 }
@@ -925,9 +935,9 @@ function compareGovernanceDeltas(
   right: ExecutableInvocationGovernanceDelta,
 ): number {
   return (
-    left.sourcePath.localeCompare(right.sourcePath) ||
-    left.launcher.localeCompare(right.launcher) ||
-    left.target.localeCompare(right.target) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+    compareUtf16CodeUnits(left.launcher, right.launcher) ||
+    compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
 }

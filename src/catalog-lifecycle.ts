@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { AssetStatus, CatalogEntry } from "./model.js";
 import {
   isDeclaredActiveLifecycleStatus,
@@ -83,7 +84,7 @@ function supersessionCycleDiagnostics(
     if (!cycleEntry) continue;
 
     const cycleKey = [...new Set(path.slice(path.indexOf(cycleEntry.id)))]
-      .sort()
+      .sort(compareUtf16CodeUnits)
       .join(" -> ");
     if (reported.has(cycleKey)) continue;
     reported.add(cycleKey);

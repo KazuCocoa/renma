@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 
 import {
@@ -256,12 +257,13 @@ function analyzeStaticSupportReferences(
     references: references.sort(
       (left, right) =>
         left.line - right.line ||
-        left.targetPath.localeCompare(right.targetPath) ||
-        left.raw.localeCompare(right.raw),
+        compareUtf16CodeUnits(left.targetPath, right.targetPath) ||
+        compareUtf16CodeUnits(left.raw, right.raw),
     ),
     incompleteBasenameReferences: incompleteBasenameReferences.sort(
       (left, right) =>
-        left.line - right.line || left.basename.localeCompare(right.basename),
+        left.line - right.line ||
+        compareUtf16CodeUnits(left.basename, right.basename),
     ),
   };
 }
@@ -324,7 +326,7 @@ export function staticallyExpectedSupportInspection(
   >();
 
   for (const [skillDirectory, parents] of [...skillParents].sort(
-    ([left], [right]) => left.localeCompare(right),
+    ([left], [right]) => compareUtf16CodeUnits(left, right),
   )) {
     if (parents.length !== 1) continue;
     const skill = documentsByPath.get(parents[0]!.sourcePath);
@@ -370,12 +372,12 @@ export function staticallyExpectedSupportInspection(
   return {
     paths: [...expectedPaths.values()].sort(
       (left, right) =>
-        left.targetPath.localeCompare(right.targetPath) ||
+        compareUtf16CodeUnits(left.targetPath, right.targetPath) ||
         compareReachabilityEvidence(left, right),
     ),
     incompleteBoundaries: [...incompleteBoundaries.values()].sort(
       (left, right) =>
-        left.boundaryPath.localeCompare(right.boundaryPath) ||
+        compareUtf16CodeUnits(left.boundaryPath, right.boundaryPath) ||
         compareReachabilityEvidence(left, right),
     ),
   };
@@ -456,7 +458,9 @@ export function plainTextSupportSecurityReachability(
     }
   }
 
-  return new Map(eligible.sort(([left], [right]) => left.localeCompare(right)));
+  return new Map(
+    eligible.sort(([left], [right]) => compareUtf16CodeUnits(left, right)),
+  );
 }
 
 function localSupportReferenceReachability(
@@ -470,7 +474,7 @@ function localSupportReferenceReachability(
   incompleteBoundaries: Map<string, StaticSupportBoundaryReachabilityEvidence>;
 } {
   const sources = [skill, ...localSupportDocs].sort((left, right) =>
-    left.artifact.path.localeCompare(right.artifact.path),
+    compareUtf16CodeUnits(left.artifact.path, right.artifact.path),
   );
   const analyses = new Map(
     sources.map((document) => [
@@ -553,9 +557,9 @@ function compareReachabilityEvidence(
 ): number {
   return (
     left.depth - right.depth ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     left.sourceLine - right.sourceLine ||
-    left.sourceRaw.localeCompare(right.sourceRaw)
+    compareUtf16CodeUnits(left.sourceRaw, right.sourceRaw)
   );
 }
 
@@ -812,8 +816,8 @@ function basenameReferenceTokens(line: string): BasenameReferenceToken[] {
 
   return [...tokens.values()].sort(
     (left, right) =>
-      left.basename.localeCompare(right.basename) ||
-      left.raw.localeCompare(right.raw),
+      compareUtf16CodeUnits(left.basename, right.basename) ||
+      compareUtf16CodeUnits(left.raw, right.raw),
   );
 }
 

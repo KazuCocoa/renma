@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "./context-lens.js";
 import {
   DIAGNOSTIC_IDS,
@@ -57,7 +58,7 @@ export function createReviewBundles(
     .map(({ seed, diagnostics: groupedDiagnostics }) =>
       reviewBundle(seed, groupedDiagnostics),
     )
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort((a, b) => compareUtf16CodeUnits(a.id, b.id));
 }
 
 function findingToDiagnosticV2(finding: Finding, index: number): DiagnosticV2 {
@@ -672,7 +673,6 @@ const REFERENCE_OR_DEPENDENCY_CODES = new Set<string>([
   DIAGNOSTIC_IDS.MAINT_ASSET_REFERENCES_SUPERSEDED_ASSET,
   DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
   DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_NON_TOOLS,
-  DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_SKILL_SCRIPTS,
 ]);
 
 function isReferenceOrDependencyCode(code: string): boolean {
@@ -951,13 +951,16 @@ function reviewOrder(
 }
 
 function compareDiagnosticsV2(a: DiagnosticV2, b: DiagnosticV2): number {
-  const byCode = a.code.localeCompare(b.code);
+  const byCode = compareUtf16CodeUnits(a.code, b.code);
   if (byCode !== 0) return byCode;
-  const byPath = (a.location?.path ?? "").localeCompare(b.location?.path ?? "");
+  const byPath = compareUtf16CodeUnits(
+    a.location?.path ?? "",
+    b.location?.path ?? "",
+  );
   if (byPath !== 0) return byPath;
   const byLine = (a.location?.startLine ?? 0) - (b.location?.startLine ?? 0);
   if (byLine !== 0) return byLine;
-  return a.message.localeCompare(b.message);
+  return compareUtf16CodeUnits(a.message, b.message);
 }
 
 function uniqueConstraints(
@@ -989,7 +992,7 @@ function uniqueVerificationSteps(
 }
 
 function stableUnique(values: string[]): string[] {
-  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  return [...new Set(values)].sort((a, b) => compareUtf16CodeUnits(a, b));
 }
 
 function bundleId(value: string): string {

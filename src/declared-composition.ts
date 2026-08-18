@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { normalizeDependencyReference } from "./dependency-resolution.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { evaluateAssetFreshness, todayIsoDate } from "./freshness.js";
@@ -431,9 +432,9 @@ export function analyzeDeclaredCompositionFindings(
     ...conflicts,
   ].sort(
     (left, right) =>
-      left.evidence.path.localeCompare(right.evidence.path) ||
+      compareUtf16CodeUnits(left.evidence.path, right.evidence.path) ||
       left.evidence.startLine - right.evidence.startLine ||
-      left.id.localeCompare(right.id),
+      compareUtf16CodeUnits(left.id, right.id),
   );
   return {
     findings,
@@ -663,16 +664,22 @@ function aggregateCycles(
 
 function cycleFindings(grouped: Map<string, CompositionCycleGroup>): Finding[] {
   return [...grouped.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => compareUtf16CodeUnits(left, right))
     .map(([, group]): Finding => {
       const required = group.requiredRoots.size > 0;
       const cycle = required ? group.requiredCycle : group.optionalCycle;
       if (!cycle) {
         throw new Error("Composition cycle group has no representative cycle.");
       }
-      const requiredRoots = [...group.requiredRoots].sort();
-      const optionalRoots = [...group.optionalRoots].sort();
-      const roots = [...new Set([...requiredRoots, ...optionalRoots])].sort();
+      const requiredRoots = [...group.requiredRoots].sort(
+        compareUtf16CodeUnits,
+      );
+      const optionalRoots = [...group.optionalRoots].sort(
+        compareUtf16CodeUnits,
+      );
+      const roots = [...new Set([...requiredRoots, ...optionalRoots])].sort(
+        compareUtf16CodeUnits,
+      );
       const evidence = cycle.edges[0]?.evidence ?? {
         path: cycle.edges[0]?.sourcePath ?? "(composition)",
         startLine: 1,
@@ -1060,7 +1067,10 @@ function compositionCycles(
       };
     })
     .sort((left, right) =>
-      left.assetIds.join("\0").localeCompare(right.assetIds.join("\0")),
+      compareUtf16CodeUnits(
+        left.assetIds.join("\0"),
+        right.assetIds.join("\0"),
+      ),
     );
 }
 
@@ -1087,7 +1097,9 @@ function stronglyConnectedComponents(
     stack.push(id);
     onStack.add(id);
 
-    for (const target of [...(adjacency.get(id) ?? [])].sort()) {
+    for (const target of [...(adjacency.get(id) ?? [])].sort(
+      compareUtf16CodeUnits,
+    )) {
       if (!indexById.has(target)) {
         visit(target);
         lowLinkById.set(
@@ -1111,10 +1123,10 @@ function stronglyConnectedComponents(
       component.push(member);
       if (member === id) break;
     }
-    components.push(component.sort());
+    components.push(component.sort(compareUtf16CodeUnits));
   };
 
-  for (const id of [...adjacency.keys()].sort()) {
+  for (const id of [...adjacency.keys()].sort(compareUtf16CodeUnits)) {
     if (!indexById.has(id)) visit(id);
   }
   return components;
@@ -1132,7 +1144,7 @@ function compositionConflicts(
     CompositionConflictDeclaration[]
   >();
 
-  for (const sourceId of [...included].sort()) {
+  for (const sourceId of [...included].sort(compareUtf16CodeUnits)) {
     for (const dependency of index.dependenciesBySource.get(sourceId) ?? []) {
       if (dependency.kind !== "conflicts") continue;
       const target = resolveIndexedTarget(dependency, index);
@@ -1212,7 +1224,7 @@ function compositionGovernanceFindings(
   const freshness: CompositionFreshnessFinding[] = [];
   const lifecycle: CompositionLifecycleFinding[] = [];
   const governedIds = new Set([root.id, ...reached.keys()]);
-  for (const assetId of [...governedIds].sort()) {
+  for (const assetId of [...governedIds].sort(compareUtf16CodeUnits)) {
     const asset = index.assetsById.get(assetId);
     if (!asset) continue;
     const membership = assetMembership(asset.id, root, reached);
@@ -1264,8 +1276,8 @@ function compositionGovernanceFindings(
     freshness: freshness.sort(compareFreshnessFindings),
     lifecycle: lifecycle.sort(
       (left, right) =>
-        left.assetId.localeCompare(right.assetId) ||
-        left.status.localeCompare(right.status),
+        compareUtf16CodeUnits(left.assetId, right.assetId) ||
+        compareUtf16CodeUnits(left.status, right.status),
     ),
   };
 }
@@ -1297,16 +1309,17 @@ function evaluationIsoDate(value: Date | string | undefined): string {
 }
 
 function normalizedPairKey(left: string, right: string): string {
-  return [left, right].sort().join("\0");
+  return [left, right].sort(compareUtf16CodeUnits).join("\0");
 }
 
 function compareDependencies(left: Dependency, right: Dependency): number {
   return (
-    (left.declaration ?? left.kind).localeCompare(
+    compareUtf16CodeUnits(
+      left.declaration ?? left.kind,
       right.declaration ?? right.kind,
     ) ||
-    left.to.localeCompare(right.to) ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.to, right.to) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
   );
@@ -1317,14 +1330,15 @@ function compareDependenciesBySource(
   right: Dependency,
 ): number {
   return (
-    left.from.localeCompare(right.from) || compareDependencies(left, right)
+    compareUtf16CodeUnits(left.from, right.from) ||
+    compareDependencies(left, right)
   );
 }
 
 function compareAssets(left: Asset, right: Asset): number {
   return (
-    left.id.localeCompare(right.id) ||
-    left.sourcePath.localeCompare(right.sourcePath)
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath)
   );
 }
 
@@ -1333,8 +1347,8 @@ function compareCompositionAssets(
   right: CompositionAsset,
 ): number {
   return (
-    left.id.localeCompare(right.id) ||
-    left.sourcePath.localeCompare(right.sourcePath)
+    compareUtf16CodeUnits(left.id, right.id) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath)
   );
 }
 
@@ -1343,11 +1357,11 @@ function compareProvenanceEdges(
   right: CompositionProvenanceEdge,
 ): number {
   return (
-    left.from.localeCompare(right.from) ||
-    left.to.localeCompare(right.to) ||
-    left.relationship.localeCompare(right.relationship) ||
-    left.membership.localeCompare(right.membership) ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.from, right.from) ||
+    compareUtf16CodeUnits(left.to, right.to) ||
+    compareUtf16CodeUnits(left.relationship, right.relationship) ||
+    compareUtf16CodeUnits(left.membership, right.membership) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
   );
@@ -1358,10 +1372,10 @@ function compareResolutionIssues(
   right: CompositionResolutionIssue,
 ): number {
   return (
-    left.sourceId.localeCompare(right.sourceId) ||
-    left.relationship.localeCompare(right.relationship) ||
-    left.declaredTarget.localeCompare(right.declaredTarget) ||
-    left.membership.localeCompare(right.membership) ||
+    compareUtf16CodeUnits(left.sourceId, right.sourceId) ||
+    compareUtf16CodeUnits(left.relationship, right.relationship) ||
+    compareUtf16CodeUnits(left.declaredTarget, right.declaredTarget) ||
+    compareUtf16CodeUnits(left.membership, right.membership) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
   );
@@ -1372,9 +1386,9 @@ function compareConflictDeclarations(
   right: CompositionConflictDeclaration,
 ): number {
   return (
-    left.from.localeCompare(right.from) ||
-    left.to.localeCompare(right.to) ||
-    left.sourcePath.localeCompare(right.sourcePath) ||
+    compareUtf16CodeUnits(left.from, right.from) ||
+    compareUtf16CodeUnits(left.to, right.to) ||
+    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
   );
@@ -1385,7 +1399,8 @@ function compareConflicts(
   right: CompositionConflict,
 ): number {
   return (
-    left.left.localeCompare(right.left) || left.right.localeCompare(right.right)
+    compareUtf16CodeUnits(left.left, right.left) ||
+    compareUtf16CodeUnits(left.right, right.right)
   );
 }
 
@@ -1394,8 +1409,8 @@ function compareFreshnessFindings(
   right: CompositionFreshnessFinding,
 ): number {
   return (
-    left.assetId.localeCompare(right.assetId) ||
-    left.kind.localeCompare(right.kind) ||
-    left.date.localeCompare(right.date)
+    compareUtf16CodeUnits(left.assetId, right.assetId) ||
+    compareUtf16CodeUnits(left.kind, right.kind) ||
+    compareUtf16CodeUnits(left.date, right.date)
   );
 }

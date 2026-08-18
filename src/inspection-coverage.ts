@@ -1,3 +1,4 @@
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 
 import {
@@ -285,7 +286,7 @@ export function buildInspectionCoverage(
     ...firstClassPathEvidence,
     ...supportPathEvidence,
     ...incompleteSupportBoundaryEvidence,
-  ]).sort((left, right) => left.path.localeCompare(right.path));
+  ]).sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
   const blockingIssues = pathEvidence.filter(
     (evidence): evidence is InspectionCoverageIssue =>
       evidence.strictBlocking && evidence.state !== "parsed",
@@ -391,7 +392,7 @@ function coverageChange(
       ? { affectedBoundary: evidence.affectedBoundary }
       : {}),
     previouslyInspectedPaths: [...previouslyInspectedPaths].sort(
-      (left, right) => left.localeCompare(right),
+      (left, right) => compareUtf16CodeUnits(left, right),
     ),
     classification: evidence.classification,
     strictBlocking: to?.strictBlocking ?? false,

@@ -85,9 +85,6 @@ test("nested procedural Skills participate in focused-workflow readiness without
     ]) {
       assert.equal(ids.has(expected), true, `${skillPath}: ${expected}`);
     }
-    assert.equal(ids.has("LAYOUT-SKILL-NOT-THIN"), false, skillPath);
-    assert.equal(ids.has("LAYOUT-SKILL-EXECUTABLE-COMMAND"), false, skillPath);
-
     const report = await readiness(root);
     assert.equal(report.level, "needs_attention", skillPath);
     assert.equal(report.score, 75, skillPath);
@@ -189,13 +186,6 @@ test("nested Skill-local references resolve their actual parent Skill", async ()
           finding.evidence.path === skillPath,
       ),
       true,
-      skillPath,
-    );
-    assert.equal(
-      result.findings.some(
-        (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
-      ),
-      false,
       skillPath,
     );
   }
