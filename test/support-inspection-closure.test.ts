@@ -1604,6 +1604,10 @@ test("ordinary slash-separated prose does not become repository path evidence", 
       "Compare input/output behavior.",
       "Use the owner/repo naming convention.",
       "Keep the frontend/backend contract documented.",
+      "Use API/V2 for requests.",
+      "Compare TLS/SSL behavior.",
+      "Support HTTP/2 clients.",
+      "Follow owner/README naming.",
     ].join("\n"),
   );
 
@@ -1619,6 +1623,27 @@ test("ordinary slash-separated prose does not become repository path evidence", 
   assert.ok(
     !snapshot.catalog.dependencies.some(
       (dependency) => dependency.kind === "statically_references",
+    ),
+  );
+  for (const proseToken of [
+    "client/server",
+    "input/output",
+    "owner/repo",
+    "frontend/backend",
+    "API/V2",
+    "TLS/SSL",
+    "HTTP/2",
+    "owner/README",
+  ]) {
+    assert.equal(
+      snapshot.repositoryPathStates.has(`skills/demo/${proseToken}`),
+      false,
+      proseToken,
+    );
+  }
+  assert.ok(
+    !evaluateStrictScan(result).matches.some(
+      (match) => match.id === STRICT_SCAN_MATCH_IDS.INCOMPLETE_INSPECTION,
     ),
   );
 });

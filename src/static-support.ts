@@ -767,7 +767,7 @@ function hasExplicitProsePathSignal(value: string): boolean {
     return true;
   }
 
-  return isStaticSupportBasename(path.posix.basename(cleaned));
+  return isStaticSupportFileLikeBasename(path.posix.basename(cleaned));
 }
 
 function stripUriSuffix(value: string): string {
@@ -851,12 +851,18 @@ function addBasenameReferenceToken(
 /** Filename syntax, not natural-language intent, bounds basename references. */
 function isStaticSupportBasename(value: string): boolean {
   return (
+    isStaticSupportFileLikeBasename(value) ||
+    /^[\p{Lu}\p{N}][\p{Lu}\p{N}_-]*$/u.test(value) ||
+    /^\p{Lu}[\p{L}\p{N}_-]*file$/u.test(value)
+  );
+}
+
+function isStaticSupportFileLikeBasename(value: string): boolean {
+  return (
     /^\.[\p{L}\p{N}_-]+$/u.test(value) ||
     /^(?:[\p{L}\p{N}_-]+(?:[ .][\p{L}\p{N}_-]+)*)\.[\p{L}][\p{L}\p{N}_-]*$/u.test(
       value,
-    ) ||
-    /^[\p{Lu}\p{N}][\p{Lu}\p{N}_-]*$/u.test(value) ||
-    /^\p{Lu}[\p{L}\p{N}_-]*file$/u.test(value)
+    )
   );
 }
 
