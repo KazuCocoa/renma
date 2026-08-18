@@ -445,8 +445,8 @@ test("quality configuration rejects unknown keys", async (t) => {
     loadConfig(root, {}),
     (error: unknown) =>
       error instanceof ConfigError &&
-      error.message ===
-        'Unknown quality config key "unknown". Allowed keys: ci_policy, skill_token_warning, skill_token_high, context_token_warning, context_token_high, reference_token_warning, reference_token_high, profile_token_warning, profile_token_high, example_token_warning, example_token_high.',
+      /quality:[\s\S]*"unknown" \(unknown\)/.test(error.message) &&
+      /Allowed quality keys:/.test(error.message),
   );
 });
 
@@ -706,6 +706,11 @@ test("JSONC aggregates removed and historical configuration keys", async (t) => 
   "layout": {
     "tool_namespace": "appium"
   },
+  "quality": {
+    // Both unsupported keys should join the same JSONC error.
+    "wrongQualityKey": 1,
+    "anotherWrongQualityKey": 2
+  },
   "security": {
     "profiles": {
       "restricted": {
@@ -724,6 +729,9 @@ test("JSONC aggregates removed and historical configuration keys", async (t) => 
     (error: unknown) =>
       error instanceof ConfigError &&
       /Top-level configuration:[\s\S]*"layout".*\(removed\)/.test(
+        error.message,
+      ) &&
+      /quality:[\s\S]*"anotherWrongQualityKey"[\s\S]*"wrongQualityKey"/.test(
         error.message,
       ) &&
       /security\.profiles\.restricted/.test(error.message) &&

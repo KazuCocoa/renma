@@ -495,12 +495,16 @@ test("CLI reports concise JSONC syntax locations without stack traces", async ()
   assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
 });
 
-test("commands fail closed with one aggregate for removed and historical keys", async () => {
+test("commands fail closed with one aggregate across config scopes", async () => {
   const root = await fixture();
   await writeFile(
     path.join(root, "renma.config.json"),
     JSON.stringify({
       layout: { tool_namespace: "appium" },
+      quality: { wrongQualityKey: 1, anotherWrongQualityKey: 2 },
+      metadata: { unexpected: true },
+      scan_boundary: { foo: true },
+      executable_surface: { bar: true },
       security: {
         profiles: {
           restricted: {
@@ -511,6 +515,7 @@ test("commands fail closed with one aggregate for removed and historical keys", 
           },
         },
       },
+      skill_discovery: { enabled: true, mystery: true },
     }),
   );
   const commands = [
@@ -530,11 +535,16 @@ test("commands fail closed with one aggregate for removed and historical keys", 
       args.join(" "),
     );
     assert.match(result.stderr, /Top-level configuration:[\s\S]*"layout"/);
+    assert.match(result.stderr, /quality:[\s\S]*"anotherWrongQualityKey"/);
+    assert.match(result.stderr, /metadata:[\s\S]*"unexpected"/);
+    assert.match(result.stderr, /scan_boundary:[\s\S]*"foo"/);
+    assert.match(result.stderr, /executable_surface:[\s\S]*"bar"/);
     assert.match(result.stderr, /security\.profiles\.release/);
     assert.match(result.stderr, /security\.profiles\.restricted/);
     assert.match(result.stderr, /humanApprovalRequired/);
     assert.match(result.stderr, /requires_human_approval/);
     assert.match(result.stderr, /"allowedData" -> use "allowed_data"/);
+    assert.match(result.stderr, /skill_discovery:[\s\S]*"enabled"/);
     assert.doesNotMatch(
       result.stderr,
       /Renma scan|Findings:|strict_scan\.|SEC-|QUAL-/,
@@ -798,7 +808,7 @@ test("invalid suppression configs are rejected", async () => {
         reason: "No extra keys.",
         ticket: "SEC-123",
       },
-      pattern: /Unknown suppression config key "ticket"/,
+      pattern: /suppressions\[0\]:[\s\S]*"ticket" \(unknown\)/,
     },
     {
       name: "invalid expires",

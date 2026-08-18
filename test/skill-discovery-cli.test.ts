@@ -386,7 +386,7 @@ test("Discovery adoption config is strict and invalid forms return exit code 2",
     ],
     [
       { skill_discovery: { adopted: true, extra: true } },
-      /Unknown skill_discovery config key "extra"/,
+      /skill_discovery:[\s\S]*"extra" \(unknown\)/,
     ],
     [
       { skill_discovery: { adopted: true, ci_policy: true } },

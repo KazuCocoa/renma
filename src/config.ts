@@ -52,6 +52,11 @@ const QUALITY_CONFIG_KEYS = [
     `${kind}_token_high`,
   ]),
 ] as const;
+const METADATA_CONFIG_KEYS = ["ci_policy", "required"] as const;
+const SUPPRESSION_CONFIG_KEYS = ["id", "paths", "reason", "expires"] as const;
+const SCAN_BOUNDARY_CONFIG_KEYS = ["ci_policy"] as const;
+const EXECUTABLE_SURFACE_CONFIG_KEYS = ["ci_policy"] as const;
+const SKILL_DISCOVERY_CONFIG_KEYS = ["adopted", "ci_policy"] as const;
 const TOP_LEVEL_CONFIG_KEYS = [
   "fail_on",
   "format",
@@ -101,19 +106,29 @@ const SECURITY_PROFILE_LEGACY_KEYS = new Map<string, string>([
   ["allowedData", SECURITY_PROFILE_KEYS.allowedData],
   ["forbiddenInputs", SECURITY_PROFILE_KEYS.forbiddenInputs],
 ] as const);
-const SECURITY_PROFILE_CANONICAL_KEYS = Object.values(
-  SECURITY_PROFILE_KEYS,
-).sort(compareUtf16CodeUnits);
-const SECURITY_PROFILE_CANONICAL_KEY_SET = new Set<string>(
-  SECURITY_PROFILE_CANONICAL_KEYS,
+const TOP_LEVEL_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  TOP_LEVEL_CONFIG_KEYS,
 );
-const TOP_LEVEL_CONFIG_KEY_SET = new Set<string>(TOP_LEVEL_CONFIG_KEYS);
-const SECURITY_CONFIG_KEY_SET = new Set<string>(SECURITY_CONFIG_KEYS);
-const SORTED_TOP_LEVEL_CONFIG_KEYS = [...TOP_LEVEL_CONFIG_KEYS].sort(
-  compareUtf16CodeUnits,
+const QUALITY_CONFIG_KEY_REGISTRY =
+  configurationKeyRegistry(QUALITY_CONFIG_KEYS);
+const METADATA_CONFIG_KEY_REGISTRY =
+  configurationKeyRegistry(METADATA_CONFIG_KEYS);
+const SUPPRESSION_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  SUPPRESSION_CONFIG_KEYS,
 );
-const SORTED_SECURITY_CONFIG_KEYS = [...SECURITY_CONFIG_KEYS].sort(
-  compareUtf16CodeUnits,
+const SCAN_BOUNDARY_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  SCAN_BOUNDARY_CONFIG_KEYS,
+);
+const EXECUTABLE_SURFACE_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  EXECUTABLE_SURFACE_CONFIG_KEYS,
+);
+const SECURITY_CONFIG_KEY_REGISTRY =
+  configurationKeyRegistry(SECURITY_CONFIG_KEYS);
+const SECURITY_PROFILE_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  Object.values(SECURITY_PROFILE_KEYS),
+);
+const SKILL_DISCOVERY_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  SKILL_DISCOVERY_CONFIG_KEYS,
 );
 
 /** Conventional repository configuration filenames in loading precedence. */
@@ -436,6 +451,7 @@ function normalizeConfig(
   if (!isRecord(value)) {
     throw new ConfigError(`Config${label(configPath)} must be a JSON object.`);
   }
+  validateConfigurationStructure(value);
   validateConfigurationKeys(value);
 
   const config: Partial<ScanConfig> = {};
@@ -480,14 +496,6 @@ function normalizeConfig(
 function metadataPolicy(value: unknown): ScanConfig["metadata"] {
   if (!isRecord(value)) {
     throw new ConfigError("metadata must be an object.");
-  }
-  const allowed = new Set(["ci_policy", "required"]);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown metadata config key "${key}". Allowed keys: ci_policy, required.`,
-      );
-    }
   }
 
   const required =
@@ -539,14 +547,6 @@ function requiredMetadataFields(value: unknown): RequiredMetadataPolicyField[] {
 function qualityPolicy(value: unknown): ScanConfig["quality"] {
   if (!isRecord(value)) {
     throw new ConfigError("quality must be an object.");
-  }
-  const allowed = new Set<string>(QUALITY_CONFIG_KEYS);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown quality config key "${key}". Allowed keys: ${QUALITY_CONFIG_KEYS.join(", ")}.`,
-      );
-    }
   }
 
   const hasWarning = value.skill_token_warning !== undefined;
@@ -655,14 +655,6 @@ function executableSurfacePolicy(
   if (!isRecord(value)) {
     throw new ConfigError("executable_surface must be an object.");
   }
-  const allowed = new Set(["ci_policy"]);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown executable_surface config key "${key}". Allowed keys: ci_policy.`,
-      );
-    }
-  }
   return {
     ciPolicy:
       value.ci_policy === undefined
@@ -679,14 +671,6 @@ function scanBoundaryPolicy(value: unknown): ScanConfig["scanBoundary"] {
   if (!isRecord(value)) {
     throw new ConfigError("scan_boundary must be an object.");
   }
-  const allowed = new Set(["ci_policy"]);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown scan_boundary config key "${key}". Allowed keys: ci_policy.`,
-      );
-    }
-  }
   return {
     ciPolicy:
       value.ci_policy === undefined
@@ -702,14 +686,6 @@ function scanBoundaryPolicy(value: unknown): ScanConfig["scanBoundary"] {
 function skillDiscoveryPolicy(value: unknown): ScanConfig["skillDiscovery"] {
   if (!isRecord(value)) {
     throw new ConfigError("skill_discovery must be an object.");
-  }
-  const allowed = new Set(["adopted", "ci_policy"]);
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new ConfigError(
-        `Unknown skill_discovery config key "${key}". Allowed keys: adopted, ci_policy.`,
-      );
-    }
   }
   if (value.adopted !== undefined && typeof value.adopted !== "boolean") {
     throw new ConfigError("skill_discovery.adopted must be a boolean.");
@@ -883,13 +859,37 @@ function securityProfiles(
   return normalized;
 }
 
-type ConfigurationKeyScope = "top-level" | "security" | "security-profile";
+interface ConfigurationKeyRegistry {
+  acceptedKeys: ReadonlySet<string>;
+  sortedKeys: readonly string[];
+}
+
+function configurationKeyRegistry(
+  keys: readonly string[],
+): ConfigurationKeyRegistry {
+  return {
+    acceptedKeys: new Set(keys),
+    sortedKeys: [...keys].sort(compareUtf16CodeUnits),
+  };
+}
+
+type ConfigurationKeyScope =
+  | "top-level"
+  | "quality"
+  | "metadata"
+  | "suppression"
+  | "scan-boundary"
+  | "executable-surface"
+  | "security"
+  | "security-profile"
+  | "skill-discovery";
 type ConfigurationKeyIssueKind = "historical" | "removed" | "unknown";
 
 interface ConfigurationKeyIssueBase {
   scope: ConfigurationKeyScope;
   key: string;
   profileName?: string;
+  suppressionIndex?: number;
 }
 
 type ConfigurationKeyIssue = ConfigurationKeyIssueBase &
@@ -900,14 +900,77 @@ type ConfigurationKeyIssue = ConfigurationKeyIssueBase &
 
 const CONFIGURATION_KEY_SCOPE_ORDER: Record<ConfigurationKeyScope, number> = {
   "top-level": 0,
-  security: 1,
-  "security-profile": 2,
+  quality: 1,
+  metadata: 2,
+  suppression: 3,
+  "scan-boundary": 4,
+  "executable-surface": 5,
+  security: 6,
+  "security-profile": 7,
+  "skill-discovery": 8,
 };
+const CONFIGURATION_KEY_SCOPES_IN_ORDER = (
+  Object.keys(CONFIGURATION_KEY_SCOPE_ORDER) as ConfigurationKeyScope[]
+).sort(
+  (left, right) =>
+    CONFIGURATION_KEY_SCOPE_ORDER[left] - CONFIGURATION_KEY_SCOPE_ORDER[right],
+);
+
+function validateConfigurationStructure(config: Record<string, unknown>): void {
+  if (config.quality !== undefined && !isRecord(config.quality)) {
+    throw new ConfigError("quality must be an object.");
+  }
+  if (config.metadata !== undefined && !isRecord(config.metadata)) {
+    throw new ConfigError("metadata must be an object.");
+  }
+  if (config.suppressions !== undefined) {
+    if (!Array.isArray(config.suppressions)) {
+      throw new ConfigError("suppressions must be an array.");
+    }
+    for (const [index, suppression] of config.suppressions.entries()) {
+      if (!isRecord(suppression)) {
+        throw new ConfigError(`suppressions[${index}] must be an object.`);
+      }
+    }
+  }
+  if (config.scan_boundary !== undefined && !isRecord(config.scan_boundary)) {
+    throw new ConfigError("scan_boundary must be an object.");
+  }
+  if (
+    config.executable_surface !== undefined &&
+    !isRecord(config.executable_surface)
+  ) {
+    throw new ConfigError("executable_surface must be an object.");
+  }
+  if (config.security !== undefined && !isRecord(config.security)) {
+    throw new ConfigError("security must be an object.");
+  }
+  if (isRecord(config.security) && config.security.profiles !== undefined) {
+    if (!isRecord(config.security.profiles)) {
+      throw new ConfigError("security.profiles must be an object.");
+    }
+    for (const profileName of Object.keys(config.security.profiles).sort(
+      compareUtf16CodeUnits,
+    )) {
+      if (!isRecord(config.security.profiles[profileName])) {
+        throw new ConfigError(
+          `security.profiles.${profileName} must be an object.`,
+        );
+      }
+    }
+  }
+  if (
+    config.skill_discovery !== undefined &&
+    !isRecord(config.skill_discovery)
+  ) {
+    throw new ConfigError("skill_discovery must be an object.");
+  }
+}
 
 function validateConfigurationKeys(config: Record<string, unknown>): void {
   const issues: ConfigurationKeyIssue[] = [];
   for (const key of Object.keys(config)) {
-    if (TOP_LEVEL_CONFIG_KEY_SET.has(key)) continue;
+    if (TOP_LEVEL_CONFIG_KEY_REGISTRY.acceptedKeys.has(key)) continue;
     issues.push({
       scope: "top-level",
       key,
@@ -915,25 +978,92 @@ function validateConfigurationKeys(config: Record<string, unknown>): void {
     });
   }
 
-  const security = config.security;
-  if (isRecord(security)) {
-    for (const key of Object.keys(security)) {
-      if (SECURITY_CONFIG_KEY_SET.has(key)) continue;
-      issues.push({
-        scope: "security",
-        key,
-        kind: "unknown",
-      });
+  if (isRecord(config.quality)) {
+    collectUnknownConfigurationKeys(
+      "quality",
+      config.quality,
+      QUALITY_CONFIG_KEY_REGISTRY,
+      issues,
+    );
+  }
+  if (isRecord(config.metadata)) {
+    collectUnknownConfigurationKeys(
+      "metadata",
+      config.metadata,
+      METADATA_CONFIG_KEY_REGISTRY,
+      issues,
+    );
+  }
+  if (Array.isArray(config.suppressions)) {
+    for (const [
+      suppressionIndex,
+      suppression,
+    ] of config.suppressions.entries()) {
+      if (!isRecord(suppression)) continue;
+      collectUnknownConfigurationKeys(
+        "suppression",
+        suppression,
+        SUPPRESSION_CONFIG_KEY_REGISTRY,
+        issues,
+        { suppressionIndex },
+      );
     }
-    const profiles = security.profiles;
-    if (isRecord(profiles)) {
-      collectSecurityProfileKeyIssues(profiles, issues);
+  }
+  if (isRecord(config.scan_boundary)) {
+    collectUnknownConfigurationKeys(
+      "scan-boundary",
+      config.scan_boundary,
+      SCAN_BOUNDARY_CONFIG_KEY_REGISTRY,
+      issues,
+    );
+  }
+  if (isRecord(config.executable_surface)) {
+    collectUnknownConfigurationKeys(
+      "executable-surface",
+      config.executable_surface,
+      EXECUTABLE_SURFACE_CONFIG_KEY_REGISTRY,
+      issues,
+    );
+  }
+  if (isRecord(config.security)) {
+    collectUnknownConfigurationKeys(
+      "security",
+      config.security,
+      SECURITY_CONFIG_KEY_REGISTRY,
+      issues,
+    );
+    if (isRecord(config.security.profiles)) {
+      collectSecurityProfileKeyIssues(config.security.profiles, issues);
     }
+  }
+  if (isRecord(config.skill_discovery)) {
+    collectUnknownConfigurationKeys(
+      "skill-discovery",
+      config.skill_discovery,
+      SKILL_DISCOVERY_CONFIG_KEY_REGISTRY,
+      issues,
+    );
   }
   if (issues.length === 0) return;
 
   issues.sort(compareConfigurationKeyIssues);
   throw new ConfigError(formatConfigurationKeyIssues(issues));
+}
+
+function collectUnknownConfigurationKeys(
+  scope: ConfigurationKeyScope,
+  config: Record<string, unknown>,
+  registry: ConfigurationKeyRegistry,
+  issues: ConfigurationKeyIssue[],
+  context: Pick<
+    ConfigurationKeyIssueBase,
+    "profileName" | "suppressionIndex"
+  > = {},
+): void {
+  for (const key of Object.keys(config)) {
+    if (registry.acceptedKeys.has(key)) continue;
+    issues.push({ scope, key, kind: "unknown", ...context });
+  }
 }
 
 function collectSecurityProfileKeyIssues(
@@ -943,7 +1073,7 @@ function collectSecurityProfileKeyIssues(
   for (const [profileName, profile] of Object.entries(profiles)) {
     if (!isRecord(profile)) continue;
     for (const key of Object.keys(profile)) {
-      if (SECURITY_PROFILE_CANONICAL_KEY_SET.has(key)) continue;
+      if (SECURITY_PROFILE_CONFIG_KEY_REGISTRY.acceptedKeys.has(key)) continue;
       const replacement = SECURITY_PROFILE_LEGACY_KEYS.get(key);
       if (replacement) {
         issues.push({
@@ -972,6 +1102,7 @@ function compareConfigurationKeyIssues(
   return (
     CONFIGURATION_KEY_SCOPE_ORDER[left.scope] -
       CONFIGURATION_KEY_SCOPE_ORDER[right.scope] ||
+    (left.suppressionIndex ?? -1) - (right.suppressionIndex ?? -1) ||
     compareUtf16CodeUnits(left.profileName ?? "", right.profileName ?? "") ||
     compareUtf16CodeUnits(left.key, right.key)
   );
@@ -996,7 +1127,7 @@ function formatConfigurationKeyIssues(
       .filter((issue) => issue.kind === "unknown")
       .map((issue) => issue.scope),
   );
-  for (const scope of ["top-level", "security", "security-profile"] as const) {
+  for (const scope of CONFIGURATION_KEY_SCOPES_IN_ORDER) {
     if (!unknownScopes.has(scope)) continue;
     lines.push("", allowedConfigurationKeys(scope));
   }
@@ -1008,10 +1139,22 @@ function configurationKeyIssueGroup(issue: ConfigurationKeyIssue): string {
   switch (issue.scope) {
     case "top-level":
       return "Top-level configuration";
+    case "quality":
+      return "quality";
+    case "metadata":
+      return "metadata";
+    case "suppression":
+      return `suppressions[${issue.suppressionIndex}]`;
+    case "scan-boundary":
+      return "scan_boundary";
+    case "executable-surface":
+      return "executable_surface";
     case "security":
       return "security";
     case "security-profile":
       return `security.profiles.${issue.profileName}`;
+    case "skill-discovery":
+      return "skill_discovery";
   }
 }
 
@@ -1029,12 +1172,58 @@ function formatConfigurationKeyIssue(issue: ConfigurationKeyIssue): string {
 function allowedConfigurationKeys(scope: ConfigurationKeyScope): string {
   switch (scope) {
     case "top-level":
-      return `Allowed top-level keys: ${SORTED_TOP_LEVEL_CONFIG_KEYS.join(", ")}.`;
+      return allowedConfigurationKeysMessage(
+        "top-level",
+        TOP_LEVEL_CONFIG_KEY_REGISTRY,
+      );
+    case "quality":
+      return allowedConfigurationKeysMessage(
+        "quality",
+        QUALITY_CONFIG_KEY_REGISTRY,
+      );
+    case "metadata":
+      return allowedConfigurationKeysMessage(
+        "metadata",
+        METADATA_CONFIG_KEY_REGISTRY,
+      );
+    case "suppression":
+      return allowedConfigurationKeysMessage(
+        "suppression",
+        SUPPRESSION_CONFIG_KEY_REGISTRY,
+      );
+    case "scan-boundary":
+      return allowedConfigurationKeysMessage(
+        "scan_boundary",
+        SCAN_BOUNDARY_CONFIG_KEY_REGISTRY,
+      );
+    case "executable-surface":
+      return allowedConfigurationKeysMessage(
+        "executable_surface",
+        EXECUTABLE_SURFACE_CONFIG_KEY_REGISTRY,
+      );
     case "security":
-      return `Allowed security keys: ${SORTED_SECURITY_CONFIG_KEYS.join(", ")}.`;
+      return allowedConfigurationKeysMessage(
+        "security",
+        SECURITY_CONFIG_KEY_REGISTRY,
+      );
     case "security-profile":
-      return `Allowed security profile keys: ${SECURITY_PROFILE_CANONICAL_KEYS.join(", ")}.`;
+      return allowedConfigurationKeysMessage(
+        "security profile",
+        SECURITY_PROFILE_CONFIG_KEY_REGISTRY,
+      );
+    case "skill-discovery":
+      return allowedConfigurationKeysMessage(
+        "skill_discovery",
+        SKILL_DISCOVERY_CONFIG_KEY_REGISTRY,
+      );
   }
+}
+
+function allowedConfigurationKeysMessage(
+  label: string,
+  registry: ConfigurationKeyRegistry,
+): string {
+  return `Allowed ${label} keys: ${registry.sortedKeys.join(", ")}.`;
 }
 
 function configurationKeyIssueAction(
@@ -1098,14 +1287,6 @@ function suppressionArray(value: unknown): SuppressionConfig[] {
       throw new ConfigError(`${name} must be an object.`);
     }
     const source = item as Record<string, unknown>;
-    const allowed = new Set(["id", "paths", "reason", "expires"]);
-    for (const key of Object.keys(source)) {
-      if (!allowed.has(key)) {
-        throw new ConfigError(
-          `Unknown suppression config key "${key}" in ${name}.`,
-        );
-      }
-    }
 
     const id = stringValue(`${name}.id`, source.id);
     const paths = stringArray(`${name}.paths`, source.paths);

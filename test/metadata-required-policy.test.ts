@@ -382,7 +382,7 @@ test("metadata configuration validates vocabulary, duplicates, values, and keys"
     [{ metadata: { required: ["id"] } }, /Unsupported.*"id"/],
     [{ metadata: { required: ["network_allowed"] } }, /Unsupported/],
     [{ metadata: { required: ["owner", "owner"] } }, /duplicate field/],
-    [{ metadata: { unknown: true } }, /Unknown metadata config key/],
+    [{ metadata: { unknown: true } }, /metadata:[\s\S]*"unknown" \(unknown\)/],
     [{ metadata: { ci_policy: "ignore" } }, /must be one of: off, warn, fail/],
   ] as const;
   for (const [index, [config, expected]] of cases.entries()) {

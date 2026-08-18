@@ -38,7 +38,7 @@ test("scan-boundary CI policy validation is strict and actionable", async (t) =>
     ],
     [
       { scan_boundary: { unknown: true } },
-      /Unknown scan_boundary config key "unknown"\. Allowed keys: ci_policy\./,
+      /scan_boundary:[\s\S]*"unknown" \(unknown\)[\s\S]*Allowed scan_boundary keys: ci_policy\./,
     ],
   ] as const) {
     await t.test(JSON.stringify(config), async (caseContext) => {
