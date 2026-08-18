@@ -115,12 +115,109 @@ test("historical security profile spellings fail with canonical replacements", a
         (error: unknown) =>
           error instanceof ConfigError &&
           error.message.includes(
-            `Historical security profile key "${legacy}"`,
+            "Unsupported historical security profile keys found:",
           ) &&
-          error.message.includes(`Use "${canonical}" instead`),
+          error.message.includes(
+            `- ${JSON.stringify(legacy)} -> use ${JSON.stringify(canonical)}`,
+          ),
       );
     });
   }
+});
+
+test("multiple historical security profile keys produce one actionable error", async (t) => {
+  const root = await configFixture(t, {
+    security: {
+      profiles: {
+        "appium-local-workflows": {
+          networkAllowed: false,
+          humanApprovalRequired: true,
+          allowedData: ["repo-local-files"],
+        },
+      },
+    },
+  });
+
+  const error = await configError(root);
+  assert.equal(
+    error.message,
+    `Unsupported historical security profile keys found:
+
+security.profiles.appium-local-workflows:
+- "allowedData" -> use "allowed_data"
+- "humanApprovalRequired" -> use "requires_human_approval"
+- "networkAllowed" -> use "network_allowed"
+
+Renma v1 does not interpret historical security profile keys. Update all listed keys and rerun \`renma scan .\`.`,
+  );
+});
+
+test("historical security profile keys are stable across profiles and author order", async (t) => {
+  const firstRoot = await configFixture(t, {
+    security: {
+      profiles: {
+        release: {
+          requiresHumanApproval: true,
+          allowedDataClass: "restricted",
+        },
+        "appium-local-workflows": {
+          networkAllowed: false,
+          allowedData: ["repo-local-files"],
+        },
+      },
+    },
+  });
+  const secondRoot = await configFixture(t, {
+    security: {
+      profiles: {
+        "appium-local-workflows": {
+          allowedData: ["repo-local-files"],
+          networkAllowed: false,
+        },
+        release: {
+          allowedDataClass: "restricted",
+          requiresHumanApproval: true,
+        },
+      },
+    },
+  });
+
+  const firstError = await configError(firstRoot);
+  const secondError = await configError(secondRoot);
+  const expected = `Unsupported historical security profile keys found:
+
+security.profiles.appium-local-workflows:
+- "allowedData" -> use "allowed_data"
+- "networkAllowed" -> use "network_allowed"
+
+security.profiles.release:
+- "allowedDataClass" -> use "allowed_data_class"
+- "requiresHumanApproval" -> use "requires_human_approval"
+
+Renma v1 does not interpret historical security profile keys. Update all listed keys and rerun \`renma scan .\`.`;
+  assert.equal(firstError.message, expected);
+  assert.equal(secondError.message, expected);
+});
+
+test("historical and unknown security profile keys are reported together", async (t) => {
+  const root = await profileConfigFixture(t, {
+    totallyUnknownField: true,
+    allowedData: ["repo-local-files"],
+  });
+
+  const error = await configError(root);
+  assert.equal(
+    error.message,
+    `Unsupported security profile keys found:
+
+security.profiles.restricted:
+- "allowedData" -> use "allowed_data" (historical)
+- "totallyUnknownField" (unknown)
+
+Allowed canonical keys: allowed_data, allowed_data_class, approvedDomains, approvedUploadDomains, disallowedCommands, external_upload_allowed, forbidden_inputs, network_allowed, requires_human_approval, secrets_allowed, security_profile.
+
+Renma v1 does not interpret historical or unknown security profile keys. Replace all listed historical keys, remove all listed unknown keys, and rerun \`renma scan .\`.`,
+  );
 });
 
 test("canonical security profile values remain strictly typed", async (t) => {
@@ -228,4 +325,14 @@ async function configFixture(
     );
   }
   return root;
+}
+
+async function configError(root: string): Promise<ConfigError> {
+  try {
+    await loadConfig(root, {});
+  } catch (error) {
+    assert.ok(error instanceof ConfigError);
+    return error;
+  }
+  assert.fail("Expected loadConfig to reject invalid security profile keys.");
 }

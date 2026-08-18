@@ -3248,9 +3248,10 @@ test("ci-report rejects historical aliases in either archived endpoint", async (
         (error: unknown) =>
           error instanceof ConfigError &&
           /security\.profiles\.restricted/.test(error.message) &&
-          /Historical security profile key "networkAllowed"/.test(
+          /Unsupported historical security profile keys found/.test(
             error.message,
-          ),
+          ) &&
+          /"networkAllowed" -> use "network_allowed"/.test(error.message),
       );
     }
 
@@ -3270,8 +3271,11 @@ test("ci-report rejects historical aliases in either archived endpoint", async (
     assert.equal(command.code, 2);
     assert.equal(command.stdout, "");
     assert.match(command.stderr, /security\.profiles\.restricted/);
-    assert.match(command.stderr, /Historical security profile key/);
-    assert.match(command.stderr, /Use "network_allowed" instead/);
+    assert.match(
+      command.stderr,
+      /Unsupported historical security profile keys found/,
+    );
+    assert.match(command.stderr, /"networkAllowed" -> use "network_allowed"/);
     assert.doesNotMatch(command.stderr, /SEC-|QUAL-|strict_scan\./);
   } finally {
     await rm(repo, { force: true, recursive: true });

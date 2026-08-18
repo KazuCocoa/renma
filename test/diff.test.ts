@@ -1450,10 +1450,10 @@ test("diff rejects historical aliases in either archived endpoint", async () => 
         (error: unknown) =>
           error instanceof ConfigError &&
           /security\.profiles\.restricted/.test(error.message) &&
-          /Historical security profile key "networkAllowed"/.test(
+          /Unsupported historical security profile keys found/.test(
             error.message,
           ) &&
-          /Use "network_allowed" instead/.test(error.message),
+          /"networkAllowed" -> use "network_allowed"/.test(error.message),
       );
     }
   } finally {

@@ -521,7 +521,7 @@ test("commands fail closed on historical security profile aliases", async () => 
     assert.equal(result.code, 2, args.join(" "));
     assert.equal(result.stdout, "", args.join(" "));
     assert.match(result.stderr, /security\.profiles\.restricted/);
-    assert.match(result.stderr, /Historical security profile key/);
+    assert.match(result.stderr, /Unsupported historical security profile keys/);
     assert.match(result.stderr, /humanApprovalRequired/);
     assert.match(result.stderr, /requires_human_approval/);
     assert.doesNotMatch(result.stderr, /strict_scan\.|SEC-|QUAL-/);

@@ -7,6 +7,17 @@ import {
   type Node as JsonNode,
   type ParseError,
 } from "jsonc-parser";
+import { compareUtf16CodeUnits } from "./canonical-json.js";
+import {
+  REQUIRED_METADATA_POLICY_FIELDS,
+  type RequiredMetadataPolicyField,
+} from "./metadata-definitions.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { safeRepositoryPath } from "./repository-boundary.js";
+import {
+  DEFAULT_SKILL_ENTRYPOINT_GLOBS,
+  DEFAULT_SKILL_SUPPORT_GLOBS,
+} from "./skill-path-contract.js";
 import type {
   ContentTokenBudgetKind,
   LoadedConfig,
@@ -17,16 +28,6 @@ import type {
   SuppressionConfig,
   SuppressionExpiration,
 } from "./types/diagnostics.js";
-import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
-import {
-  DEFAULT_SKILL_ENTRYPOINT_GLOBS,
-  DEFAULT_SKILL_SUPPORT_GLOBS,
-} from "./skill-path-contract.js";
-import {
-  REQUIRED_METADATA_POLICY_FIELDS,
-  type RequiredMetadataPolicyField,
-} from "./metadata-definitions.js";
-import { safeRepositoryPath } from "./repository-boundary.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
@@ -77,6 +78,12 @@ const SECURITY_PROFILE_LEGACY_KEYS = new Map<string, string>([
   ["allowedData", SECURITY_PROFILE_KEYS.allowedData],
   ["forbiddenInputs", SECURITY_PROFILE_KEYS.forbiddenInputs],
 ] as const);
+const SECURITY_PROFILE_CANONICAL_KEYS = Object.values(
+  SECURITY_PROFILE_KEYS,
+).sort(compareUtf16CodeUnits);
+const SECURITY_PROFILE_CANONICAL_KEY_SET = new Set<string>(
+  SECURITY_PROFILE_CANONICAL_KEYS,
+);
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = [
@@ -832,21 +839,14 @@ function securityProfiles(
   const profiles = objectRecord("security.profiles", value);
   const normalized: NonNullable<ScanConfig["security"]["profiles"]> = {};
   for (const [name, profile] of Object.entries(profiles)) {
-    if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+    if (!isRecord(profile)) {
       throw new ConfigError(`security.profiles.${name} must be an object.`);
     }
+  }
+  validateSecurityProfileKeys(profiles);
+
+  for (const [name, profile] of Object.entries(profiles)) {
     const source = profile as Record<string, unknown>;
-    const allowed = new Set<string>(Object.values(SECURITY_PROFILE_KEYS));
-    for (const key of Object.keys(source)) {
-      if (!allowed.has(key)) {
-        const replacement = SECURITY_PROFILE_LEGACY_KEYS.get(key);
-        throw new ConfigError(
-          replacement
-            ? `Historical security profile key "${key}" in security.profiles.${name} is not supported in v1. Use "${replacement}" instead.`
-            : `Unknown security profile key "${key}" in security.profiles.${name}. Allowed keys: ${[...allowed].join(", ")}.`,
-        );
-      }
-    }
     const profilePath = `security.profiles.${name}`;
     normalized[name] = {
       allowedDataClass: optionalString(
@@ -896,6 +896,88 @@ function securityProfiles(
     };
   }
   return normalized;
+}
+
+interface SecurityProfileKeyIssue {
+  profileName: string;
+  key: string;
+  replacement?: string;
+}
+
+function validateSecurityProfileKeys(profiles: Record<string, unknown>): void {
+  const issues: SecurityProfileKeyIssue[] = [];
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    const source = profile as Record<string, unknown>;
+    for (const key of Object.keys(source)) {
+      if (SECURITY_PROFILE_CANONICAL_KEY_SET.has(key)) continue;
+      const replacement = SECURITY_PROFILE_LEGACY_KEYS.get(key);
+      issues.push({
+        profileName,
+        key,
+        ...(replacement ? { replacement } : {}),
+      });
+    }
+  }
+  if (issues.length === 0) return;
+
+  issues.sort(
+    (left, right) =>
+      compareUtf16CodeUnits(left.profileName, right.profileName) ||
+      compareUtf16CodeUnits(left.key, right.key),
+  );
+  throw new ConfigError(formatSecurityProfileKeyIssues(issues));
+}
+
+function formatSecurityProfileKeyIssues(
+  issues: readonly SecurityProfileKeyIssue[],
+): string {
+  const hasHistorical = issues.some((issue) => issue.replacement !== undefined);
+  const hasUnknown = issues.some((issue) => issue.replacement === undefined);
+  const lines = [
+    hasHistorical && hasUnknown
+      ? "Unsupported security profile keys found:"
+      : hasHistorical
+        ? "Unsupported historical security profile keys found:"
+        : "Unknown security profile keys found:",
+  ];
+  let previousProfileName: string | undefined;
+  for (const issue of issues) {
+    if (issue.profileName !== previousProfileName) {
+      lines.push("", `security.profiles.${issue.profileName}:`);
+      previousProfileName = issue.profileName;
+    }
+    if (issue.replacement !== undefined) {
+      lines.push(
+        `- ${JSON.stringify(issue.key)} -> use ${JSON.stringify(issue.replacement)}${hasUnknown ? " (historical)" : ""}`,
+      );
+    } else {
+      lines.push(
+        `- ${JSON.stringify(issue.key)}${hasHistorical ? " (unknown)" : ""}`,
+      );
+    }
+  }
+
+  if (hasUnknown) {
+    lines.push(
+      "",
+      `Allowed canonical keys: ${SECURITY_PROFILE_CANONICAL_KEYS.join(", ")}.`,
+    );
+  }
+  lines.push("", securityProfileKeyIssueAction(hasHistorical, hasUnknown));
+  return lines.join("\n");
+}
+
+function securityProfileKeyIssueAction(
+  hasHistorical: boolean,
+  hasUnknown: boolean,
+): string {
+  if (hasHistorical && hasUnknown) {
+    return "Renma v1 does not interpret historical or unknown security profile keys. Replace all listed historical keys, remove all listed unknown keys, and rerun `renma scan .`.";
+  }
+  if (hasHistorical) {
+    return "Renma v1 does not interpret historical security profile keys. Update all listed keys and rerun `renma scan .`.";
+  }
+  return "Renma v1 does not interpret unknown security profile keys. Remove all listed keys and rerun `renma scan .`.";
 }
 
 function optionalString(name: string, value: unknown): string | undefined {

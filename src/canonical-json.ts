@@ -16,7 +16,7 @@ export function canonicalJson(value: unknown): string {
 }
 
 /** Compare strings by ECMAScript UTF-16 code-unit order without locale data. */
-function compareUtf16CodeUnits(left: string, right: string): number {
+export function compareUtf16CodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 

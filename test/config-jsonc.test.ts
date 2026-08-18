@@ -721,8 +721,10 @@ test("JSONC rejects historical security profile aliases", async (t) => {
     (error: unknown) =>
       error instanceof ConfigError &&
       /security\.profiles\.restricted/.test(error.message) &&
-      /Historical security profile key "networkAllowed"/.test(error.message) &&
-      /Use "network_allowed" instead/.test(error.message),
+      /Unsupported historical security profile keys found/.test(
+        error.message,
+      ) &&
+      /"networkAllowed" -> use "network_allowed"/.test(error.message),
   );
 });
 
