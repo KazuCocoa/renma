@@ -12,6 +12,7 @@ import { spawnSync } from "node:child_process";
 
 const PACKAGE_NAME = "renma";
 const PACKAGE_JSON_SPECIFIER = "renma/package.json";
+const NPM_COMMAND = process.platform === "win32" ? "npm.cmd" : "npm";
 const REPOSITORY_ONLY_README_PREFIXES = ["docs/development/"];
 const SEMANTIC_PUBLIC_IMPORTS = [
   ["renma/types", "dist/public-types.js", "dist/public-types.d.ts"],
@@ -178,7 +179,7 @@ try {
   await mkdir(consumerDirectory, { recursive: true });
   await mkdir(cacheDirectory, { recursive: true });
   const packed = spawnSync(
-    "npm",
+    NPM_COMMAND,
     [
       "pack",
       "--json",
@@ -305,7 +306,7 @@ async function installInTemporaryConsumer(
     )}\n`,
   );
   const installed = spawnSync(
-    "npm",
+    NPM_COMMAND,
     [
       "install",
       "--ignore-scripts",

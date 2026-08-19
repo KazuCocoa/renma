@@ -58,6 +58,8 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
   ".github/workflows/ci.yml": [
     "actions/checkout#v7",
     "actions/checkout#v7",
+    "actions/checkout#v7",
+    "actions/setup-node#v7",
     "actions/setup-node#v7",
     "actions/setup-node#v7",
     "SocketDev/action#v1.3.2",
@@ -231,6 +233,47 @@ test("dedicated Renma report remains PR-only", () => {
   assert.match(source, /github\.event\.pull_request/);
   assert.match(source, /node dist\/index\.js ci-report/);
   assert.match(source, /node dist\/index\.js scan \. --fail-on high --strict/);
+});
+
+test("supported-platform CI keeps focused macOS and Windows evidence", () => {
+  const workflow = readWorkflow(".github/workflows/ci.yml");
+  const packageVerifier = readFileSync("scripts/verify-package.mjs", "utf8");
+  const platform = workflow.jobs?.["supported-platform-evidence"];
+  assert.deepEqual(platform?.strategy?.matrix, {
+    os: ["macos-latest", "windows-latest"],
+  });
+  assert.equal(
+    actionStep(platform, "actions/checkout")?.with?.["fetch-depth"],
+    0,
+  );
+  assert.equal(
+    actionStep(platform, "actions/setup-node")?.with?.["node-version"],
+    "lts/*",
+  );
+
+  const commands = runCommands(platform).join("\n");
+  for (const command of [
+    "npm ci",
+    "npm run build",
+    "npx --no-install tsc -p tsconfig.test.json",
+    "dist-test/test/repository-paths.test.js",
+    "dist-test/test/helper-command-evidence.test.js",
+    "dist-test/test/executable-dependency-analyzer.test.js",
+    "dist-test/test/public-json-compatibility.test.js",
+    "npm run verify:package",
+    "node scripts/verify-platform-smoke.mjs",
+  ]) {
+    assert.ok(commands.includes(command), command);
+  }
+  assert.doesNotMatch(commands, /npm run docs:build|npm run lint|npm test/);
+  assert.match(
+    packageVerifier,
+    /const NPM_COMMAND = process\.platform === "win32" \? "npm\.cmd" : "npm";/,
+  );
+  assert.equal(
+    [...packageVerifier.matchAll(/spawnSync\(\s*NPM_COMMAND,/gu)].length,
+    2,
+  );
 });
 
 test("public Renma report is a portable exact package-consumer workflow", () => {

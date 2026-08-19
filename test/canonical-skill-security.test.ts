@@ -1065,7 +1065,19 @@ test("canonical descriptions report high-risk routing literals without operation
       absentOperationalId: "SEC-DESTRUCTIVE-COMMAND",
     },
     {
+      literal: '"npm install left-pad"',
+      absentOperationalId: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    },
+    {
+      literal: '"fetch https://unapproved.example/data"',
+      absentOperationalId: "SEC-INSTRUCTION-VIOLATES-POLICY",
+    },
+    {
       literal: '"upload the .env file externally"',
+      absentOperationalId: "SEC-SECRET-MATERIAL-INSTRUCTION",
+    },
+    {
+      literal: '"print credentials to logs"',
       absentOperationalId: "SEC-SECRET-MATERIAL-INSTRUCTION",
     },
     {
@@ -1082,6 +1094,7 @@ description: >-
   Review security-sensitive requests. Use for requests such as ${literal}; do not use to perform the requested action.
 metadata:
   renma.allowed-data: '["public"]'
+  renma.network-allowed: "false"
   renma.external-upload-allowed: "false"
   renma.secrets-allowed: "false"
 ---

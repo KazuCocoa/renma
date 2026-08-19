@@ -6,6 +6,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added focused macOS and Windows CI evidence for path, filesystem,
+  shell-family parsing, package startup, and representative JSON behavior while
+  retaining the complete Linux quality gate.
+- Added `SEC-EXECUTABLE-AS-POLICY-AUTHORITY` for the bounded case where a
+  recognized inline Skill helper is explicitly made the allow/deny authority
+  for a security-relevant operation.
+
+### Changed
+
+- Completed whole-document golden compatibility assurance for every stable
+  public JSON producer except Trust Graph v2, which retains its published JSON
+  Schema and frozen exact semantic-contract test. Documented the 1.x stability
+  policy and retained the published `renma.trustGraph.v2` spelling.
+
 ## [0.34.0] - 2026-08-18
 
 ### Added
@@ -350,7 +366,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   overlapping `<<` suffix cannot hide dependencies on later lines.
 - Removed the release-version literal from the CI consumer-workflow contract
   test. The expected exact `npm install --save-dev --save-exact
-  renma@<package version>` command is now derived from `package.json`, so a
+renma@<package version>` command is now derived from `package.json`, so a
   correctly pinned next-version release fixture passes finalization without a
   release-specific test edit or an expansion of the release-file allowlist.
 - Unedited or partially edited Renma Skill and Context scaffolds now emit the

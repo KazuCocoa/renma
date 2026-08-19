@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "renma.metadata-suggestion.v1",
+  "path": "<ROOT>/contexts/valid.md",
+  "kind": "context",
+  "suggestedMode": "metadata-retrofit",
+  "decisionStatus": "human-confirmation-required",
+  "decision": {
+    "reasonCode": "independent-governance-intent-unconfirmed",
+    "summary": "Renma constructed only deterministic candidates; the intended owner, lifecycle, and source-of-truth evidence still require human confirmation.",
+    "question": "Confirm the intended owner, lifecycle, and source-of-truth evidence for this independent asset."
+  },
+  "classification": {
+    "kind": "context",
+    "scope": "independent",
+    "matchedRule": "context-root",
+    "reasonCode": "under-recognized-context-root",
+    "reason": "The file is under the recognized contexts/** root.",
+    "recognizedRoot": "contexts"
+  },
+  "ownerProvided": true,
+  "instructions": [
+    "Inspect the existing asset before editing.",
+    "Preserve the existing markdown body content.",
+    "Preserve existing frontmatter fields and values unless they are clearly invalid.",
+    "Add missing metadata only when it is clearly supported by file content, established Renma path conventions, or user-provided options.",
+    "Do not infer or invent owner.",
+    "Do not infer owner from Git history, file path, prose, or author.",
+    "Missing owner is allowed.",
+    "Avoid placeholder metadata.",
+    "Keep metadata compact.",
+    "Preserve existing owner: qa-platform.",
+    "Run renma scan . and renma ownership . after editing."
+  ],
+  "candidateMetadata": {
+    "title": "Valid Context"
+  },
+  "blockedMetadata": [],
+  "nextActions": [
+    {
+      "kind": "inspect-target",
+      "invocation": {
+        "command": "renma",
+        "args": [
+          "inspect",
+          "<ROOT>/contexts/valid.md",
+          "--format",
+          "json"
+        ],
+        "display": "renma inspect <ROOT>/contexts/valid.md --format json"
+      }
+    },
+    {
+      "kind": "verify",
+      "invocation": {
+        "command": "renma",
+        "args": [
+          "scan",
+          "<ROOT>",
+          "--fail-on",
+          "high",
+          "--format",
+          "json"
+        ],
+        "display": "renma scan <ROOT> --fail-on high --format json"
+      }
+    }
+  ]
+}

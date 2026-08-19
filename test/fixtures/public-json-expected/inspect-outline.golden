@@ -1,0 +1,200 @@
+{
+  "schemaVersion": "renma.inspect-outline.v1",
+  "bytes": 1253,
+  "asset": {
+    "id": "skill.review",
+    "kind": "skill",
+    "owner": "qa-platform",
+    "status": "stable",
+    "appliesTo": [],
+    "focus": [],
+    "expectedOutputs": [],
+    "inboundDependents": [],
+    "outboundDependencies": [
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": true,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.inactive",
+        "targetId": "context.inactive",
+        "targetKind": "context",
+        "targetPath": "contexts/inactive.md"
+      },
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": true,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.invalid-status",
+        "targetId": "context.invalid-status",
+        "targetKind": "context",
+        "targetPath": "contexts/invalid-status.md"
+      },
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": true,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.missing-boundary",
+        "targetId": "context.missing-boundary",
+        "targetKind": "context",
+        "targetPath": "contexts/missing-boundary.md"
+      },
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": true,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.missing-owner",
+        "targetId": "context.missing-owner",
+        "targetKind": "context",
+        "targetPath": "contexts/missing-owner.md"
+      },
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": true,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.placeholder",
+        "targetId": "context.placeholder",
+        "targetKind": "context",
+        "targetPath": "contexts/placeholder.md"
+      },
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": false,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.unknown"
+      },
+      {
+        "from": "skill.review",
+        "kind": "requires_context",
+        "resolved": true,
+        "sourcePath": "skills/review/SKILL.md",
+        "to": "context.valid",
+        "targetId": "context.valid",
+        "targetKind": "context",
+        "targetPath": "contexts/valid.md"
+      }
+    ],
+    "relationshipChains": [],
+    "tags": []
+  },
+  "codeFences": [],
+  "contextLens": {
+    "enabled": true,
+    "detected": false,
+    "totalLensCount": 0,
+    "validLensCount": 0,
+    "invalidLensCount": 0,
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "definitionPaths": [],
+    "targetReferences": [],
+    "targetPaths": [],
+    "unresolvedTargetReferences": [],
+    "scopeSummary": [],
+    "lenses": []
+  },
+  "classification": {
+    "kind": "skill",
+    "scope": "independent",
+    "matchedRule": "skill-entrypoint",
+    "reasonCode": "under-canonical-skill-root",
+    "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+    "recognizedRoot": "skills"
+  },
+  "governance": {
+    "ownership": {
+      "declaredOwner": "qa-platform",
+      "effectiveOwner": "qa-platform",
+      "source": "declared"
+    },
+    "policySource": "declared",
+    "metadataState": "declared"
+  },
+  "frontmatterRange": "L1-L15",
+  "headings": [
+    {
+      "depth": 1,
+      "line": 16,
+      "preview": [
+        "L0018: Review repository evidence and report completion.",
+        "L0020: ## Required Inputs",
+        "L0022: - The repository evidence and requested validation scope."
+      ],
+      "range": "L16-L43",
+      "text": "Review"
+    },
+    {
+      "depth": 2,
+      "line": 20,
+      "preview": [
+        "L0022: - The repository evidence and requested validation scope."
+      ],
+      "range": "L20-L23",
+      "text": "Required Inputs"
+    },
+    {
+      "depth": 2,
+      "line": 24,
+      "preview": [
+        "L0026: Confirm the repository root and preserve all source content."
+      ],
+      "range": "L24-L27",
+      "text": "Preflight"
+    },
+    {
+      "depth": 2,
+      "line": 28,
+      "preview": [
+        "L0030: Review declared metadata, diagnostics, and dependency evidence."
+      ],
+      "range": "L28-L31",
+      "text": "Workflow"
+    },
+    {
+      "depth": 2,
+      "line": 32,
+      "preview": [
+        "L0034: Use the Skill for deterministic repository validation, not runtime selection."
+      ],
+      "range": "L32-L35",
+      "text": "Examples"
+    },
+    {
+      "depth": 2,
+      "line": 36,
+      "preview": [
+        "L0038: Confirm every reported result is supported by repository evidence."
+      ],
+      "range": "L36-L39",
+      "text": "Verification"
+    },
+    {
+      "depth": 2,
+      "line": 40,
+      "preview": [
+        "L0042: Return the findings and verification status without modifying the repository."
+      ],
+      "range": "L40-L43",
+      "text": "Completion Criteria"
+    }
+  ],
+  "lineCount": 43,
+  "links": [],
+  "path": "<ROOT>/skills/review/SKILL.md",
+  "repositoryBoundary": {
+    "state": "resolved",
+    "source": "marker",
+    "root": "<ROOT>",
+    "relativePath": "skills/review/SKILL.md",
+    "absolutePath": "<ROOT>/skills/review/SKILL.md",
+    "marker": "renma.config.json"
+  }
+}

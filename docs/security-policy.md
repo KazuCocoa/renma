@@ -949,6 +949,35 @@ nested list items are separated by their AST boundaries and are not combined.
 Ordinary adjacent prose in one paragraph remains eligible for bounded multiline
 matching.
 
+### Executable helpers and policy authority
+
+Renma inventories supported helper invocations and executable surfaces as
+review evidence, but executable bytes do not become declarative security
+policy. A canonical Skill body crosses this boundary when a parser-recognized
+inline helper invocation explicitly delegates an allow, permit, approve,
+authorize, or safety decision for a security-relevant operation to that helper.
+
+Unsafe:
+
+```markdown
+Run `bash scripts/check-policy.sh` to determine whether uploading this data is allowed.
+```
+
+Safer:
+
+```markdown
+Run `bash scripts/check-policy.sh` to report bounded validation evidence. Apply the reviewed Skill instructions and declarative Renma policy to decide whether uploading is allowed.
+```
+
+Renma reports the unsafe form as
+`SEC-EXECUTABLE-AS-POLICY-AUTHORITY`. It requires the existing bounded helper
+grammar and one positioned Markdown paragraph. Ordinary execution, linting,
+testing, validation, and calculation are not findings. A fenced command is not
+combined with later policy prose, unrecognized executable-looking text is not
+promoted to evidence, and Renma never runs or interprets the helper. This is an
+intentional high-confidence boundary rather than a claim to understand
+arbitrary executable policy delegation.
+
 If a workflow explicitly traverses external sources recursively, put its source
 and destination scope, relevance test, logical visited identity and cycle
 handling, depth/count/time cap, failure stop condition, and unresolved-scope
@@ -1200,6 +1229,7 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body or canonical Skill `description`      |
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text or canonical Skill `description` |
 | `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body text or canonical Skill `description` |
+| `SEC-EXECUTABLE-AS-POLICY-AUTHORITY`      | A recognized inline Skill helper decides whether a security-relevant operation is allowed, approved, authorized, or safe.            | Keep the authorization decision in reviewed Skill instructions and declarative Renma policy; use executable output only as bounded evidence.                                                                                                                                                                                                                                | Canonical Skill body                        |
 | `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary.                                                      | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section.                                                                                                                                                                                                                                                                  | Body or canonical Skill `description`      |
 | `SEC-DESTRUCTIVE-COMMAND`                 | A destructive command appears without enough local safety context.                                                                   | Remove it, scope it tightly, or add explicit approval and recovery guidance.                                                                                                                                                                                                                                                                                                | Body text                                  |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`    | `sudo` or similar privileged action lacks guardrails.                                                                                 | Add prerequisites, confirmation, rollback, and verification guidance.                                                                                                                                                                                                                                                                                                       | Body text                                  |

@@ -1,0 +1,198 @@
+{
+  "schemaVersion": "renma.ownership.v1",
+  "root": "<ROOT>",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 7,
+  "totalAssets": 7,
+  "ownedAssets": 6,
+  "unownedAssets": 1,
+  "coveragePercent": 85.71,
+  "byKind": [
+    {
+      "kind": "context",
+      "totalAssets": 6,
+      "ownedAssets": 5,
+      "unownedAssets": 1,
+      "coveragePercent": 83.33
+    },
+    {
+      "kind": "skill",
+      "totalAssets": 1,
+      "ownedAssets": 1,
+      "unownedAssets": 0,
+      "coveragePercent": 100
+    }
+  ],
+  "owners": [
+    {
+      "owner": "qa-platform",
+      "totalAssets": 6,
+      "byKind": [
+        {
+          "kind": "context",
+          "totalAssets": 5
+        },
+        {
+          "kind": "skill",
+          "totalAssets": 1
+        }
+      ],
+      "assets": [
+        {
+          "id": "context.inactive",
+          "kind": "context",
+          "sourcePath": "contexts/inactive.md",
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "archived",
+          "tags": []
+        },
+        {
+          "id": "context.invalid-status",
+          "kind": "context",
+          "sourcePath": "contexts/invalid-status.md",
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": null,
+          "tags": []
+        },
+        {
+          "id": "context.missing-boundary",
+          "kind": "context",
+          "sourcePath": "contexts/missing-boundary.md",
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable",
+          "tags": []
+        },
+        {
+          "id": "context.placeholder",
+          "kind": "context",
+          "sourcePath": "contexts/placeholder.md",
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable",
+          "tags": []
+        },
+        {
+          "id": "context.valid",
+          "kind": "context",
+          "sourcePath": "contexts/valid.md",
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable",
+          "tags": []
+        },
+        {
+          "id": "skill.review",
+          "kind": "skill",
+          "sourcePath": "skills/review/SKILL.md",
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable",
+          "tags": []
+        }
+      ]
+    }
+  ],
+  "unownedAssetList": [
+    {
+      "id": "context.missing-owner",
+      "kind": "context",
+      "sourcePath": "contexts/missing-owner.md",
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": null,
+        "source": "unowned"
+      },
+      "status": "stable",
+      "tags": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "path": "contexts/invalid-status.md",
+      "message": "Invalid status \"active\". Expected one of: experimental, stable, suspended, deprecated, archived.",
+      "evidence": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-boundary.md",
+      "message": "Shared context asset is missing when_to_use metadata.",
+      "evidence": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-owner.md",
+      "message": "Asset is missing an owner."
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_not_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "skills/review/SKILL.md",
+      "message": "Metadata dependency \"context.unknown\" from \"skill.review\" does not match a catalog entry.",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md"
+      }
+    }
+  ]
+}

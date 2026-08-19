@@ -94,6 +94,10 @@ import {
 } from "./security-body-policy/clause-facts.js";
 import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "./types/skill-description.js";
 import type { PlainTextSupportSecurityReachability } from "./static-support.js";
+import {
+  collectHelperCommandEvidence,
+  type HelperCommandEvidence,
+} from "./helper-command-evidence.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -667,6 +671,29 @@ const RULES = {
     confidence: "high",
     riskClass: "violation",
   },
+  executableAsPolicyAuthority: {
+    id: DIAGNOSTIC_IDS.SEC_EXECUTABLE_AS_POLICY_AUTHORITY,
+    category: "safety",
+    title: "Executable helper becomes security-policy authority",
+    whyItMatters:
+      "A repository helper can produce review evidence, but its opaque behavior must not silently become the authority that permits, approves, or authorizes a security-sensitive operation.",
+    remediation:
+      "Keep the authorization decision in reviewed Skill instructions and declarative Renma security policy. Use the helper only to collect or validate evidence for that decision.",
+    constraints: [
+      "Do not treat ordinary helper execution, linting, testing, validation, or calculation as policy delegation.",
+      "Do not interpret or execute the helper while repairing the instruction.",
+      "Preserve the helper when it remains useful as evidence rather than authority.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the helper no longer decides whether a security-sensitive operation is allowed, permitted, approved, authorized, or safe.",
+      "Confirm reviewed instructions and declarative policy state the authorization boundary.",
+    ],
+    llmHint:
+      "Rewrite the instruction so the recognized helper reports bounded evidence, while reviewed Skill instructions and declarative Renma policy retain the allow/deny or approval decision.",
+    confidence: "high",
+    riskClass: "suspicious",
+  },
   unboundedExternalSourceTraversal: {
     id: DIAGNOSTIC_IDS.SEC_UNBOUNDED_EXTERNAL_SOURCE_TRAVERSAL,
     category: "safety",
@@ -1054,6 +1081,18 @@ const UNTRUSTED_EXECUTION_ACTION_RE =
   /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}?\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}?\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}?\b(it|them|the content|the instructions?)\b.{0,40}?\b(verbatim|exactly|without review)\b/i;
 const UNTRUSTED_ACTION_VERB_RE =
   /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting|treat|regard|accept)\b/i;
+const EXECUTABLE_POLICY_AUTHORITY_DELEGATION_RE =
+  /^[\s`*_).,:;\]–—-]{0,24}(?:(?:(?:and\s+)?use\s+(?:its|the\s+helper(?:'s)?)\s+(?:result|output|exit\s+code)\s+to)|to)\s+(?<decision>(?:determine|decide|establish)\s+(?:if|whether)\b.{0,160}?\b(?:is|are|would\s+be|may\s+be|can\s+be)\s+(?:allowed|permitted|approved|authorized|safe)\b)/i;
+const EXECUTABLE_POLICY_AUTHORITY_SECURITY_CONCEPT_RE = new RegExp(
+  [
+    String.raw`\b(?:uploads?|uploading|uploaded)\b`,
+    String.raw`\b(?:sends?|sending|sent|posts?|posting|posted|shares?|sharing|shared|attaches?|attaching|attached|submits?|submitting|submitted|syncs?|syncing|synced|pushes?|pushing|pushed|publishes?|publishing|published)\b.{0,80}\b(?:secrets?|credentials?|tokens?|private[ -]keys?|\.env|environment[ -]files?|repository[ -]data|source[ -]code|private[ -]data|sensitive[ -]data|externally|publicly|third[ -]part(?:y|ies)|remote(?:ly)?)\b`,
+    String.raw`\b(?:network|internet)[ -](?:access|use|usage|connection|requests?)\b`,
+    String.raw`\b(?:access(?:es|ed|ing)?|reads?|reading|read|writes?|writing|wrote|copies?|copying|copied|stores?|storing|stored|logs?|logging|logged|prints?|printing|printed|exposes?|exposing|exposed|discloses?|disclosing|disclosed|uses?|using|used|handles?|handling|handled|deletes?|deleting|deleted|rotates?|rotating|rotated)\b.{0,80}\b(?:secrets?|credentials?|tokens?|private[ -]keys?|\.env|environment[ -]files?)\b`,
+    String.raw`\b(?:security|privacy|authorization)[ -]policy\b|\baccess[ -]control\b`,
+  ].join("|"),
+  "i",
+);
 const REVIEW_VOCABULARY_SOURCE = String.raw`(?:review(?:s|ed|ing|ers?)?|validat(?:e|es|ed|ing|ion)|verif(?:y|ies|ied|ying|ication)|inspect(?:s|ed|ing|ion)?|check(?:s|ed|ing)?)`;
 const UNTRUSTED_REVIEW_ORDERING_SOURCE = String.raw`before|prior to`;
 const UNTRUSTED_REVIEW_TARGET_ACTION_SOURCE = String.raw`execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting`;
@@ -1152,6 +1191,7 @@ interface PreparedSecurityDocumentAnalysis {
     YamlFrontmatterCommentAnalysis | undefined;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
+  readonly helperCommands: readonly HelperCommandEvidence[];
   readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
   readonly securityParagraphContextByLine: ReadonlyMap<
     number,
@@ -1308,6 +1348,7 @@ function securityFindingsForPreparedDocument(
     ...collectCanonicalDescriptionDetections(prepared),
     ...collectSecurityLineDetections(prepared),
     ...collectSemanticInstructionDetections(prepared),
+    ...collectExecutablePolicyAuthorityDetections(prepared),
   ];
   const detections: Detection[] = [
     ...collectPolicyPreludeDetections(
@@ -1676,6 +1717,7 @@ function prepareSecurityDocumentAnalysis(
     markdownView,
     parsedPolicy,
   );
+  const helperCommands = collectHelperCommandEvidence([document]);
   const securityParagraphAnalysis = prepareSecurityParagraphContexts(
     markdownView,
     syntax,
@@ -1695,6 +1737,7 @@ function prepareSecurityDocumentAnalysis(
     yamlFrontmatterCommentAnalysis: frontmatter,
     scanStart,
     logicalCommands,
+    helperCommands,
     securityParagraphs: securityParagraphAnalysis.paragraphs,
     securityParagraphContextByLine: securityParagraphAnalysis.contextByLine,
     surface: options.surface ?? "markdown",
@@ -2612,6 +2655,59 @@ function collectSemanticInstructionDetections(
     );
   }
   return detections;
+}
+
+function collectExecutablePolicyAuthorityDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  if (prepared.artifact.kind !== "skill" || prepared.surface !== "markdown") {
+    return [];
+  }
+
+  return prepared.helperCommands.flatMap((command) => {
+    const unit = prepared.markdownView.semanticUnits.find(
+      (candidate) =>
+        candidate.kind === "paragraph" &&
+        candidate.startLine <= command.line &&
+        candidate.endLine >= command.line,
+    );
+    if (unit === undefined) return [];
+
+    const instructionText = unit.lines.join(" ");
+    const commandStart = instructionText.indexOf(command.snippet);
+    if (commandStart < 0) return [];
+    const suffix = instructionText.slice(commandStart + command.snippet.length);
+    const delegation = EXECUTABLE_POLICY_AUTHORITY_DELEGATION_RE.exec(suffix);
+    const decision = delegation?.groups?.decision;
+    if (
+      decision === undefined ||
+      !EXECUTABLE_POLICY_AUTHORITY_SECURITY_CONCEPT_RE.test(decision)
+    ) {
+      return [];
+    }
+
+    const evidence: DetectionEvidence = {
+      startLine: unit.startLine,
+      endLine: unit.endLine,
+      snippet: prepared.sourceLines
+        .slice(unit.startLine - 1, unit.endLine)
+        .join("\n"),
+    };
+    return [
+      {
+        metadata: RULES.executableAsPolicyAuthority,
+        severity: "medium" as const,
+        ...evidence,
+        dedupeKey: `${RULES.executableAsPolicyAuthority.id}:${command.line}:${command.launcher}:${command.rawTarget}`,
+        details: {
+          evidenceKind: "recognized-helper-command",
+          launcher: command.launcher,
+          rawTarget: command.rawTarget,
+          decision: decision.trim(),
+        },
+      },
+    ];
+  });
 }
 
 function collectCanonicalDescriptionDetections(
