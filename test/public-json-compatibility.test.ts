@@ -419,6 +419,26 @@ test("compatibility root normalization handles JSON-escaped Windows paths", () =
   );
 });
 
+test("public JSON fixtures and goldens are pinned to LF across Git checkouts", () => {
+  const result = spawnSync(
+    "git",
+    [
+      "check-attr",
+      "eol",
+      "--",
+      "test/fixtures/public-json-baseline/contexts/valid.md",
+      "test/fixtures/public-json-expected/scan.golden",
+    ],
+    { encoding: "utf8" },
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(result.stdout.trim().split(/\r?\n/u), [
+    "test/fixtures/public-json-baseline/contexts/valid.md: eol: lf",
+    "test/fixtures/public-json-expected/scan.golden: eol: lf",
+  ]);
+});
+
 test("CLI JSON output matches direct command serialization", async () => {
   const expected = formatCatalogJson(await catalog(FIXTURE_ROOT));
   const actual = await captureProcessOutput(() =>
