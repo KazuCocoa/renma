@@ -399,6 +399,9 @@ test("compatibility root normalization handles JSON-escaped Windows paths", () =
     {
       root: windowsRoot,
       path: `${windowsRoot}\\skills\\review\\SKILL.md`,
+      prompt: `${windowsRoot}\\skills\\review\\SKILL.md then run scripts\\check.ps1`,
+      multiple: `${windowsRoot}\\contexts\\one.md and ${windowsRoot}\\contexts\\two.md`,
+      surrounded: `run scripts\\before.ps1; inspect ${windowsRoot}\\skills\\review\\SKILL.md; then run scripts\\after.ps1`,
       unrelated: String.raw`powershell.exe -File scripts\check.ps1`,
     },
     null,
@@ -411,6 +414,9 @@ test("compatibility root normalization handles JSON-escaped Windows paths", () =
       {
         root: "<ROOT>",
         path: "<ROOT>/skills/review/SKILL.md",
+        prompt: String.raw`<ROOT>/skills/review/SKILL.md then run scripts\check.ps1`,
+        multiple: "<ROOT>/contexts/one.md and <ROOT>/contexts/two.md",
+        surrounded: String.raw`run scripts\before.ps1; inspect <ROOT>/skills/review/SKILL.md; then run scripts\after.ps1`,
         unrelated: String.raw`powershell.exe -File scripts\check.ps1`,
       },
       null,
@@ -523,9 +529,7 @@ function normalizeJsonRoot(stdout: string, root: string): string {
 
 function normalizeJsonValue(value: unknown, root: string): unknown {
   if (typeof value === "string") {
-    if (!value.includes(root)) return value;
-    const normalized = value.replaceAll(root, "<ROOT>");
-    return root.includes("\\") ? normalized.replaceAll("\\", "/") : normalized;
+    return normalizeCheckoutRootInString(value, root);
   }
   if (Array.isArray(value)) {
     return value.map((item) => normalizeJsonValue(item, root));
@@ -539,6 +543,55 @@ function normalizeJsonValue(value: unknown, root: string): unknown {
     );
   }
   return value;
+}
+
+const WINDOWS_ROOT_PATH_BOUNDARY_RE = /[\s`"'<>|?*()\[\]{};,:=&#]/u;
+
+function normalizeCheckoutRootInString(value: string, root: string): string {
+  if (root.length === 0 || !value.includes(root)) return value;
+
+  let cursor = 0;
+  let normalized = "";
+  while (cursor < value.length) {
+    const rootStart = value.indexOf(root, cursor);
+    if (rootStart < 0) return normalized + value.slice(cursor);
+
+    normalized += `${value.slice(cursor, rootStart)}<ROOT>`;
+    cursor = rootStart + root.length;
+    if (!root.includes("\\")) continue;
+
+    const suffix = normalizeWindowsRootPathSuffix(value, cursor);
+    normalized += suffix.value;
+    cursor = suffix.end;
+  }
+  return normalized;
+}
+
+function normalizeWindowsRootPathSuffix(
+  value: string,
+  start: number,
+): { value: string; end: number } {
+  let cursor = start;
+  let normalized = "";
+
+  while (value[cursor] === "\\") {
+    normalized += "/";
+    cursor += 1;
+
+    const segmentStart = cursor;
+    while (
+      cursor < value.length &&
+      value[cursor] !== "\\" &&
+      !WINDOWS_ROOT_PATH_BOUNDARY_RE.test(value[cursor] ?? "")
+    ) {
+      cursor += 1;
+    }
+    normalized += value.slice(segmentStart, cursor);
+
+    if (value[cursor] !== "\\") break;
+  }
+
+  return { value: normalized, end: cursor };
 }
 
 async function assertOrUpdateGolden(
