@@ -64,6 +64,7 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
     "actions/setup-node#v7",
     "SocketDev/action#v1.3.2",
     "SocketDev/action#v1.3.2",
+    "SocketDev/action#v1.3.2",
   ],
   ".github/workflows/docs-pages.yml": [
     "actions/checkout#v7",
@@ -239,6 +240,7 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
   const workflow = readWorkflow(".github/workflows/ci.yml");
   const packageVerifier = readFileSync("scripts/verify-package.mjs", "utf8");
   const platform = workflow.jobs?.["supported-platform-evidence"];
+  const platformSteps = steps(platform);
   assert.deepEqual(platform?.strategy?.matrix, {
     os: ["macos-latest", "windows-latest"],
   });
@@ -251,9 +253,28 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
     "lts/*",
   );
 
+  const installStepIndex = platformSteps.findIndex(
+    (step) => step.name === "Install dependencies",
+  );
+  const firewallStepIndex = platformSteps.findIndex((step) =>
+    step.uses?.startsWith("SocketDev/action@"),
+  );
+  const installCommand = platformSteps[installStepIndex]?.run?.trim();
+  const firewallMode = platformSteps[firewallStepIndex]?.with?.mode;
+  const socketProtectedInstall =
+    firewallStepIndex >= 0 &&
+    firewallStepIndex < installStepIndex &&
+    firewallMode === "firewall-free" &&
+    installCommand === "sfw npm ci";
+  const scriptlessInstall = installCommand === "npm ci --ignore-scripts";
+  assert.ok(
+    socketProtectedInstall || scriptlessInstall,
+    "platform dependency installation must use Socket Firewall or disable lifecycle scripts",
+  );
+  assert.notEqual(installCommand, "npm ci");
+
   const commands = runCommands(platform).join("\n");
   for (const command of [
-    "npm ci",
     "npm run build",
     "npx --no-install tsc -p tsconfig.test.json",
     "dist-test/test/repository-paths.test.js",
