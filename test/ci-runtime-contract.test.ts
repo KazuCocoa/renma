@@ -299,7 +299,11 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
     packageVerifier,
     /spawnSync\(process\.execPath, \[NPM_CLI_PATH, \.\.\.args\], options\)/,
   );
-  assert.doesNotMatch(packageVerifier, /npm\.cmd|shell:\s*true/);
+  assert.match(
+    packageVerifier,
+    /spawnSync\(process\.execPath, \[cliPath, "--help"\]/,
+  );
+  assert.doesNotMatch(packageVerifier, /\.cmd|shell:\s*true/);
 });
 
 test("public Renma report is a portable exact package-consumer workflow", () => {

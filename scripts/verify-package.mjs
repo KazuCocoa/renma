@@ -283,7 +283,7 @@ try {
   await verifyInstalledExports(packageRoot);
   await verifyPackageSpecifierPolicy(consumerDirectory);
   await verifyPackageSpecifierDeclarations(consumerDirectory);
-  verifyPackagedCli(consumerDirectory);
+  verifyPackagedCli(packageRoot, consumerDirectory);
 
   process.stdout.write(
     `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_PACKAGE_SPECIFIERS.length} rejected module subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} rejected declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, and every README-relative target.\n`,
@@ -641,15 +641,9 @@ export {};
   }
 }
 
-function verifyPackagedCli(consumerDirectory) {
-  const binaryName = process.platform === "win32" ? "renma.cmd" : "renma";
-  const binaryPath = path.join(
-    consumerDirectory,
-    "node_modules",
-    ".bin",
-    binaryName,
-  );
-  const verified = spawnSync(binaryPath, ["--help"], {
+function verifyPackagedCli(packageRoot, consumerDirectory) {
+  const cliPath = path.join(packageRoot, "dist", "index.js");
+  const verified = spawnSync(process.execPath, [cliPath, "--help"], {
     cwd: consumerDirectory,
     encoding: "utf8",
   });
