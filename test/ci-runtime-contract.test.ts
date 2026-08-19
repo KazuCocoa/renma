@@ -64,7 +64,6 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
     "actions/setup-node#v7",
     "SocketDev/action#v1.3.2",
     "SocketDev/action#v1.3.2",
-    "SocketDev/action#v1.3.2",
   ],
   ".github/workflows/docs-pages.yml": [
     "actions/checkout#v7",
