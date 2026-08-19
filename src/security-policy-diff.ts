@@ -501,7 +501,7 @@ function profileSuppliesFieldValue(
   if (!declared) return false;
   const chain = evidence.profileChain;
   const profileIndex = chain.indexOf(profile);
-  const candidate = config.profiles?.[profile];
+  const candidate = configuredProfile(config, profile);
   if (profileIndex < 0 || candidate === undefined) return false;
 
   if (SCALAR_FIELDS.has(field)) {
@@ -509,7 +509,9 @@ function profileSuppliesFieldValue(
     const scalarField = field as ScalarSecurityPolicyField;
     const contributor = [...chain]
       .reverse()
-      .find((name) => config.profiles?.[name]?.[scalarField] !== undefined);
+      .find(
+        (name) => configuredProfile(config, name)?.[scalarField] !== undefined,
+      );
     return (
       contributor === profile &&
       candidate[scalarField] === evidence.effectivePolicy[scalarField]
@@ -702,7 +704,8 @@ function profileListContribution(
       const lastClassContributor = [...chain]
         .reverse()
         .find(
-          (name) => config.profiles?.[name]?.allowedDataClass !== undefined,
+          (name) =>
+            configuredProfile(config, name)?.allowedDataClass !== undefined,
         );
       return uniqueStrings([
         ...(lastClassContributor === profileName && profile.allowedDataClass
@@ -749,8 +752,8 @@ function profileFieldChanged(
   profile: string,
   field: ReviewableSecurityPolicyField,
 ): boolean {
-  const before = input.fromConfig?.profiles?.[profile];
-  const after = input.toConfig?.profiles?.[profile];
+  const before = configuredProfile(input.fromConfig, profile);
+  const after = configuredProfile(input.toConfig, profile);
   if ((before?.securityProfile ?? null) !== (after?.securityProfile ?? null)) {
     return true;
   }
@@ -785,8 +788,11 @@ function changedProfileAttribution(
     return { contributes: false, exact: false };
   }
 
-  const counterfactualProfiles = { ...(input.toConfig.profiles ?? {}) };
-  const beforeProfile = input.fromConfig.profiles?.[profile];
+  const counterfactualProfiles = Object.assign(
+    Object.create(null),
+    input.toConfig.profiles ?? {},
+  ) as Record<string, SecurityProfileConfig>;
+  const beforeProfile = configuredProfile(input.fromConfig, profile);
   if (beforeProfile === undefined) {
     delete counterfactualProfiles[profile];
   } else {
@@ -825,8 +831,8 @@ function changedProfileListAttribution(
     return { contributes: false, exact: false };
   }
 
-  const beforeProfile = input.fromConfig.profiles?.[profile];
-  const afterProfile = input.toConfig.profiles?.[profile];
+  const beforeProfile = configuredProfile(input.fromConfig, profile);
+  const afterProfile = configuredProfile(input.toConfig, profile);
   const parentLinkChanged =
     (beforeProfile?.securityProfile ?? null) !==
     (afterProfile?.securityProfile ?? null);
@@ -911,7 +917,7 @@ function profileEffectiveListContribution(
   field: ListSecurityPolicyField,
 ): string[] {
   if (!profileSuppliesFieldValue(evidence, config, profile, field)) return [];
-  const candidate = config.profiles?.[profile];
+  const candidate = configuredProfile(config, profile);
   if (!candidate) return [];
   const effectiveValues = new Set(evidence.effectivePolicy[field]);
   return profileListContribution(
@@ -1054,6 +1060,16 @@ function profileValue(
     case "disallowedCommands":
       return uniqueStrings(profile?.disallowedCommands ?? []);
   }
+}
+
+function configuredProfile(
+  config: SecurityConfig | undefined,
+  name: string,
+): SecurityProfileConfig | undefined {
+  const profiles = config?.profiles;
+  return profiles !== undefined && Object.hasOwn(profiles, name)
+    ? profiles[name]
+    : undefined;
 }
 
 function repositoryFieldChanged(
