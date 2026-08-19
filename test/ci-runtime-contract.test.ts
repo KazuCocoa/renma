@@ -24,10 +24,11 @@ type WorkflowJob = {
   strategy?: {
     matrix?: Record<string, unknown>;
   };
+  uses?: string;
 };
 
 type Workflow = {
-  on?: Record<string, { branches?: string[] }>;
+  on?: Record<string, { branches?: string[] } | null>;
   permissions?: Record<string, string>;
   jobs?: Record<string, WorkflowJob>;
 };
@@ -58,8 +59,6 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
   ".github/workflows/ci.yml": [
     "actions/checkout#v7",
     "actions/checkout#v7",
-    "actions/checkout#v7",
-    "actions/setup-node#v7",
     "actions/setup-node#v7",
     "actions/setup-node#v7",
     "SocketDev/action#v1.3.2",
@@ -79,6 +78,10 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
     "actions/setup-node#v7",
     "actions/setup-node#v7",
   ],
+  ".github/workflows/supported-platform-validation.yml": [
+    "actions/checkout#v7",
+    "actions/setup-node#v7",
+  ],
   ".github/workflows/renma-ci-report.yml": [
     "actions/checkout#v7",
     "actions/download-artifact#v8",
@@ -93,6 +96,19 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
     "actions/setup-node#v6",
     "actions/upload-artifact#v7",
   ],
+};
+
+const EXPECTED_LOCAL_WORKFLOWS_BY_FILE: Record<string, string[]> = {
+  ".github/workflows/ci.yml": [
+    "./.github/workflows/supported-platform-validation.yml",
+  ],
+  ".github/workflows/docs-pages.yml": [],
+  ".github/workflows/npm-publish.yml": [
+    "./.github/workflows/supported-platform-validation.yml",
+  ],
+  ".github/workflows/renma-ci-report.yml": [],
+  ".github/workflows/supported-platform-validation.yml": [],
+  "examples/github-actions/renma-ci-report.yml": [],
 };
 
 test("minimum Node helper derives the normalized package engine floor", () => {
@@ -236,9 +252,21 @@ test("dedicated Renma report remains PR-only", () => {
 });
 
 test("supported-platform CI keeps focused macOS and Windows evidence", () => {
-  const workflow = readWorkflow(".github/workflows/ci.yml");
+  const primaryWorkflow = readWorkflow(".github/workflows/ci.yml");
+  const workflow = readWorkflow(
+    ".github/workflows/supported-platform-validation.yml",
+  );
   const packageVerifier = readFileSync("scripts/verify-package.mjs", "utf8");
-  const platform = workflow.jobs?.["supported-platform-evidence"];
+  const primaryPlatform = primaryWorkflow.jobs?.["supported-platform-evidence"];
+  assert.equal(
+    primaryPlatform?.uses,
+    "./.github/workflows/supported-platform-validation.yml",
+  );
+  assert.deepEqual(primaryPlatform?.permissions, { contents: "read" });
+  assert.ok(workflow.on && "workflow_call" in workflow.on);
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+
+  const platform = workflow.jobs?.validate;
   const platformSteps = steps(platform);
   assert.deepEqual(platform?.strategy?.matrix, {
     os: ["macos-latest", "windows-latest"],
@@ -246,6 +274,10 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
   assert.equal(
     actionStep(platform, "actions/checkout")?.with?.["fetch-depth"],
     0,
+  );
+  assert.equal(
+    actionStep(platform, "actions/checkout")?.with?.ref,
+    "${{ github.sha }}",
   );
   assert.equal(
     actionStep(platform, "actions/setup-node")?.with?.["node-version"],
@@ -290,10 +322,13 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
     packageVerifier,
     /const NPM_CLI_PATH = process\.env\.npm_execpath;/,
   );
-  assert.equal(
-    [...packageVerifier.matchAll(/const (?:packed|installed) = runNpm\(/gu)]
-      .length,
-    2,
+  assert.match(
+    packageVerifier,
+    /packageJson\.bin\?\.renma !== "\.\/dist\/index\.js"/,
+  );
+  assert.match(
+    packageVerifier,
+    /function verifyInstalledCommand[\s\S]+"exec",[\s\S]+"--offline",[\s\S]+"--",[\s\S]+"renma",[\s\S]+"--help"/,
   );
   assert.match(
     packageVerifier,
@@ -301,7 +336,7 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
   );
   assert.match(
     packageVerifier,
-    /spawnSync\(process\.execPath, \[cliPath, "--help"\]/,
+    /function verifyPackagedCliEntrypoint[\s\S]+spawnSync\(process\.execPath, \[cliPath, "--help"\]/,
   );
   assert.doesNotMatch(packageVerifier, /\.cmd|shell:\s*true/);
 });
@@ -394,10 +429,23 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
   }
   assert.doesNotMatch(validationCommands, /npm publish/);
 
+  const platformValidation = workflow.jobs?.["validate-supported-platform"];
+  assert.equal(
+    platformValidation?.name,
+    "Validate supported release platforms",
+  );
+  assert.equal(platformValidation?.needs, "verify-release-ref");
+  assert.equal(
+    platformValidation?.uses,
+    "./.github/workflows/supported-platform-validation.yml",
+  );
+  assert.deepEqual(platformValidation?.permissions, { contents: "read" });
+
   const publish = workflow.jobs?.publish;
   assert.deepEqual(publish?.needs, [
     "verify-release-ref",
     "validate-supported-runtime",
+    "validate-supported-platform",
   ]);
   assert.equal(publish?.environment, "npm-publish");
   assert.deepEqual(publish?.permissions, {
@@ -435,16 +483,26 @@ test("all external GitHub Actions use expected identities at immutable SHAs", ()
     const usesLines = source
       .split(/\r?\n/u)
       .filter((line) => /^\s*(?:-\s*)?uses:/u.test(line));
-    const actualActions = usesLines.map((line) => {
-      const match = line.match(
-        /^\s*(?:-\s*)?uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\d+(?:\.\d+){0,2})\s*$/u,
-      );
-      assert.ok(
-        match,
-        `${file} must pin this external action to a full SHA with a release-tag comment: ${line.trim()}`,
-      );
-      return `${match[1]}#${match[3]}`;
-    });
+    const localWorkflows = usesLines
+      .map((line) => line.match(/^\s*(?:-\s*)?uses:\s+([^\s]+)\s*$/u)?.[1])
+      .filter((value): value is string => value?.startsWith("./") === true);
+    assert.deepEqual(
+      localWorkflows.sort(),
+      [...(EXPECTED_LOCAL_WORKFLOWS_BY_FILE[file] ?? [])].sort(),
+      `${file} local reusable workflow calls changed`,
+    );
+    const actualActions = usesLines
+      .filter((line) => !/^\s*(?:-\s*)?uses:\s+\.\//u.test(line))
+      .map((line) => {
+        const match = line.match(
+          /^\s*(?:-\s*)?uses:\s+([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\d+(?:\.\d+){0,2})\s*$/u,
+        );
+        assert.ok(
+          match,
+          `${file} must pin this external action to a full SHA with a release-tag comment: ${line.trim()}`,
+        );
+        return `${match[1]}#${match[3]}`;
+      });
 
     assert.deepEqual(
       actualActions.sort(),

@@ -799,7 +799,9 @@ function securityProfiles(
   value: unknown,
 ): NonNullable<ScanConfig["security"]["profiles"]> {
   const profiles = objectRecord("security.profiles", value);
-  const normalized: NonNullable<ScanConfig["security"]["profiles"]> = {};
+  const normalized = Object.create(null) as NonNullable<
+    ScanConfig["security"]["profiles"]
+  >;
   for (const [name, profile] of Object.entries(profiles)) {
     if (!isRecord(profile)) {
       throw new ConfigError(`security.profiles.${name} must be an object.`);
