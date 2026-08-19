@@ -1,0 +1,642 @@
+{
+  "schemaVersion": "renma.diff.v1",
+  "root": "<ROOT>",
+  "from": {
+    "ref": "contract-base",
+    "scannedFileCount": 7,
+    "totalAssets": 7,
+    "readinessScore": 67,
+    "readinessLevel": "not_ready",
+    "ownership": {
+      "ownedAssets": 6,
+      "eligibleAssets": 7,
+      "coveragePercent": 86
+    },
+    "contextLens": {
+      "enabled": true,
+      "detected": false,
+      "totalLensCount": 0,
+      "validLensCount": 0,
+      "invalidLensCount": 0,
+      "diagnosticCounts": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "definitionPaths": [],
+      "targetReferences": [],
+      "targetPaths": [],
+      "unresolvedTargetReferences": [],
+      "scopeSummary": [],
+      "lenses": []
+    },
+    "securityPolicyInventory": {
+      "totalPolicyAssets": 7,
+      "assetsWithLocalPolicyMetadata": 7,
+      "assetsWithInheritedPolicy": 0,
+      "assetsWithEffectivePolicy": 7,
+      "assetsWithoutEffectivePolicy": 0,
+      "policySources": {
+        "local": 7,
+        "security_profile": 0,
+        "repository_config": 0,
+        "owning_skill": 0
+      },
+      "assetKinds": {
+        "skill": 1,
+        "context": 6,
+        "context_lens": 0,
+        "agent": 0,
+        "profile": 0,
+        "reference": 0,
+        "example": 0,
+        "script": 0,
+        "asset": 0,
+        "config": 0,
+        "unknown": 0
+      },
+      "networkAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "externalUploadAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "externalUploadGovernance": {
+        "denied": 7,
+        "allowedApprovalRequired": 0,
+        "allowedNoApprovalRequired": 0,
+        "allowedApprovalUnspecified": 0,
+        "unspecified": 0
+      },
+      "secretsAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "humanApprovalRequired": {
+        "true": 7,
+        "false": 0,
+        "unspecified": 0
+      },
+      "approvedNetworkDestinationCount": 0,
+      "approvedUploadDestinationCount": 0,
+      "forbiddenInputCount": 0,
+      "disallowedCommandCount": 0,
+      "securityProfiles": {
+        "referenced": 0,
+        "resolved": 0,
+        "missing": 0,
+        "cyclic": 0,
+        "none": 7,
+        "names": []
+      },
+      "topApprovedNetworkDestinations": [],
+      "topApprovedUploadDestinations": [],
+      "topForbiddenInputs": [],
+      "assetsWithoutEffectivePolicyList": []
+    }
+  },
+  "to": {
+    "ref": "contract-head",
+    "scannedFileCount": 7,
+    "totalAssets": 7,
+    "readinessScore": 67,
+    "readinessLevel": "not_ready",
+    "ownership": {
+      "ownedAssets": 6,
+      "eligibleAssets": 7,
+      "coveragePercent": 86
+    },
+    "contextLens": {
+      "enabled": true,
+      "detected": false,
+      "totalLensCount": 0,
+      "validLensCount": 0,
+      "invalidLensCount": 0,
+      "diagnosticCounts": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "definitionPaths": [],
+      "targetReferences": [],
+      "targetPaths": [],
+      "unresolvedTargetReferences": [],
+      "scopeSummary": [],
+      "lenses": []
+    },
+    "securityPolicyInventory": {
+      "totalPolicyAssets": 7,
+      "assetsWithLocalPolicyMetadata": 7,
+      "assetsWithInheritedPolicy": 0,
+      "assetsWithEffectivePolicy": 7,
+      "assetsWithoutEffectivePolicy": 0,
+      "policySources": {
+        "local": 7,
+        "security_profile": 0,
+        "repository_config": 0,
+        "owning_skill": 0
+      },
+      "assetKinds": {
+        "skill": 1,
+        "context": 6,
+        "context_lens": 0,
+        "agent": 0,
+        "profile": 0,
+        "reference": 0,
+        "example": 0,
+        "script": 0,
+        "asset": 0,
+        "config": 0,
+        "unknown": 0
+      },
+      "networkAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "externalUploadAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "externalUploadGovernance": {
+        "denied": 7,
+        "allowedApprovalRequired": 0,
+        "allowedNoApprovalRequired": 0,
+        "allowedApprovalUnspecified": 0,
+        "unspecified": 0
+      },
+      "secretsAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "humanApprovalRequired": {
+        "true": 7,
+        "false": 0,
+        "unspecified": 0
+      },
+      "approvedNetworkDestinationCount": 0,
+      "approvedUploadDestinationCount": 0,
+      "forbiddenInputCount": 0,
+      "disallowedCommandCount": 0,
+      "securityProfiles": {
+        "referenced": 0,
+        "resolved": 0,
+        "missing": 0,
+        "cyclic": 0,
+        "none": 7,
+        "names": []
+      },
+      "topApprovedNetworkDestinations": [],
+      "topApprovedUploadDestinations": [],
+      "topForbiddenInputs": [],
+      "assetsWithoutEffectivePolicyList": []
+    }
+  },
+  "summary": {
+    "readinessScoreDelta": 0,
+    "readinessLevelChanged": false,
+    "totalAssetsDelta": 0,
+    "ownershipCoverageDelta": 0,
+    "graphResolutionDelta": 0,
+    "findingsDelta": 0,
+    "highOrCriticalFindingsDelta": 0,
+    "contentChangedAssets": 1
+  },
+  "catalog": {
+    "addedAssets": [],
+    "removedAssets": [],
+    "changedAssets": [
+      {
+        "id": "context.valid",
+        "path": "contexts/valid.md",
+        "changedFields": [],
+        "contentChanged": true,
+        "from": {
+          "id": "context.valid",
+          "path": "contexts/valid.md",
+          "kind": "context",
+          "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "status": "stable"
+        },
+        "to": {
+          "id": "context.valid",
+          "path": "contexts/valid.md",
+          "kind": "context",
+          "contentHash": "sha256:52ccac95c44ded24cce48ea3c80f1c8256fb091809ddc70189d0ee4a3450075f",
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "status": "stable"
+        }
+      }
+    ]
+  },
+  "graph": {
+    "addedEdges": [],
+    "removedEdges": [],
+    "newUnresolvedEdges": [],
+    "resolvedEdges": []
+  },
+  "readiness": {
+    "checkChanges": []
+  },
+  "discovery": {
+    "schemaVersion": "renma.skill-discovery-diff.v1",
+    "adoption": {
+      "from": "adopted",
+      "to": "adopted",
+      "changed": false
+    },
+    "coverage": {
+      "from": "authoritative",
+      "to": "authoritative",
+      "changed": false
+    },
+    "summary": {
+      "publishedEntrypointCountDelta": 0,
+      "routeEligibleSkillCountDelta": 0,
+      "reachableSkillCountDelta": 0,
+      "notReachedSkillCountDelta": 0,
+      "unroutedSkillCountDelta": 0,
+      "usableRouteCountDelta": 0,
+      "unusableRouteCountDelta": 0,
+      "unresolvedRouteCountDelta": 0,
+      "cycleComponentCountDelta": 0
+    },
+    "publishedEntrypoints": {
+      "added": [],
+      "removed": []
+    },
+    "reachability": {
+      "newlyReachable": [],
+      "newlyNotReached": []
+    },
+    "unroutedSkills": {
+      "newlyUnrouted": [],
+      "resolvedUnrouted": []
+    },
+    "routes": {
+      "added": [],
+      "removed": [],
+      "changed": []
+    },
+    "cycles": {
+      "added": [],
+      "resolved": []
+    }
+  },
+  "executableSurface": {
+    "summary": {
+      "totalSurfacesDelta": 0,
+      "skillLocalSurfacesDelta": 0,
+      "repositoryToolSurfacesDelta": 0,
+      "noncanonicalSurfacesDelta": 0,
+      "reachableSkillLocalSurfacesDelta": 0,
+      "unreachableSkillLocalSurfacesDelta": 0,
+      "referencedSurfacesDelta": 0,
+      "invokedSurfacesDelta": 0,
+      "surfacesWithEffectivePolicyDelta": 0,
+      "surfacesWithoutEffectivePolicyDelta": 0,
+      "totalInvocationsDelta": 0,
+      "resolvedInvocationsDelta": 0,
+      "missingInvocationsDelta": 0,
+      "unsafeInvocationsDelta": 0,
+      "unscopedInvocationsDelta": 0,
+      "noncanonicalInvocationsDelta": 0,
+      "unavailableInvocationsDelta": 0,
+      "invocationsWithEffectivePolicyEvidenceDelta": 0,
+      "invocationsWithoutEffectivePolicyEvidenceDelta": 0,
+      "resolvedInvocationsWithEffectivePolicyEvidenceDelta": 0,
+      "resolvedInvocationsWithoutEffectivePolicyEvidenceDelta": 0,
+      "invocationsWithMultipleEffectivePolicyFingerprintsDelta": 0,
+      "sourceArtifactPolicyEvidenceRelationsDelta": 0,
+      "owningSkillPolicyEvidenceRelationsDelta": 0,
+      "effectivePolicyCoverageDelta": 0,
+      "totalDependenciesDelta": 0,
+      "resolvedDependenciesDelta": 0,
+      "missingDependenciesDelta": 0,
+      "unsafeDependenciesDelta": 0,
+      "ambiguousDependenciesDelta": 0,
+      "noncanonicalDependenciesDelta": 0,
+      "notInventoryDependenciesDelta": 0,
+      "unavailableDependenciesDelta": 0,
+      "directlyInvokedSurfacesDelta": 0,
+      "transitivelyReachableSurfacesDelta": 0,
+      "unreachedFromInvocationSurfacesDelta": 0
+    },
+    "fromSummary": {
+      "totalSurfaces": 0,
+      "skillLocalSurfaces": 0,
+      "repositoryToolSurfaces": 0,
+      "noncanonicalSurfaces": 0,
+      "textSurfaces": 0,
+      "binarySurfaces": 0,
+      "reachableSkillLocalSurfaces": 0,
+      "unreachableSkillLocalSurfaces": 0,
+      "referencedSurfaces": 0,
+      "unreferencedSurfaces": 0,
+      "invokedSurfaces": 0,
+      "uninvokedSurfaces": 0,
+      "surfacesWithEffectivePolicy": 0,
+      "surfacesWithoutEffectivePolicy": 0,
+      "totalInvocations": 0,
+      "resolvedInvocations": 0,
+      "missingInvocations": 0,
+      "unsafeInvocations": 0,
+      "unscopedInvocations": 0,
+      "noncanonicalInvocations": 0,
+      "unavailableInvocations": 0,
+      "invocationsWithEffectivePolicyEvidence": 0,
+      "invocationsWithoutEffectivePolicyEvidence": 0,
+      "resolvedInvocationsWithEffectivePolicyEvidence": 0,
+      "resolvedInvocationsWithoutEffectivePolicyEvidence": 0,
+      "invocationsWithMultipleEffectivePolicyFingerprints": 0,
+      "invocationPolicyEvidenceRelations": {
+        "sourceArtifact": 0,
+        "owningSkill": 0
+      },
+      "totalDependencies": 0,
+      "resolvedDependencies": 0,
+      "missingDependencies": 0,
+      "unsafeDependencies": 0,
+      "ambiguousDependencies": 0,
+      "noncanonicalDependencies": 0,
+      "notInventoryDependencies": 0,
+      "unavailableDependencies": 0,
+      "surfacesWithIncomingDependencies": 0,
+      "surfacesWithOutgoingDependencies": 0,
+      "directlyInvokedSurfaces": 0,
+      "transitivelyReachableSurfaces": 0,
+      "unreachedFromInvocationSurfaces": 0,
+      "dependencyAnalyzers": [],
+      "dependencyRelations": [],
+      "interpreterHints": []
+    },
+    "toSummary": {
+      "totalSurfaces": 0,
+      "skillLocalSurfaces": 0,
+      "repositoryToolSurfaces": 0,
+      "noncanonicalSurfaces": 0,
+      "textSurfaces": 0,
+      "binarySurfaces": 0,
+      "reachableSkillLocalSurfaces": 0,
+      "unreachableSkillLocalSurfaces": 0,
+      "referencedSurfaces": 0,
+      "unreferencedSurfaces": 0,
+      "invokedSurfaces": 0,
+      "uninvokedSurfaces": 0,
+      "surfacesWithEffectivePolicy": 0,
+      "surfacesWithoutEffectivePolicy": 0,
+      "totalInvocations": 0,
+      "resolvedInvocations": 0,
+      "missingInvocations": 0,
+      "unsafeInvocations": 0,
+      "unscopedInvocations": 0,
+      "noncanonicalInvocations": 0,
+      "unavailableInvocations": 0,
+      "invocationsWithEffectivePolicyEvidence": 0,
+      "invocationsWithoutEffectivePolicyEvidence": 0,
+      "resolvedInvocationsWithEffectivePolicyEvidence": 0,
+      "resolvedInvocationsWithoutEffectivePolicyEvidence": 0,
+      "invocationsWithMultipleEffectivePolicyFingerprints": 0,
+      "invocationPolicyEvidenceRelations": {
+        "sourceArtifact": 0,
+        "owningSkill": 0
+      },
+      "totalDependencies": 0,
+      "resolvedDependencies": 0,
+      "missingDependencies": 0,
+      "unsafeDependencies": 0,
+      "ambiguousDependencies": 0,
+      "noncanonicalDependencies": 0,
+      "notInventoryDependencies": 0,
+      "unavailableDependencies": 0,
+      "surfacesWithIncomingDependencies": 0,
+      "surfacesWithOutgoingDependencies": 0,
+      "directlyInvokedSurfaces": 0,
+      "transitivelyReachableSurfaces": 0,
+      "unreachedFromInvocationSurfaces": 0,
+      "dependencyAnalyzers": [],
+      "dependencyRelations": [],
+      "interpreterHints": []
+    },
+    "addedSurfacePaths": [],
+    "removedSurfacePaths": [],
+    "changedSurfaces": [],
+    "invocationResolutionChanges": [],
+    "invocationGovernanceChanges": [],
+    "newInvocationsWithoutEffectivePolicyEvidence": [],
+    "newInvocationsWithMultipleEffectivePolicyFingerprints": [],
+    "invocationsGainedEffectivePolicyEvidence": [],
+    "invocationsLostEffectivePolicyEvidence": [],
+    "invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints": [],
+    "newProblematicInvocations": [],
+    "addedDependencies": [],
+    "removedDependencies": [],
+    "dependencyResolutionChanges": [],
+    "newProblematicDependencies": [],
+    "newlyTransitivelyReachableSurfacePaths": [],
+    "surfacesLostStaticInvocationReachability": [],
+    "invocationDependencyDepthChanges": [],
+    "newlyReachableSkillLocalPaths": [],
+    "newlyUnreachableSkillLocalPaths": []
+  },
+  "security": {
+    "posture": {
+      "added": {
+        "totalSecurityFindings": 0,
+        "riskClasses": {
+          "violation": 0,
+          "suspicious": 0,
+          "advisory": 0,
+          "unclassified": 0
+        },
+        "severities": {
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0
+        },
+        "highOrCritical": 0,
+        "topFindingIds": []
+      },
+      "resolved": {
+        "totalSecurityFindings": 0,
+        "riskClasses": {
+          "violation": 0,
+          "suspicious": 0,
+          "advisory": 0,
+          "unclassified": 0
+        },
+        "severities": {
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0
+        },
+        "highOrCritical": 0,
+        "topFindingIds": []
+      }
+    },
+    "policyInventory": {
+      "totalPolicyAssets": 0,
+      "assetsWithLocalPolicyMetadata": 0,
+      "assetsWithInheritedPolicy": 0,
+      "assetsWithEffectivePolicy": 0,
+      "assetsWithoutEffectivePolicy": 0,
+      "policySources": {
+        "local": 0,
+        "security_profile": 0,
+        "repository_config": 0,
+        "owning_skill": 0
+      },
+      "networkAllowed": {
+        "true": 0,
+        "false": 0,
+        "unspecified": 0
+      },
+      "externalUploadAllowed": {
+        "true": 0,
+        "false": 0,
+        "unspecified": 0
+      },
+      "externalUploadGovernance": {
+        "denied": 0,
+        "allowedApprovalRequired": 0,
+        "allowedNoApprovalRequired": 0,
+        "allowedApprovalUnspecified": 0,
+        "unspecified": 0
+      },
+      "secretsAllowed": {
+        "true": 0,
+        "false": 0,
+        "unspecified": 0
+      },
+      "humanApprovalRequired": {
+        "true": 0,
+        "false": 0,
+        "unspecified": 0
+      },
+      "approvedNetworkDestinationCount": 0,
+      "approvedUploadDestinationCount": 0,
+      "forbiddenInputCount": 0,
+      "disallowedCommandCount": 0,
+      "securityProfiles": {
+        "referenced": 0,
+        "resolved": 0,
+        "missing": 0,
+        "cyclic": 0,
+        "none": 0
+      }
+    },
+    "policyChanges": [],
+    "policyTransitions": [],
+    "sharedPolicyChanges": []
+  },
+  "scanBoundary": {
+    "schemaVersion": "renma.scan-boundary-diff.v1",
+    "from": {
+      "schemaVersion": "renma.scan-boundary.v1",
+      "configPath": "renma.config.json",
+      "globs": [
+        ".agents/**/*.md",
+        ".agents/skills/**/SKILL.md",
+        ".agents/skills/**/assets/**/*",
+        ".agents/skills/**/examples/**/*.md",
+        ".agents/skills/**/profiles/**/*.md",
+        ".agents/skills/**/references/**/*",
+        ".agents/skills/**/scripts/**/*",
+        "AGENTS.md",
+        "README.md",
+        "contexts/**/*.md",
+        "lenses/**/*.md",
+        "skills/**/SKILL.md",
+        "skills/**/assets/**/*",
+        "skills/**/examples/**/*.md",
+        "skills/**/profiles/**/*.md",
+        "skills/**/references/**/*",
+        "skills/**/scripts/**/*",
+        "tools/**/*"
+      ],
+      "exclude": [
+        ".git",
+        "dist",
+        "node_modules"
+      ],
+      "maxFileSizeBytes": 524288,
+      "maxDepth": 16,
+      "activeSuppressions": []
+    },
+    "to": {
+      "schemaVersion": "renma.scan-boundary.v1",
+      "configPath": "renma.config.json",
+      "globs": [
+        ".agents/**/*.md",
+        ".agents/skills/**/SKILL.md",
+        ".agents/skills/**/assets/**/*",
+        ".agents/skills/**/examples/**/*.md",
+        ".agents/skills/**/profiles/**/*.md",
+        ".agents/skills/**/references/**/*",
+        ".agents/skills/**/scripts/**/*",
+        "AGENTS.md",
+        "README.md",
+        "contexts/**/*.md",
+        "lenses/**/*.md",
+        "skills/**/SKILL.md",
+        "skills/**/assets/**/*",
+        "skills/**/examples/**/*.md",
+        "skills/**/profiles/**/*.md",
+        "skills/**/references/**/*",
+        "skills/**/scripts/**/*",
+        "tools/**/*"
+      ],
+      "exclude": [
+        ".git",
+        "dist",
+        "node_modules"
+      ],
+      "maxFileSizeBytes": 524288,
+      "maxDepth": 16,
+      "activeSuppressions": []
+    },
+    "changes": []
+  },
+  "qualityPolicy": {
+    "schemaVersion": "renma.quality-policy-diff.v1",
+    "changes": []
+  },
+  "inspectionCoverage": {
+    "schemaVersion": "renma.inspection-coverage-diff.v1",
+    "from": {
+      "expectedPathCount": 7,
+      "inspectedPathCount": 7,
+      "blockingIssueCount": 0
+    },
+    "to": {
+      "expectedPathCount": 7,
+      "inspectedPathCount": 7,
+      "blockingIssueCount": 0
+    },
+    "regressions": [],
+    "resolvedIssues": []
+  },
+  "findings": {
+    "added": [],
+    "removed": [],
+    "countById": [],
+    "suppressed": {
+      "from": [],
+      "to": [],
+      "added": [],
+      "removed": []
+    }
+  }
+}

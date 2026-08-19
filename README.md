@@ -139,6 +139,13 @@ npx renma graph . --format markdown
 npx renma readiness . --format markdown
 ```
 
+Renma supports the current Node.js engine range on Linux, macOS, and Windows.
+The same deterministic repository contract applies on all three platforms,
+including native path/filesystem handling, packaged CLI startup, and bounded
+POSIX shell, PowerShell, and Windows batch evidence. Renma analyzes those
+command forms as repository text; it does not require their interpreters to be
+installed and never executes them during a scan.
+
 `renma init` initializes repository-level Renma configuration. It does not
 create Skills or Context Assets. Existing repositories can use built-in
 defaults without running `renma init`; use initialization only when the

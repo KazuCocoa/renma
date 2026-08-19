@@ -69,6 +69,14 @@ list prevents scaffolding.
 
 ## Install And Build
 
+Renma supports the declared Node.js engine range on Linux, macOS, and Windows.
+CI keeps the full quality gate on Linux and separately verifies installation,
+build, path/filesystem behavior, packaged consumer CLI startup, and a
+representative machine-readable scan on macOS and Windows. Static evidence for
+POSIX shell, PowerShell, and Windows batch is supported on every host; Renma
+parses those bounded forms without executing them or requiring the matching
+interpreter.
+
 From a checkout:
 
 ```bash

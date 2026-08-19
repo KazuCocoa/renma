@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "renma.inspect-slice.v1",
+  "path": "<ROOT>/skills/review/SKILL.md",
+  "range": "L1-L8",
+  "text": "L0001: ---\nL0002: name: review\nL0003: description: Review repository evidence and report deterministic results. Use when repository validation is requested; do not use for runtime selection or command execution.\nL0004: metadata:\nL0005:   renma.id: skill.review\nL0006:   renma.status: stable\nL0007:   renma.owner: qa-platform\nL0008:   renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+}

@@ -58,6 +58,8 @@ const EXPECTED_ACTIONS_BY_FILE: Record<string, string[]> = {
   ".github/workflows/ci.yml": [
     "actions/checkout#v7",
     "actions/checkout#v7",
+    "actions/checkout#v7",
+    "actions/setup-node#v7",
     "actions/setup-node#v7",
     "actions/setup-node#v7",
     "SocketDev/action#v1.3.2",
@@ -231,6 +233,77 @@ test("dedicated Renma report remains PR-only", () => {
   assert.match(source, /github\.event\.pull_request/);
   assert.match(source, /node dist\/index\.js ci-report/);
   assert.match(source, /node dist\/index\.js scan \. --fail-on high --strict/);
+});
+
+test("supported-platform CI keeps focused macOS and Windows evidence", () => {
+  const workflow = readWorkflow(".github/workflows/ci.yml");
+  const packageVerifier = readFileSync("scripts/verify-package.mjs", "utf8");
+  const platform = workflow.jobs?.["supported-platform-evidence"];
+  const platformSteps = steps(platform);
+  assert.deepEqual(platform?.strategy?.matrix, {
+    os: ["macos-latest", "windows-latest"],
+  });
+  assert.equal(
+    actionStep(platform, "actions/checkout")?.with?.["fetch-depth"],
+    0,
+  );
+  assert.equal(
+    actionStep(platform, "actions/setup-node")?.with?.["node-version"],
+    "lts/*",
+  );
+
+  const installStepIndex = platformSteps.findIndex(
+    (step) => step.name === "Install dependencies",
+  );
+  const firewallStepIndex = platformSteps.findIndex((step) =>
+    step.uses?.startsWith("SocketDev/action@"),
+  );
+  const installCommand = platformSteps[installStepIndex]?.run?.trim();
+  const firewallMode = platformSteps[firewallStepIndex]?.with?.mode;
+  const socketProtectedInstall =
+    firewallStepIndex >= 0 &&
+    firewallStepIndex < installStepIndex &&
+    firewallMode === "firewall-free" &&
+    installCommand === "sfw npm ci";
+  const scriptlessInstall = installCommand === "npm ci --ignore-scripts";
+  assert.ok(
+    socketProtectedInstall || scriptlessInstall,
+    "platform dependency installation must use Socket Firewall or disable lifecycle scripts",
+  );
+  assert.notEqual(installCommand, "npm ci");
+
+  const commands = runCommands(platform).join("\n");
+  for (const command of [
+    "npm run build",
+    "npx --no-install tsc -p tsconfig.test.json",
+    "dist-test/test/repository-paths.test.js",
+    "dist-test/test/helper-command-evidence.test.js",
+    "dist-test/test/executable-dependency-analyzer.test.js",
+    "dist-test/test/public-json-compatibility.test.js",
+    "npm run verify:package",
+    "node scripts/verify-platform-smoke.mjs",
+  ]) {
+    assert.ok(commands.includes(command), command);
+  }
+  assert.doesNotMatch(commands, /npm run docs:build|npm run lint|npm test/);
+  assert.match(
+    packageVerifier,
+    /const NPM_CLI_PATH = process\.env\.npm_execpath;/,
+  );
+  assert.equal(
+    [...packageVerifier.matchAll(/const (?:packed|installed) = runNpm\(/gu)]
+      .length,
+    2,
+  );
+  assert.match(
+    packageVerifier,
+    /spawnSync\(process\.execPath, \[NPM_CLI_PATH, \.\.\.args\], options\)/,
+  );
+  assert.match(
+    packageVerifier,
+    /spawnSync\(process\.execPath, \[cliPath, "--help"\]/,
+  );
+  assert.doesNotMatch(packageVerifier, /\.cmd|shell:\s*true/);
 });
 
 test("public Renma report is a portable exact package-consumer workflow", () => {

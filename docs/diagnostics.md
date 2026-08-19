@@ -980,6 +980,23 @@ without reviewing, validating, verifying, inspecting, or checking explicitly
 rejects the preceding guard and remains an untrusted-content finding. Guard and
 contradiction matching use the same review vocabulary and inflected forms.
 
+`SEC-EXECUTABLE-AS-POLICY-AUTHORITY` reports a narrower authority boundary in
+canonical Skill body instructions. It requires parser-owned evidence for an
+existing supported inline `Run` helper invocation and an immediate,
+explicit purpose that makes the helper determine whether a security-relevant
+operation is allowed, permitted, approved, authorized, or safe. The finding
+preserves the whole positioned paragraph plus the recognized launcher and raw
+target as details.
+
+Ordinary helper execution, linting, testing, validation, calculation, and
+reporting remain outside the rule. A helper may collect or validate evidence;
+reviewed Skill instructions and declarative Renma policy must retain the actual
+authorization decision. Fenced commands and later prose in another paragraph
+are not composed, generic executable-looking prose is not inferred, and Renma
+does not inspect or execute the helper. These deliberate false-negative
+boundaries keep the diagnostic deterministic rather than turning it into a
+general executable-policy classifier.
+
 `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` is an advisory for explicit recursive
 link, issue, attachment, page, or source traversal when the same bounded
 Markdown section states none of the expected scope, relevance, visited/cycle,
@@ -1294,6 +1311,7 @@ written during scanning.
 | `SEC-CLOUD-UPLOAD-INSTRUCTION`                   | Instructions allow cloud upload.                     | Content sends files or data to cloud storage without policy controls.                              | Add approved destinations, limits, and approval requirements.                                          |
 | `SEC-CREDENTIAL-IN-COMMAND-ARG`                  | Command embeds a credential-like value.              | Example commands include secrets in arguments.                                                     | Move credentials to secure environment or secret-management guidance.                                  |
 | `SEC-DANGEROUS-TOOL-INSTRUCTION`                 | Instructions permit dangerous tool use.              | Content allows destructive or high-risk commands without guardrails.                               | Require review, dry runs, or explicit user approval before execution.                                  |
+| `SEC-EXECUTABLE-AS-POLICY-AUTHORITY`             | A recognized Skill helper becomes policy authority.  | A supported inline helper invocation explicitly decides whether a security-relevant operation is allowed, approved, authorized, or safe. | Keep authorization in reviewed Skill instructions and declarative Renma policy; use the helper only for bounded evidence. |
 | `SEC-EXTERNAL-UPLOAD-INSTRUCTION`                | Instructions allow external upload.                  | Content sends artifacts to external services without controls.                                     | Restrict uploads to approved destinations and document review steps.                                   |
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`                | Instructions request forbidden input.                | Content asks for secrets or other disallowed sensitive values.                                     | Remove the request or replace it with safe placeholder guidance.                                       |
 | `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`             | YAML frontmatter comment hides an operational instruction. | Raw eligible agent-facing Markdown contains a bounded recognized security-sensitive instruction that metadata consumers ignore. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |

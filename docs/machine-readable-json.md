@@ -7,31 +7,43 @@ path.
 
 ## Contract identifiers
 
-| Command or output        | Top-level `schemaVersion`                  |
-| ------------------------ | ------------------------------------------ |
-| `scan`                   | `renma.scan.v1`                            |
-| `catalog`                | `renma.catalog.v1`                         |
-| `graph`                  | `renma.graph.v1`                           |
-| `readiness`              | `renma.readiness.v2`                       |
-| `ownership`              | `renma.ownership.v1`                       |
-| `diff`                   | `renma.diff.v1`                            |
-| `ci-report`              | `renma.ci-report.v1`                       |
-| `inspect` outline        | `renma.inspect-outline.v1`                 |
-| `inspect --lines`        | `renma.inspect-slice.v1`                   |
-| `guide skill`            | `renma.skill-authoring-guide.v1`           |
-| `scaffold`               | `renma.scaffold.v1`                        |
-| `suggest-metadata`       | `renma.metadata-suggestion.v1`             |
-| `suggest-semantic-split` | `renma.semantic-split-suggestion.v1`       |
-| `skill-index`            | `renma.skill-index.v1`                     |
-| `trust-graph`            | `renma.trustGraph.v2`                      |
-| `bom`                    | `renma.repository-context-bom.v3`          |
-| `execution-contract`     | `renma.experimental-execution-contract.v1` |
+| Command or output        | Top-level `schemaVersion`                  | Repository compatibility assurance                          |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------------------- |
+| `scan`                   | `renma.scan.v1`                            | Representative whole-document golden                        |
+| `catalog`                | `renma.catalog.v1`                         | Representative whole-document golden                        |
+| `graph`                  | `renma.graph.v1`                           | Representative whole-document golden                        |
+| `readiness`              | `renma.readiness.v2`                       | Representative whole-document golden                        |
+| `ownership`              | `renma.ownership.v1`                       | Representative whole-document golden                        |
+| `diff`                   | `renma.diff.v1`                            | Representative revision-diff whole-document golden          |
+| `ci-report`              | `renma.ci-report.v1`                       | Representative revision-report whole-document golden        |
+| `inspect` outline        | `renma.inspect-outline.v1`                 | Representative whole-document golden                        |
+| `inspect --lines`        | `renma.inspect-slice.v1`                   | Representative whole-document golden                        |
+| `guide skill`            | `renma.skill-authoring-guide.v1`           | Representative whole-document golden                        |
+| `scaffold`               | `renma.scaffold.v1`                        | Representative whole-document golden                        |
+| `suggest-metadata`       | `renma.metadata-suggestion.v1`             | Representative whole-document golden                        |
+| `suggest-semantic-split` | `renma.semantic-split-suggestion.v1`       | Representative whole-document golden                        |
+| `skill-index`            | `renma.skill-index.v1`                     | Representative whole-document golden                        |
+| `trust-graph`            | `renma.trustGraph.v2`                      | Published JSON Schema plus frozen semantic contract fixture |
+| `bom`                    | `renma.repository-context-bom.v3`          | Published JSON Schema plus whole-document golden            |
+| `execution-contract`     | `renma.experimental-execution-contract.v1` | Explicitly experimental tests; no stable 1.x assurance      |
 
 The internal `PUBLIC_JSON_SCHEMA_VERSIONS` registry mirrors this table and
 separates stable identifiers from the explicitly experimental execution
 contract. A repository test compares the registry and this documentation so a
 public top-level document cannot be added, removed, or renamed on only one
 side.
+
+The compatibility-assurance column is also intentional release evidence. The
+golden suite normalizes checkout-local paths and package-derived versions, then
+compares the complete serialized document. The Trust Graph uses its published
+Draft 2020-12 schema and an exact semantic contract fixture instead because
+those guards are stronger than adding a second representative golden.
+
+`renma.trustGraph.v2` intentionally retains its established camel-case
+spelling. It is already a published stable identifier used by the schema,
+producers, tests, and consumer documentation. Renaming it for stylistic
+consistency would itself be a breaking wire-contract change, so Renma 1.x keeps
+the spelling and its compatibility test locks that decision.
 
 The execution contract remains explicitly experimental under its documented
 compatibility policy. Published BOM, Trust Graph, and Skill Authoring Handoff
