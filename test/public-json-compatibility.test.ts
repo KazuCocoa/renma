@@ -393,13 +393,15 @@ test("every stable public JSON contract has an explicit compatibility assurance"
   );
 });
 
-test("compatibility root normalization handles JSON-escaped Windows paths", () => {
+test("compatibility root normalization handles native and portable Windows paths", () => {
   const windowsRoot = String.raw`C:\work\renma-fixture`;
+  const portableWindowsRoot = windowsRoot.replaceAll("\\", "/");
   const output = `${JSON.stringify(
     {
       root: windowsRoot,
-      path: `${windowsRoot}\\skills\\review\\SKILL.md`,
-      prompt: `${windowsRoot}\\skills\\review\\SKILL.md then run scripts\\check.ps1`,
+      nativePath: `${windowsRoot}\\skills\\review\\SKILL.md`,
+      portablePath: `${portableWindowsRoot}/contexts/valid.md`,
+      prompt: `${portableWindowsRoot}/skills/review/SKILL.md then run scripts\\check.ps1`,
       multiple: `${windowsRoot}\\contexts\\one.md and ${windowsRoot}\\contexts\\two.md`,
       surrounded: `run scripts\\before.ps1; inspect ${windowsRoot}\\skills\\review\\SKILL.md; then run scripts\\after.ps1`,
       unrelated: String.raw`powershell.exe -File scripts\check.ps1`,
@@ -413,11 +415,87 @@ test("compatibility root normalization handles JSON-escaped Windows paths", () =
     `${JSON.stringify(
       {
         root: "<ROOT>",
-        path: "<ROOT>/skills/review/SKILL.md",
+        nativePath: "<ROOT>/skills/review/SKILL.md",
+        portablePath: "<ROOT>/contexts/valid.md",
         prompt: String.raw`<ROOT>/skills/review/SKILL.md then run scripts\check.ps1`,
         multiple: "<ROOT>/contexts/one.md and <ROOT>/contexts/two.md",
         surrounded: String.raw`run scripts\before.ps1; inspect <ROOT>/skills/review/SKILL.md; then run scripts\after.ps1`,
         unrelated: String.raw`powershell.exe -File scripts\check.ps1`,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+});
+
+test("compatibility root normalization canonicalizes only root-derived display quoting", () => {
+  const windowsRoot = String.raw`D:\a\renma\renma\test\fixtures\public-json-baseline`;
+  const portableWindowsRoot = windowsRoot.replaceAll("\\", "/");
+  const output = `${JSON.stringify(
+    {
+      path: `${portableWindowsRoot}/contexts/valid.md`,
+      nextActions: [
+        {
+          kind: "inspect-target",
+          invocation: {
+            command: "renma",
+            args: [
+              "inspect",
+              `${windowsRoot}\\contexts\\valid.md`,
+              "--format",
+              "json",
+            ],
+            display: `renma inspect '${windowsRoot}\\contexts\\valid.md' --format json`,
+          },
+        },
+        {
+          kind: "verify",
+          invocation: {
+            command: "renma",
+            args: [
+              "scan",
+              windowsRoot,
+              "--fail-on",
+              "high",
+              "--format",
+              "json",
+            ],
+            display: `renma scan '${windowsRoot}' --fail-on high --format json`,
+          },
+        },
+      ],
+      quotedProse: `Keep '${windowsRoot}' quoted here.`,
+      unrelatedDisplay: String.raw`renma inspect 'scripts\check.ps1' --format json`,
+    },
+    null,
+    2,
+  )}\n`;
+
+  assert.equal(
+    normalizeJsonRoot(output, windowsRoot),
+    `${JSON.stringify(
+      {
+        path: "<ROOT>/contexts/valid.md",
+        nextActions: [
+          {
+            kind: "inspect-target",
+            invocation: {
+              command: "renma",
+              args: ["inspect", "<ROOT>/contexts/valid.md", "--format", "json"],
+              display: "renma inspect <ROOT>/contexts/valid.md --format json",
+            },
+          },
+          {
+            kind: "verify",
+            invocation: {
+              command: "renma",
+              args: ["scan", "<ROOT>", "--fail-on", "high", "--format", "json"],
+              display: "renma scan <ROOT> --fail-on high --format json",
+            },
+          },
+        ],
+        quotedProse: "Keep '<ROOT>' quoted here.",
+        unrelatedDisplay: String.raw`renma inspect 'scripts\check.ps1' --format json`,
       },
       null,
       2,
@@ -527,9 +605,13 @@ function normalizeJsonRoot(stdout: string, root: string): string {
   return `${JSON.stringify(normalizeJsonValue(JSON.parse(stdout), root), null, 2)}\n`;
 }
 
-function normalizeJsonValue(value: unknown, root: string): unknown {
+function normalizeJsonValue(
+  value: unknown,
+  root: string,
+  fieldName?: string,
+): unknown {
   if (typeof value === "string") {
-    return normalizeCheckoutRootInString(value, root);
+    return normalizeCheckoutRootInString(value, root, fieldName === "display");
   }
   if (Array.isArray(value)) {
     return value.map((item) => normalizeJsonValue(item, root));
@@ -538,7 +620,7 @@ function normalizeJsonValue(value: unknown, root: string): unknown {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        normalizeJsonValue(item, root),
+        normalizeJsonValue(item, root, key),
       ]),
     );
   }
@@ -547,24 +629,57 @@ function normalizeJsonValue(value: unknown, root: string): unknown {
 
 const WINDOWS_ROOT_PATH_BOUNDARY_RE = /[\s`"'<>|?*()\[\]{};,:=&#]/u;
 
-function normalizeCheckoutRootInString(value: string, root: string): string {
-  if (root.length === 0 || !value.includes(root)) return value;
+function normalizeCheckoutRootInString(
+  value: string,
+  root: string,
+  canonicalizeDisplayQuote = false,
+): string {
+  if (root.length === 0) return value;
+
+  const rootSpellings = [root];
+  const portableRoot = root.replaceAll("\\", "/");
+  if (portableRoot !== root) rootSpellings.push(portableRoot);
+  if (!rootSpellings.some((spelling) => value.includes(spelling))) return value;
 
   let cursor = 0;
   let normalized = "";
   while (cursor < value.length) {
-    const rootStart = value.indexOf(root, cursor);
-    if (rootStart < 0) return normalized + value.slice(cursor);
+    const occurrence = nextCheckoutRootOccurrence(value, cursor, rootSpellings);
+    if (!occurrence) return normalized + value.slice(cursor);
 
-    normalized += `${value.slice(cursor, rootStart)}<ROOT>`;
-    cursor = rootStart + root.length;
-    if (!root.includes("\\")) continue;
+    const rootEnd = occurrence.start + occurrence.spelling.length;
+    const suffix = root.includes("\\")
+      ? normalizeWindowsRootPathSuffix(value, rootEnd)
+      : { value: "", end: rootEnd };
+    const removeDisplayQuotes =
+      canonicalizeDisplayQuote &&
+      root.includes("\\") &&
+      value[occurrence.start - 1] === "'" &&
+      value[suffix.end] === "'";
 
-    const suffix = normalizeWindowsRootPathSuffix(value, cursor);
-    normalized += suffix.value;
-    cursor = suffix.end;
+    normalized += value.slice(
+      cursor,
+      removeDisplayQuotes ? occurrence.start - 1 : occurrence.start,
+    );
+    normalized += `<ROOT>${suffix.value}`;
+    cursor = suffix.end + (removeDisplayQuotes ? 1 : 0);
   }
   return normalized;
+}
+
+function nextCheckoutRootOccurrence(
+  value: string,
+  start: number,
+  rootSpellings: readonly string[],
+): { start: number; spelling: string } | undefined {
+  let next: { start: number; spelling: string } | undefined;
+  for (const spelling of rootSpellings) {
+    const occurrenceStart = value.indexOf(spelling, start);
+    if (occurrenceStart >= 0 && (!next || occurrenceStart < next.start)) {
+      next = { start: occurrenceStart, spelling };
+    }
+  }
+  return next;
 }
 
 function normalizeWindowsRootPathSuffix(
@@ -574,7 +689,7 @@ function normalizeWindowsRootPathSuffix(
   let cursor = start;
   let normalized = "";
 
-  while (value[cursor] === "\\") {
+  while (value[cursor] === "\\" || value[cursor] === "/") {
     normalized += "/";
     cursor += 1;
 
@@ -582,13 +697,14 @@ function normalizeWindowsRootPathSuffix(
     while (
       cursor < value.length &&
       value[cursor] !== "\\" &&
+      value[cursor] !== "/" &&
       !WINDOWS_ROOT_PATH_BOUNDARY_RE.test(value[cursor] ?? "")
     ) {
       cursor += 1;
     }
     normalized += value.slice(segmentStart, cursor);
 
-    if (value[cursor] !== "\\") break;
+    if (value[cursor] !== "\\" && value[cursor] !== "/") break;
   }
 
   return { value: normalized, end: cursor };
