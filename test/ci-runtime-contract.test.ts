@@ -288,12 +288,18 @@ test("supported-platform CI keeps focused macOS and Windows evidence", () => {
   assert.doesNotMatch(commands, /npm run docs:build|npm run lint|npm test/);
   assert.match(
     packageVerifier,
-    /const NPM_COMMAND = process\.platform === "win32" \? "npm\.cmd" : "npm";/,
+    /const NPM_CLI_PATH = process\.env\.npm_execpath;/,
   );
   assert.equal(
-    [...packageVerifier.matchAll(/spawnSync\(\s*NPM_COMMAND,/gu)].length,
+    [...packageVerifier.matchAll(/const (?:packed|installed) = runNpm\(/gu)]
+      .length,
     2,
   );
+  assert.match(
+    packageVerifier,
+    /spawnSync\(process\.execPath, \[NPM_CLI_PATH, \.\.\.args\], options\)/,
+  );
+  assert.doesNotMatch(packageVerifier, /npm\.cmd|shell:\s*true/);
 });
 
 test("public Renma report is a portable exact package-consumer workflow", () => {

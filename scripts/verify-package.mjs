@@ -12,7 +12,12 @@ import { spawnSync } from "node:child_process";
 
 const PACKAGE_NAME = "renma";
 const PACKAGE_JSON_SPECIFIER = "renma/package.json";
-const NPM_COMMAND = process.platform === "win32" ? "npm.cmd" : "npm";
+const NPM_CLI_PATH = process.env.npm_execpath;
+if (!NPM_CLI_PATH) {
+  throw new Error(
+    "Package verification must be run through npm run verify:package.",
+  );
+}
 const REPOSITORY_ONLY_README_PREFIXES = ["docs/development/"];
 const SEMANTIC_PUBLIC_IMPORTS = [
   ["renma/types", "dist/public-types.js", "dist/public-types.d.ts"],
@@ -178,8 +183,7 @@ try {
   await mkdir(packDirectory, { recursive: true });
   await mkdir(consumerDirectory, { recursive: true });
   await mkdir(cacheDirectory, { recursive: true });
-  const packed = spawnSync(
-    NPM_COMMAND,
+  const packed = runNpm(
     [
       "pack",
       "--json",
@@ -305,8 +309,7 @@ async function installInTemporaryConsumer(
       2,
     )}\n`,
   );
-  const installed = spawnSync(
-    NPM_COMMAND,
+  const installed = runNpm(
     [
       "install",
       "--ignore-scripts",
@@ -687,6 +690,10 @@ function assertSameStrings(actual, expected, message) {
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function runNpm(args, options) {
+  return spawnSync(process.execPath, [NPM_CLI_PATH, ...args], options);
 }
 
 function requirePackagedPath(files, target) {
