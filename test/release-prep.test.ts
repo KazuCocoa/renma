@@ -82,6 +82,25 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
   assert.match(workflow, /run: npm publish/);
 });
 
+test("release-prep maintains strict Renma self-validation", () => {
+  const source = readFileSync("tools/release-prep.mjs", "utf8");
+  const strictScan = "node dist/index.js scan . --fail-on high --strict";
+  const result = spawnSync("node", ["tools/release-prep.mjs", "--check-only"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.deepEqual(
+    result.stdout
+      .split(/\r?\n/u)
+      .filter((line) => line.startsWith("- node dist/index.js scan ")),
+    [`- ${strictScan}`],
+  );
+  assert.match(source, new RegExp(`"${strictScan}"`, "u"));
+  assert.doesNotMatch(source, /"node dist\/index\.js scan \. --fail-on high"/u);
+});
+
 test("authoritative release Context gates tag pushes on external publication security", () => {
   const context = readFileSync("contexts/release/prep.md", "utf8");
   assert.match(context, /^version: 0\.2\.1$/mu);
@@ -160,6 +179,10 @@ test("release-prep prints GitHub release notes from the target changelog section
   assert.match(result.stdout, /### Changed/);
   assert.match(result.stdout, /## Upgrade/);
   assert.match(result.stdout, /## Validation/);
+  assert.match(
+    result.stdout,
+    /node dist\/index\.js scan \. --fail-on high --strict/,
+  );
   assert.match(
     result.stdout,
     /node dist\/index\.js diff \. --from v0\.5\.1 --to HEAD --format markdown/,

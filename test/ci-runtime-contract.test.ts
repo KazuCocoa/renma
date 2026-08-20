@@ -427,6 +427,24 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
   ]) {
     assert.match(validationCommands, new RegExp(command));
   }
+  const strictScans = validationSteps.filter((step) =>
+    step.run?.includes("node dist/index.js scan"),
+  );
+  assert.equal(strictScans.length, 1);
+  const [strictScan] = strictScans;
+  assert.ok(strictScan);
+  assert.equal(strictScan.name, "Validate release repository with Renma");
+  assert.equal(strictScan.if, "matrix.runtime == 'lts'");
+  assert.equal(
+    strictScan.run,
+    "node dist/index.js scan . --fail-on high --strict",
+  );
+  assert.ok(
+    validationSteps.findIndex((step) => step.run === "npm run build") <
+      validationSteps.indexOf(strictScan),
+    "strict release validation must run after the package build",
+  );
+  assert.doesNotMatch(strictScan.run ?? "", /npm publish/);
   assert.doesNotMatch(validationCommands, /npm publish/);
 
   const platformValidation = workflow.jobs?.["validate-supported-platform"];
@@ -452,6 +470,12 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
     contents: "read",
     "id-token": "write",
   });
+  assert.deepEqual(
+    Object.entries(workflow.jobs ?? {})
+      .filter(([, job]) => job.permissions?.["id-token"] === "write")
+      .map(([jobName]) => jobName),
+    ["publish"],
+  );
   const publishSteps = steps(publish);
   assert.equal(
     actionStep(publish, "actions/setup-node")?.with?.["node-version"],
@@ -519,6 +543,10 @@ test("Dependabot retains the GitHub Actions updater", () => {
 
 test("release security documentation preserves the external trust boundary", () => {
   const source = readFileSync("docs/development/release-security.md", "utf8");
+  assert.match(
+    source,
+    /strict Renma self-validation of the exact release commit/u,
+  );
   assert.match(source, /exact workflow filename `npm-publish\.yml`/u);
   assert.match(source, /`npm-publish` environment/u);
   assert.match(source, /Publication job size review/u);
