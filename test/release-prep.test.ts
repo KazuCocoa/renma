@@ -82,13 +82,28 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
   assert.match(workflow, /run: npm publish/);
 });
 
-test("release-prep maintains strict Renma self-validation", () => {
+test("release-prep maintains strict Renma self-validation", async (t) => {
   const source = readFileSync("tools/release-prep.mjs", "utf8");
   const strictScan = "node dist/index.js scan . --fail-on high --strict";
-  const result = spawnSync("node", ["tools/release-prep.mjs", "--check-only"], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-  });
+  const packageVersion = (
+    JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
+  ).version;
+  const root = await currentConsumerExamplesFixture(t, packageVersion);
+  const result = spawnSync(
+    "node",
+    [
+      path.resolve("tools/release-prep.mjs"),
+      "--check-only",
+      "--version",
+      packageVersion,
+      "--from",
+      "v0.0.0",
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+    },
+  );
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.deepEqual(
