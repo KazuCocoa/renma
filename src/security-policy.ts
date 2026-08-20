@@ -1066,8 +1066,12 @@ export function securityProfileChain(
     seen.add(current);
     path.push(current);
 
+    const configuredProfiles = config.profiles;
     const profile: NonNullable<SecurityConfig["profiles"]>[string] | undefined =
-      config.profiles?.[current];
+      configuredProfiles !== undefined &&
+      Object.hasOwn(configuredProfiles, current)
+        ? configuredProfiles[current]
+        : undefined;
     if (profile === undefined) {
       return { profiles: [], missingProfile: current };
     }

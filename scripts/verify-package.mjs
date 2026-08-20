@@ -283,7 +283,8 @@ try {
   await verifyInstalledExports(packageRoot);
   await verifyPackageSpecifierPolicy(consumerDirectory);
   await verifyPackageSpecifierDeclarations(consumerDirectory);
-  verifyPackagedCli(packageRoot, consumerDirectory);
+  verifyInstalledCommand(consumerDirectory, cacheDirectory);
+  verifyPackagedCliEntrypoint(packageRoot, consumerDirectory);
 
   process.stdout.write(
     `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_PACKAGE_SPECIFIERS.length} rejected module subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} rejected declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, and every README-relative target.\n`,
@@ -641,14 +642,29 @@ export {};
   }
 }
 
-function verifyPackagedCli(packageRoot, consumerDirectory) {
+function verifyInstalledCommand(consumerDirectory, cacheDirectory) {
+  const verified = runNpm(
+    ["exec", "--offline", "--cache", cacheDirectory, "--", "renma", "--help"],
+    {
+      cwd: consumerDirectory,
+      encoding: "utf8",
+    },
+  );
+  verifyCliHelp(verified, "Installed Renma command");
+}
+
+function verifyPackagedCliEntrypoint(packageRoot, consumerDirectory) {
   const cliPath = path.join(packageRoot, "dist", "index.js");
   const verified = spawnSync(process.execPath, [cliPath, "--help"], {
     cwd: consumerDirectory,
     encoding: "utf8",
   });
+  verifyCliHelp(verified, "Packaged CLI entrypoint");
+}
+
+function verifyCliHelp(verified, label) {
   if (verified.error) {
-    throw new Error(`Packaged CLI failed: ${verified.error.message}`);
+    throw new Error(`${label} failed: ${verified.error.message}`);
   }
   if (
     verified.status !== 0 ||
@@ -656,7 +672,7 @@ function verifyPackagedCli(packageRoot, consumerDirectory) {
     !verified.stdout.includes("Renma provides deterministic repository")
   ) {
     throw new Error(
-      `Packaged CLI help failed: ${verified.stderr.trim() || verified.stdout.trim() || `exit code ${verified.status}`}`,
+      `${label} help failed: ${verified.stderr.trim() || verified.stdout.trim() || `exit code ${verified.status}`}`,
     );
   }
 }

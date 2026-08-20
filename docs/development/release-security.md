@@ -17,7 +17,9 @@ exact equality with `origin/main`, and then requires the tag version to equal
 behind, or beside main; ancestry is not enough.
 
 The publish job also depends on successful tests, builds, and package checks at
-both the minimum supported Node version and the current LTS version. A separate
+both the minimum supported Node version and the current LTS version. It also
+depends on the same focused macOS and Windows validation used by pull-request
+and main CI, checked out at the exact triggering revision. A separate
 `typecheck:node-min` gate checks production source against Node 22.17 type
 definitions while the normal `typecheck` continues to use the current
 development definitions. This catches accidental use of newer Node APIs
@@ -124,9 +126,9 @@ the intended LTS matrix leg, and make the environment-protected job publish
 that exact artifact. Adding a parallel `npm pack`, mutable artifact selection,
 or an unverified handoff would weaken clarity rather than harden publication.
 The current repeated validation is therefore acceptable for 1.0 and is not a
-release blocker. Exact tag/main identity, minimum plus LTS validation, package
-content verification, the `npm-publish` environment, and OIDC Trusted
-Publishing remain mandatory.
+release blocker. Exact tag/main identity, minimum plus LTS validation, exact-ref
+macOS and Windows validation, package content verification, the `npm-publish`
+environment, and OIDC Trusted Publishing remain mandatory.
 
 Repository code can verify Git objects, workflow structure, tests, and package
 metadata. It cannot verify that npm Trusted Publisher settings, GitHub
