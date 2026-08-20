@@ -18,6 +18,12 @@ behind, or beside main; ancestry is not enough.
 
 The publish job also depends on successful tests, builds, and package checks at
 both the minimum supported Node version and the current LTS version. It also
+depends on strict Renma self-validation of the exact release commit, run from
+the built package on the LTS matrix leg with
+`node dist/index.js scan . --fail-on high --strict`. Strict mode makes invalid
+Agent Skills, error diagnostics, incomplete inspection coverage, and incomplete
+applicable security-analysis coverage publication-blocking conditions in
+addition to high-severity findings. It also
 depends on the same focused macOS and Windows validation used by pull-request
 and main CI, checked out at the exact triggering revision. A separate
 `typecheck:node-min` gate checks production source against Node 22.17 type
@@ -127,8 +133,9 @@ that exact artifact. Adding a parallel `npm pack`, mutable artifact selection,
 or an unverified handoff would weaken clarity rather than harden publication.
 The current repeated validation is therefore acceptable for 1.0 and is not a
 release blocker. Exact tag/main identity, minimum plus LTS validation, exact-ref
-macOS and Windows validation, package content verification, the `npm-publish`
-environment, and OIDC Trusted Publishing remain mandatory.
+macOS and Windows validation, strict Renma self-validation, package content
+verification, the `npm-publish` environment, and OIDC Trusted Publishing remain
+mandatory.
 
 Repository code can verify Git objects, workflow structure, tests, and package
 metadata. It cannot verify that npm Trusted Publisher settings, GitHub

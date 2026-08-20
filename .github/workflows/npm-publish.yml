@@ -57,6 +57,10 @@ jobs:
       - name: Build package
         run: npm run build
 
+      - name: Validate release repository with Renma
+        if: matrix.runtime == 'lts'
+        run: node dist/index.js scan . --fail-on high --strict
+
       - name: Check package contents
         run: npm run verify:package
 
