@@ -1,7 +1,7 @@
 import type { ContextLensSummary } from "../context-lens.js";
 import type { RepositoryClassificationPathResolution } from "../discovery.js";
 import type { AssetKind, AssetStatus } from "../model.js";
-import type { KnownAssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/known-classification.js";
 import type { AssetGovernanceEvidence } from "../types/governance.js";
 
 /** Neutral DTO shared by inspect orchestration and rendering. */

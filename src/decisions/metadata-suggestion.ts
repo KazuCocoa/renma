@@ -1,6 +1,6 @@
 import type { AgentSkillMigrationSuggestion } from "../skill-migration.js";
 import type { ArtifactKind } from "../types/artifact.js";
-import type { KnownAssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/known-classification.js";
 import type {
   AssetDecisionEvidence,
   DecisionStatus,

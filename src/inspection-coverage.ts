@@ -17,7 +17,8 @@ import type {
   StaticSupportReachabilityEvidence,
 } from "./static-support.js";
 import type { Artifact } from "./types/artifact.js";
-import type { KnownAssetClassificationEvidence } from "./types/classification.js";
+import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/known-classification.js";
 import type { ScanConfig } from "./types/configuration.js";
 
 export const INSPECTION_COVERAGE_SCHEMA_VERSION =
@@ -63,7 +64,7 @@ export interface InspectionCoveragePathEvidence {
   scope: InspectionCoverageScope;
   affectedBoundary?: InspectionCoverageBoundary;
   reason: string;
-  classification: KnownAssetClassificationEvidence;
+  classification: AssetClassificationEvidence;
   strictBlocking: boolean;
   details?: StaticSupportInspectionDetails;
 }
@@ -93,7 +94,7 @@ export interface InspectionCoverageChange {
   scope: InspectionCoverageScope;
   affectedBoundary?: InspectionCoverageBoundary;
   previouslyInspectedPaths: string[];
-  classification: KnownAssetClassificationEvidence;
+  classification: AssetClassificationEvidence;
   strictBlocking: boolean;
   details?: StaticSupportInspectionDetails;
 }

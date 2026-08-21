@@ -15,6 +15,7 @@ import {
 import { ASSET_CLASSIFICATION_RULES as directClassificationRules } from "../src/types/classification.js";
 import { SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION as directSecurityAnalysisCoverageSchemaVersion } from "../src/types/security-analysis-coverage.js";
 import type { ScanResult } from "../src/types/scan-result.js";
+import type * as CT from "../src/types/classification.js";
 import type * as PublicTypes from "../src/public-types.js";
 import type * as PublicScanTypes from "../src/public-types/scan-result.js";
 
@@ -25,12 +26,15 @@ void establishedTypesFacade;
 const futureClassificationRule: AssetClassificationRule = "future-rule";
 const futureClassificationReason: AssetClassificationReasonCode =
   "future-reason";
+const futureCoverageClassificationRule: ScanJsonDocument["inspectionCoverage"]["blockingIssues"][number]["classification"]["matchedRule"] =
+  "future-rule";
 // @ts-expect-error Internal known-rule helpers remain closed and exhaustive.
 const unknownKnownRule: KnownAssetClassificationRule = "future-rule";
 // @ts-expect-error Internal known-reason helpers remain closed and exhaustive.
 const unknownKnownReason: KnownAssetClassificationReasonCode = "future-reason";
 void futureClassificationRule;
 void futureClassificationReason;
+void futureCoverageClassificationRule;
 void unknownKnownRule;
 void unknownKnownReason;
 
@@ -73,6 +77,21 @@ void (undefined as unknown as RemovedScanConfig);
 void (undefined as unknown as RemovedDecision);
 void (undefined as unknown as RemovedGovernance);
 void (undefined as unknown as RemovedScanResult);
+
+// Closed evidence shapes are implementation details, unlike the public Known*
+// rule and reason-code unions used by exhaustive consumers.
+// @ts-expect-error Closed classifier evidence is not in the public facade.
+type RemovedKnownEvidence = PublicTypes.KnownAssetClassificationEvidence;
+// @ts-expect-error Closed competing evidence is not in the public facade.
+type RemovedKnownCompeting = PublicTypes.KnownAssetCompetingRuleEvidence;
+// @ts-expect-error The supported classification subpath also excludes it.
+type RemovedDirectKnown = CT.KnownAssetClassificationEvidence;
+// @ts-expect-error The supported classification subpath also excludes it.
+type RemovedDirectCompeting = CT.KnownAssetCompetingRuleEvidence;
+void (undefined as unknown as RemovedKnownEvidence);
+void (undefined as unknown as RemovedKnownCompeting);
+void (undefined as unknown as RemovedDirectKnown);
+void (undefined as unknown as RemovedDirectCompeting);
 
 // Internal orchestration continues using the core result through source imports.
 type InternalCoreResult = ScanResult;

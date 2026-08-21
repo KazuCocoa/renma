@@ -1,6 +1,6 @@
 import { classifyAssetPath } from "../discovery.js";
 import { parseAssetMetadata } from "../metadata.js";
-import type { KnownAssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/known-classification.js";
 import type { ParsedDocument } from "../types/metadata.js";
 
 /** Build the structural classification view shared by snapshot consumers. */

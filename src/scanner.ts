@@ -24,7 +24,7 @@ import {
   effectiveCiScanBoundary,
 } from "./scan-boundary.js";
 import { buildTrustGraph } from "./trust-graph.js";
-import type { KnownAssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/known-classification.js";
 import type { Diagnostic, Finding } from "./types/diagnostics.js";
 import type { SuppressionConfig } from "./types/diagnostics.js";
 import type { ScanResult } from "./types/scan-result.js";

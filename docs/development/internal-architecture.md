@@ -151,17 +151,25 @@ cohesive consumer imports without turning low-level parser or runtime models
 into 1.x commitments.
 
 `scripts/verify-public-api.mjs` uses the TypeScript compiler API to normalize
-the declarations exported from every supported package entrypoint. The checked
-in snapshot freezes exported names, signatures, interface properties,
-optionality, readonly modifiers, literal unions, and the exact entrypoint set.
-Internal package modules remain outside that snapshot and outside the package
-exports map.
+the complete Renma-owned declaration graph reachable from every supported
+package entrypoint. The checked-in snapshot maps each exported name to its root
+declaration, follows referenced declarations with cycle detection, and freezes
+signatures, interface properties, optionality, readonly modifiers, aliases,
+literal unions, tuples, and the exact entrypoint set. TypeScript default-library
+declarations, Node declarations, dependency declarations, and any other
+declaration outside Renma's built `dist/` tree are treated as external and are
+not recursively expanded. Internal modules remain outside the package exports
+map, while any internal declaration that contributes to an effective public
+shape is intentionally included in the snapshot.
 
 Classification rule and reason-code wire values are intentionally open. Public
 `AssetClassificationRule` and `AssetClassificationReasonCode` accept
 unfamiliar strings so consumers can retain them and fail closed. Renma's
 implementation uses the separate closed `KnownAssetClassification*` helpers,
 so adding wire tolerance does not weaken internal classifier exhaustiveness.
+The closed `KnownAssetClassificationEvidence` and
+`KnownAssetCompetingRuleEvidence` shapes live in an implementation-only module;
+supported package entrypoints expose only the open evidence contracts.
 
 ## Typed Finding Repair Authority
 

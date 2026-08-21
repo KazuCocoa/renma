@@ -23,7 +23,7 @@ import { formatVersionedJsonDocument } from "../report.js";
 import { buildAgentSkillMigrationSuggestion } from "../skill-migration.js";
 import { renderMetadataPrompt } from "../renderers/metadata-suggestion.js";
 import type { ArtifactKind } from "../types/artifact.js";
-import type { KnownAssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/known-classification.js";
 import type { MetadataValue } from "../types/metadata.js";
 import type { SuggestedNextAction } from "../types/decision.js";
 

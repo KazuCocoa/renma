@@ -46,7 +46,7 @@ import {
   type SkillDiscoveryIndex,
 } from "./skill-discovery.js";
 import type { Artifact } from "./types/artifact.js";
-import type { KnownAssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/known-classification.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { Diagnostic } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
