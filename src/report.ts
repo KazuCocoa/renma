@@ -38,14 +38,40 @@ export function formatVersionedJsonDocument(
   );
 }
 
+/** Project the internal scan model into the supported renma.scan.v1 wire shape. */
+export function toScanJsonDocument(result: ScanResult): ScanJsonDocument {
+  return {
+    schemaVersion: SCAN_JSON_SCHEMA_VERSION,
+    root: result.root,
+    ...(result.configPath !== undefined
+      ? { configPath: result.configPath }
+      : {}),
+    scanBoundary: result.scanBoundary,
+    inspectionCoverage: result.inspectionCoverage,
+    securityAnalysisCoverage: result.securityAnalysisCoverage,
+    scannedFileCount: result.scannedFileCount,
+    format: "json",
+    agentSkills: result.agentSkills,
+    ...(result.contextLens ? { contextLens: result.contextLens } : {}),
+    ...(result.executableSurfaceInventory
+      ? { executableSurfaceInventory: result.executableSurfaceInventory }
+      : {}),
+    ...(result.securityPolicyInventory
+      ? { securityPolicyInventory: result.securityPolicyInventory }
+      : {}),
+    ...(result.trustGraph ? { trustGraph: result.trustGraph } : {}),
+    findings: result.findings,
+    suppressedFindings: result.suppressedFindings,
+    diagnostics: result.diagnostics,
+    diagnosticsV2: result.diagnosticsV2,
+    reviewBundles: result.reviewBundles,
+    exitThreshold: result.exitThreshold,
+  };
+}
+
 /** Format a scan result as pretty-printed JSON. */
 export function formatJson(result: ScanResult): string {
-  const document = Object.assign(
-    { schemaVersion: SCAN_JSON_SCHEMA_VERSION },
-    result,
-    { format: "json" as const, schemaVersion: SCAN_JSON_SCHEMA_VERSION },
-  ) satisfies ScanJsonDocument;
-  return formatJsonDocument(document);
+  return formatJsonDocument(toScanJsonDocument(result));
 }
 
 /** Format a scan result as human-readable terminal text. */

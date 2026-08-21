@@ -137,8 +137,10 @@ production modules import the cohesive owner under `src/types/` directly:
 - `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
   permitted to import Agent Skills, Context Lens, Executable Surface Inventory,
   Security Policy Inventory, and Trust Graph result types. The public
-  `ScanJsonDocument` narrows that core result to the literal `renma.scan.v1`
-  serializer boundary and `format: "json"`.
+  `ScanJsonDocument` explicitly lists the top-level `renma.scan.v1` wire fields,
+  and `toScanJsonDocument()` projects only those fields with literal
+  `format: "json"`. Internal `ScanResult` additions therefore do not become
+  public JSON additions implicitly.
 
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
@@ -147,6 +149,42 @@ or other foundation modules. Focused semantic type exports exist only for
 classification, diagnostics, and the scan JSON wire document. They preserve
 cohesive consumer imports without turning low-level parser or runtime models
 into 1.x commitments.
+
+`scripts/verify-public-api.mjs` uses the TypeScript compiler API to normalize
+the complete Renma-owned declaration graph reachable from every supported
+package entrypoint. The checked-in snapshot maps each exported name to its root
+declaration, follows referenced declarations with cycle detection, and freezes
+signatures, interface properties, optionality, readonly modifiers, aliases,
+literal unions, tuples, and the exact entrypoint set. TypeScript default-library
+declarations, Node declarations, dependency declarations, and any other
+declaration outside Renma's built `dist/` tree are treated as external and are
+not recursively expanded. Internal modules remain outside the package exports
+map, while any internal declaration that contributes to an effective public
+shape is intentionally included in the snapshot.
+
+Classification rule and reason-code wire values are intentionally open. Public
+`AssetClassificationRule` and `AssetClassificationReasonCode` accept
+unfamiliar strings so consumers can retain them and fail closed. Renma's
+implementation uses the separate closed `KnownAssetClassification*` helpers,
+so adding wire tolerance does not weaken internal classifier exhaustiveness.
+The closed `KnownAssetClassificationEvidence` and
+`KnownAssetCompetingRuleEvidence` shapes live in an implementation-only module;
+supported package entrypoints expose only the open evidence contracts.
+
+## Typed Finding Repair Authority
+
+Finding producers author `RepairConstraint[]` and `VerificationStep[]`
+semantics explicitly. `projectFindingRepairGuidance()` is the one compatibility
+boundary that generates legacy `constraints` and `verificationSteps` arrays
+from the typed objects' `text` fields. The canonical typed values remain
+available internally for Diagnostics v2 even though legacy-only Finding
+producers are rejected.
+
+`createDiagnosticsV2()` never classifies a constraint from English verbs and
+never discovers commands from sentence prefixes. It consumes only the typed
+guidance, adds the established code-specific typed guardrails, and applies
+typed defaults only when a producer supplied no verification steps. Prose may
+therefore improve without changing machine semantics.
 
 `src/commands/public-json-schema-versions.ts` inventories stable and
 experimental public top-level JSON identifiers by referencing their existing

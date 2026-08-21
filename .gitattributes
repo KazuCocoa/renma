@@ -1,2 +1,3 @@
 test/fixtures/public-json-baseline/** text eol=lf
 test/fixtures/public-json-expected/*.golden text eol=lf
+test/fixtures/public-types-api.snapshot.json text eol=lf

@@ -52,6 +52,9 @@ jobs:
       - run: npm run build
         name: Build
 
+      - name: Verify public TypeScript API
+        run: npm run verify:api
+
       - name: Run Unit Tests
         run: npm run test
 

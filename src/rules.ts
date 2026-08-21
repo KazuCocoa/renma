@@ -45,13 +45,14 @@ import {
   type RenmaScaffoldPlaceholderName,
 } from "./scaffold-placeholders.js";
 import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
+import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 
 type FindingDetails = Partial<
   Pick<
     Finding,
     | "whyItMatters"
-    | "constraints"
-    | "verificationSteps"
+    | "repairConstraints"
+    | "verificationStepsV2"
     | "llmHint"
     | "riskClass"
     | "details"
@@ -210,11 +211,13 @@ export function runRules(
     catalog,
     config,
   );
-  return findings.sort((a, b) => {
-    const byPath = compareUtf16CodeUnits(a.evidence.path, b.evidence.path);
-    if (byPath !== 0) return byPath;
-    return a.evidence.startLine - b.evidence.startLine;
-  });
+  return findings
+    .map((finding) => projectFindingRepairGuidance(finding))
+    .sort((a, b) => {
+      const byPath = compareUtf16CodeUnits(a.evidence.path, b.evidence.path);
+      if (byPath !== 0) return byPath;
+      return a.evidence.startLine - b.evidence.startLine;
+    });
 }
 
 function rulesForEvaluationDate(
@@ -389,15 +392,25 @@ function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
         "Freshness metadata is a human review contract. Expired assets may contain guidance that has not been intentionally revalidated for current use.",
       remediation:
         "Review the asset with a human owner, then update expires_at, last_reviewed_at, review_cycle, status, or dependent references as appropriate.",
-      constraints: [
-        "Do not infer freshness from file modification time.",
-        "Do not introduce runtime context selection.",
-        "Do not create prompt packages.",
+      repairConstraints: [
+        {
+          kind: "must_not_change",
+          text: "Do not infer freshness from file modification time.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not introduce runtime context selection.",
+        },
+        { kind: "must_not_change", text: "Do not create prompt packages." },
       ],
-      verificationSteps: [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm the freshness metadata reflects human review.",
+      verificationStepsV2: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma catalog.",
+          command: "renma catalog",
+          expected: "Catalog output resolves relevant assets and dependencies.",
+        },
+        { text: "Confirm the freshness metadata reflects human review." },
       ],
       llmHint: `Review ${entry.sourcePath} for stale assumptions, then update explicit freshness metadata only after human review.`,
     },
@@ -431,15 +444,25 @@ function reviewOverdueAssetFindings(
         "Review cycles make human freshness expectations explicit. Overdue assets may no longer match current product, policy, or workflow behavior.",
       remediation:
         "Review the asset with a human owner, then update last_reviewed_at or review_cycle if the guidance is still current.",
-      constraints: [
-        "Do not infer freshness from Git history or file modification time.",
-        "Do not introduce runtime context selection.",
-        "Do not create prompt packages.",
+      repairConstraints: [
+        {
+          kind: "must_not_change",
+          text: "Do not infer freshness from Git history or file modification time.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not introduce runtime context selection.",
+        },
+        { kind: "must_not_change", text: "Do not create prompt packages." },
       ],
-      verificationSteps: [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm the next review date is not overdue.",
+      verificationStepsV2: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma catalog.",
+          command: "renma catalog",
+          expected: "Catalog output resolves relevant assets and dependencies.",
+        },
+        { text: "Confirm the next review date is not overdue." },
       ],
       llmHint: `The next review date for ${entry.sourcePath} was ${dueAt}. Revalidate the asset before updating freshness metadata.`,
     },
@@ -474,18 +497,35 @@ function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
         "Asset ids make skills, contexts, and support assets referenceable across the repository. Duplicate ids make dependency validation, ownership, and agent-readable cataloging ambiguous.",
       remediation:
         "Give each asset a unique stable id. If the assets represent the same source-of-truth knowledge, merge or deprecate one of them. If they are distinct, rename one id to reflect its actual scope.",
-      constraints: [
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Do not make Renma call an LLM.",
-        "Do not automatically rewrite ids during scan.",
-        "Update declared references through a reviewable patch after renaming an id.",
+      repairConstraints: [
+        {
+          kind: "must_not_change",
+          text: "Do not introduce runtime context resolution.",
+        },
+        { kind: "must_not_change", text: "Do not create prompt packages." },
+        { kind: "must_not_change", text: "Do not make Renma call an LLM." },
+        {
+          kind: "must_not_change",
+          text: "Do not automatically rewrite ids during scan.",
+        },
+        {
+          kind: "allowed_change",
+          text: "Update declared references through a reviewable patch after renaming an id.",
+        },
       ],
-      verificationSteps: [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Run any project-specific validation checks that apply to this repository.",
-        "Confirm each asset id is unique and references still point to the intended asset.",
+      verificationStepsV2: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma catalog.",
+          command: "renma catalog",
+          expected: "Catalog output resolves relevant assets and dependencies.",
+        },
+        {
+          text: "Run any project-specific validation checks that apply to this repository.",
+        },
+        {
+          text: "Confirm each asset id is unique and references still point to the intended asset.",
+        },
       ],
       llmHint: `Find all assets with id "${assetId}", compare their scope and metadata, and propose a merge/deprecation path or unique replacement ids. Duplicate paths: ${paths.join(", ")}`,
       details: {
@@ -527,16 +567,27 @@ function unknownReferenceFindings(
           "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
         remediation:
           "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
-        constraints: [
-          "Do not select runtime context.",
-          "Do not assemble prompt packages.",
-          "Do not infer missing dependencies with an LLM during scan.",
-          "Only validate declared repository relationships.",
+        repairConstraints: [
+          { kind: "must_not_change", text: "Do not select runtime context." },
+          { kind: "must_not_change", text: "Do not assemble prompt packages." },
+          {
+            kind: "must_not_change",
+            text: "Do not infer missing dependencies with an LLM during scan.",
+          },
+          {
+            kind: "allowed_change",
+            text: "Only validate declared repository relationships.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run renma catalog.",
-          "Confirm declared references resolve to known assets.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run renma catalog.",
+            command: "renma catalog",
+            expected:
+              "Catalog output resolves relevant assets and dependencies.",
+          },
+          { text: "Confirm declared references resolve to known assets." },
         ],
         llmHint: `Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}".`,
         details: {
@@ -594,16 +645,32 @@ function referenceDeprecatedAssetFindings(
           "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
         remediation:
           "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
-        constraints: [
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Do not automatically rewrite references during scan.",
-          "Preserve compatibility shims when they are intentionally needed.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not introduce runtime context resolution.",
+          },
+          { kind: "must_not_change", text: "Do not create prompt packages." },
+          {
+            kind: "must_not_change",
+            text: "Do not automatically rewrite references during scan.",
+          },
+          {
+            kind: "must_preserve",
+            text: "Preserve compatibility shims when they are intentionally needed.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run renma catalog.",
-          "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run renma catalog.",
+            command: "renma catalog",
+            expected:
+              "Catalog output resolves relevant assets and dependencies.",
+          },
+          {
+            text: "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented.",
+          },
         ],
         llmHint: `Inspect "${target.sourcePath}" for a reviewed superseded_by relationship or replacement guidance. If a canonical replacement exists, update ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}". If not, decide whether the reference should remain and document why.`,
         details: {
@@ -655,16 +722,37 @@ function orphanedContextLensFindings(
           "Context lenses are easier to review when a skill declares how the purpose-oriented interpretation is used. An unreferenced active lens may be newly created, intentionally staged, or stale.",
         remediation:
           "If the lens should be used, reference it from a canonical Skill with metadata.renma.requires-lens or metadata.renma.optional-lens JSON-array metadata. Pre-0.16-only Skills use requires_lens or optional_lens only during migration. If the lens is not ready or no longer needed, update its lifecycle status after review.",
-        constraints: [
-          "Do not make Renma select runtime lenses.",
-          "Do not rank or retrieve lenses semantically.",
-          "Do not assemble prompts or inject context.",
-          "Treat this as repository governance only.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not make Renma select runtime lenses.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not rank or retrieve lenses semantically.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not assemble prompts or inject context.",
+          },
+          {
+            kind: "allowed_change",
+            text: "Treat this as repository governance only.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run renma catalog.",
-          "Run renma graph focused on the lens or owning skill.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run renma catalog.",
+            command: "renma catalog",
+            expected:
+              "Catalog output resolves relevant assets and dependencies.",
+          },
+          {
+            text: "Run renma graph focused on the lens or owning skill.",
+            command: "renma graph",
+            expected: "Graph output shows the repaired relationships.",
+          },
         ],
         llmHint: `Search for Skills that should declare "${entry.id}" as a required or optional lens. For canonical Skills, update metadata.renma.requires-lens or metadata.renma.optional-lens as a JSON-array string; use requires_lens or optional_lens only for pre-0.16 migration inputs. Do not add runtime selection logic or prompt assembly.`,
         details: {
@@ -713,16 +801,33 @@ function contextLensAppliesToInactiveContextFindings(
           "A lens that interprets deprecated or archived context may keep stale knowledge connected to active skills. The relationship can still be intentional, but it should be easy to review.",
         remediation:
           "Point applies_to at the active replacement context when one exists, or mark the lens lifecycle appropriately if it only applies to archived knowledge.",
-        constraints: [
-          "Do not infer a replacement context with an LLM.",
-          "Do not make Renma select runtime lenses.",
-          "Do not assemble prompts or inject context.",
-          "Keep the check deterministic and relationship-based.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not infer a replacement context with an LLM.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not make Renma select runtime lenses.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not assemble prompts or inject context.",
+          },
+          {
+            kind: "must_preserve",
+            text: "Keep the check deterministic and relationship-based.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run renma catalog.",
-          "Inspect the lens and applied context lifecycle metadata.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run renma catalog.",
+            command: "renma catalog",
+            expected:
+              "Catalog output resolves relevant assets and dependencies.",
+          },
+          { text: "Inspect the lens and applied context lifecycle metadata." },
         ],
         llmHint: `Inspect "${target.sourcePath}" for superseded_by or replacement guidance. Update the applies_to reference in "${source.sourcePath}" only if a reviewed replacement exists.`,
         details: {
@@ -773,16 +878,35 @@ function orphanedContextAssetFindings(
           "Shared context assets are most valuable when discoverable and connected to skills, other contexts, or repository guidance. Orphaned context assets may be unused, newly created but not wired in, or missing declared references.",
         remediation:
           "If the context is intended to be used, reference it from the relevant skill or context metadata. If it is obsolete, deprecate or archive it. If it is intentionally standalone, document its intended discovery path.",
-        constraints: [
-          "Do not delete context assets automatically.",
-          "Do not require every context asset to be referenced immediately.",
-          "Do not make Renma decide runtime context selection.",
-          "Use this as a repository maintenance advisory.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not delete context assets automatically.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not require every context asset to be referenced immediately.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not make Renma decide runtime context selection.",
+          },
+          {
+            kind: "allowed_change",
+            text: "Use this as a repository maintenance advisory.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run renma catalog.",
-          "Confirm context is referenced, intentionally standalone, deprecated, or archived.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run renma catalog.",
+            command: "renma catalog",
+            expected:
+              "Catalog output resolves relevant assets and dependencies.",
+          },
+          {
+            text: "Confirm context is referenced, intentionally standalone, deprecated, or archived.",
+          },
         ],
         llmHint: `Search the repository for related skills, contexts, filenames, headings, or domain terms for "${entry.sourcePath}". If this context should be used, add a declared reference from the appropriate skill or context. If obsolete, propose a deprecation or archive patch.`,
         details: {
@@ -1022,17 +1146,33 @@ function shapeFindings(
         {
           whyItMatters:
             "Long Skill bodies can make activated workflows harder to navigate and maintain. Token size is evidence for progressive-disclosure review, not proof that the Skill has the wrong structure or must be split.",
-          constraints: [
-            "Do not introduce runtime context resolution.",
-            "Do not create prompt packages.",
-            "Do not make Renma responsible for selecting context.",
-            "Preserve ordered workflow steps, constraints, and completion criteria.",
-            "Choose a destination by semantic ownership, not by size alone.",
+          repairConstraints: [
+            {
+              kind: "must_not_change",
+              text: "Do not introduce runtime context resolution.",
+            },
+            { kind: "must_not_change", text: "Do not create prompt packages." },
+            {
+              kind: "must_not_change",
+              text: "Do not make Renma responsible for selecting context.",
+            },
+            {
+              kind: "must_preserve",
+              text: "Preserve ordered workflow steps, constraints, and completion criteria.",
+            },
+            {
+              kind: "allowed_change",
+              text: "Choose a destination by semantic ownership, not by size alone.",
+            },
           ],
-          verificationSteps: [
-            "Run renma scan.",
-            "Run any project-specific validation checks that apply to this repository.",
-            "Confirm any moved material remains statically reachable and semantically owned by its destination.",
+          verificationStepsV2: [
+            { text: "Run renma scan.", command: "renma scan" },
+            {
+              text: "Run any project-specific validation checks that apply to this repository.",
+            },
+            {
+              text: "Confirm any moved material remains statically reachable and semantically owned by its destination.",
+            },
           ],
           llmHint: `${measurementSummary} ${sectionReview} Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge. Treat the listed sections only as review candidates.`,
           details: {
@@ -1167,17 +1307,36 @@ function shapeFindings(
         {
           whyItMatters:
             "Agents need explicit input requirements before starting a workflow. Missing required inputs can cause the agent to guess targets, assume permissions, or start without enough repository context.",
-          constraints: [
-            "Do not infer runtime context.",
-            "Do not assemble prompt packages.",
-            "Do not require optional context selection.",
-            "Do not make Renma decide whether the workflow can run for the current task.",
-            "Keep the skill as a static workflow entrypoint.",
+          repairConstraints: [
+            { kind: "must_not_change", text: "Do not infer runtime context." },
+            {
+              kind: "must_not_change",
+              text: "Do not assemble prompt packages.",
+            },
+            {
+              kind: "must_not_change",
+              text: "Do not require optional context selection.",
+            },
+            {
+              kind: "must_not_change",
+              text: "Do not make Renma decide whether the workflow can run for the current task.",
+            },
+            {
+              kind: "must_preserve",
+              text: "Keep the skill as a static workflow entrypoint.",
+            },
           ],
-          verificationSteps: [
-            "Run renma scan.",
-            "Run renma readiness.",
-            "Confirm each skill entrypoint either documents required inputs or explicitly states that no special inputs are required.",
+          verificationStepsV2: [
+            { text: "Run renma scan.", command: "renma scan" },
+            {
+              text: "Run renma readiness.",
+              command: "renma readiness",
+              expected:
+                "Readiness checks reflect the repaired repository state.",
+            },
+            {
+              text: "Confirm each skill entrypoint either documents required inputs or explicitly states that no special inputs are required.",
+            },
           ],
           llmHint:
             "Add a concise Required inputs or Prerequisites section to this SKILL.md. State user-provided inputs, target files, repository state, permissions, credentials, and environment assumptions needed before the workflow starts. Do not add runtime context selection or prompt assembly behavior.",
@@ -1207,17 +1366,36 @@ function shapeFindings(
         {
           whyItMatters:
             "Agents need explicit completion criteria before finishing a workflow. Missing completion criteria can cause incomplete delivery, unnecessary follow-up work, or inconsistent final responses.",
-          constraints: [
-            "Do not infer runtime context.",
-            "Do not assemble prompt packages.",
-            "Do not require optional context selection.",
-            "Do not make Renma decide task-specific success at runtime.",
-            "Keep the skill as a static workflow entrypoint.",
+          repairConstraints: [
+            { kind: "must_not_change", text: "Do not infer runtime context." },
+            {
+              kind: "must_not_change",
+              text: "Do not assemble prompt packages.",
+            },
+            {
+              kind: "must_not_change",
+              text: "Do not require optional context selection.",
+            },
+            {
+              kind: "must_not_change",
+              text: "Do not make Renma decide task-specific success at runtime.",
+            },
+            {
+              kind: "must_preserve",
+              text: "Keep the skill as a static workflow entrypoint.",
+            },
           ],
-          verificationSteps: [
-            "Run renma scan.",
-            "Run renma readiness.",
-            "Confirm each skill workflow entrypoint documents completion criteria.",
+          verificationStepsV2: [
+            { text: "Run renma scan.", command: "renma scan" },
+            {
+              text: "Run renma readiness.",
+              command: "renma readiness",
+              expected:
+                "Readiness checks reflect the repaired repository state.",
+            },
+            {
+              text: "Confirm each skill workflow entrypoint documents completion criteria.",
+            },
           ],
           llmHint:
             "Add a concise Completion criteria, Success requirements, Deliverables, or Final response section to this SKILL.md. State the observable outputs, checks, or final-response conditions that mean the workflow is complete. Do not add runtime context selection or prompt assembly behavior.",
@@ -1344,14 +1522,31 @@ function renmaScaffoldPlaceholderFindings(document: ParsedDocument): Finding[] {
           evidence: markerEvidence,
           whyItMatters:
             "Renma's own starter prose is deterministic creation guidance, not authored workflow or Context content. Leaving it in place can make keyword-based quality checks overstate readiness.",
-          constraints: [
-            "Replace only the evidenced Renma-generated marker.",
-            "Do not invent domain facts, owners, policies, dependencies, or source authority.",
-            "Do not treat this exact-marker check as proof of general semantic completeness.",
+          repairConstraints: [
+            {
+              kind: "allowed_change",
+              text: "Replace only the evidenced Renma-generated marker.",
+            },
+            {
+              kind: "must_not_change",
+              text: "Do not invent domain facts, owners, policies, dependencies, or source authority.",
+            },
+            {
+              kind: "must_not_change",
+              text: "Do not treat this exact-marker check as proof of general semantic completeness.",
+            },
           ],
-          verificationSteps: [
-            "Run renma scan . --fail-on high --strict.",
-            "Run renma readiness . and confirm scaffold completeness passes.",
+          verificationStepsV2: [
+            {
+              text: "Run renma scan . --fail-on high --strict.",
+              command: "renma scan",
+            },
+            {
+              text: "Run renma readiness . and confirm scaffold completeness passes.",
+              command: "renma readiness",
+              expected:
+                "Readiness checks reflect the repaired repository state.",
+            },
           ],
           llmHint:
             "Use repository evidence or human input to replace the exact scaffold marker. Preserve the asset's intended boundary and report any truth that remains unresolved.",
@@ -1515,16 +1710,30 @@ function reusableContextCandidateFinding(
       "Reusable setup notes, troubleshooting, platform guidance, testing heuristics, or domain rules are easier to own, review, and reuse when they live in shared context assets instead of only inside one skill.",
     remediation:
       "Review the matched headings and phrases. Promote content to contexts/ only when it needs cross-Skill reuse, independent ownership, lifecycle, or source-of-truth status; otherwise keep Skill-specific detail in SKILL.md or references/.",
-    constraints: [
-      "Do not make Renma select runtime context.",
-      "Do not assemble prompt packages.",
-      "Do not automatically rewrite or split skills.",
-      "Preserve SKILL.md as a focused workflow entrypoint.",
-      "Give extracted context assets stable metadata such as id, owner, and status.",
+    repairConstraints: [
+      {
+        kind: "must_not_change",
+        text: "Do not make Renma select runtime context.",
+      },
+      { kind: "must_not_change", text: "Do not assemble prompt packages." },
+      {
+        kind: "must_not_change",
+        text: "Do not automatically rewrite or split skills.",
+      },
+      {
+        kind: "must_preserve",
+        text: "Preserve SKILL.md as a focused workflow entrypoint.",
+      },
+      {
+        kind: "requires_human_decision",
+        text: "Give extracted context assets stable metadata such as id, owner, and status.",
+      },
     ],
-    verificationSteps: [
-      "Run renma scan.",
-      "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets.",
+    verificationStepsV2: [
+      { text: "Run renma scan.", command: "renma scan" },
+      {
+        text: "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets.",
+      },
     ],
     llmHint:
       "Check whether the matched knowledge is used across Skills or needs independent ownership. Use contexts/ only for shared knowledge; keep Skill-local procedures and edge cases in SKILL.md or references/.",
@@ -1641,20 +1850,43 @@ function supportSharedContextCandidateFindings(
         "Skill-local references are useful for local support, but reusable source-of-truth knowledge is easier to own, review, and reuse when represented as a first-class shared context asset under contexts/. Large support files with setup, decision logic, troubleshooting, validation, constraints, or policy-like guidance may be useful beyond one skill.",
       remediation:
         "Review this support file and decide whether reusable knowledge should be promoted to a shared context asset under contexts/. Keep only skill-specific reading order, local notes, or one-off examples under skills/*/references/. Update declared context references after any promotion.",
-      constraints: [
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Do not make Renma call an LLM.",
-        "Do not move files automatically as part of scan.",
-        "Do not delete or summarize procedural details.",
-        "Preserve skill-local references when they are truly local to one skill.",
-        "Give promoted context assets stable metadata such as id, owner, and status.",
+      repairConstraints: [
+        {
+          kind: "must_not_change",
+          text: "Do not introduce runtime context resolution.",
+        },
+        { kind: "must_not_change", text: "Do not create prompt packages." },
+        { kind: "must_not_change", text: "Do not make Renma call an LLM." },
+        {
+          kind: "must_not_change",
+          text: "Do not move files automatically as part of scan.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not delete or summarize procedural details.",
+        },
+        {
+          kind: "must_preserve",
+          text: "Preserve skill-local references when they are truly local to one skill.",
+        },
+        {
+          kind: "requires_human_decision",
+          text: "Give promoted context assets stable metadata such as id, owner, and status.",
+        },
       ],
-      verificationSteps: [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Run any project-specific validation checks that apply to this repository.",
-        "Confirm reusable source-of-truth knowledge lives in contexts/ and skill-local references only contain local support guidance.",
+      verificationStepsV2: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma catalog.",
+          command: "renma catalog",
+          expected: "Catalog output resolves relevant assets and dependencies.",
+        },
+        {
+          text: "Run any project-specific validation checks that apply to this repository.",
+        },
+        {
+          text: "Confirm reusable source-of-truth knowledge lives in contexts/ and skill-local references only contain local support guidance.",
+        },
       ],
       llmHint:
         "Search the repository for similar headings, filenames, repeated procedures, commands, constraints, or overlapping guidance. If this support file appears reusable, propose a first-class context asset under contexts/, move the reusable details without losing information, keep truly local notes in the skill directory, and update declared context references.",
@@ -1705,20 +1937,43 @@ function contextPathNonSemanticFindings(document: ParsedDocument): Finding[] {
         "Shared context assets should be discoverable by their meaning, ownership, domain, tool, team, or policy scope. Process-state folders such as promoted, generated, or drafts describe how a file was created rather than what knowledge it owns, which makes the repository harder for humans and agents to navigate over time.",
       remediation:
         "Move this context asset to a semantic path that reflects its source-of-truth scope. Prefer paths such as contexts/tools/<tool>/..., contexts/domain/<domain>/..., contexts/testing/..., contexts/teams/<team>/..., or contexts/policies/.... Update any declared context references after moving the file.",
-      constraints: [
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Do not make Renma call an LLM.",
-        "Do not move files automatically as part of scan.",
-        "Preserve the context content and metadata.",
-        "Update references only through a reviewable human or calling-agent patch.",
-        "Temporary staging folders are acceptable outside final contexts/ paths, but final shared context assets should use semantic paths.",
+      repairConstraints: [
+        {
+          kind: "must_not_change",
+          text: "Do not introduce runtime context resolution.",
+        },
+        { kind: "must_not_change", text: "Do not create prompt packages." },
+        { kind: "must_not_change", text: "Do not make Renma call an LLM." },
+        {
+          kind: "must_not_change",
+          text: "Do not move files automatically as part of scan.",
+        },
+        {
+          kind: "must_preserve",
+          text: "Preserve the context content and metadata.",
+        },
+        {
+          kind: "requires_human_decision",
+          text: "Update references only through a reviewable human or calling-agent patch.",
+        },
+        {
+          kind: "allowed_change",
+          text: "Temporary staging folders are acceptable outside final contexts/ paths, but final shared context assets should use semantic paths.",
+        },
       ],
-      verificationSteps: [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Run project-specific validation checks that apply to this repository.",
-        "Confirm the context asset now lives under a semantic path and declared references still point to it correctly.",
+      verificationStepsV2: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma catalog.",
+          command: "renma catalog",
+          expected: "Catalog output resolves relevant assets and dependencies.",
+        },
+        {
+          text: "Run project-specific validation checks that apply to this repository.",
+        },
+        {
+          text: "Confirm the context asset now lives under a semantic path and declared references still point to it correctly.",
+        },
       ],
       llmHint:
         "Infer semantic scope from context title, headings, metadata, and references. Propose a path based on meaning, ownership, or reuse domain, such as contexts/tools/<tool>/..., contexts/domain/<domain>/..., contexts/testing/..., contexts/teams/<team>/..., or contexts/policies/.... Avoid final folders named after migration state such as promoted or generated.",
@@ -1762,16 +2017,28 @@ function skillContextReferenceNotDeclaredFindings(
         "Declared context references make skill/context relationships visible to catalog, graph, and validation reports. If a skill only mentions a context in prose, humans may see the dependency but repository tooling cannot validate it.",
       remediation:
         "Add the referenced shared context asset to metadata.renma.requires-context as a JSON-array string, or remove the prose reference if it is no longer needed. Pre-0.16 requires_context is migration input only and is not operational in Renma 0.16.0.",
-      constraints: [
-        "Do not select runtime context.",
-        "Do not assemble prompt packages.",
-        "Do not make Renma decide which context a task should use.",
-        "Only declare repository relationships that the skill already references or intentionally depends on.",
+      repairConstraints: [
+        { kind: "must_not_change", text: "Do not select runtime context." },
+        { kind: "must_not_change", text: "Do not assemble prompt packages." },
+        {
+          kind: "must_not_change",
+          text: "Do not make Renma decide which context a task should use.",
+        },
+        {
+          kind: "allowed_change",
+          text: "Only declare repository relationships that the skill already references or intentionally depends on.",
+        },
       ],
-      verificationSteps: [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm the skill/context relationship appears in metadata and catalog output.",
+      verificationStepsV2: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma catalog.",
+          command: "renma catalog",
+          expected: "Catalog output resolves relevant assets and dependencies.",
+        },
+        {
+          text: "Confirm the skill/context relationship appears in metadata and catalog output.",
+        },
       ],
       llmHint: `Find context paths mentioned in the Skill body and add the missing declaration using metadata.renma.requires-context as a JSON-array string. Pre-0.16 requires_context is accepted only by suggest-metadata and is not operational. Missing declaration: ${referencedPath}`,
       details: {
@@ -1835,20 +2102,44 @@ function skillReferencesSupersededAssetFindings(
           "Deprecated or superseded local support files can be useful as compatibility shims, but keeping them in a primary reading path may hide the canonical shared context asset from humans and agents. Shared context assets should be the visible source of truth when reusable knowledge has been promoted to contexts/.",
         remediation:
           "Update the skill to reference the canonical shared context asset directly, or keep the deprecated local support file only as a clearly documented compatibility shim. If the local file still contains unique skill-specific guidance, reduce it to that local guidance and point to the shared context for reusable knowledge.",
-        constraints: [
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Do not make Renma call an LLM.",
-          "Do not automatically move or delete files during scan.",
-          "Preserve compatibility shims if they are still needed.",
-          "Preserve unique skill-local guidance if it is not reusable shared context.",
-          "Update declared context references when pointing the skill directly at shared contexts.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not introduce runtime context resolution.",
+          },
+          { kind: "must_not_change", text: "Do not create prompt packages." },
+          { kind: "must_not_change", text: "Do not make Renma call an LLM." },
+          {
+            kind: "must_not_change",
+            text: "Do not automatically move or delete files during scan.",
+          },
+          {
+            kind: "must_preserve",
+            text: "Preserve compatibility shims if they are still needed.",
+          },
+          {
+            kind: "must_preserve",
+            text: "Preserve unique skill-local guidance if it is not reusable shared context.",
+          },
+          {
+            kind: "allowed_change",
+            text: "Update declared context references when pointing the skill directly at shared contexts.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run renma catalog.",
-          "Run project-specific validation checks that apply to this repository.",
-          "Confirm the skill points to canonical shared context assets directly, or any deprecated local support file is clearly only a compatibility shim.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run renma catalog.",
+            command: "renma catalog",
+            expected:
+              "Catalog output resolves relevant assets and dependencies.",
+          },
+          {
+            text: "Run project-specific validation checks that apply to this repository.",
+          },
+          {
+            text: "Confirm the skill points to canonical shared context assets directly, or any deprecated local support file is clearly only a compatibility shim.",
+          },
         ],
         llmHint:
           "Inspect the deprecated local support file and its superseded_by metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a migration shim.",
@@ -1970,20 +2261,50 @@ function assetReferencesSupersededAssetFindings(
               "Deprecated or superseded support files may remain as compatibility shims, but assets that keep referencing them can hide the canonical shared context asset from humans and agents. Once reusable knowledge has been promoted to contexts/, repository assets should usually reference the canonical context directly.",
             remediation:
               "Update this asset to reference the canonical shared context asset directly, or keep the superseded reference only if it is intentionally needed as a compatibility shim. If the deprecated file still contains unique local guidance, preserve that local guidance and point reusable knowledge to the canonical context.",
-            constraints: [
-              "Do not introduce runtime context resolution.",
-              "Do not create prompt packages.",
-              "Do not make Renma call an LLM.",
-              "Do not automatically move or rewrite files during scan.",
-              "Preserve compatibility shims if they are intentionally needed.",
-              "Preserve unique local guidance not reusable shared context.",
-              "Update references through a reviewable human or calling-agent patch.",
+            repairConstraints: [
+              {
+                kind: "must_not_change",
+                text: "Do not introduce runtime context resolution.",
+              },
+              {
+                kind: "must_not_change",
+                text: "Do not create prompt packages.",
+              },
+              {
+                kind: "must_not_change",
+                text: "Do not make Renma call an LLM.",
+              },
+              {
+                kind: "must_not_change",
+                text: "Do not automatically move or rewrite files during scan.",
+              },
+              {
+                kind: "must_preserve",
+                text: "Preserve compatibility shims if they are intentionally needed.",
+              },
+              {
+                kind: "must_preserve",
+                text: "Preserve unique local guidance not reusable shared context.",
+              },
+              {
+                kind: "requires_human_decision",
+                text: "Update references through a reviewable human or calling-agent patch.",
+              },
             ],
-            verificationSteps: [
-              "Run renma scan.",
-              "Run renma catalog.",
-              "Run project-specific validation checks that apply to this repository.",
-              "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
+            verificationStepsV2: [
+              { text: "Run renma scan.", command: "renma scan" },
+              {
+                text: "Run renma catalog.",
+                command: "renma catalog",
+                expected:
+                  "Catalog output resolves relevant assets and dependencies.",
+              },
+              {
+                text: "Run project-specific validation checks that apply to this repository.",
+              },
+              {
+                text: "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
+              },
             ],
             llmHint:
               "Inspect the referenced deprecated asset and its reviewed superseded_by relationship. If the canonical shared context named by that relationship is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
@@ -2104,12 +2425,23 @@ function contextBudgetFindings(
       {
         whyItMatters:
           "Token-budget overrides record a declared human decision. Malformed, ambiguous, incomplete, orphaned, or unnecessary metadata cannot safely raise the effective repository warning floor.",
-        constraints: [
-          "Do not automatically insert token-budget override metadata.",
-          "Do not treat the override as a general ignore mechanism.",
-          "Ask whether a meaningful split preserves coherence and execution order before proposing an override.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not automatically insert token-budget override metadata.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not treat the override as a general ignore mechanism.",
+          },
+          {
+            kind: "allowed_change",
+            text: "Ask whether a meaningful split preserves coherence and execution order before proposing an override.",
+          },
         ],
-        verificationSteps: ["Run renma scan."],
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+        ],
         llmHint: `${invalidReasonSummary} Report these reasons to the user in their existing order without inferring a correction. First ask whether the asset can be split along meaningful boundaries without harming coherence or execution order. Only if the user confirms it should remain long should you repair explicit override metadata with their rationale.`,
         details: {
           estimatedTokens,
@@ -2185,19 +2517,41 @@ function contextBudgetFindings(
       {
         whyItMatters:
           "Large content assets deserve a coherence and maintainability review. Token size is evidence only: a meaningful split may help when it preserves semantic boundaries, while an explicit override can record the user's declared decision for an intentionally coherent or ordered long-form asset.",
-        constraints: [
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Do not split based on size alone.",
-          "Require the user's decision before splitting or treating the asset as intentionally long.",
-          "Do not automatically add or increase token-budget override metadata.",
-          "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
-          "Keep static references from the parent file or SKILL.md to every split part.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not introduce runtime context resolution.",
+          },
+          { kind: "must_not_change", text: "Do not create prompt packages." },
+          {
+            kind: "must_not_change",
+            text: "Do not split based on size alone.",
+          },
+          {
+            kind: "allowed_change",
+            text: "Require the user's decision before splitting or treating the asset as intentionally long.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not automatically add or increase token-budget override metadata.",
+          },
+          {
+            kind: "must_preserve",
+            text: "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
+          },
+          {
+            kind: "must_preserve",
+            text: "Keep static references from the parent file or SKILL.md to every split part.",
+          },
         ],
-        verificationSteps: [
-          "Run renma scan.",
-          "Run the repository-specific validation or test command, if one exists.",
-          "Confirm every agreed split part remains reachable, or that an intentional-long decision uses valid declared metadata.",
+        verificationStepsV2: [
+          { text: "Run renma scan.", command: "renma scan" },
+          {
+            text: "Run the repository-specific validation or test command, if one exists.",
+          },
+          {
+            text: "Confirm every agreed split part remains reachable, or that an intentional-long decision uses valid declared metadata.",
+          },
         ],
         llmHint: `${measurementSummary} ${sectionReview} ${decisionGuidance} Treat headings only as review candidates; choose destinations by semantic ownership, not heading names.`,
         details: {
@@ -2341,16 +2695,32 @@ function skillLocalSupportReachabilityFindings(
           {
             whyItMatters:
               "Local support files should be statically discoverable from the skill so humans and LLM coding agents can tell which repository evidence belongs to the skill without relying on runtime context selection.",
-            constraints: [
-              "Do not introduce runtime context resolution.",
-              "Do not make Renma responsible for selecting context.",
-              "Use static repository references from SKILL.md to local support files or their index.",
-              "Preserve original concrete steps and support content.",
+            repairConstraints: [
+              {
+                kind: "must_not_change",
+                text: "Do not introduce runtime context resolution.",
+              },
+              {
+                kind: "must_not_change",
+                text: "Do not make Renma responsible for selecting context.",
+              },
+              {
+                kind: "allowed_change",
+                text: "Use static repository references from SKILL.md to local support files or their index.",
+              },
+              {
+                kind: "must_preserve",
+                text: "Preserve original concrete steps and support content.",
+              },
             ],
-            verificationSteps: [
-              "Run renma scan.",
-              "Run any project-specific validation checks that apply to this repository.",
-              "Confirm each local profile, reference, example, script, or asset is reachable from SKILL.md or from a referenced parent support file.",
+            verificationStepsV2: [
+              { text: "Run renma scan.", command: "renma scan" },
+              {
+                text: "Run any project-specific validation checks that apply to this repository.",
+              },
+              {
+                text: "Confirm each local profile, reference, example, script, or asset is reachable from SKILL.md or from a referenced parent support file.",
+              },
             ],
             llmHint:
               "Add concise reachability guidance in SKILL.md that references local profiles, references, examples, scripts, assets, or ordered support indexes without adding runtime routing behavior.",
@@ -2380,16 +2750,32 @@ function skillLocalSupportReachabilityFindings(
             {
               whyItMatters:
                 "Unreachable local support files can drift outside review and be missed by humans or LLM coding agents. Reachability should be static repository evidence, not runtime context assembly.",
-              constraints: [
-                "Do not introduce runtime context resolution.",
-                "Do not delete or summarize support content just to satisfy the check.",
-                "Preserve ordered split parts and concrete procedural details.",
-                "Use SKILL.md or a referenced parent support file for static reachability.",
+              repairConstraints: [
+                {
+                  kind: "must_not_change",
+                  text: "Do not introduce runtime context resolution.",
+                },
+                {
+                  kind: "must_not_change",
+                  text: "Do not delete or summarize support content just to satisfy the check.",
+                },
+                {
+                  kind: "must_preserve",
+                  text: "Preserve ordered split parts and concrete procedural details.",
+                },
+                {
+                  kind: "allowed_change",
+                  text: "Use SKILL.md or a referenced parent support file for static reachability.",
+                },
               ],
-              verificationSteps: [
-                "Run renma scan.",
-                "Run any project-specific validation checks that apply to this repository.",
-                "Confirm this support file is no longer reported as unreachable.",
+              verificationStepsV2: [
+                { text: "Run renma scan.", command: "renma scan" },
+                {
+                  text: "Run any project-specific validation checks that apply to this repository.",
+                },
+                {
+                  text: "Confirm this support file is no longer reported as unreachable.",
+                },
               ],
               llmHint:
                 "Update SKILL.md or a referenced support index to mention this file by path, basename, or clear title so the static reachability graph can find it.",
@@ -2755,9 +3141,11 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
         {
           whyItMatters:
             "README.md and AGENTS.md should describe the current repository model without treating valid Skill-local support as stale.",
-          verificationSteps: [
-            "Confirm docs distinguish canonical Skill roots and valid local support from governed contexts/** assets and shared tools/** helpers.",
-            "Run renma scan again.",
+          verificationStepsV2: [
+            {
+              text: "Confirm docs distinguish canonical Skill roots and valid local support from governed contexts/** assets and shared tools/** helpers.",
+            },
+            { text: "Run renma scan again.", command: "renma scan" },
           ],
         },
       ),
@@ -2829,7 +3217,13 @@ function declaredDependencyLayoutFindings(
         "Declared context references should resolve through canonical contexts/**, skills/**, .agents/skills/**, or tools/** repository paths.",
       remediation:
         "Rewrite declared required or optional context dependency values to canonical repo-root paths without changing the Skill's operational metadata format.",
-      verificationSteps: ["Run renma graph and confirm all edges resolve."],
+      verificationStepsV2: [
+        {
+          text: "Run renma graph and confirm all edges resolve.",
+          command: "renma graph",
+          expected: "Graph output shows the repaired relationships.",
+        },
+      ],
       details: {
         source: dependency.from,
         target: dependency.to,
@@ -2863,9 +3257,15 @@ function unresolvedHelperCommandFinding(
     {
       whyItMatters:
         "Agents need shared tools/** helpers and Skill-local scripts to resolve deterministically before running them.",
-      verificationSteps: [
-        "Confirm the command resolves to an existing tools/** helper or to scripts/** inside its owning Skill.",
-        "Run renma readiness and check paths.helper_commands.",
+      verificationStepsV2: [
+        {
+          text: "Confirm the command resolves to an existing tools/** helper or to scripts/** inside its owning Skill.",
+        },
+        {
+          text: "Run renma readiness and check paths.helper_commands.",
+          command: "renma readiness",
+          expected: "Readiness checks reflect the repaired repository state.",
+        },
       ],
       ...details,
     },
@@ -2921,9 +3321,11 @@ function finding(
       details.whyItMatters ??
       "Skills and repository instructions are loaded into agent context, so risky or unclear text can become risky behavior.",
     remediation,
-    ...(details.constraints ? { constraints: details.constraints } : {}),
-    ...(details.verificationSteps
-      ? { verificationSteps: details.verificationSteps }
+    ...(details.repairConstraints
+      ? { repairConstraints: details.repairConstraints }
+      : {}),
+    ...(details.verificationStepsV2
+      ? { verificationStepsV2: details.verificationStepsV2 }
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),
@@ -2951,9 +3353,11 @@ function documentFinding(
       details.whyItMatters ??
       "Clear skill structure helps agents choose the right workflow and report useful evidence.",
     remediation,
-    ...(details.constraints ? { constraints: details.constraints } : {}),
-    ...(details.verificationSteps
-      ? { verificationSteps: details.verificationSteps }
+    ...(details.repairConstraints
+      ? { repairConstraints: details.repairConstraints }
+      : {}),
+    ...(details.verificationStepsV2
+      ? { verificationStepsV2: details.verificationStepsV2 }
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),

@@ -21,7 +21,7 @@ import {
 import type { CatalogEntry, Dependency } from "../model.js";
 import { formatVersionedJsonDocument } from "../report.js";
 import { renderTextOutline } from "../renderers/inspect.js";
-import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/known-classification.js";
 import type { AssetGovernanceEvidence } from "../types/governance.js";
 import type { ParsedDocument } from "../types/metadata.js";
 import {
@@ -144,7 +144,7 @@ function inspectRepositoryForTarget(
   asset: InspectAssetSummary | null;
   contextLens: ContextLensSummary;
   governance: AssetGovernanceEvidence | null;
-  classification: AssetClassificationEvidence;
+  classification: KnownAssetClassificationEvidence;
 } {
   if (repository.state === "unavailable") {
     return {

@@ -1491,7 +1491,9 @@ environment-derived values excluded from portable deterministic comparisons.
 In the npm type surface, `ScanJsonDocument` models the serialized scan wire
 shape with literal `schemaVersion: "renma.scan.v1"` and `format: "json"`, as
 emitted by `formatJson()` and `scan --format json`. The producerless
-pre-serialization core scan model remains internal.
+pre-serialization core scan model remains internal. The serializer explicitly
+projects supported wire fields, so a new internal scan-result property is not
+an implicit JSON-contract addition.
 
 Use `trust-graph` when a reviewer asks: "Why should this asset be considered safe, owned, current, and usable enough for an agent-facing repository?" The command does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
 

@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Made the pre-1.0 compatibility boundary explicit without changing stable CLI
+  behavior or stable JSON output: scan JSON now uses an explicit wire
+  projection, supported TypeScript entrypoints have a checked declaration
+  snapshot, classification wire enums are documented and typed as open while
+  known-value helpers remain closed, typed diagnostic repair guidance is the
+  internal authority for legacy text projections, and asset path normalization
+  rejects every parent-directory segment without an unreachable normalization
+  branch.
+
 ## [0.35.0] - 2026-08-20
 
 ### Added

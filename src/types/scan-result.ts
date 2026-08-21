@@ -41,7 +41,24 @@ export interface ScanResult {
 }
 
 /** Public JSON document emitted by `formatJson()` and `scan --format json`. */
-export type ScanJsonDocument = Omit<ScanResult, "format"> & {
+export interface ScanJsonDocument {
   schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION;
+  root: string;
+  configPath?: string;
+  scanBoundary: EffectiveScanBoundaryEvidence;
+  inspectionCoverage: InspectionCoverage;
+  securityAnalysisCoverage: SecurityAnalysisCoverage;
+  scannedFileCount: number;
   format: "json";
-};
+  agentSkills: AgentSkillsValidationSummary;
+  contextLens?: ContextLensSummary;
+  executableSurfaceInventory?: ExecutableSurfaceInventory;
+  securityPolicyInventory?: SecurityPolicyInventorySummary;
+  trustGraph?: TrustGraph;
+  findings: Finding[];
+  suppressedFindings: SuppressedFindingEvidence[];
+  diagnostics: Diagnostic[];
+  diagnosticsV2: DiagnosticV2[];
+  reviewBundles: ReviewBundle[];
+  exitThreshold: Severity;
+}

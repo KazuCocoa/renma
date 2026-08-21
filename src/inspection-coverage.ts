@@ -18,6 +18,7 @@ import type {
 } from "./static-support.js";
 import type { Artifact } from "./types/artifact.js";
 import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/known-classification.js";
 import type { ScanConfig } from "./types/configuration.js";
 
 export const INSPECTION_COVERAGE_SCHEMA_VERSION =
@@ -115,7 +116,7 @@ export interface InspectionCoverageDiff {
 }
 
 const EXPECTED_AGENT_FACING_RULES = new Set<
-  AssetClassificationEvidence["matchedRule"]
+  KnownAssetClassificationEvidence["matchedRule"]
 >(["skill-entrypoint", "context-root", "lens-root", "agent-root"]);
 
 const BLOCKING_STATES = new Set<RepositoryPathState>([

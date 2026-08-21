@@ -76,6 +76,7 @@ if (finalize) {
 const commands = [
   ["npm", ["test"]],
   ["npm", ["run", "build"]],
+  ["npm", ["run", "verify:api"]],
   ["node", ["dist/index.js", "scan", ".", "--fail-on", "high", "--strict"]],
   ["node", ["dist/index.js", "catalog", ".", "--format", "markdown"]],
   ["node", ["dist/index.js", "readiness", ".", "--format", "markdown"]],
@@ -652,7 +653,7 @@ function releaseSummary(sections) {
 }
 
 function releaseValidationCommands(baseTag, target) {
-  const commands = ["npm test", "npm run build"];
+  const commands = ["npm test", "npm run build", "npm run verify:api"];
   commands.push("node dist/index.js scan . --fail-on high --strict");
   commands.push("node dist/index.js catalog . --format markdown");
   commands.push("node dist/index.js readiness . --format markdown");

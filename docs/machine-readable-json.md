@@ -72,7 +72,16 @@ For scan consumers, the public TypeScript `ScanJsonDocument` models the wire
 shape with literal `schemaVersion: "renma.scan.v1"` and `format: "json"`.
 Renma's pre-serialization core scan model has no supported public library
 producer and remains internal; `formatJson()` remains the authoritative
-serializer.
+serializer. Its dedicated `toScanJsonDocument()` projection explicitly selects
+every supported top-level field; it never spreads the internal `ScanResult`
+model into the wire document.
+
+Classification `matchedRule` and `reasonCode` values are open enums in JSON and
+in the public TypeScript wire types. Consumers must retain unfamiliar future
+strings and fail closed. The exported `KnownAssetClassificationRule` and
+`KnownAssetClassificationReasonCode` helpers describe only values known to the
+current Renma version and are appropriate for exhaustive handling followed by
+an unknown-value fallback.
 
 ## Compatibility during 1.x
 

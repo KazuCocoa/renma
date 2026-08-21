@@ -117,8 +117,8 @@ For full release preparation:
    - バージョンフィールド、changelog のセクションとリンク、リリースノート、影響を受けるドキュメント、および保守対象の 2 つの正確なコンシューマー向け固定値を編集します。`--save-dev`、`--save-exact`、`npm ci`、`npx --no-install` を維持し、バージョンを変動範囲に置き換えません。
 4. Run `node tools/release-prep.mjs --release-notes --version <version>` to generate the GitHub Release body from `CHANGELOG.md`. Add `--from <tag>` or `--to <ref>` when generating notes for an older tag or a non-default comparison range.
    - `node tools/release-prep.mjs --release-notes --version <version>` を実行し、`CHANGELOG.md` から GitHub Release の本文を生成します。過去のタグまたはデフォルト以外の比較範囲からノートを生成する場合は、`--from <tag>` または `--to <ref>` を追加します。
-5. Run `node tools/release-prep.mjs` to execute tests, build, Renma scan/catalog/readiness/graph, diff, and CI report.
-   - `node tools/release-prep.mjs` を実行し、テスト、ビルド、Renma の scan、catalog、readiness、graph、diff、および CI report を実行します。
+5. Run `node tools/release-prep.mjs` to execute tests, build, the public TypeScript API snapshot check, Renma scan/catalog/readiness/graph, diff, and CI report.
+   - `node tools/release-prep.mjs` を実行し、テスト、ビルド、公開 TypeScript API スナップショット確認、Renma の scan、catalog、readiness、graph、diff、および CI report を実行します。
 6. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files—including both maintained pin-bearing consumer examples—and create the local version commit and annotated tag.
    - 依頼された場合は、`node tools/release-prep.mjs --finalize` を実行し、保守対象のバージョン固定を含む 2 つのコンシューマー例を含め、意図したリリースファイルだけをステージして、ローカルのバージョンコミットと注釈付きタグを作成します。
 7. Hand off changed artifacts, generated release notes, validation results, blockers, residual risks, commit hash, and tag name.

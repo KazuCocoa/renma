@@ -4,7 +4,7 @@ import { lstatSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Artifact, ArtifactKind } from "./types/artifact.js";
-import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/known-classification.js";
 import type { Diagnostic } from "./types/diagnostics.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { RepositoryPathState } from "./repository-paths.js";
@@ -237,7 +237,12 @@ export function normalizeRepositorySkillRelativePath(
   return normalizedRootEndIndex === rootEndIndex ? normalized : undefined;
 }
 
-/** Normalize any repository-relative path without permitting root traversal. */
+/**
+ * Normalize a repository-relative asset path.
+ *
+ * All parent-directory (`..`) segments are rejected rather than resolved,
+ * including segments that would remain inside the repository.
+ */
 export function normalizeAssetRepositoryRelativePath(
   filePath: string,
 ): string | undefined {
@@ -247,11 +252,6 @@ export function normalizeAssetRepositoryRelativePath(
   const resolved: string[] = [];
   for (const segment of normalizedSeparators.split("/")) {
     if (!segment || segment === ".") continue;
-    if (segment === "..") {
-      if (resolved.length === 0) return undefined;
-      resolved.pop();
-      continue;
-    }
     resolved.push(segment);
   }
   return resolved.length > 0 ? resolved.join("/") : undefined;
@@ -350,7 +350,7 @@ export function repositoryClassificationPath(
 export function classifyAssetPath(
   relativePath: string,
   options: { metadataType?: string } = {},
-): AssetClassificationEvidence {
+): KnownAssetClassificationEvidence {
   const currentPath = normalizeAssetRepositoryRelativePath(relativePath);
   if (!currentPath) {
     return classification(
@@ -461,7 +461,7 @@ export function classifyAssetPath(
     );
     const kind =
       options.metadataType === "context_lens" ? "context_lens" : "context";
-    const result: AssetClassificationEvidence = {
+    const result: KnownAssetClassificationEvidence = {
       ...classification(
         kind,
         "independent",
@@ -572,11 +572,11 @@ export function classifyAssetPath(
 
 function classification(
   kind: ArtifactKind,
-  scope: AssetClassificationEvidence["scope"],
-  matchedRule: AssetClassificationEvidence["matchedRule"],
-  reasonCode: AssetClassificationEvidence["reasonCode"],
+  scope: KnownAssetClassificationEvidence["scope"],
+  matchedRule: KnownAssetClassificationEvidence["matchedRule"],
+  reasonCode: KnownAssetClassificationEvidence["reasonCode"],
   reason: string,
-): AssetClassificationEvidence {
+): KnownAssetClassificationEvidence {
   return { kind, scope, matchedRule, reasonCode, reason };
 }
 

@@ -78,9 +78,13 @@ export interface Finding {
   evidence: Evidence;
   whyItMatters: string;
   remediation: string;
+  /** Legacy compatibility projection of `repairConstraints[].text`. */
   constraints?: string[];
+  /** Canonical typed repair guardrails used by Renma internally. */
   repairConstraints?: RepairConstraint[];
+  /** Legacy compatibility projection of `verificationStepsV2[].text`. */
   verificationSteps?: string[];
+  /** Canonical typed verification semantics used by Renma internally. */
   verificationStepsV2?: VerificationStep[];
   llmHint?: string;
   details?: Record<string, unknown>;

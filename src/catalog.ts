@@ -23,7 +23,7 @@ import {
 import { parseAssetMetadata } from "./metadata.js";
 import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
-import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/known-classification.js";
 import type { AssetOwnership } from "./types/governance.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -112,10 +112,10 @@ export function resolveSkillSupportParent(
 
 /** Attach resolved parent evidence without changing structural classification. */
 export function withResolvedSkillParent(
-  classification: AssetClassificationEvidence,
+  classification: KnownAssetClassificationEvidence,
   relativePath: string,
   skillParents: SkillParentIndex,
-): AssetClassificationEvidence {
+): KnownAssetClassificationEvidence {
   const resolution = resolveSkillSupportParent(relativePath, skillParents);
   if (resolution.state === "not-applicable") return classification;
   if (resolution.state === "resolved") {

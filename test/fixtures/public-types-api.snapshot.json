@@ -1,0 +1,902 @@
+{
+  "version": 2,
+  "entrypoints": {
+    "renma/types": {
+      "ASSET_CLASSIFICATION_REASON_CODES": "types/classification.d.ts#ASSET_CLASSIFICATION_REASON_CODES",
+      "ASSET_CLASSIFICATION_RULES": "types/classification.d.ts#ASSET_CLASSIFICATION_RULES",
+      "ArtifactKind": "types/artifact.d.ts#ArtifactKind",
+      "AssetClassificationEvidence": "types/classification.d.ts#AssetClassificationEvidence",
+      "AssetClassificationReasonCode": "types/classification.d.ts#AssetClassificationReasonCode",
+      "AssetClassificationRule": "types/classification.d.ts#AssetClassificationRule",
+      "AssetCompetingRuleEvidence": "types/classification.d.ts#AssetCompetingRuleEvidence",
+      "AssetScope": "types/classification.d.ts#AssetScope",
+      "Diagnostic": "types/diagnostics.d.ts#Diagnostic",
+      "DiagnosticLocation": "types/diagnostics.d.ts#DiagnosticLocation",
+      "DiagnosticV2": "types/diagnostics.d.ts#DiagnosticV2",
+      "Evidence": "types/diagnostics.d.ts#Evidence",
+      "Finding": "types/diagnostics.d.ts#Finding",
+      "KnownAssetClassificationReasonCode": "types/classification.d.ts#KnownAssetClassificationReasonCode",
+      "KnownAssetClassificationRule": "types/classification.d.ts#KnownAssetClassificationRule",
+      "ParentAssetResolution": "types/classification.d.ts#ParentAssetResolution",
+      "RepairConstraint": "types/diagnostics.d.ts#RepairConstraint",
+      "ReviewBundle": "types/diagnostics.d.ts#ReviewBundle",
+      "RiskClass": "types/diagnostics.d.ts#RiskClass",
+      "SCAN_JSON_SCHEMA_VERSION": "types/scan-result.d.ts#SCAN_JSON_SCHEMA_VERSION",
+      "SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION": "types/security-analysis-coverage.d.ts#SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION",
+      "ScanJsonDocument": "types/scan-result.d.ts#ScanJsonDocument",
+      "SecurityAnalysisCoverage": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverage",
+      "SecurityAnalysisCoverageAnalyses": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageAnalyses",
+      "SecurityAnalysisCoverageArtifact": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageArtifact",
+      "SecurityAnalysisCoverageState": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageState",
+      "SecurityAnalysisCoverageSurfaceCounts": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageSurfaceCounts",
+      "Severity": "types/diagnostics.d.ts#Severity",
+      "SuppressedFindingEvidence": "types/diagnostics.d.ts#SuppressedFindingEvidence",
+      "SuppressionConfig": "types/diagnostics.d.ts#SuppressionConfig",
+      "SuppressionExpiration": "types/diagnostics.d.ts#SuppressionExpiration",
+      "VerificationStep": "types/diagnostics.d.ts#VerificationStep"
+    },
+    "renma/types/classification": {
+      "ASSET_CLASSIFICATION_REASON_CODES": "types/classification.d.ts#ASSET_CLASSIFICATION_REASON_CODES",
+      "ASSET_CLASSIFICATION_RULES": "types/classification.d.ts#ASSET_CLASSIFICATION_RULES",
+      "AssetClassificationEvidence": "types/classification.d.ts#AssetClassificationEvidence",
+      "AssetClassificationReasonCode": "types/classification.d.ts#AssetClassificationReasonCode",
+      "AssetClassificationRule": "types/classification.d.ts#AssetClassificationRule",
+      "AssetCompetingRuleEvidence": "types/classification.d.ts#AssetCompetingRuleEvidence",
+      "AssetScope": "types/classification.d.ts#AssetScope",
+      "KnownAssetClassificationReasonCode": "types/classification.d.ts#KnownAssetClassificationReasonCode",
+      "KnownAssetClassificationRule": "types/classification.d.ts#KnownAssetClassificationRule",
+      "ParentAssetResolution": "types/classification.d.ts#ParentAssetResolution"
+    },
+    "renma/types/diagnostics": {
+      "Diagnostic": "types/diagnostics.d.ts#Diagnostic",
+      "DiagnosticLocation": "types/diagnostics.d.ts#DiagnosticLocation",
+      "DiagnosticV2": "types/diagnostics.d.ts#DiagnosticV2",
+      "Evidence": "types/diagnostics.d.ts#Evidence",
+      "Finding": "types/diagnostics.d.ts#Finding",
+      "RepairConstraint": "types/diagnostics.d.ts#RepairConstraint",
+      "ReviewBundle": "types/diagnostics.d.ts#ReviewBundle",
+      "RiskClass": "types/diagnostics.d.ts#RiskClass",
+      "Severity": "types/diagnostics.d.ts#Severity",
+      "SuppressedFindingEvidence": "types/diagnostics.d.ts#SuppressedFindingEvidence",
+      "SuppressionConfig": "types/diagnostics.d.ts#SuppressionConfig",
+      "SuppressionExpiration": "types/diagnostics.d.ts#SuppressionExpiration",
+      "VerificationStep": "types/diagnostics.d.ts#VerificationStep"
+    },
+    "renma/types/scan-result": {
+      "SCAN_JSON_SCHEMA_VERSION": "types/scan-result.d.ts#SCAN_JSON_SCHEMA_VERSION",
+      "ScanJsonDocument": "types/scan-result.d.ts#ScanJsonDocument"
+    },
+    "renma/discovery": {
+      "CanonicalSkillEntrypointPath": "skill-path-contract.d.ts#CanonicalSkillEntrypointPath",
+      "RESERVED_SKILL_SUPPORT_DIRS": "skill-path-contract.d.ts#RESERVED_SKILL_SUPPORT_DIRS",
+      "RepositorySkillPath": "discovery.d.ts#RepositorySkillPath",
+      "ReservedSkillSupportDirectory": "skill-path-contract.d.ts#ReservedSkillSupportDirectory",
+      "SKILL_ROOTS": "skill-path-contract.d.ts#SKILL_ROOTS",
+      "SKILL_SUPPORT_DISCOVERY_MODE": "skill-path-contract.d.ts#SKILL_SUPPORT_DISCOVERY_MODE",
+      "SkillRoot": "skill-path-contract.d.ts#SkillRoot",
+      "classifyAssetPath": "public-discovery.d.ts#classifyAssetPath",
+      "classifyRepositorySkillEntrypointPath": "discovery.d.ts#classifyRepositorySkillEntrypointPath",
+      "classifyRepositorySkillPath": "discovery.d.ts#classifyRepositorySkillPath",
+      "logicalSkillDirectory": "discovery.d.ts#logicalSkillDirectory",
+      "normalizeAssetRepositoryRelativePath": "discovery.d.ts#normalizeAssetRepositoryRelativePath",
+      "normalizeRepositorySkillRelativePath": "discovery.d.ts#normalizeRepositorySkillRelativePath"
+    }
+  },
+  "declarations": {
+    "agent-skills.d.ts#AgentSkillFormat": {
+      "declarations": [
+        "export type AgentSkillFormat = \"agent-skills\" | \"renma-legacy\" | \"hybrid\" | \"unknown\";"
+      ],
+      "references": []
+    },
+    "agent-skills.d.ts#AgentSkillMigrationCommand": {
+      "declarations": [
+        "export type AgentSkillMigrationCommand = CommandInvocation<[ \"suggest-metadata\", string ]>;"
+      ],
+      "references": ["types/decision.d.ts#CommandInvocation"]
+    },
+    "agent-skills.d.ts#AgentSkillValidationIssue": {
+      "declarations": [
+        "export interface AgentSkillValidationIssue { code: AgentSkillDiagnosticId; severity: \"error\" | \"warning\"; category: \"specification\" | \"renma-authoring\"; path: string; startLine: number; endLine: number; message: string; field?: string; details?: Record<string, unknown>; }"
+      ],
+      "references": ["diagnostic-ids.d.ts#AgentSkillDiagnosticId"]
+    },
+    "agent-skills.d.ts#AgentSkillValidationResult": {
+      "declarations": [
+        "export interface AgentSkillValidationResult { path: string; format: AgentSkillFormat; valid: boolean; name?: string; description?: string; migrationRecommended: boolean; migrationDirection?: \"legacy-to-agent-skills\"; migrationCommand?: AgentSkillMigrationCommand; legacyFields: string[]; canonicalRenmaFields: string[]; errorCount: number; warningCount: number; issues: AgentSkillValidationIssue[]; }"
+      ],
+      "references": [
+        "agent-skills.d.ts#AgentSkillFormat",
+        "agent-skills.d.ts#AgentSkillMigrationCommand",
+        "agent-skills.d.ts#AgentSkillValidationIssue"
+      ]
+    },
+    "agent-skills.d.ts#AgentSkillsValidationSummary": {
+      "declarations": [
+        "export interface AgentSkillsValidationSummary { specification: string; profile: string; totalSkillCount: number; validSkillCount: number; invalidSkillCount: number; canonicalSkillCount: number; legacySkillCount: number; hybridSkillCount: number; warningCount: number; results: AgentSkillValidationResult[]; }"
+      ],
+      "references": ["agent-skills.d.ts#AgentSkillValidationResult"]
+    },
+    "context-lens.d.ts#ContextLensDiagnosticCounts": {
+      "declarations": [
+        "export interface ContextLensDiagnosticCounts { error: number; warning: number; info: number; }"
+      ],
+      "references": []
+    },
+    "context-lens.d.ts#ContextLensItemSummary": {
+      "declarations": [
+        "export interface ContextLensItemSummary { id: string; path: string; valid: boolean; scope: string; targets: string[]; targetPaths: string[]; diagnosticCounts: ContextLensDiagnosticCounts; diagnosticCodes: string[]; }"
+      ],
+      "references": ["context-lens.d.ts#ContextLensDiagnosticCounts"]
+    },
+    "context-lens.d.ts#ContextLensSummary": {
+      "declarations": [
+        "export interface ContextLensSummary { enabled: boolean; detected: boolean; totalLensCount: number; validLensCount: number; invalidLensCount: number; diagnosticCounts: ContextLensDiagnosticCounts; representativeDiagnosticCode?: string; definitionPaths: string[]; targetReferences: string[]; targetPaths: string[]; unresolvedTargetReferences: string[]; scopeSummary: Array<{ scope: string; count: number; }>; lenses: ContextLensItemSummary[]; }"
+      ],
+      "references": [
+        "context-lens.d.ts#ContextLensDiagnosticCounts",
+        "context-lens.d.ts#ContextLensItemSummary"
+      ]
+    },
+    "diagnostic-ids.d.ts#AGENT_SKILL_DIAGNOSTIC_IDS": {
+      "declarations": [
+        "AGENT_SKILL_DIAGNOSTIC_IDS: { readonly AS_NONCANONICAL_FILENAME: \"AS-SKILL-NONCANONICAL-FILENAME\"; readonly AS_MISSING_FRONTMATTER: \"AS-SKILL-MISSING-FRONTMATTER\"; readonly AS_UNCLOSED_FRONTMATTER: \"AS-SKILL-UNCLOSED-FRONTMATTER\"; readonly AS_INVALID_YAML: \"AS-SKILL-INVALID-YAML\"; readonly AS_FRONTMATTER_NOT_MAPPING: \"AS-SKILL-FRONTMATTER-NOT-MAPPING\"; readonly AS_DUPLICATE_FIELD: \"AS-SKILL-DUPLICATE-FIELD\"; readonly AS_DUPLICATE_METADATA_KEY: \"AS-SKILL-DUPLICATE-METADATA-KEY\"; readonly AS_UNEXPECTED_TOP_LEVEL_FIELD: \"AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD\"; readonly AS_MISSING_NAME: \"AS-SKILL-MISSING-NAME\"; readonly AS_INVALID_NAME: \"AS-SKILL-INVALID-NAME\"; readonly AS_NAME_DIRECTORY_MISMATCH: \"AS-SKILL-NAME-DIRECTORY-MISMATCH\"; readonly AS_MISSING_DESCRIPTION: \"AS-SKILL-MISSING-DESCRIPTION\"; readonly AS_INVALID_DESCRIPTION: \"AS-SKILL-INVALID-DESCRIPTION\"; readonly AS_DESCRIPTION_TOO_LONG: \"AS-SKILL-DESCRIPTION-TOO-LONG\"; readonly AS_INVALID_COMPATIBILITY: \"AS-SKILL-INVALID-COMPATIBILITY\"; readonly AS_COMPATIBILITY_TOO_LONG: \"AS-SKILL-COMPATIBILITY-TOO-LONG\"; readonly AS_INVALID_LICENSE: \"AS-SKILL-INVALID-LICENSE\"; readonly AS_INVALID_ALLOWED_TOOLS: \"AS-SKILL-INVALID-ALLOWED-TOOLS\"; readonly AS_INVALID_METADATA: \"AS-SKILL-INVALID-METADATA\"; readonly RN_UNSUPPORTED_ROUTING_METADATA: \"RN-SKILL-UNSUPPORTED-ROUTING-METADATA\"; readonly RN_DESCRIPTION_MISSING_USAGE_BOUNDARY: \"RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY\"; readonly RN_DESCRIPTION_MISSING_CAPABILITY: \"RN-SKILL-DESCRIPTION-MISSING-CAPABILITY\"; readonly RN_DESCRIPTION_OMITS_SELECTION_BOUNDARY: \"RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY\"; readonly RN_EXECUTION_CONSTRAINT_NOT_PROMINENT: \"RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT\"; readonly RN_EXECUTION_CONSTRAINT_SCATTERED: \"RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED\"; readonly RN_EXECUTION_CONSTRAINT_MISSING_ALTERNATIVE: \"RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE\"; }"
+      ],
+      "references": []
+    },
+    "diagnostic-ids.d.ts#AgentSkillDiagnosticId": {
+      "declarations": [
+        "export type AgentSkillDiagnosticId = (typeof AGENT_SKILL_DIAGNOSTIC_IDS)[keyof typeof AGENT_SKILL_DIAGNOSTIC_IDS];"
+      ],
+      "references": ["diagnostic-ids.d.ts#AGENT_SKILL_DIAGNOSTIC_IDS"]
+    },
+    "discovery.d.ts#RepositorySkillPath": {
+      "declarations": [
+        "export type RepositorySkillPath = { kind: \"entrypoint\"; currentPath: string; root: SkillRoot; skillDirectory: string; skillName: string; domainPath: string[]; relativeToSkillDirectory: string; entrypoint: CanonicalSkillEntrypointPath; } | { kind: \"support\"; currentPath: string; root: SkillRoot; skillDirectory: string; skillName: string; domainPath: string[]; relativeToSkillDirectory: string; supportDirectory: ReservedSkillSupportDirectory; } | { kind: \"reserved-root\"; currentPath: string; root: SkillRoot; supportDirectory: ReservedSkillSupportDirectory; };"
+      ],
+      "references": [
+        "skill-path-contract.d.ts#CanonicalSkillEntrypointPath",
+        "skill-path-contract.d.ts#ReservedSkillSupportDirectory",
+        "skill-path-contract.d.ts#SkillRoot"
+      ]
+    },
+    "discovery.d.ts#classifyRepositorySkillEntrypointPath": {
+      "declarations": [
+        "export declare function classifyRepositorySkillEntrypointPath(relativePath: string): CanonicalSkillEntrypointPath | undefined;"
+      ],
+      "references": ["skill-path-contract.d.ts#CanonicalSkillEntrypointPath"]
+    },
+    "discovery.d.ts#classifyRepositorySkillPath": {
+      "declarations": [
+        "export declare function classifyRepositorySkillPath(relativePath: string): RepositorySkillPath | undefined;"
+      ],
+      "references": ["discovery.d.ts#RepositorySkillPath"]
+    },
+    "discovery.d.ts#logicalSkillDirectory": {
+      "declarations": [
+        "export declare function logicalSkillDirectory(relativePath: string): string | undefined;"
+      ],
+      "references": []
+    },
+    "discovery.d.ts#normalizeAssetRepositoryRelativePath": {
+      "declarations": [
+        "export declare function normalizeAssetRepositoryRelativePath(filePath: string): string | undefined;"
+      ],
+      "references": []
+    },
+    "discovery.d.ts#normalizeRepositorySkillRelativePath": {
+      "declarations": [
+        "export declare function normalizeRepositorySkillRelativePath(filePath: string): string | undefined;"
+      ],
+      "references": []
+    },
+    "executable-dependency-analyzer.d.ts#BuiltInExecutableDependencyAnalyzerId": {
+      "declarations": [
+        "export type BuiltInExecutableDependencyAnalyzerId = \"js-ts\" | \"python\" | \"shell\" | \"powershell\" | \"batch\";"
+      ],
+      "references": []
+    },
+    "executable-dependency-analyzer.d.ts#ExecutableDependencyRelation": {
+      "declarations": [
+        "export type ExecutableDependencyRelation = \"static-execution\" | \"static-import\" | \"static-reexport\" | \"static-source\";"
+      ],
+      "references": []
+    },
+    "executable-dependency-resolution.d.ts#ExecutableSurfaceDependency": {
+      "declarations": [
+        "export interface ExecutableSurfaceDependency { analyzer: BuiltInExecutableDependencyAnalyzerId; sourcePath: string; line: number; snippet: string; relation: ExecutableDependencyRelation; rawSpecifier: string; normalizedTargetCandidates: string[]; normalizedTarget?: string; resolution: ExecutableSurfaceDependencyResolution; targetPathState?: RepositoryPathState; occurrenceOrdinal: number; }"
+      ],
+      "references": [
+        "executable-dependency-analyzer.d.ts#BuiltInExecutableDependencyAnalyzerId",
+        "executable-dependency-analyzer.d.ts#ExecutableDependencyRelation",
+        "executable-dependency-resolution.d.ts#ExecutableSurfaceDependencyResolution",
+        "repository-paths.d.ts#RepositoryPathState"
+      ]
+    },
+    "executable-dependency-resolution.d.ts#ExecutableSurfaceDependencyResolution": {
+      "declarations": [
+        "export type ExecutableSurfaceDependencyResolution = \"resolved\" | \"missing\" | \"unsafe\" | \"ambiguous\" | \"noncanonical\" | \"not-inventory\" | \"excluded\" | \"deep\" | \"oversize\" | \"unsupported\" | \"symlink\" | \"unreadable\";"
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#EXECUTABLE_SURFACE_INVENTORY_SCHEMA": {
+      "declarations": [
+        "EXECUTABLE_SURFACE_INVENTORY_SCHEMA: \"renma.executable-surface-inventory.v1\""
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#ExecutableInvocationGovernance": {
+      "declarations": [
+        "export interface ExecutableInvocationGovernance { owningSkillResolution: ExecutableInvocationOwningSkillResolution; policyEvidence: ExecutableInvocationPolicyEvidence[]; hasEffectivePolicyEvidence: boolean; distinctEffectivePolicyFingerprints: string[]; fingerprint: string; }"
+      ],
+      "references": [
+        "executable-surface-inventory.d.ts#ExecutableInvocationOwningSkillResolution",
+        "executable-surface-inventory.d.ts#ExecutableInvocationPolicyEvidence"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableInvocationOwningSkillResolution": {
+      "declarations": [
+        "export type ExecutableInvocationOwningSkillResolution = \"not-applicable\" | \"resolved\" | \"missing\" | \"ambiguous\";"
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#ExecutableInvocationPolicyEvidence": {
+      "declarations": [
+        "export interface ExecutableInvocationPolicyEvidence { relation: ExecutableInvocationPolicyRelation; path: string; hasEffectivePolicy: boolean; policySources: SecurityPolicySource[]; fingerprint?: string; }"
+      ],
+      "references": [
+        "executable-surface-inventory.d.ts#ExecutableInvocationPolicyRelation",
+        "security-policy-inventory.d.ts#SecurityPolicySource"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableInvocationPolicyRelation": {
+      "declarations": [
+        "export type ExecutableInvocationPolicyRelation = \"source-artifact\" | \"owning-skill\";"
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceDependencySummary": {
+      "declarations": [
+        "export interface ExecutableSurfaceDependencySummary { incomingResolvedDependencyCount: number; outgoingResolvedDependencyCount: number; staticInvocationReachability: StaticInvocationReachability; minimumInvocationDependencyDepth?: number; }"
+      ],
+      "references": [
+        "executable-surface-inventory.d.ts#StaticInvocationReachability"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceEntry": {
+      "declarations": [
+        "export interface ExecutableSurfaceEntry { path: string; scope: ExecutableSurfaceScope; origins: ExecutableSurfaceOrigin[]; artifactKind: ArtifactKind; contentClassification: \"text\" | \"binary\"; contentHash?: string; owningSkill?: { skillDirectory: string; entrypointPath?: string; }; interpreterHints: string[]; shebang?: string; reachableFromOwningSkill?: boolean; reachabilityDepth?: number; staticallyReferenced: boolean; staticallyInvoked: boolean; referenceCount: number; invocationCount: number; securityPolicy: ExecutableSurfaceSecurityPolicy; invocationGovernance: ExecutableSurfaceInvocationGovernanceSummary; dependencyEvidence: ExecutableSurfaceDependencySummary; fingerprint: string; }"
+      ],
+      "references": [
+        "executable-surface-inventory.d.ts#ExecutableSurfaceDependencySummary",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceInvocationGovernanceSummary",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceOrigin",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceScope",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceSecurityPolicy",
+        "types/artifact.d.ts#ArtifactKind"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceInventory": {
+      "declarations": [
+        "export interface ExecutableSurfaceInventory { schema: typeof EXECUTABLE_SURFACE_INVENTORY_SCHEMA; summary: ExecutableSurfaceInventorySummary; surfaces: ExecutableSurfaceEntry[]; invocations: ExecutableSurfaceInvocation[]; dependencies: ExecutableSurfaceDependency[]; }"
+      ],
+      "references": [
+        "executable-dependency-resolution.d.ts#ExecutableSurfaceDependency",
+        "executable-surface-inventory.d.ts#EXECUTABLE_SURFACE_INVENTORY_SCHEMA",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceEntry",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceInventorySummary",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceInvocation"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceInventorySummary": {
+      "declarations": [
+        "export interface ExecutableSurfaceInventorySummary { totalSurfaces: number; skillLocalSurfaces: number; repositoryToolSurfaces: number; noncanonicalSurfaces: number; textSurfaces: number; binarySurfaces: number; reachableSkillLocalSurfaces: number; unreachableSkillLocalSurfaces: number; referencedSurfaces: number; unreferencedSurfaces: number; invokedSurfaces: number; uninvokedSurfaces: number; surfacesWithEffectivePolicy: number; surfacesWithoutEffectivePolicy: number; totalInvocations: number; resolvedInvocations: number; missingInvocations: number; unsafeInvocations: number; unscopedInvocations: number; noncanonicalInvocations: number; unavailableInvocations: number; invocationsWithEffectivePolicyEvidence: number; invocationsWithoutEffectivePolicyEvidence: number; resolvedInvocationsWithEffectivePolicyEvidence: number; resolvedInvocationsWithoutEffectivePolicyEvidence: number; invocationsWithMultipleEffectivePolicyFingerprints: number; invocationPolicyEvidenceRelations: { sourceArtifact: number; owningSkill: number; }; totalDependencies: number; resolvedDependencies: number; missingDependencies: number; unsafeDependencies: number; ambiguousDependencies: number; noncanonicalDependencies: number; notInventoryDependencies: number; unavailableDependencies: number; surfacesWithIncomingDependencies: number; surfacesWithOutgoingDependencies: number; directlyInvokedSurfaces: number; transitivelyReachableSurfaces: number; unreachedFromInvocationSurfaces: number; dependencyAnalyzers: Array<{ analyzer: BuiltInExecutableDependencyAnalyzerId; count: number; }>; dependencyRelations: Array<{ relation: ExecutableDependencyRelation; count: number; }>; interpreterHints: Array<{ interpreter: string; count: number; }>; }"
+      ],
+      "references": [
+        "executable-dependency-analyzer.d.ts#BuiltInExecutableDependencyAnalyzerId",
+        "executable-dependency-analyzer.d.ts#ExecutableDependencyRelation"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceInvocation": {
+      "declarations": [
+        "export interface ExecutableSurfaceInvocation { sourcePath: string; line: number; snippet: string; launcher: HelperCommandLauncher; rawTarget: string; normalizedTarget?: string; sourceSkillDirectory?: string; resolution: HelperInvocationResolution; targetPathState?: RepositoryPathState; occurrenceOrdinal: number; governance: ExecutableInvocationGovernance; }"
+      ],
+      "references": [
+        "executable-surface-inventory.d.ts#ExecutableInvocationGovernance",
+        "helper-command-evidence.d.ts#HelperCommandLauncher",
+        "helper-command-evidence.d.ts#HelperInvocationResolution",
+        "repository-paths.d.ts#RepositoryPathState"
+      ]
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceInvocationGovernanceSummary": {
+      "declarations": [
+        "export interface ExecutableSurfaceInvocationGovernanceSummary { invocationsWithEffectivePolicyEvidence: number; invocationsWithoutEffectivePolicyEvidence: number; distinctEffectivePolicyFingerprints: string[]; }"
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceOrigin": {
+      "declarations": [
+        "export type ExecutableSurfaceOrigin = \"discovered-script\" | \"resolved-static-invocation\";"
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceScope": {
+      "declarations": [
+        "export type ExecutableSurfaceScope = \"skill-local\" | \"repository-tool\" | \"noncanonical\";"
+      ],
+      "references": []
+    },
+    "executable-surface-inventory.d.ts#ExecutableSurfaceSecurityPolicy": {
+      "declarations": [
+        "export interface ExecutableSurfaceSecurityPolicy { hasEffectivePolicy: boolean; policySources: SecurityPolicySource[]; fingerprint?: string; }"
+      ],
+      "references": ["security-policy-inventory.d.ts#SecurityPolicySource"]
+    },
+    "executable-surface-inventory.d.ts#StaticInvocationReachability": {
+      "declarations": [
+        "export type StaticInvocationReachability = \"direct\" | \"transitive\" | \"unreached\";"
+      ],
+      "references": []
+    },
+    "helper-command-evidence.d.ts#HELPER_COMMAND_LAUNCHERS": {
+      "declarations": [
+        "HELPER_COMMAND_LAUNCHERS: readonly [ \"node\", \"bash\", \"sh\", \"python\", \"python3\", \"pwsh\", \"pwsh.exe\", \"powershell\", \"powershell.exe\", \"cmd\", \"cmd.exe\" ]"
+      ],
+      "references": []
+    },
+    "helper-command-evidence.d.ts#HelperCommandLauncher": {
+      "declarations": [
+        "export type HelperCommandLauncher = (typeof HELPER_COMMAND_LAUNCHERS)[number];"
+      ],
+      "references": ["helper-command-evidence.d.ts#HELPER_COMMAND_LAUNCHERS"]
+    },
+    "helper-command-evidence.d.ts#HelperInvocationResolution": {
+      "declarations": [
+        "export type HelperInvocationResolution = \"resolved\" | \"missing\" | \"unsafe\" | \"unscoped\" | \"noncanonical\" | \"excluded\" | \"deep\" | \"oversize\" | \"unsupported\" | \"symlink\" | \"unreadable\";"
+      ],
+      "references": []
+    },
+    "inspection-coverage.d.ts#INSPECTION_COVERAGE_SCHEMA_VERSION": {
+      "declarations": [
+        "INSPECTION_COVERAGE_SCHEMA_VERSION: \"renma.inspection-coverage.v1\""
+      ],
+      "references": []
+    },
+    "inspection-coverage.d.ts#InspectionCoverage": {
+      "declarations": [
+        "export interface InspectionCoverage { schemaVersion: typeof INSPECTION_COVERAGE_SCHEMA_VERSION; expectedPathCount: number; inspectedPathCount: number; complete: boolean; inspectedPaths: string[]; blockingIssues: InspectionCoverageIssue[]; }"
+      ],
+      "references": [
+        "inspection-coverage.d.ts#INSPECTION_COVERAGE_SCHEMA_VERSION",
+        "inspection-coverage.d.ts#InspectionCoverageIssue"
+      ]
+    },
+    "inspection-coverage.d.ts#InspectionCoverageBoundary": {
+      "declarations": [
+        "export type InspectionCoverageBoundary = \"skills\" | \".agents/skills\" | \"contexts\" | \"context\" | \"lenses\" | \".agents\";"
+      ],
+      "references": []
+    },
+    "inspection-coverage.d.ts#InspectionCoverageIssue": {
+      "declarations": [
+        "export type InspectionCoverageIssue = InspectionCoveragePathEvidence & { state: Exclude<InspectionCoverageState, \"parsed\">; strictBlocking: true; };"
+      ],
+      "references": [
+        "inspection-coverage.d.ts#InspectionCoveragePathEvidence",
+        "inspection-coverage.d.ts#InspectionCoverageState"
+      ]
+    },
+    "inspection-coverage.d.ts#InspectionCoveragePathEvidence": {
+      "declarations": [
+        "export interface InspectionCoveragePathEvidence { path: string; state: InspectionCoverageState; scope: InspectionCoverageScope; affectedBoundary?: InspectionCoverageBoundary; reason: string; classification: AssetClassificationEvidence; strictBlocking: boolean; details?: StaticSupportInspectionDetails; }"
+      ],
+      "references": [
+        "inspection-coverage.d.ts#InspectionCoverageBoundary",
+        "inspection-coverage.d.ts#InspectionCoverageScope",
+        "inspection-coverage.d.ts#InspectionCoverageState",
+        "inspection-coverage.d.ts#StaticSupportInspectionDetails",
+        "types/classification.d.ts#AssetClassificationEvidence"
+      ]
+    },
+    "inspection-coverage.d.ts#InspectionCoverageScope": {
+      "declarations": [
+        "export type InspectionCoverageScope = \"exact\" | \"subtree\";"
+      ],
+      "references": []
+    },
+    "inspection-coverage.d.ts#InspectionCoverageState": {
+      "declarations": [
+        "export type InspectionCoverageState = \"parsed\" | \"excluded\" | \"symlink\" | \"unreadable\" | \"oversize\" | \"deep\" | \"unsupported\";"
+      ],
+      "references": []
+    },
+    "inspection-coverage.d.ts#StaticSupportInspectionDetails": {
+      "declarations": [
+        "export interface StaticSupportInspectionDetails { expectationSource: \"static-support-reference\"; owningSkillPath: string; sourcePath: string; sourceLine: number; reachabilityDepth: number; packageContentKind?: StaticSkillPackageContentKind; inspectionKind: SupportInspectionKind; scanBoundaryDisposition?: \"explicitly-excluded\"; }"
+      ],
+      "references": [
+        "inspection-coverage.d.ts#SupportInspectionKind",
+        "static-support.d.ts#StaticSkillPackageContentKind"
+      ]
+    },
+    "inspection-coverage.d.ts#SupportInspectionKind": {
+      "declarations": [
+        "export type SupportInspectionKind = \"semantic-plain-text\" | \"semantic-markdown\" | \"executable-surface\" | \"opaque-resource\" | \"repository-resource\";"
+      ],
+      "references": []
+    },
+    "public-discovery.d.ts#classifyAssetPath": {
+      "declarations": [
+        "export declare function classifyAssetPath(relativePath: string, options?: { metadataType?: string; }): AssetClassificationEvidence;"
+      ],
+      "references": ["types/classification.d.ts#AssetClassificationEvidence"]
+    },
+    "repository-paths.d.ts#RepositoryPathState": {
+      "declarations": [
+        "export type RepositoryPathState = \"parsed\" | \"excluded\" | \"oversize\" | \"deep\" | \"unsupported\" | \"symlink\" | \"unreadable\" | \"absent\";"
+      ],
+      "references": []
+    },
+    "scan-boundary.d.ts#CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION": {
+      "declarations": [
+        "CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION: \"renma.ci-evidence-boundary.v1\""
+      ],
+      "references": []
+    },
+    "scan-boundary.d.ts#CanonicalSuppressionEvidence": {
+      "declarations": [
+        "export interface CanonicalSuppressionEvidence { id: string; paths: string[]; reason: string; expires: SuppressionExpiration; }"
+      ],
+      "references": ["types/diagnostics.d.ts#SuppressionExpiration"]
+    },
+    "scan-boundary.d.ts#EffectiveCiScanBoundaryEvidence": {
+      "declarations": [
+        "export interface EffectiveCiScanBoundaryEvidence { schemaVersion: typeof CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION; coverageModel: \"target_path_endpoint_coverage_union\"; configPath: null; globs: string[]; exclude: string[]; maxFileSizeBytes: number; maxDepth: number; activeSuppressions: CanonicalSuppressionEvidence[]; sourceBoundaries: ScanBoundaryEvidence[]; inspectedPaths: string[]; }"
+      ],
+      "references": [
+        "scan-boundary.d.ts#CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION",
+        "scan-boundary.d.ts#CanonicalSuppressionEvidence",
+        "scan-boundary.d.ts#ScanBoundaryEvidence"
+      ]
+    },
+    "scan-boundary.d.ts#EffectiveScanBoundaryEvidence": {
+      "declarations": [
+        "export type EffectiveScanBoundaryEvidence = ScanBoundaryEvidence | EffectiveCiScanBoundaryEvidence;"
+      ],
+      "references": [
+        "scan-boundary.d.ts#EffectiveCiScanBoundaryEvidence",
+        "scan-boundary.d.ts#ScanBoundaryEvidence"
+      ]
+    },
+    "scan-boundary.d.ts#SCAN_BOUNDARY_SCHEMA_VERSION": {
+      "declarations": [
+        "SCAN_BOUNDARY_SCHEMA_VERSION: \"renma.scan-boundary.v1\""
+      ],
+      "references": []
+    },
+    "scan-boundary.d.ts#ScanBoundaryEvidence": {
+      "declarations": [
+        "export interface ScanBoundaryEvidence { schemaVersion: typeof SCAN_BOUNDARY_SCHEMA_VERSION; configPath: string | null; globs: string[]; exclude: string[]; maxFileSizeBytes: number; maxDepth: number; activeSuppressions: CanonicalSuppressionEvidence[]; }"
+      ],
+      "references": [
+        "scan-boundary.d.ts#CanonicalSuppressionEvidence",
+        "scan-boundary.d.ts#SCAN_BOUNDARY_SCHEMA_VERSION"
+      ]
+    },
+    "security-policy-inventory.d.ts#ExternalUploadGovernanceCounts": {
+      "declarations": [
+        "export interface ExternalUploadGovernanceCounts { denied: number; allowedApprovalRequired: number; allowedNoApprovalRequired: number; allowedApprovalUnspecified: number; unspecified: number; }"
+      ],
+      "references": []
+    },
+    "security-policy-inventory.d.ts#InventoryArtifactKind": {
+      "declarations": ["type InventoryArtifactKind = ArtifactKind;"],
+      "references": ["types/artifact.d.ts#ArtifactKind"]
+    },
+    "security-policy-inventory.d.ts#PolicyBooleanCounts": {
+      "declarations": [
+        "export interface PolicyBooleanCounts { true: number; false: number; unspecified: number; }"
+      ],
+      "references": []
+    },
+    "security-policy-inventory.d.ts#SecurityPolicyInventorySummary": {
+      "declarations": [
+        "export interface SecurityPolicyInventorySummary { totalPolicyAssets: number; assetsWithLocalPolicyMetadata: number; assetsWithInheritedPolicy: number; assetsWithEffectivePolicy: number; assetsWithoutEffectivePolicy: number; policySources: Record<SecurityPolicySource, number>; assetKinds: Record<InventoryArtifactKind, number>; networkAllowed: PolicyBooleanCounts; externalUploadAllowed: PolicyBooleanCounts; externalUploadGovernance: ExternalUploadGovernanceCounts; secretsAllowed: PolicyBooleanCounts; humanApprovalRequired: PolicyBooleanCounts; approvedNetworkDestinationCount: number; approvedUploadDestinationCount: number; forbiddenInputCount: number; disallowedCommandCount: number; securityProfiles: { referenced: number; resolved: number; missing: number; cyclic: number; none: number; names: Array<{ name: string; count: number; }>; }; topApprovedNetworkDestinations: Array<{ destination: string; count: number; }>; topApprovedUploadDestinations: Array<{ destination: string; count: number; }>; topForbiddenInputs: Array<{ input: string; count: number; }>; assetsWithoutEffectivePolicyList: Array<{ path: string; kind: ArtifactKind; }>; }"
+      ],
+      "references": [
+        "security-policy-inventory.d.ts#ExternalUploadGovernanceCounts",
+        "security-policy-inventory.d.ts#InventoryArtifactKind",
+        "security-policy-inventory.d.ts#PolicyBooleanCounts",
+        "security-policy-inventory.d.ts#SecurityPolicySource",
+        "types/artifact.d.ts#ArtifactKind"
+      ]
+    },
+    "security-policy-inventory.d.ts#SecurityPolicySource": {
+      "declarations": [
+        "export type SecurityPolicySource = \"local\" | \"security_profile\" | \"repository_config\" | \"owning_skill\";"
+      ],
+      "references": []
+    },
+    "skill-path-contract.d.ts#CanonicalSkillEntrypointPath": {
+      "declarations": [
+        "export interface CanonicalSkillEntrypointPath { kind: \"canonical\"; currentPath: string; candidateName: string; }"
+      ],
+      "references": []
+    },
+    "skill-path-contract.d.ts#RESERVED_SKILL_SUPPORT_DIRS": {
+      "declarations": [
+        "RESERVED_SKILL_SUPPORT_DIRS: readonly [ \"assets\", \"examples\", \"profiles\", \"references\", \"scripts\" ]"
+      ],
+      "references": []
+    },
+    "skill-path-contract.d.ts#ReservedSkillSupportDirectory": {
+      "declarations": [
+        "export type ReservedSkillSupportDirectory = (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];"
+      ],
+      "references": ["skill-path-contract.d.ts#RESERVED_SKILL_SUPPORT_DIRS"]
+    },
+    "skill-path-contract.d.ts#SKILL_ROOTS": {
+      "declarations": [
+        "SKILL_ROOTS: readonly [ \"skills\", \".agents/skills\" ]"
+      ],
+      "references": []
+    },
+    "skill-path-contract.d.ts#SKILL_SUPPORT_DISCOVERY_MODE": {
+      "declarations": [
+        "SKILL_SUPPORT_DISCOVERY_MODE: { readonly assets: \"all-files\"; readonly examples: \"markdown\"; readonly profiles: \"markdown\"; readonly references: \"all-files\"; readonly scripts: \"all-files\"; }"
+      ],
+      "references": []
+    },
+    "skill-path-contract.d.ts#SkillRoot": {
+      "declarations": ["export type SkillRoot = (typeof SKILL_ROOTS)[number];"],
+      "references": ["skill-path-contract.d.ts#SKILL_ROOTS"]
+    },
+    "static-support.d.ts#StaticSkillPackageContentKind": {
+      "declarations": [
+        "export type StaticSkillPackageContentKind = \"canonical-support\" | \"explicit-noncanonical\";"
+      ],
+      "references": []
+    },
+    "trust-graph.d.ts#TRUST_GRAPH_SCHEMA_VERSION": {
+      "declarations": ["TRUST_GRAPH_SCHEMA_VERSION: \"renma.trustGraph.v2\""],
+      "references": []
+    },
+    "trust-graph.d.ts#TrustGraph": {
+      "declarations": [
+        "export interface TrustGraph { schemaVersion: TrustGraphSchemaVersion; summary: TrustGraphSummary; nodes: TrustGraphNode[]; edges: TrustGraphEdge[]; findings: TrustGraphFinding[]; }"
+      ],
+      "references": [
+        "trust-graph.d.ts#TrustGraphEdge",
+        "trust-graph.d.ts#TrustGraphFinding",
+        "trust-graph.d.ts#TrustGraphNode",
+        "trust-graph.d.ts#TrustGraphSchemaVersion",
+        "trust-graph.d.ts#TrustGraphSummary"
+      ]
+    },
+    "trust-graph.d.ts#TrustGraphEdge": {
+      "declarations": [
+        "export interface TrustGraphEdge { id: string; from: string; to: string; type: TrustGraphEdgeType; properties?: Record<string, unknown>; evidence?: Evidence[]; }"
+      ],
+      "references": [
+        "trust-graph.d.ts#TrustGraphEdgeType",
+        "types/diagnostics.d.ts#Evidence"
+      ]
+    },
+    "trust-graph.d.ts#TrustGraphEdgeType": {
+      "declarations": [
+        "export type TrustGraphEdgeType = \"owned_by\" | \"has_lifecycle_status\" | \"declares_dependency\" | \"references\" | \"owns_local_resource\" | \"statically_references\" | \"inherits_owner\" | \"selects_security_profile\" | \"inherits_policy\" | \"has_effective_policy\" | \"has_diagnostic\";"
+      ],
+      "references": []
+    },
+    "trust-graph.d.ts#TrustGraphFinding": {
+      "declarations": [
+        "export interface TrustGraphFinding { source: TrustGraphFindingSource; severity: TrustGraphFindingSeverity; message: string; path?: string; code?: string; id?: string; title?: string; riskClass?: RiskClass; evidence?: Evidence; }"
+      ],
+      "references": [
+        "trust-graph.d.ts#TrustGraphFindingSeverity",
+        "trust-graph.d.ts#TrustGraphFindingSource",
+        "types/diagnostics.d.ts#Evidence",
+        "types/diagnostics.d.ts#RiskClass"
+      ]
+    },
+    "trust-graph.d.ts#TrustGraphFindingSeverity": {
+      "declarations": [
+        "export type TrustGraphFindingSeverity = Finding[\"severity\"] | Diagnostic[\"severity\"];"
+      ],
+      "references": [
+        "types/diagnostics.d.ts#Diagnostic",
+        "types/diagnostics.d.ts#Finding"
+      ]
+    },
+    "trust-graph.d.ts#TrustGraphFindingSource": {
+      "declarations": [
+        "export type TrustGraphFindingSource = \"finding\" | \"diagnostic\";"
+      ],
+      "references": []
+    },
+    "trust-graph.d.ts#TrustGraphNode": {
+      "declarations": [
+        "export interface TrustGraphNode { id: string; type: TrustGraphNodeType; label: string; properties?: Record<string, unknown>; evidence?: Evidence[]; }"
+      ],
+      "references": [
+        "trust-graph.d.ts#TrustGraphNodeType",
+        "types/diagnostics.d.ts#Evidence"
+      ]
+    },
+    "trust-graph.d.ts#TrustGraphNodeType": {
+      "declarations": [
+        "export type TrustGraphNodeType = \"asset\" | \"owner\" | \"lifecycle_status\" | \"security_profile\" | \"effective_policy\" | \"diagnostic\";"
+      ],
+      "references": []
+    },
+    "trust-graph.d.ts#TrustGraphSchemaVersion": {
+      "declarations": [
+        "export type TrustGraphSchemaVersion = typeof TRUST_GRAPH_SCHEMA_VERSION;"
+      ],
+      "references": ["trust-graph.d.ts#TRUST_GRAPH_SCHEMA_VERSION"]
+    },
+    "trust-graph.d.ts#TrustGraphSummary": {
+      "declarations": [
+        "export interface TrustGraphSummary { assetCount: number; nodeCount: number; edgeCount: number; findingCount: number; nodeTypeCounts: Record<TrustGraphNodeType, number>; edgeTypeCounts: Record<TrustGraphEdgeType, number>; findingSeverityCounts: Record<TrustGraphFindingSeverity, number>; riskClassCounts: Record<RiskClass | \"unclassified\", number>; }"
+      ],
+      "references": [
+        "trust-graph.d.ts#TrustGraphEdgeType",
+        "trust-graph.d.ts#TrustGraphFindingSeverity",
+        "trust-graph.d.ts#TrustGraphNodeType",
+        "types/diagnostics.d.ts#RiskClass"
+      ]
+    },
+    "types/artifact.d.ts#ArtifactKind": {
+      "declarations": [
+        "export type ArtifactKind = \"skill\" | \"agent\" | \"context\" | \"context_lens\" | \"profile\" | \"reference\" | \"example\" | \"script\" | \"asset\" | \"config\" | \"unknown\";"
+      ],
+      "references": []
+    },
+    "types/classification.d.ts#ASSET_CLASSIFICATION_REASON_CODES": {
+      "declarations": [
+        "ASSET_CLASSIFICATION_REASON_CODES: readonly [ \"under-canonical-skill-root\", \"under-skill-support-directory\", \"outside-recognized-asset-boundary\", \"unsupported-skill-local-directory\", \"under-recognized-context-root\", \"under-recognized-lens-root\", \"under-recognized-agent-root\", \"repository-tool-not-context\", \"recognized-config-file\", \"under-generic-support-directory\", \"outside-recognized-skill-boundary\", \"outside-recognized-context-root\" ]"
+      ],
+      "references": []
+    },
+    "types/classification.d.ts#ASSET_CLASSIFICATION_RULES": {
+      "declarations": [
+        "ASSET_CLASSIFICATION_RULES: readonly [ \"skill-entrypoint\", \"skill-local-support\", \"context-root\", \"lens-root\", \"agent-root\", \"repository-tool\", \"config-file\", \"generic-profile\", \"generic-reference\", \"generic-example\", \"unknown\" ]"
+      ],
+      "references": []
+    },
+    "types/classification.d.ts#AssetClassificationEvidence": {
+      "declarations": [
+        "export interface AssetClassificationEvidence { kind: ArtifactKind; scope: AssetScope; matchedRule: AssetClassificationRule; reasonCode: AssetClassificationReasonCode; reason: string; recognizedRoot?: string; parentAssetCandidatePath?: string; parentAssetPath?: string; parentResolution?: ParentAssetResolution; parentAssetCandidates?: string[]; supportDirectory?: string; ignoredNestedSegments?: string[]; competingRules?: AssetCompetingRuleEvidence[]; }"
+      ],
+      "references": [
+        "types/artifact.d.ts#ArtifactKind",
+        "types/classification.d.ts#AssetClassificationReasonCode",
+        "types/classification.d.ts#AssetClassificationRule",
+        "types/classification.d.ts#AssetCompetingRuleEvidence",
+        "types/classification.d.ts#AssetScope",
+        "types/classification.d.ts#ParentAssetResolution"
+      ]
+    },
+    "types/classification.d.ts#AssetClassificationReasonCode": {
+      "declarations": [
+        "export type AssetClassificationReasonCode = KnownAssetClassificationReasonCode | (string & Record<never, never>);"
+      ],
+      "references": [
+        "types/classification.d.ts#KnownAssetClassificationReasonCode"
+      ]
+    },
+    "types/classification.d.ts#AssetClassificationRule": {
+      "declarations": [
+        "export type AssetClassificationRule = KnownAssetClassificationRule | (string & Record<never, never>);"
+      ],
+      "references": ["types/classification.d.ts#KnownAssetClassificationRule"]
+    },
+    "types/classification.d.ts#AssetCompetingRuleEvidence": {
+      "declarations": [
+        "export interface AssetCompetingRuleEvidence { rule: AssetClassificationRule; matched: false; reasonCode: AssetClassificationReasonCode; reason: string; }"
+      ],
+      "references": [
+        "types/classification.d.ts#AssetClassificationReasonCode",
+        "types/classification.d.ts#AssetClassificationRule"
+      ]
+    },
+    "types/classification.d.ts#AssetScope": {
+      "declarations": [
+        "export type AssetScope = \"independent\" | \"skill-local\" | \"repository-support\" | \"unknown\";"
+      ],
+      "references": []
+    },
+    "types/classification.d.ts#KnownAssetClassificationReasonCode": {
+      "declarations": [
+        "export type KnownAssetClassificationReasonCode = (typeof ASSET_CLASSIFICATION_REASON_CODES)[number];"
+      ],
+      "references": [
+        "types/classification.d.ts#ASSET_CLASSIFICATION_REASON_CODES"
+      ]
+    },
+    "types/classification.d.ts#KnownAssetClassificationRule": {
+      "declarations": [
+        "export type KnownAssetClassificationRule = (typeof ASSET_CLASSIFICATION_RULES)[number];"
+      ],
+      "references": ["types/classification.d.ts#ASSET_CLASSIFICATION_RULES"]
+    },
+    "types/classification.d.ts#ParentAssetResolution": {
+      "declarations": [
+        "export type ParentAssetResolution = \"structural-candidate\" | \"resolved\" | \"missing\" | \"ambiguous\";"
+      ],
+      "references": []
+    },
+    "types/decision.d.ts#CommandInvocation": {
+      "declarations": [
+        "export interface CommandInvocation<Args extends string[] = string[]> { command: \"renma\"; args: Args; display: string; }"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#Diagnostic": {
+      "declarations": [
+        "export interface Diagnostic { code?: string; severity: \"info\" | \"warning\" | \"error\"; message: string; path?: string; evidence?: Evidence; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "references": [
+        "types/diagnostics.d.ts#Evidence",
+        "types/diagnostics.d.ts#RepairConstraint",
+        "types/diagnostics.d.ts#VerificationStep"
+      ]
+    },
+    "types/diagnostics.d.ts#DiagnosticLocation": {
+      "declarations": [
+        "export interface DiagnosticLocation { path: string; startLine?: number; endLine?: number; snippet?: string; }"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#DiagnosticV2": {
+      "declarations": [
+        "export interface DiagnosticV2 { version: 2; code: string; severity: \"error\" | \"warning\" | \"info\"; message: string; repairPolicy?: \"preserve_semantics\"; location?: DiagnosticLocation; relatedLocations?: DiagnosticLocation[]; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "references": [
+        "types/diagnostics.d.ts#DiagnosticLocation",
+        "types/diagnostics.d.ts#RepairConstraint",
+        "types/diagnostics.d.ts#VerificationStep"
+      ]
+    },
+    "types/diagnostics.d.ts#Evidence": {
+      "declarations": [
+        "export interface Evidence { path: string; startLine: number; endLine: number; snippet: string; }"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#Finding": {
+      "declarations": [
+        "export interface Finding { id: string; title: string; category: \"quality\" | \"safety\" | \"structure\" | \"maintenance\"; severity: Severity; confidence: \"low\" | \"medium\" | \"high\"; riskClass?: RiskClass; evidence: Evidence; whyItMatters: string; remediation: string; constraints?: string[]; repairConstraints?: RepairConstraint[]; verificationSteps?: string[]; verificationStepsV2?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "references": [
+        "types/diagnostics.d.ts#Evidence",
+        "types/diagnostics.d.ts#RepairConstraint",
+        "types/diagnostics.d.ts#RiskClass",
+        "types/diagnostics.d.ts#Severity",
+        "types/diagnostics.d.ts#VerificationStep"
+      ]
+    },
+    "types/diagnostics.d.ts#RepairConstraint": {
+      "declarations": [
+        "export interface RepairConstraint { kind: \"must_preserve\" | \"must_not_change\" | \"allowed_change\" | \"requires_human_decision\" | \"risk\"; text: string; }"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#ReviewBundle": {
+      "declarations": [
+        "export interface ReviewBundle { id: string; title: string; summary: string; severity: \"error\" | \"warning\" | \"info\"; diagnosticCodes: string[]; diagnosticIds?: string[]; affectedAssets?: string[]; affectedFiles?: string[]; suggestedReviewOrder?: string[]; llmHint?: string; }"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#RiskClass": {
+      "declarations": [
+        "export type RiskClass = \"violation\" | \"suspicious\" | \"advisory\";"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#Severity": {
+      "declarations": [
+        "export type Severity = \"low\" | \"medium\" | \"high\" | \"critical\";"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#SuppressedFindingEvidence": {
+      "declarations": [
+        "export interface SuppressedFindingEvidence { suppression: { id: string; matchedPath: string; reason: string; expires: SuppressionExpiration; }; finding: Finding; }"
+      ],
+      "references": [
+        "types/diagnostics.d.ts#Finding",
+        "types/diagnostics.d.ts#SuppressionExpiration"
+      ]
+    },
+    "types/diagnostics.d.ts#SuppressionConfig": {
+      "declarations": [
+        "export interface SuppressionConfig { id: string; paths: string[]; reason: string; expires?: SuppressionExpiration; }"
+      ],
+      "references": ["types/diagnostics.d.ts#SuppressionExpiration"]
+    },
+    "types/diagnostics.d.ts#SuppressionExpiration": {
+      "declarations": [
+        "export type SuppressionExpiration = \"never\" | `${number}-${number}-${number}`;"
+      ],
+      "references": []
+    },
+    "types/diagnostics.d.ts#VerificationStep": {
+      "declarations": [
+        "export interface VerificationStep { text: string; command?: string; expected?: string; }"
+      ],
+      "references": []
+    },
+    "types/scan-result.d.ts#SCAN_JSON_SCHEMA_VERSION": {
+      "declarations": ["SCAN_JSON_SCHEMA_VERSION: \"renma.scan.v1\""],
+      "references": []
+    },
+    "types/scan-result.d.ts#ScanJsonDocument": {
+      "declarations": [
+        "export interface ScanJsonDocument { schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION; root: string; configPath?: string; scanBoundary: EffectiveScanBoundaryEvidence; inspectionCoverage: InspectionCoverage; securityAnalysisCoverage: SecurityAnalysisCoverage; scannedFileCount: number; format: \"json\"; agentSkills: AgentSkillsValidationSummary; contextLens?: ContextLensSummary; executableSurfaceInventory?: ExecutableSurfaceInventory; securityPolicyInventory?: SecurityPolicyInventorySummary; trustGraph?: TrustGraph; findings: Finding[]; suppressedFindings: SuppressedFindingEvidence[]; diagnostics: Diagnostic[]; diagnosticsV2: DiagnosticV2[]; reviewBundles: ReviewBundle[]; exitThreshold: Severity; }"
+      ],
+      "references": [
+        "agent-skills.d.ts#AgentSkillsValidationSummary",
+        "context-lens.d.ts#ContextLensSummary",
+        "executable-surface-inventory.d.ts#ExecutableSurfaceInventory",
+        "inspection-coverage.d.ts#InspectionCoverage",
+        "scan-boundary.d.ts#EffectiveScanBoundaryEvidence",
+        "security-policy-inventory.d.ts#SecurityPolicyInventorySummary",
+        "trust-graph.d.ts#TrustGraph",
+        "types/diagnostics.d.ts#Diagnostic",
+        "types/diagnostics.d.ts#DiagnosticV2",
+        "types/diagnostics.d.ts#Finding",
+        "types/diagnostics.d.ts#ReviewBundle",
+        "types/diagnostics.d.ts#Severity",
+        "types/diagnostics.d.ts#SuppressedFindingEvidence",
+        "types/scan-result.d.ts#SCAN_JSON_SCHEMA_VERSION",
+        "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverage"
+      ]
+    },
+    "types/security-analysis-coverage.d.ts#SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION": {
+      "declarations": [
+        "SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION: \"renma.security-analysis-coverage.v1\""
+      ],
+      "references": []
+    },
+    "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverage": {
+      "declarations": [
+        "export interface SecurityAnalysisCoverage { schemaVersion: typeof SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION; artifacts: SecurityAnalysisCoverageArtifact[]; }"
+      ],
+      "references": [
+        "types/security-analysis-coverage.d.ts#SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION",
+        "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageArtifact"
+      ]
+    },
+    "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageAnalyses": {
+      "declarations": [
+        "export interface SecurityAnalysisCoverageAnalyses { hiddenUnicode: SecurityAnalysisCoverageState; semanticInstructions: SecurityAnalysisCoverageState; canonicalDescription: SecurityAnalysisCoverageState; yamlFrontmatterComments: SecurityAnalysisCoverageState; }"
+      ],
+      "references": [
+        "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageState"
+      ]
+    },
+    "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageArtifact": {
+      "declarations": [
+        "export interface SecurityAnalysisCoverageArtifact { path: string; kind: ArtifactKind; contentClassification: \"text\" | \"binary\"; analyses: SecurityAnalysisCoverageAnalyses; surfaceCounts?: SecurityAnalysisCoverageSurfaceCounts; }"
+      ],
+      "references": [
+        "types/artifact.d.ts#ArtifactKind",
+        "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageAnalyses",
+        "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageSurfaceCounts"
+      ]
+    },
+    "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageState": {
+      "declarations": [
+        "export type SecurityAnalysisCoverageState = \"analyzed\" | \"not-applicable\" | \"unsupported\" | \"blocked\" | \"not-analyzable\";"
+      ],
+      "references": []
+    },
+    "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageSurfaceCounts": {
+      "declarations": [
+        "export interface SecurityAnalysisCoverageSurfaceCounts { yamlFrontmatterComments: number; }"
+      ],
+      "references": []
+    }
+  }
+}
