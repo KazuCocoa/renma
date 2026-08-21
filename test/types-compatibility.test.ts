@@ -5,7 +5,11 @@ import {
   ASSET_CLASSIFICATION_RULES,
   SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION,
   type ArtifactKind,
+  type AssetClassificationReasonCode,
+  type AssetClassificationRule,
   type Diagnostic,
+  type KnownAssetClassificationReasonCode,
+  type KnownAssetClassificationRule,
   type ScanJsonDocument,
 } from "../src/public-types.js";
 import { ASSET_CLASSIFICATION_RULES as directClassificationRules } from "../src/types/classification.js";
@@ -17,6 +21,18 @@ import type * as PublicScanTypes from "../src/public-types/scan-result.js";
 type EstablishedTypesFacade = ArtifactKind | Diagnostic | ScanJsonDocument;
 const establishedTypesFacade: EstablishedTypesFacade | undefined = undefined;
 void establishedTypesFacade;
+
+const futureClassificationRule: AssetClassificationRule = "future-rule";
+const futureClassificationReason: AssetClassificationReasonCode =
+  "future-reason";
+// @ts-expect-error Internal known-rule helpers remain closed and exhaustive.
+const unknownKnownRule: KnownAssetClassificationRule = "future-rule";
+// @ts-expect-error Internal known-reason helpers remain closed and exhaustive.
+const unknownKnownReason: KnownAssetClassificationReasonCode = "future-reason";
+void futureClassificationRule;
+void futureClassificationReason;
+void unknownKnownRule;
+void unknownKnownReason;
 
 test("the established types deep import re-exports cohesive runtime registries", () => {
   assert.equal(ASSET_CLASSIFICATION_RULES, directClassificationRules);

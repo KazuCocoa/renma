@@ -1,0 +1,235 @@
+{
+  "version": 1,
+  "entrypoints": {
+    "renma/types": {
+      "ASSET_CLASSIFICATION_REASON_CODES": [
+        "ASSET_CLASSIFICATION_REASON_CODES: readonly [ \"under-canonical-skill-root\", \"under-skill-support-directory\", \"outside-recognized-asset-boundary\", \"unsupported-skill-local-directory\", \"under-recognized-context-root\", \"under-recognized-lens-root\", \"under-recognized-agent-root\", \"repository-tool-not-context\", \"recognized-config-file\", \"under-generic-support-directory\", \"outside-recognized-skill-boundary\", \"outside-recognized-context-root\" ]"
+      ],
+      "ASSET_CLASSIFICATION_RULES": [
+        "ASSET_CLASSIFICATION_RULES: readonly [ \"skill-entrypoint\", \"skill-local-support\", \"context-root\", \"lens-root\", \"agent-root\", \"repository-tool\", \"config-file\", \"generic-profile\", \"generic-reference\", \"generic-example\", \"unknown\" ]"
+      ],
+      "ArtifactKind": [
+        "export type ArtifactKind = \"skill\" | \"agent\" | \"context\" | \"context_lens\" | \"profile\" | \"reference\" | \"example\" | \"script\" | \"asset\" | \"config\" | \"unknown\";"
+      ],
+      "AssetClassificationEvidence": [
+        "export interface AssetClassificationEvidence { kind: ArtifactKind; scope: AssetScope; matchedRule: AssetClassificationRule; reasonCode: AssetClassificationReasonCode; reason: string; recognizedRoot?: string; parentAssetCandidatePath?: string; parentAssetPath?: string; parentResolution?: ParentAssetResolution; parentAssetCandidates?: string[]; supportDirectory?: string; ignoredNestedSegments?: string[]; competingRules?: AssetCompetingRuleEvidence[]; }"
+      ],
+      "AssetClassificationReasonCode": [
+        "export type AssetClassificationReasonCode = KnownAssetClassificationReasonCode | (string & Record<never, never>);"
+      ],
+      "AssetClassificationRule": [
+        "export type AssetClassificationRule = KnownAssetClassificationRule | (string & Record<never, never>);"
+      ],
+      "AssetCompetingRuleEvidence": [
+        "export interface AssetCompetingRuleEvidence { rule: AssetClassificationRule; matched: false; reasonCode: AssetClassificationReasonCode; reason: string; }"
+      ],
+      "AssetScope": [
+        "export type AssetScope = \"independent\" | \"skill-local\" | \"repository-support\" | \"unknown\";"
+      ],
+      "Diagnostic": [
+        "export interface Diagnostic { code?: string; severity: \"info\" | \"warning\" | \"error\"; message: string; path?: string; evidence?: Evidence; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "DiagnosticLocation": [
+        "export interface DiagnosticLocation { path: string; startLine?: number; endLine?: number; snippet?: string; }"
+      ],
+      "DiagnosticV2": [
+        "export interface DiagnosticV2 { version: 2; code: string; severity: \"error\" | \"warning\" | \"info\"; message: string; repairPolicy?: \"preserve_semantics\"; location?: DiagnosticLocation; relatedLocations?: DiagnosticLocation[]; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "Evidence": [
+        "export interface Evidence { path: string; startLine: number; endLine: number; snippet: string; }"
+      ],
+      "Finding": [
+        "export interface Finding { id: string; title: string; category: \"quality\" | \"safety\" | \"structure\" | \"maintenance\"; severity: Severity; confidence: \"low\" | \"medium\" | \"high\"; riskClass?: RiskClass; evidence: Evidence; whyItMatters: string; remediation: string; constraints?: string[]; repairConstraints?: RepairConstraint[]; verificationSteps?: string[]; verificationStepsV2?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "KnownAssetClassificationEvidence": [
+        "export interface KnownAssetClassificationEvidence extends Omit<AssetClassificationEvidence, \"matchedRule\" | \"reasonCode\" | \"competingRules\"> { matchedRule: KnownAssetClassificationRule; reasonCode: KnownAssetClassificationReasonCode; competingRules?: KnownAssetCompetingRuleEvidence[]; }"
+      ],
+      "KnownAssetClassificationReasonCode": [
+        "export type KnownAssetClassificationReasonCode = (typeof ASSET_CLASSIFICATION_REASON_CODES)[number];"
+      ],
+      "KnownAssetClassificationRule": [
+        "export type KnownAssetClassificationRule = (typeof ASSET_CLASSIFICATION_RULES)[number];"
+      ],
+      "KnownAssetCompetingRuleEvidence": [
+        "export interface KnownAssetCompetingRuleEvidence extends Omit<AssetCompetingRuleEvidence, \"rule\" | \"reasonCode\"> { rule: KnownAssetClassificationRule; reasonCode: KnownAssetClassificationReasonCode; }"
+      ],
+      "ParentAssetResolution": [
+        "export type ParentAssetResolution = \"structural-candidate\" | \"resolved\" | \"missing\" | \"ambiguous\";"
+      ],
+      "RepairConstraint": [
+        "export interface RepairConstraint { kind: \"must_preserve\" | \"must_not_change\" | \"allowed_change\" | \"requires_human_decision\" | \"risk\"; text: string; }"
+      ],
+      "ReviewBundle": [
+        "export interface ReviewBundle { id: string; title: string; summary: string; severity: \"error\" | \"warning\" | \"info\"; diagnosticCodes: string[]; diagnosticIds?: string[]; affectedAssets?: string[]; affectedFiles?: string[]; suggestedReviewOrder?: string[]; llmHint?: string; }"
+      ],
+      "RiskClass": [
+        "export type RiskClass = \"violation\" | \"suspicious\" | \"advisory\";"
+      ],
+      "SCAN_JSON_SCHEMA_VERSION": [
+        "SCAN_JSON_SCHEMA_VERSION: \"renma.scan.v1\""
+      ],
+      "SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION": [
+        "SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION: \"renma.security-analysis-coverage.v1\""
+      ],
+      "ScanJsonDocument": [
+        "export interface ScanJsonDocument { schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION; root: string; configPath?: string; scanBoundary: EffectiveScanBoundaryEvidence; inspectionCoverage: InspectionCoverage; securityAnalysisCoverage: SecurityAnalysisCoverage; scannedFileCount: number; format: \"json\"; agentSkills: AgentSkillsValidationSummary; contextLens?: ContextLensSummary; executableSurfaceInventory?: ExecutableSurfaceInventory; securityPolicyInventory?: SecurityPolicyInventorySummary; trustGraph?: TrustGraph; findings: Finding[]; suppressedFindings: SuppressedFindingEvidence[]; diagnostics: Diagnostic[]; diagnosticsV2: DiagnosticV2[]; reviewBundles: ReviewBundle[]; exitThreshold: Severity; }"
+      ],
+      "SecurityAnalysisCoverage": [
+        "export interface SecurityAnalysisCoverage { schemaVersion: typeof SECURITY_ANALYSIS_COVERAGE_SCHEMA_VERSION; artifacts: SecurityAnalysisCoverageArtifact[]; }"
+      ],
+      "SecurityAnalysisCoverageAnalyses": [
+        "export interface SecurityAnalysisCoverageAnalyses { hiddenUnicode: SecurityAnalysisCoverageState; semanticInstructions: SecurityAnalysisCoverageState; canonicalDescription: SecurityAnalysisCoverageState; yamlFrontmatterComments: SecurityAnalysisCoverageState; }"
+      ],
+      "SecurityAnalysisCoverageArtifact": [
+        "export interface SecurityAnalysisCoverageArtifact { path: string; kind: ArtifactKind; contentClassification: \"text\" | \"binary\"; analyses: SecurityAnalysisCoverageAnalyses; surfaceCounts?: SecurityAnalysisCoverageSurfaceCounts; }"
+      ],
+      "SecurityAnalysisCoverageState": [
+        "export type SecurityAnalysisCoverageState = \"analyzed\" | \"not-applicable\" | \"unsupported\" | \"blocked\" | \"not-analyzable\";"
+      ],
+      "SecurityAnalysisCoverageSurfaceCounts": [
+        "export interface SecurityAnalysisCoverageSurfaceCounts { yamlFrontmatterComments: number; }"
+      ],
+      "Severity": [
+        "export type Severity = \"low\" | \"medium\" | \"high\" | \"critical\";"
+      ],
+      "SuppressedFindingEvidence": [
+        "export interface SuppressedFindingEvidence { suppression: { id: string; matchedPath: string; reason: string; expires: SuppressionExpiration; }; finding: Finding; }"
+      ],
+      "SuppressionConfig": [
+        "export interface SuppressionConfig { id: string; paths: string[]; reason: string; expires?: SuppressionExpiration; }"
+      ],
+      "SuppressionExpiration": [
+        "export type SuppressionExpiration = \"never\" | `${number}-${number}-${number}`;"
+      ],
+      "VerificationStep": [
+        "export interface VerificationStep { text: string; command?: string; expected?: string; }"
+      ]
+    },
+    "renma/types/classification": {
+      "ASSET_CLASSIFICATION_REASON_CODES": [
+        "ASSET_CLASSIFICATION_REASON_CODES: readonly [ \"under-canonical-skill-root\", \"under-skill-support-directory\", \"outside-recognized-asset-boundary\", \"unsupported-skill-local-directory\", \"under-recognized-context-root\", \"under-recognized-lens-root\", \"under-recognized-agent-root\", \"repository-tool-not-context\", \"recognized-config-file\", \"under-generic-support-directory\", \"outside-recognized-skill-boundary\", \"outside-recognized-context-root\" ]"
+      ],
+      "ASSET_CLASSIFICATION_RULES": [
+        "ASSET_CLASSIFICATION_RULES: readonly [ \"skill-entrypoint\", \"skill-local-support\", \"context-root\", \"lens-root\", \"agent-root\", \"repository-tool\", \"config-file\", \"generic-profile\", \"generic-reference\", \"generic-example\", \"unknown\" ]"
+      ],
+      "AssetClassificationEvidence": [
+        "export interface AssetClassificationEvidence { kind: ArtifactKind; scope: AssetScope; matchedRule: AssetClassificationRule; reasonCode: AssetClassificationReasonCode; reason: string; recognizedRoot?: string; parentAssetCandidatePath?: string; parentAssetPath?: string; parentResolution?: ParentAssetResolution; parentAssetCandidates?: string[]; supportDirectory?: string; ignoredNestedSegments?: string[]; competingRules?: AssetCompetingRuleEvidence[]; }"
+      ],
+      "AssetClassificationReasonCode": [
+        "export type AssetClassificationReasonCode = KnownAssetClassificationReasonCode | (string & Record<never, never>);"
+      ],
+      "AssetClassificationRule": [
+        "export type AssetClassificationRule = KnownAssetClassificationRule | (string & Record<never, never>);"
+      ],
+      "AssetCompetingRuleEvidence": [
+        "export interface AssetCompetingRuleEvidence { rule: AssetClassificationRule; matched: false; reasonCode: AssetClassificationReasonCode; reason: string; }"
+      ],
+      "AssetScope": [
+        "export type AssetScope = \"independent\" | \"skill-local\" | \"repository-support\" | \"unknown\";"
+      ],
+      "KnownAssetClassificationEvidence": [
+        "export interface KnownAssetClassificationEvidence extends Omit<AssetClassificationEvidence, \"matchedRule\" | \"reasonCode\" | \"competingRules\"> { matchedRule: KnownAssetClassificationRule; reasonCode: KnownAssetClassificationReasonCode; competingRules?: KnownAssetCompetingRuleEvidence[]; }"
+      ],
+      "KnownAssetClassificationReasonCode": [
+        "export type KnownAssetClassificationReasonCode = (typeof ASSET_CLASSIFICATION_REASON_CODES)[number];"
+      ],
+      "KnownAssetClassificationRule": [
+        "export type KnownAssetClassificationRule = (typeof ASSET_CLASSIFICATION_RULES)[number];"
+      ],
+      "KnownAssetCompetingRuleEvidence": [
+        "export interface KnownAssetCompetingRuleEvidence extends Omit<AssetCompetingRuleEvidence, \"rule\" | \"reasonCode\"> { rule: KnownAssetClassificationRule; reasonCode: KnownAssetClassificationReasonCode; }"
+      ],
+      "ParentAssetResolution": [
+        "export type ParentAssetResolution = \"structural-candidate\" | \"resolved\" | \"missing\" | \"ambiguous\";"
+      ]
+    },
+    "renma/types/diagnostics": {
+      "Diagnostic": [
+        "export interface Diagnostic { code?: string; severity: \"info\" | \"warning\" | \"error\"; message: string; path?: string; evidence?: Evidence; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "DiagnosticLocation": [
+        "export interface DiagnosticLocation { path: string; startLine?: number; endLine?: number; snippet?: string; }"
+      ],
+      "DiagnosticV2": [
+        "export interface DiagnosticV2 { version: 2; code: string; severity: \"error\" | \"warning\" | \"info\"; message: string; repairPolicy?: \"preserve_semantics\"; location?: DiagnosticLocation; relatedLocations?: DiagnosticLocation[]; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "Evidence": [
+        "export interface Evidence { path: string; startLine: number; endLine: number; snippet: string; }"
+      ],
+      "Finding": [
+        "export interface Finding { id: string; title: string; category: \"quality\" | \"safety\" | \"structure\" | \"maintenance\"; severity: Severity; confidence: \"low\" | \"medium\" | \"high\"; riskClass?: RiskClass; evidence: Evidence; whyItMatters: string; remediation: string; constraints?: string[]; repairConstraints?: RepairConstraint[]; verificationSteps?: string[]; verificationStepsV2?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+      ],
+      "RepairConstraint": [
+        "export interface RepairConstraint { kind: \"must_preserve\" | \"must_not_change\" | \"allowed_change\" | \"requires_human_decision\" | \"risk\"; text: string; }"
+      ],
+      "ReviewBundle": [
+        "export interface ReviewBundle { id: string; title: string; summary: string; severity: \"error\" | \"warning\" | \"info\"; diagnosticCodes: string[]; diagnosticIds?: string[]; affectedAssets?: string[]; affectedFiles?: string[]; suggestedReviewOrder?: string[]; llmHint?: string; }"
+      ],
+      "RiskClass": [
+        "export type RiskClass = \"violation\" | \"suspicious\" | \"advisory\";"
+      ],
+      "Severity": [
+        "export type Severity = \"low\" | \"medium\" | \"high\" | \"critical\";"
+      ],
+      "SuppressedFindingEvidence": [
+        "export interface SuppressedFindingEvidence { suppression: { id: string; matchedPath: string; reason: string; expires: SuppressionExpiration; }; finding: Finding; }"
+      ],
+      "SuppressionConfig": [
+        "export interface SuppressionConfig { id: string; paths: string[]; reason: string; expires?: SuppressionExpiration; }"
+      ],
+      "SuppressionExpiration": [
+        "export type SuppressionExpiration = \"never\" | `${number}-${number}-${number}`;"
+      ],
+      "VerificationStep": [
+        "export interface VerificationStep { text: string; command?: string; expected?: string; }"
+      ]
+    },
+    "renma/types/scan-result": {
+      "SCAN_JSON_SCHEMA_VERSION": [
+        "SCAN_JSON_SCHEMA_VERSION: \"renma.scan.v1\""
+      ],
+      "ScanJsonDocument": [
+        "export interface ScanJsonDocument { schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION; root: string; configPath?: string; scanBoundary: EffectiveScanBoundaryEvidence; inspectionCoverage: InspectionCoverage; securityAnalysisCoverage: SecurityAnalysisCoverage; scannedFileCount: number; format: \"json\"; agentSkills: AgentSkillsValidationSummary; contextLens?: ContextLensSummary; executableSurfaceInventory?: ExecutableSurfaceInventory; securityPolicyInventory?: SecurityPolicyInventorySummary; trustGraph?: TrustGraph; findings: Finding[]; suppressedFindings: SuppressedFindingEvidence[]; diagnostics: Diagnostic[]; diagnosticsV2: DiagnosticV2[]; reviewBundles: ReviewBundle[]; exitThreshold: Severity; }"
+      ]
+    },
+    "renma/discovery": {
+      "CanonicalSkillEntrypointPath": [
+        "export interface CanonicalSkillEntrypointPath { kind: \"canonical\"; currentPath: string; candidateName: string; }"
+      ],
+      "RESERVED_SKILL_SUPPORT_DIRS": [
+        "RESERVED_SKILL_SUPPORT_DIRS: readonly [ \"assets\", \"examples\", \"profiles\", \"references\", \"scripts\" ]"
+      ],
+      "RepositorySkillPath": [
+        "export type RepositorySkillPath = { kind: \"entrypoint\"; currentPath: string; root: SkillRoot; skillDirectory: string; skillName: string; domainPath: string[]; relativeToSkillDirectory: string; entrypoint: CanonicalSkillEntrypointPath; } | { kind: \"support\"; currentPath: string; root: SkillRoot; skillDirectory: string; skillName: string; domainPath: string[]; relativeToSkillDirectory: string; supportDirectory: ReservedSkillSupportDirectory; } | { kind: \"reserved-root\"; currentPath: string; root: SkillRoot; supportDirectory: ReservedSkillSupportDirectory; };"
+      ],
+      "ReservedSkillSupportDirectory": [
+        "export type ReservedSkillSupportDirectory = (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];"
+      ],
+      "SKILL_ROOTS": [
+        "SKILL_ROOTS: readonly [ \"skills\", \".agents/skills\" ]"
+      ],
+      "SKILL_SUPPORT_DISCOVERY_MODE": [
+        "SKILL_SUPPORT_DISCOVERY_MODE: { readonly assets: \"all-files\"; readonly examples: \"markdown\"; readonly profiles: \"markdown\"; readonly references: \"all-files\"; readonly scripts: \"all-files\"; }"
+      ],
+      "SkillRoot": ["export type SkillRoot = (typeof SKILL_ROOTS)[number];"],
+      "classifyAssetPath": [
+        "export declare function classifyAssetPath(relativePath: string, options?: { metadataType?: string; }): AssetClassificationEvidence;"
+      ],
+      "classifyRepositorySkillEntrypointPath": [
+        "export declare function classifyRepositorySkillEntrypointPath(relativePath: string): CanonicalSkillEntrypointPath | undefined;"
+      ],
+      "classifyRepositorySkillPath": [
+        "export declare function classifyRepositorySkillPath(relativePath: string): RepositorySkillPath | undefined;"
+      ],
+      "logicalSkillDirectory": [
+        "export declare function logicalSkillDirectory(relativePath: string): string | undefined;"
+      ],
+      "normalizeAssetRepositoryRelativePath": [
+        "export declare function normalizeAssetRepositoryRelativePath(filePath: string): string | undefined;"
+      ],
+      "normalizeRepositorySkillRelativePath": [
+        "export declare function normalizeRepositorySkillRelativePath(filePath: string): string | undefined;"
+      ]
+    }
+  }
+}

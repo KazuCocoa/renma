@@ -187,6 +187,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "diagnostics-v2.ts",
       "executable-surface-ci-policy.ts",
       "executable-surface-diff.ts",
+      "finding-repair-guidance.ts",
       "hidden-unicode.ts",
       "metadata-policy-ci-policy.ts",
       "metadata-policy-diff.ts",

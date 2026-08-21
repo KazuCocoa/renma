@@ -80,7 +80,9 @@
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json}\"",
     "lint": "eslint \"{scripts,tools}/**/*.mjs\" \"eslint.config.js\"",
     "lint:fix": "eslint --fix \"{scripts,tools}/**/*.mjs\" \"eslint.config.js\"",
-    "verify:package": "npm run build && node scripts/verify-package.mjs",
+    "verify:api": "node scripts/verify-public-api.mjs",
+    "update:api": "npm run build && node scripts/verify-public-api.mjs --write",
+    "verify:package": "npm run build && npm run verify:api && node scripts/verify-package.mjs",
     "split-reference": "node scripts/split-reference.mjs",
     "suggest-semantic-split": "node dist/index.js suggest-semantic-split"
   },

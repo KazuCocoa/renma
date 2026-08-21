@@ -114,6 +114,7 @@ test("release-prep maintains strict Renma self-validation", async (t) => {
   );
   assert.match(source, new RegExp(`"${strictScan}"`, "u"));
   assert.doesNotMatch(source, /"node dist\/index\.js scan \. --fail-on high"/u);
+  assert.match(source, /\["npm", \["run", "verify:api"\]\]/u);
 });
 
 test("authoritative release Context gates tag pushes on external publication security", () => {

@@ -4,6 +4,7 @@ import {
   DIAGNOSTIC_IDS,
   DISCOVERY_LAYOUT_DIAGNOSTIC_IDS,
 } from "./diagnostic-ids.js";
+import { canonicalFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type {
   Diagnostic,
   DiagnosticLocation,
@@ -121,11 +122,12 @@ function isGuidanceOnlyDiagnostic(code: string): boolean {
 }
 
 function repairConstraintsForFinding(finding: Finding): RepairConstraint[] {
+  const guidance = canonicalFindingRepairGuidance(finding);
   return uniqueConstraints([
     ...semanticRepairConstraints(),
     ...specificRepairConstraints(finding.id),
     ...(finding.repairConstraints ?? []),
-    ...constraintTextsToRepairConstraints(finding.constraints ?? []),
+    ...(guidance?.repairConstraints ?? []),
   ]);
 }
 
@@ -369,46 +371,10 @@ function specificRepairConstraints(code: string): RepairConstraint[] {
   ];
 }
 
-function constraintTextsToRepairConstraints(
-  constraints: string[],
-): RepairConstraint[] {
-  return constraints.map((text) => ({
-    kind: repairConstraintKindForText(text),
-    text,
-  }));
-}
-
-function repairConstraintKindForText(text: string): RepairConstraint["kind"] {
-  const normalized = text.toLowerCase();
-  if (/\b(do not|don't|must not|never)\b/.test(normalized)) {
-    return "must_not_change";
-  }
-  if (/\b(preserve|keep|retain|maintain)\b/.test(normalized)) {
-    return "must_preserve";
-  }
-  if (
-    /\b(human|owner|review|approval|confirm|decide|ambiguous)\b/.test(
-      normalized,
-    )
-  ) {
-    return "requires_human_decision";
-  }
-  if (
-    /\b(risk|risky|danger|unsafe|secret|credential|destructive)\b/.test(
-      normalized,
-    )
-  ) {
-    return "risk";
-  }
-  return "allowed_change";
-}
-
 function verificationStepsForFinding(finding: Finding): VerificationStep[] {
-  const steps = finding.verificationStepsV2 ?? [
-    ...(finding.verificationSteps ?? []).map((step) =>
-      verificationStepFromText(step, finding.id),
-    ),
-  ];
+  const guidance = canonicalFindingRepairGuidance(finding);
+  const steps =
+    finding.verificationStepsV2 ?? guidance?.verificationSteps ?? [];
   return steps.length > 0
     ? uniqueVerificationSteps(steps)
     : defaultVerificationSteps(finding.id);
@@ -432,49 +398,6 @@ function defaultVerificationSteps(code: string): VerificationStep[] {
       expected: `No diagnostics with code ${code} are reported.`,
     },
   ];
-}
-
-function verificationStepFromText(
-  text: string,
-  code: string,
-): VerificationStep {
-  const normalized = text.toLowerCase();
-  if (normalized.startsWith("run renma scan")) {
-    return {
-      text,
-      command: "renma scan",
-      expected: `No diagnostics with code ${code} are reported.`,
-    };
-  }
-  if (normalized.startsWith("run renma catalog")) {
-    return {
-      text,
-      command: "renma catalog",
-      expected: "Catalog output resolves relevant assets and dependencies.",
-    };
-  }
-  if (normalized.startsWith("run renma readiness")) {
-    return {
-      text,
-      command: "renma readiness",
-      expected: "Readiness checks reflect the repaired repository state.",
-    };
-  }
-  if (normalized.startsWith("run renma graph")) {
-    return {
-      text,
-      command: "renma graph",
-      expected: "Graph output shows the repaired relationships.",
-    };
-  }
-  if (normalized.startsWith("run npm test")) {
-    return {
-      text,
-      command: "npm test",
-      expected: "The test suite passes.",
-    };
-  }
-  return { text };
 }
 
 function llmHintForFinding(finding: Finding): string {

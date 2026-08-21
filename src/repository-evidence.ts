@@ -46,7 +46,7 @@ import {
   type SkillDiscoveryIndex,
 } from "./skill-discovery.js";
 import type { Artifact } from "./types/artifact.js";
-import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/classification.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { Diagnostic } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -117,7 +117,7 @@ export interface RepositorySnapshot extends RepositoryEvidence {
   repositoryPaths: ReadonlySet<string>;
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>;
   /** Snapshot-scoped indexes reused by commands without reinterpreting files. */
-  classifications: ReadonlyMap<string, AssetClassificationEvidence>;
+  classifications: ReadonlyMap<string, KnownAssetClassificationEvidence>;
   skillParents: SkillParentIndex;
   securityPolicies: SecurityPolicyAssetEvidence[];
   executableSurfaceInventory: ExecutableSurfaceInventory;
@@ -144,7 +144,7 @@ interface RepositoryProjections {
   catalog(): CatalogProjection;
   agentSkills(): AgentSkillsValidationSummary;
   skillDiscovery(): SkillDiscoveryIndex;
-  classifications(): ReadonlyMap<string, AssetClassificationEvidence>;
+  classifications(): ReadonlyMap<string, KnownAssetClassificationEvidence>;
   securityPolicies(): SecurityPolicyAssetEvidence[];
   contextLens(): ContextLensProjection;
 }

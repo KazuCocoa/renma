@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { formatJson } from "../src/report.js";
+import { formatJson, toScanJsonDocument } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import {
   SCAN_JSON_SCHEMA_VERSION,
@@ -15,11 +15,7 @@ import {
 test("scan JSON serialization adds the typed renma.scan.v1 wire boundary", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-json-type-"));
   const result: ScanResult = await scan(root, { format: "json" });
-  const expectedDocument = {
-    schemaVersion: SCAN_JSON_SCHEMA_VERSION,
-    ...result,
-    format: "json" as const,
-  } satisfies ScanJsonDocument;
+  const expectedDocument = toScanJsonDocument(result);
   const document = JSON.parse(formatJson(result)) as ScanJsonDocument;
 
   assert.equal("schemaVersion" in result, false);
@@ -27,6 +23,21 @@ test("scan JSON serialization adds the typed renma.scan.v1 wire boundary", async
   assert.equal(document.schemaVersion, "renma.scan.v1");
   assert.equal(document.format, "json");
   assert.deepEqual(document, expectedDocument);
+});
+
+test("scan JSON projection excludes internal-only ScanResult properties", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-scan-json-internal-"),
+  );
+  const result = (await scan(root, { format: "json" })) as ScanResult & {
+    internalOnly: { enumerable: true };
+  };
+  result.internalOnly = { enumerable: true };
+
+  const document = JSON.parse(formatJson(result)) as Record<string, unknown>;
+
+  assert.equal("internalOnly" in document, false);
+  assert.equal("internalOnly" in toScanJsonDocument(result), false);
 });
 
 test("the JSON wire type is narrower than the core scan result", () => {

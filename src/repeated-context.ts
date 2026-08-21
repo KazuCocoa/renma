@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, estimatedTokenUnits } from "./token-estimator.js";
+import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type { Finding } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
@@ -130,7 +131,9 @@ export function detectRepeatedContextPatterns(
     ),
   ];
 
-  return findings.sort(compareFindings);
+  return findings
+    .map((finding) => projectFindingRepairGuidance(finding))
+    .sort(compareFindings);
 }
 
 function collectRepeatedSections(documents: ParsedDocument[]): RepeatGroup[] {
@@ -318,14 +321,28 @@ function groupsToFindings(
           whyItMatters:
             "Repeated agent context can drift across skills, agents, references, and examples. Renma reports deterministic evidence so an LLM or maintainer can propose consolidation and a human can approve it.",
           llmHint: `${title} detected for ${group.label}. ${alsoAppears} Use these locations as evidence for a consolidation proposal, but do not treat them as an automatic source-of-truth decision.`,
-          constraints: [
-            "Do not delete or rewrite content solely because this finding exists.",
-            "Preserve procedural details and ownership boundaries while consolidating.",
-            "Treat this as deterministic evidence, not a semantic source-of-truth decision.",
+          repairConstraints: [
+            {
+              kind: "must_not_change",
+              text: "Do not delete or rewrite content solely because this finding exists.",
+            },
+            {
+              kind: "must_preserve",
+              text: "Preserve procedural details and ownership boundaries while consolidating.",
+            },
+            {
+              kind: "allowed_change",
+              text: "Treat this as deterministic evidence, not a semantic source-of-truth decision.",
+            },
           ],
-          verificationSteps: [
-            "Review all reported occurrences and choose an owned source of truth.",
-            "Run renma scan after any consolidation patch.",
+          verificationStepsV2: [
+            {
+              text: "Review all reported occurrences and choose an owned source of truth.",
+            },
+            {
+              text: "Run renma scan after any consolidation patch.",
+              command: "renma scan",
+            },
           ],
           details: {
             profile: QUALITY.profile,

@@ -12,6 +12,7 @@ import type {
 } from "./model.js";
 import type { Evidence, Finding } from "./types/diagnostics.js";
 import { isLifecycleUsable } from "./lifecycle.js";
+import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 
 export type CompositionMembership = "required" | "optional";
 export type CompositionRelationship =
@@ -430,12 +431,14 @@ export function analyzeDeclaredCompositionFindings(
     ...duplicateDeclarationFindings(index.sortedDependencies),
     ...cycleFindings(cycleGroups),
     ...conflicts,
-  ].sort(
-    (left, right) =>
-      compareUtf16CodeUnits(left.evidence.path, right.evidence.path) ||
-      left.evidence.startLine - right.evidence.startLine ||
-      compareUtf16CodeUnits(left.id, right.id),
-  );
+  ]
+    .map((finding) => projectFindingRepairGuidance(finding))
+    .sort(
+      (left, right) =>
+        compareUtf16CodeUnits(left.evidence.path, right.evidence.path) ||
+        left.evidence.startLine - right.evidence.startLine ||
+        compareUtf16CodeUnits(left.id, right.id),
+    );
   return {
     findings,
     stats: { rootsAnalyzed, peakRetainedRootReports },
@@ -524,16 +527,31 @@ function sourceKindMismatchFinding(
       "Relationship source kinds are part of the declared composition contract. An applies_to declaration outside a Context Lens is invalid independently of whether its target resolves.",
     remediation:
       "Move applies_to to the intended Context Lens, or change or remove the declaration only when reviewed repository intent supports that correction.",
-    constraints: [
-      "Do not change or create a target merely to hide a source-kind violation.",
-      "Do not infer a Context Lens from prose, paths, names, or similarity.",
-      "Keep unresolved and target-kind problems independently visible.",
-      "Do not introduce runtime Context selection or loading.",
+    repairConstraints: [
+      {
+        kind: "must_not_change",
+        text: "Do not change or create a target merely to hide a source-kind violation.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not infer a Context Lens from prose, paths, names, or similarity.",
+      },
+      {
+        kind: "must_preserve",
+        text: "Keep unresolved and target-kind problems independently visible.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not introduce runtime Context selection or loading.",
+      },
     ],
-    verificationSteps: [
-      "Inspect the kind of the asset that declares applies_to.",
-      "Confirm applies_to originates from a Context Lens.",
-      "Run renma scan and the focused composition graph.",
+    verificationStepsV2: [
+      { text: "Inspect the kind of the asset that declares applies_to." },
+      { text: "Confirm applies_to originates from a Context Lens." },
+      {
+        text: "Run renma scan and the focused composition graph.",
+        command: "renma scan",
+      },
     ],
     llmHint: `Review ${dependency.sourcePath}: ${declaration} may originate only from ${expectedSourceKind}, but ${source.id} is ${source.kind}. Correct the declaring asset or relationship from repository evidence; preserve any separate unresolved-target or target-kind finding.`,
     details: {
@@ -567,16 +585,31 @@ function targetKindMismatchFinding(
       "Relationship target kinds are part of the declared composition contract. A resolved target with the wrong kind cannot satisfy the declared relationship.",
     remediation:
       "Point the declaration at an existing asset of the expected target kind, or change the declaration only when reviewed repository intent supports a different relationship.",
-    constraints: [
-      "Do not create a placeholder asset only to satisfy validation.",
-      "Do not infer composition from prose, paths, names, or similarity.",
-      "Preserve supported Context-to-Context dependency semantics.",
-      "Do not introduce runtime Context selection or loading.",
+    repairConstraints: [
+      {
+        kind: "must_not_change",
+        text: "Do not create a placeholder asset only to satisfy validation.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not infer composition from prose, paths, names, or similarity.",
+      },
+      {
+        kind: "must_preserve",
+        text: "Preserve supported Context-to-Context dependency semantics.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not introduce runtime Context selection or loading.",
+      },
     ],
-    verificationSteps: [
-      "Inspect the resolved target and its cataloged asset kind.",
-      "Confirm the declaration points to the intended target kind.",
-      "Run renma scan and the focused composition graph.",
+    verificationStepsV2: [
+      { text: "Inspect the resolved target and its cataloged asset kind." },
+      { text: "Confirm the declaration points to the intended target kind." },
+      {
+        text: "Run renma scan and the focused composition graph.",
+        command: "renma scan",
+      },
     ],
     llmHint: `Review ${dependency.sourcePath} and preserve its intended ${declaration} relationship. Target ${dependency.to} resolves to ${target.kind}, but the declaration expects ${expectedTargetKind}. Correct the target or relationship from repository evidence and preserve any separate source-kind finding.`,
     details: {
@@ -622,15 +655,29 @@ function duplicateDeclarationFindings(dependencies: Dependency[]): Finding[] {
           "Repeated values in one metadata field add noise and can obscure whether multiple declarations were intentional. This is separate from valid multi-parent composition.",
         remediation:
           "Keep one copy of the exact value in the metadata field after confirming that the duplicate carries no distinct meaning.",
-        constraints: [
-          "Do not remove declarations from different parents.",
-          "Do not collapse different stable asset IDs based on similar titles or content.",
-          "Do not change declaration order into semantic precedence.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not remove declarations from different parents.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not collapse different stable asset IDs based on similar titles or content.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not change declaration order into semantic precedence.",
+          },
         ],
-        verificationSteps: [
-          "Inspect every duplicate line listed in the finding details.",
-          "Remove only redundant copies in the same field.",
-          "Run renma scan and the focused composition graph.",
+        verificationStepsV2: [
+          {
+            text: "Inspect every duplicate line listed in the finding details.",
+          },
+          { text: "Remove only redundant copies in the same field." },
+          {
+            text: "Run renma scan and the focused composition graph.",
+            command: "renma scan",
+          },
         ],
         llmHint: `Remove only a redundant ${duplicate.declaration} value equal to ${JSON.stringify(duplicate.to)} in ${duplicate.sourcePath}. Preserve legitimate declarations through other parents and ask for review if the repetitions are not exact duplicates.`,
         details: {
@@ -700,16 +747,36 @@ function cycleFindings(grouped: Map<string, CompositionCycleGroup>): Finding[] {
         whyItMatters: `The closure resolves finitely by stable asset ID, but a cycle may indicate unclear responsibility boundaries. It is required from ${requiredRoots.length > 0 ? requiredRoots.join(", ") : "no roots"} and optional from ${optionalRoots.length > 0 ? optionalRoots.join(", ") : "no roots"}; it defines neither precedence nor repeated runtime loading.`,
         remediation:
           "Review whether the assets should be split, consolidated, or related without a composition cycle.",
-        constraints: [
-          "Do not treat declaration order as precedence or override behavior.",
-          "Do not repeatedly expand the same stable asset ID.",
-          "Do not classify references, conflicts, or superseded_by cycles as composition cycles.",
-          "Do not introduce runtime Context loading.",
+        repairConstraints: [
+          {
+            kind: "must_not_change",
+            text: "Do not treat declaration order as precedence or override behavior.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not repeatedly expand the same stable asset ID.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not classify references, conflicts, or superseded_by cycles as composition cycles.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not introduce runtime Context loading.",
+          },
         ],
-        verificationSteps: [
-          "Inspect each cycle-forming declaration and its line evidence.",
-          "Run renma graph --view composition for an affected root.",
-          "Confirm that requiredComplete and cycleFree are reviewed separately.",
+        verificationStepsV2: [
+          {
+            text: "Inspect each cycle-forming declaration and its line evidence.",
+          },
+          {
+            text: "Run renma graph --view composition for an affected root.",
+            command: "renma graph",
+            expected: "Graph output shows the repaired relationships.",
+          },
+          {
+            text: "Confirm that requiredComplete and cycleFree are reviewed separately.",
+          },
         ],
         llmHint: `Review the ${required ? "required" : "optional"} composition cycle containing ${cycle.assetIds.join(", ")}. Required roots: ${requiredRoots.join(", ") || "none"}. Optional roots: ${optionalRoots.join(", ") || "none"}. Preserve valid knowledge while clarifying asset responsibilities; do not invent precedence or remove an edge solely to silence the finding.`,
         details: {
@@ -797,15 +864,32 @@ function conflictFinding(
       : "At least one asset is optional. The conflict matters only if a runtime consumer selects that optional candidate; Renma does not make that selection.",
     remediation:
       "Review the declarations and asset responsibilities. Remove or change a relationship only when repository intent supports it; otherwise keep the conflict visible to consumers.",
-    constraints: [
-      "Do not select a winner from declaration order, status, date, popularity, or model inference.",
-      "Do not merge prose or infer semantic conflict resolution.",
-      "Do not select optional Context at runtime.",
+    repairConstraints: [
+      {
+        kind: "must_not_change",
+        text: "Do not select a winner from declaration order, status, date, popularity, or model inference.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not merge prose or infer semantic conflict resolution.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not select optional Context at runtime.",
+      },
     ],
-    verificationSteps: [
-      `Run renma graph . --view composition --focus ${root.id} --format json.`,
-      "Inspect both conflict declarations and the provenance that includes each asset.",
-      "Confirm the conflict remains declared when no reviewed resolution exists.",
+    verificationStepsV2: [
+      {
+        text: `Run renma graph . --view composition --focus ${root.id} --format json.`,
+        command: "renma graph",
+        expected: "Graph output shows the repaired relationships.",
+      },
+      {
+        text: "Inspect both conflict declarations and the provenance that includes each asset.",
+      },
+      {
+        text: "Confirm the conflict remains declared when no reviewed resolution exists.",
+      },
     ],
     llmHint: `For composition root ${root.id}, review declared conflict ${conflict.left} versus ${conflict.right}. Preserve all provenance and do not choose a winner; ask for a human decision when the repository contract does not resolve the design.`,
     details: {

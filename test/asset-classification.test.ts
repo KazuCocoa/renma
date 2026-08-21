@@ -199,6 +199,24 @@ test("classification normalization is stable and rejects traversal", () => {
   );
 });
 
+test("asset path normalization rejects every parent segment and absolute path", () => {
+  const cases = [
+    ["..", undefined],
+    ["foo/..", undefined],
+    ["foo/../bar", undefined],
+    ["./foo/./bar", "foo/bar"],
+    [".\\foo\\.\\bar", "foo/bar"],
+    ["/foo/bar", undefined],
+    ["C:\\foo\\bar", undefined],
+    ["", undefined],
+    ["contexts/foo/policy.md", "contexts/foo/policy.md"],
+  ] as const;
+
+  for (const [input, expected] of cases) {
+    assert.equal(normalizeAssetRepositoryRelativePath(input), expected, input);
+  }
+});
+
 test("repository boundaries prefer a nested repository marker over cwd containment", async () => {
   const workspace = await mkdtemp(
     path.join(os.tmpdir(), "renma-classify-workspace-"),

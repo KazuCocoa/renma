@@ -137,8 +137,10 @@ production modules import the cohesive owner under `src/types/` directly:
 - `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
   permitted to import Agent Skills, Context Lens, Executable Surface Inventory,
   Security Policy Inventory, and Trust Graph result types. The public
-  `ScanJsonDocument` narrows that core result to the literal `renma.scan.v1`
-  serializer boundary and `format: "json"`.
+  `ScanJsonDocument` explicitly lists the top-level `renma.scan.v1` wire fields,
+  and `toScanJsonDocument()` projects only those fields with literal
+  `format: "json"`. Internal `ScanResult` additions therefore do not become
+  public JSON additions implicitly.
 
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
@@ -147,6 +149,34 @@ or other foundation modules. Focused semantic type exports exist only for
 classification, diagnostics, and the scan JSON wire document. They preserve
 cohesive consumer imports without turning low-level parser or runtime models
 into 1.x commitments.
+
+`scripts/verify-public-api.mjs` uses the TypeScript compiler API to normalize
+the declarations exported from every supported package entrypoint. The checked
+in snapshot freezes exported names, signatures, interface properties,
+optionality, readonly modifiers, literal unions, and the exact entrypoint set.
+Internal package modules remain outside that snapshot and outside the package
+exports map.
+
+Classification rule and reason-code wire values are intentionally open. Public
+`AssetClassificationRule` and `AssetClassificationReasonCode` accept
+unfamiliar strings so consumers can retain them and fail closed. Renma's
+implementation uses the separate closed `KnownAssetClassification*` helpers,
+so adding wire tolerance does not weaken internal classifier exhaustiveness.
+
+## Typed Finding Repair Authority
+
+Finding producers author `RepairConstraint[]` and `VerificationStep[]`
+semantics explicitly. `projectFindingRepairGuidance()` is the one compatibility
+boundary that generates legacy `constraints` and `verificationSteps` arrays
+from the typed objects' `text` fields. The canonical typed values remain
+available internally for Diagnostics v2 even though legacy-only Finding
+producers are rejected.
+
+`createDiagnosticsV2()` never classifies a constraint from English verbs and
+never discovers commands from sentence prefixes. It consumes only the typed
+guidance, adds the established code-specific typed guardrails, and applies
+typed defaults only when a producer supplied no verification steps. Prose may
+therefore improve without changing machine semantics.
 
 `src/commands/public-json-schema-versions.ts` inventories stable and
 experimental public top-level JSON identifiers by referencing their existing

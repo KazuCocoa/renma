@@ -1,6 +1,6 @@
 import type { AgentSkillMigrationSuggestion } from "../skill-migration.js";
 import type { ArtifactKind } from "../types/artifact.js";
-import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/classification.js";
 import type {
   AssetDecisionEvidence,
   DecisionStatus,
@@ -23,7 +23,7 @@ export interface MetadataSuggestion {
     | "no-proposal";
   decisionStatus: DecisionStatus;
   decision: AssetDecisionEvidence;
-  classification: AssetClassificationEvidence;
+  classification: KnownAssetClassificationEvidence;
   ownerProvided: boolean;
   instructions: string[];
   candidateMetadata: Record<string, string>;
@@ -58,7 +58,7 @@ export interface UnsupportedTargetSuggestionDecisionInput {
 export interface MetadataCandidateSuggestionDecisionInput {
   hasOwnerConflict: boolean;
   hasCandidate: boolean;
-  scope: AssetClassificationEvidence["scope"];
+  scope: KnownAssetClassificationEvidence["scope"];
 }
 
 /**

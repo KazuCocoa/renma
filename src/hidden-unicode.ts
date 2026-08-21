@@ -1,6 +1,11 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { Artifact } from "./types/artifact.js";
-import type { Finding } from "./types/diagnostics.js";
+import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
+import type {
+  Finding,
+  RepairConstraint,
+  VerificationStep,
+} from "./types/diagnostics.js";
 import {
   C0_CONTROL_RANGES,
   DELETE_AND_C1_CONTROL_RANGE,
@@ -232,16 +237,31 @@ const FINDING_METADATA = {
 const REMEDIATION =
   "Inspect the exact reported code point, then remove only that character or replace it with the intended visible text. Do not normalize or rewrite the whole file, and preserve legitimate multilingual content. When bidirectional formatting is intentional, request human confirmation. If a reported character is verified as necessary, use an existing narrowly path-scoped suppression with a documented reason.";
 
-const CONSTRAINTS = [
-  "Preserve legitimate multilingual text and visible source content.",
-  "Do not normalize or rewrite the entire file.",
-  "Require human confirmation before retaining intentional bidirectional formatting.",
-  "Use only an existing narrowly path-scoped suppression with a reason for a verified intentional occurrence.",
+const REPAIR_CONSTRAINTS: RepairConstraint[] = [
+  {
+    kind: "must_preserve",
+    text: "Preserve legitimate multilingual text and visible source content.",
+  },
+  {
+    kind: "must_not_change",
+    text: "Do not normalize or rewrite the entire file.",
+  },
+  {
+    kind: "requires_human_decision",
+    text: "Require human confirmation before retaining intentional bidirectional formatting.",
+  },
+  {
+    kind: "allowed_change",
+    text: "Use only an existing narrowly path-scoped suppression with a reason for a verified intentional occurrence.",
+  },
 ];
 
-const VERIFICATION_STEPS = [
-  "Inspect the exact reported code point in the original source.",
-  "Run renma scan and confirm the intended finding is removed or narrowly suppressed.",
+const VERIFICATION_STEPS: VerificationStep[] = [
+  { text: "Inspect the exact reported code point in the original source." },
+  {
+    text: "Run renma scan and confirm the intended finding is removed or narrowly suppressed.",
+    command: "renma scan",
+  },
 ];
 
 const LLM_HINT =
@@ -282,7 +302,7 @@ export function hiddenUnicodeFindings(artifact: Artifact): Finding[] {
     }
   }
 
-  return findings;
+  return findings.map((finding) => projectFindingRepairGuidance(finding));
 }
 
 /** Shared eligibility predicate for raw hidden-Unicode analysis and coverage. */
@@ -587,8 +607,8 @@ function findingForLine(
     },
     whyItMatters: metadata.whyItMatters,
     remediation: REMEDIATION,
-    constraints: CONSTRAINTS,
-    verificationSteps: VERIFICATION_STEPS,
+    repairConstraints: REPAIR_CONSTRAINTS,
+    verificationStepsV2: VERIFICATION_STEPS,
     llmHint: LLM_HINT,
     details: {
       unicodeCategory: category,

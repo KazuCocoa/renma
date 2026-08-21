@@ -3,6 +3,7 @@ import { catalogDiagnosticFindings } from "./catalog-findings.js";
 import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
+import { copyFindingWith } from "./finding-repair-guidance.js";
 import {
   collectRepositorySnapshot,
   prepareRepositorySnapshotProjections,
@@ -23,7 +24,7 @@ import {
   effectiveCiScanBoundary,
 } from "./scan-boundary.js";
 import { buildTrustGraph } from "./trust-graph.js";
-import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { KnownAssetClassificationEvidence } from "./types/classification.js";
 import type { Diagnostic, Finding } from "./types/diagnostics.js";
 import type { SuppressionConfig } from "./types/diagnostics.js";
 import type { ScanResult } from "./types/scan-result.js";
@@ -207,7 +208,7 @@ export function scanFromRepositorySnapshot(
 
 function attachFindingClassification(
   finding: Finding,
-  classifications: ReadonlyMap<string, AssetClassificationEvidence>,
+  classifications: ReadonlyMap<string, KnownAssetClassificationEvidence>,
 ): Finding {
   if (!classificationRelevantFinding(finding.id)) return finding;
   const classification = classifications.get(finding.evidence.path);
@@ -216,11 +217,10 @@ function attachFindingClassification(
     finding.id === DIAGNOSTIC_IDS.QUAL_SKILL_MIXED_RESPONSIBILITY
       ? finding.llmHint
       : classificationLlmHint(classification, finding.llmHint);
-  return {
-    ...finding,
+  return copyFindingWith(finding, {
     ...(llmHint ? { llmHint } : {}),
     details: { ...(finding.details ?? {}), classification },
-  };
+  });
 }
 
 function classificationRelevantFinding(id: string): boolean {
@@ -240,7 +240,7 @@ function classificationRelevantFinding(id: string): boolean {
 
 function attachDiagnosticClassification(
   diagnostic: Diagnostic,
-  classifications: ReadonlyMap<string, AssetClassificationEvidence>,
+  classifications: ReadonlyMap<string, KnownAssetClassificationEvidence>,
 ): Diagnostic {
   const classification = diagnostic.path
     ? classifications.get(diagnostic.path)
@@ -254,7 +254,7 @@ function attachDiagnosticClassification(
 }
 
 function classificationLlmHint(
-  classification: AssetClassificationEvidence,
+  classification: KnownAssetClassificationEvidence,
   existing: string | undefined,
 ): string {
   return [

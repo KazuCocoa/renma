@@ -23,7 +23,7 @@ import { formatVersionedJsonDocument } from "../report.js";
 import { buildAgentSkillMigrationSuggestion } from "../skill-migration.js";
 import { renderMetadataPrompt } from "../renderers/metadata-suggestion.js";
 import type { ArtifactKind } from "../types/artifact.js";
-import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/classification.js";
 import type { MetadataValue } from "../types/metadata.js";
 import type { SuggestedNextAction } from "../types/decision.js";
 
@@ -373,7 +373,7 @@ function ownerInstruction(input: {
 }
 
 function skillLocalInstructions(
-  classification: AssetClassificationEvidence,
+  classification: KnownAssetClassificationEvidence,
   hasOverride: boolean,
   parentBlocked: boolean,
   hasLocalGovernance: boolean,
@@ -395,7 +395,7 @@ function skillLocalInstructions(
 
 function suggestionNextActions(
   targetPath: string,
-  classification: AssetClassificationEvidence,
+  classification: KnownAssetClassificationEvidence,
   repositoryRoot: string | undefined,
 ): SuggestedNextAction[] {
   // Do not manufacture an action relative to cwd when the repository root is
@@ -455,7 +455,7 @@ function suggestionNextActions(
 }
 
 interface SkillLocalContext {
-  classification: AssetClassificationEvidence;
+  classification: KnownAssetClassificationEvidence;
   parent: SkillParentResolution;
   ownershipSource: "declared" | "inherited" | "unowned";
   hasLocalPolicyMetadata: boolean;

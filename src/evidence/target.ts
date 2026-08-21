@@ -24,7 +24,7 @@ import {
 } from "../repository-evidence.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import type { Artifact } from "../types/artifact.js";
-import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { KnownAssetClassificationEvidence } from "../types/classification.js";
 import type { AssetGovernanceEvidence } from "../types/governance.js";
 import type { ParsedDocument } from "../types/metadata.js";
 
@@ -38,7 +38,7 @@ export interface TargetDocumentEvidence {
   repositoryRoot?: string;
   repositoryRelativePath: string;
   entrypoint?: SkillMigrationEntrypointPath;
-  classification: AssetClassificationEvidence;
+  classification: KnownAssetClassificationEvidence;
 }
 
 export type TargetRepositoryEvidence =
@@ -49,7 +49,7 @@ export type TargetRepositoryEvidence =
       parent: SkillParentResolution;
       entry?: CatalogEntry;
       policy?: SecurityPolicyAssetEvidence;
-      classification: AssetClassificationEvidence;
+      classification: KnownAssetClassificationEvidence;
       governance: AssetGovernanceEvidence | null;
     }
   | {
@@ -58,7 +58,7 @@ export type TargetRepositoryEvidence =
         | "repository-boundary-unresolved"
         | "repository-boundary-ambiguous"
         | "snapshot-unavailable";
-      classification: AssetClassificationEvidence;
+      classification: KnownAssetClassificationEvidence;
     };
 
 export interface CollectTargetDocumentOptions {
@@ -198,7 +198,7 @@ export async function collectTargetRepositoryEvidence(
 
 function buildTargetGovernance(
   target: TargetDocumentEvidence,
-  classification: AssetClassificationEvidence,
+  classification: KnownAssetClassificationEvidence,
   parent: SkillParentResolution,
   entry: CatalogEntry | undefined,
   policy: SecurityPolicyAssetEvidence | undefined,
@@ -254,7 +254,7 @@ function policySource(
 
 function targetMetadataState(
   target: TargetDocumentEvidence,
-  classification: AssetClassificationEvidence,
+  classification: KnownAssetClassificationEvidence,
 ): "declared" | "partial" | "missing" | "not-required" {
   const hasMetadata = Object.keys(target.document.metadata).length > 0;
   if (classification.scope === "skill-local" && !hasMetadata) {

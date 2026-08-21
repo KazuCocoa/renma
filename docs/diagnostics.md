@@ -59,6 +59,14 @@ Structured facts in `details` are the authoritative inputs for review tooling.
 `llmHint` is guidance only; changing hint wording should not change bundle
 grouping, affected files, affected assets, or repair decisions.
 
+Typed repair guidance is authoritative before Diagnostics v2 is constructed.
+Finding and diagnostic producers author `RepairConstraint[]` and
+`VerificationStep[]` values directly, including constraint kinds, commands, and
+expected outcomes. Renma does not derive those semantics from phrases such as
+"Do not", "Preserve", or "Run renma". For the stable Finding compatibility
+shape, `constraints` and `verificationSteps` are generated only from the typed
+objects' `text` fields.
+
 ## Classification Evidence
 
 `inspect`, `suggest-metadata`, and relevant scan finding or diagnostic
@@ -616,8 +624,10 @@ Each `findings` entry contains these required fields:
 
 A Finding may also include `riskClass`, `constraints`, `repairConstraints`,
 `verificationSteps`, `verificationStepsV2`, `llmHint`, and structured `details`.
-Consumers must tolerate absent optional fields and additive fields they do not
-recognize.
+`repairConstraints` and `verificationStepsV2` carry typed semantics;
+`constraints` and `verificationSteps` are legacy text compatibility projections
+of those typed objects. Consumers must tolerate absent optional fields and
+additive fields they do not recognize.
 
 `evidence` always contains `path`, `startLine`, `endLine`, and `snippet`.
 Line numbers are one-based and inclusive. Paths identify the scanned source

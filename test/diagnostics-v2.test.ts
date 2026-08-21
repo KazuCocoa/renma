@@ -3,11 +3,130 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createReviewBundles } from "../src/diagnostics-v2.js";
+import {
+  createDiagnosticsV2,
+  createReviewBundles,
+} from "../src/diagnostics-v2.js";
+import {
+  canonicalFindingRepairGuidance,
+  projectFindingRepairGuidance,
+} from "../src/finding-repair-guidance.js";
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
-import type { DiagnosticV2, ReviewBundle } from "../src/types.js";
+import type { DiagnosticV2, Finding, ReviewBundle } from "../src/types.js";
+
+test("typed Finding guidance projects legacy text without prose inference", () => {
+  const finding = projectFindingRepairGuidance({
+    id: "TEST-TYPED-GUIDANCE",
+    title: "Typed guidance test",
+    category: "maintenance",
+    severity: "low",
+    confidence: "high",
+    evidence: {
+      path: "contexts/test.md",
+      startLine: 1,
+      endLine: 1,
+      snippet: "test",
+    },
+    whyItMatters: "Typed repair semantics must not depend on prose wording.",
+    remediation: "Apply the typed guidance.",
+    repairConstraints: [
+      {
+        kind: "allowed_change",
+        text: "Preserve this wording while testing an explicitly different kind.",
+      },
+    ],
+    verificationStepsV2: [
+      {
+        text: "Run renma catalog, despite the explicitly authored command.",
+        command: "npm test",
+        expected: "The authored expectation remains authoritative.",
+      },
+    ],
+  });
+
+  assert.deepEqual(finding.constraints, [
+    "Preserve this wording while testing an explicitly different kind.",
+  ]);
+  assert.deepEqual(finding.verificationSteps, [
+    "Run renma catalog, despite the explicitly authored command.",
+  ]);
+  assert.deepEqual(
+    canonicalFindingRepairGuidance(finding)?.repairConstraints,
+    finding.repairConstraints,
+  );
+  assert.deepEqual(
+    canonicalFindingRepairGuidance(finding)?.verificationSteps,
+    finding.verificationStepsV2,
+  );
+
+  const [diagnostic] = createDiagnosticsV2({
+    findings: [finding],
+    diagnostics: [],
+  });
+  assert.ok(
+    diagnostic?.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "allowed_change" &&
+        constraint.text.startsWith("Preserve this wording"),
+    ),
+  );
+  assert.ok(
+    diagnostic?.verificationSteps?.some(
+      (step) =>
+        step.command === "npm test" &&
+        step.expected === "The authored expectation remains authoritative.",
+    ),
+  );
+});
+
+test("legacy-only Finding guidance is rejected at the producer boundary", () => {
+  const legacyFinding = {
+    id: "TEST-LEGACY-GUIDANCE",
+    title: "Legacy guidance test",
+    category: "maintenance",
+    severity: "low",
+    confidence: "high",
+    evidence: {
+      path: "contexts/test.md",
+      startLine: 1,
+      endLine: 1,
+      snippet: "test",
+    },
+    whyItMatters: "Legacy prose cannot be the semantic authority.",
+    remediation: "Author typed guidance.",
+    constraints: ["Do not infer a repair kind from this sentence."],
+  } satisfies Finding;
+
+  assert.throws(
+    () => projectFindingRepairGuidance(legacyFinding),
+    /authored legacy repair guidance instead of typed guidance/,
+  );
+});
+
+test("scan Finding legacy arrays cannot drift from canonical typed guidance", async () => {
+  const result = await scan(await duplicateContextFixture());
+  let guidedFindingCount = 0;
+
+  for (const finding of result.findings) {
+    const guidance = canonicalFindingRepairGuidance(finding);
+    if (!guidance) continue;
+    guidedFindingCount += 1;
+    assert.deepEqual(
+      finding.constraints,
+      guidance.repairConstraints?.map((constraint) => constraint.text),
+      finding.id,
+    );
+    assert.deepEqual(
+      finding.verificationSteps,
+      guidance.verificationSteps?.map((step) => step.text),
+      finding.id,
+    );
+  }
+
+  assert.ok(guidedFindingCount > 0);
+});
 
 test("scan JSON includes LLM-actionable diagnostics v2 metadata", async () => {
   const root = await duplicateContextFixture();
