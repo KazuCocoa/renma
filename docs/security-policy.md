@@ -568,12 +568,14 @@ through exact Markdown structure: the same instruction, the same list item, the
 immediately preceding paragraph, or an active safety section. A guard does not
 cross an unrelated heading or thematic break, move between sibling list items,
 or come from an unrelated code block. Ordinary quotations remain
-non-operational. When bounded shell parsing succeeds, destructive and privileged
-diagnostics require executable command-position evidence, so risky-looking text
-passed to `echo` or `printf` is not treated as execution. Command substitution
-remains operational, as do shell `-c`/`eval` contexts and literal output piped
-into a shell. Local quotation or bounded source attribution such as “the
-incident report says:” or “the audit states:” keeps a blockquote inert even
+non-operational. Bounded shell text is classified as literal-only, operational,
+or unknown. Risky-looking text is suppressed only along proven literal-only
+command and data paths, such as direct output through `echo` or `printf`.
+Command substitution, shell `-c`/`eval` contexts, and standard input consumed as
+shell code remain operational; unrecognized wrappers, consumers, and shell
+options use conservative matching. Local quotation or bounded source
+attribution such as “the incident report says:” or “the audit states:” keeps a
+blockquote inert even
 beneath a generic instruction heading; attribution does not need to contain the
 word “quote.” An explicit local execution route takes precedence. A routed blockquote is
 analyzed as an instruction only within that local structural boundary. For a

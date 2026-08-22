@@ -380,6 +380,43 @@ sudo sh -c "rm -rf /tmp/example" || true
   ]);
 });
 
+test("commands with executable subcommands remain unknown", () => {
+  const cases: Array<{ command: string; diagnosticIds: string[] }> = [
+    {
+      command: 'git filter-branch --tree-filter "rm -rf /tmp/example"',
+      diagnosticIds: ["SEC-DESTRUCTIVE-COMMAND"],
+    },
+    {
+      command: 'git submodule foreach "sudo some-command"',
+      diagnosticIds: ["SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD"],
+    },
+    {
+      command: 'kubectl exec demo -- sh -c "rm -rf /tmp/example"',
+      diagnosticIds: ["SEC-DESTRUCTIVE-COMMAND"],
+    },
+    {
+      command: "launchctl submit -l demo -- /bin/rm -rf /tmp/example",
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
+    },
+  ];
+
+  for (const { command, diagnosticIds } of cases) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    for (const diagnosticId of diagnosticIds) {
+      const finding = findingFor(findings, diagnosticId);
+      assert.equal(finding.evidence.snippet, command);
+    }
+  }
+});
+
 test("process substitutions remain operational inside literal-output commands", () => {
   const cases = [
     {
