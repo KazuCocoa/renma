@@ -287,7 +287,7 @@ export function logicalShellCommands(
 }
 
 function isLogicalShellCommandStart(line: string): boolean {
-  return /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?(?:sudo\b|(?:(?:command|env)\s+|[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:curl|npm|pnpm|yarn|rm|git|docker|kubectl|drop|truncate|chmod|chown|mount|launchctl|systemctl)\b)/i.test(
+  return /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?(?:(?:command|env)\s+|[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:sudo\b|(?:curl|npm|pnpm|yarn|rm|git|docker|kubectl|drop|truncate|chmod|chown|mount|launchctl|systemctl)\b)/i.test(
     line,
   );
 }

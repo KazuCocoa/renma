@@ -1420,6 +1420,8 @@ const PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE = new RegExp(
 );
 const INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE =
   /^(?:ignore|disregard|override|supersede|take\s+precedence\s+over)/iu;
+const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE =
+  /\b(?:cannot|can't|can not|(?:do|does|did) not|don't|doesn't|didn't|(?:will|would) not|won't|wouldn't|(?:is|are|was|were) (?:unable to|not able to))\s*$/iu;
 
 type SafeguardBypassPattern = {
   pattern: RegExp;
@@ -4531,14 +4533,28 @@ function riskyShellFailureSuppressions(
           candidate.kind === "operator" &&
           isShellCommandBoundary(candidate.value),
       );
+    const previousPipelineBoundary = [...tokenization.tokens.slice(0, index)]
+      .reverse()
+      .find(
+        (candidate) =>
+          candidate.kind === "operator" &&
+          isShellPipelineBoundary(candidate.value),
+      );
     const operationStart = previousBoundary?.end ?? 0;
+    const pipelineStart = previousPipelineBoundary?.end ?? 0;
     const operation = command.slice(operationStart, token.start).trim();
+    const sensitiveDataOperation = command
+      .slice(pipelineStart, token.start)
+      .trim();
     if (!operation) continue;
-    const operationKinds = classifyRiskyShellOperation(operation);
+    const operationKinds = classifyRiskyShellOperation(
+      operation,
+      sensitiveDataOperation,
+    );
     if (operationKinds.length === 0) continue;
 
     suppressions.push({
-      start: operationStart,
+      start: pipelineStart,
       suppression: suppressor.value === "true" ? "|| true" : "|| :",
       operationKinds,
     });
@@ -4556,7 +4572,14 @@ function isShellCommandBoundary(operator: string): boolean {
   );
 }
 
-function classifyRiskyShellOperation(operation: string): RiskyOperationKind[] {
+function isShellPipelineBoundary(operator: string): boolean {
+  return isShellCommandBoundary(operator) && operator !== "|";
+}
+
+function classifyRiskyShellOperation(
+  operation: string,
+  sensitiveDataOperation = operation,
+): RiskyOperationKind[] {
   const kinds: RiskyOperationKind[] = [];
   if (DESTRUCTIVE_COMMAND_RE.test(operation)) {
     kinds.push("destructive-command");
@@ -4576,9 +4599,21 @@ function classifyRiskyShellOperation(operation: string): RiskyOperationKind[] {
   if (isUploadInstruction(analysis.destinationAnalysis)) {
     kinds.push("security-sensitive-upload");
   }
+  const sensitiveDataAnalysis =
+    sensitiveDataOperation === operation
+      ? analysis
+      : analyzeSecurityCommand({
+          source: {
+            text: sensitiveDataOperation,
+            startLine: 1,
+            endLine: sensitiveDataOperation.split(/\r?\n/u).length,
+            lines: sensitiveDataOperation.split(/\r?\n/u),
+          },
+        });
   if (
-    (analysis.sensitiveSources.length > 0 && analysis.sinks.length > 0) ||
-    CREDENTIAL_ARG_ANY_RE.test(operation)
+    (sensitiveDataAnalysis.sensitiveSources.length > 0 &&
+      sensitiveDataAnalysis.sinks.length > 0) ||
+    CREDENTIAL_ARG_ANY_RE.test(sensitiveDataOperation)
   ) {
     kinds.push("sensitive-data-operation");
   }
@@ -5255,6 +5290,7 @@ function unsafeInstructionHierarchyOverride(
       PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
     ],
     INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE,
+    hierarchyOverrideActionIsNegated,
   );
 }
 
@@ -5262,6 +5298,7 @@ function firstUnsafeBoundedActionMatch(
   text: string,
   patterns: readonly RegExp[],
   recognizedAction: RegExp,
+  additionalProhibition?: (text: string, actionStart: number) => boolean,
 ): UnsafeBoundedActionMatch | undefined {
   const analysisText = safeguardMarkdownPresentationProjection(text);
   const actions = safeguardActionPolarities(analysisText);
@@ -5273,7 +5310,8 @@ function firstUnsafeBoundedActionMatch(
           action.start >= match.start &&
           action.start < end &&
           recognizedAction.test(analysisText.slice(action.start, action.end)) &&
-          !action.prohibited,
+          !action.prohibited &&
+          !(additionalProhibition?.(analysisText, action.start) ?? false),
       );
       if (unsafeAction) {
         return {
@@ -5284,6 +5322,27 @@ function firstUnsafeBoundedActionMatch(
     }
   }
   return undefined;
+}
+
+function hierarchyOverrideActionIsNegated(
+  text: string,
+  actionStart: number,
+): boolean {
+  const boundedPrefix = text.slice(Math.max(0, actionStart - 120), actionStart);
+  const boundary = Math.max(
+    boundedPrefix.lastIndexOf("."),
+    boundedPrefix.lastIndexOf(";"),
+    boundedPrefix.lastIndexOf(":"),
+    boundedPrefix.lastIndexOf("!"),
+    boundedPrefix.lastIndexOf("?"),
+    boundedPrefix.lastIndexOf("—"),
+    boundedPrefix.lastIndexOf("–"),
+    boundedPrefix.lastIndexOf("\n"),
+    boundedPrefix.lastIndexOf("\r"),
+  );
+  return INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(
+    boundedPrefix.slice(boundary + 1),
+  );
 }
 
 /** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
