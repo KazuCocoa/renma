@@ -5301,7 +5301,10 @@ function firstUnsafeBoundedActionMatch(
   additionalProhibition?: (text: string, actionStart: number) => boolean,
 ): UnsafeBoundedActionMatch | undefined {
   const analysisText = safeguardMarkdownPresentationProjection(text);
-  const actions = safeguardActionPolarities(analysisText);
+  const actions = safeguardActionPolarities(
+    analysisText,
+    additionalProhibition,
+  );
   for (const pattern of patterns) {
     for (const match of overlappingPatternMatches(analysisText, pattern)) {
       const end = match.start + match.text.length;
@@ -5310,8 +5313,7 @@ function firstUnsafeBoundedActionMatch(
           action.start >= match.start &&
           action.start < end &&
           recognizedAction.test(analysisText.slice(action.start, action.end)) &&
-          !action.prohibited &&
-          !(additionalProhibition?.(analysisText, action.start) ?? false),
+          !action.prohibited,
       );
       if (unsafeAction) {
         return {
@@ -5441,6 +5443,7 @@ function overlappingPatternMatches(
 
 function safeguardActionPolarities(
   text: string,
+  additionalProhibition?: (text: string, actionStart: number) => boolean,
 ): Array<{ start: number; end: number; prohibited: boolean }> {
   const actions = [...text.matchAll(SAFEGUARD_ACTION_PREDICATE_RE)].flatMap(
     (match) =>
@@ -5457,6 +5460,10 @@ function safeguardActionPolarities(
 
   for (const [index, action] of actions.entries()) {
     const previous = actions[index - 1];
+    if (additionalProhibition?.(text, action.start) ?? false) {
+      action.prohibited = true;
+      continue;
+    }
     const localStart = previous?.end ?? Math.max(0, action.start - 120);
     const localPrefix = text.slice(localStart, action.start);
     const prohibitions = [...localPrefix.matchAll(SAFEGUARD_PROHIBITION_RE)];
