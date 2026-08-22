@@ -181,6 +181,26 @@ test("literal output piped into a shell remains operational", () => {
       command: 'command printf "%s\\n" "chmod 777 output" | env bash -s',
       diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
     },
+    {
+      command: 'echo "rm -rf /tmp/example" | nice -n 5 sh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: 'printf "%s\\n" "sudo some-command" | nohup -- bash',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      command: 'echo "git reset --hard" | timeout -s KILL 5 zsh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: 'printf "%s\\n" "chmod 777 output" | stdbuf -o L sh',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      command: 'echo "rm -rf /tmp/example" | setsid -- sh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
   ];
 
   for (const { command, diagnosticId } of cases) {
@@ -209,6 +229,19 @@ echo "rm -rf /tmp/example" | cat
 `);
   assert.deepEqual(
     safePipeline.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+    [],
+  );
+
+  const safeWrappedPipeline = findingsFor(`# Workflow
+
+\`\`\`bash
+echo "rm -rf /tmp/example" | timeout 5 bash script.sh
+\`\`\`
+`);
+  assert.deepEqual(
+    safeWrappedPipeline.filter(({ id }) =>
+      RISKY_COMMAND_DIAGNOSTIC_IDS.has(id),
+    ),
     [],
   );
 
@@ -263,6 +296,20 @@ test("shell code evaluators preserve nested destructive and privileged risks", (
     {
       command: 'command eval "sudo some-command"',
       diagnosticIds: ["SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD"],
+    },
+    {
+      command: 'sudo nice -n 5 sh -c "rm -rf /tmp/example"',
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
+    },
+    {
+      command: 'sudo timeout -k 1 5 bash -lc "git reset --hard"',
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
     },
   ];
 

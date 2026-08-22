@@ -4865,8 +4865,11 @@ const SHELL_CODE_EXECUTABLES = new Set([
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
-const SHELL_WRAPPER_RE = /^(?:command|env)$/iu;
+const SHELL_WRAPPER_RE = /^(?:command|env|nice|nohup|setsid|stdbuf|timeout)$/iu;
 const SHELL_WRAPPER_OPTION_WITH_VALUE_RE = /^(?:-u|--unset|-C|--chdir)$/u;
+const NICE_OPTION_WITH_VALUE_RE = /^(?:-n|--adjustment)$/u;
+const STDBUF_OPTION_WITH_VALUE_RE = /^(?:-[ioe]|--(?:input|output|error))$/u;
+const TIMEOUT_OPTION_WITH_VALUE_RE = /^(?:-k|--kill-after|-s|--signal)$/u;
 const SUDO_OPTION_WITH_VALUE_RE =
   /^(?:-[ughpCTRD]|--(?:user|group|host|prompt|chdir|command-timeout|chroot))$/u;
 
@@ -4947,15 +4950,36 @@ function wrappedShellExecutableIndex(
   let index = startIndex;
   while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   while (SHELL_WRAPPER_RE.test(normalizedShellExecutable(words[index]) ?? "")) {
+    const wrapper = normalizedShellExecutable(words[index]) ?? "";
     index += 1;
     while ((words[index] ?? "").startsWith("-")) {
       const option = words[index] ?? "";
       index += 1;
-      if (SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option)) index += 1;
+      if (option === "--") break;
+      if (shellWrapperOptionConsumesValue(wrapper, option)) index += 1;
     }
-    while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
+    if (wrapper === "timeout" && words[index] !== undefined) {
+      index += 1;
+    }
+    if (wrapper === "command" || wrapper === "env") {
+      while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
+    }
   }
   return index;
+}
+
+function shellWrapperOptionConsumesValue(
+  wrapper: string,
+  option: string,
+): boolean {
+  if (option.includes("=")) return false;
+  if (wrapper === "command" || wrapper === "env") {
+    return SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option);
+  }
+  if (wrapper === "nice") return NICE_OPTION_WITH_VALUE_RE.test(option);
+  if (wrapper === "stdbuf") return STDBUF_OPTION_WITH_VALUE_RE.test(option);
+  if (wrapper === "timeout") return TIMEOUT_OPTION_WITH_VALUE_RE.test(option);
+  return false;
 }
 
 function shellCommandRiskPatterns(
