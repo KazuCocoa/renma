@@ -68,7 +68,10 @@ import {
   positiveDisclosureActions,
   type SecurityCommandAnalysis,
 } from "./security-command/index.js";
-import { tokenizeBoundedShell } from "./security-command/shell.js";
+import {
+  hasBoundedShellCommandSubstitution,
+  tokenizeBoundedShell,
+} from "./security-command/shell.js";
 import {
   disclosureClauseRangesIntersectingRange,
   disclosureRangeIsExplicitlyProhibited,
@@ -1427,12 +1430,19 @@ const INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE =
   /^(?:ignore(?:s|ing)?|disregard(?:s|ing)?|override(?:s|ing)?|supersede(?:s|ing)?|takes?\s+precedence\s+over)/iu;
 const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE =
   /\b(?:cannot|can't|can not|can\s+never|may\s+not|(?:do|does|did) not|don't|doesn't|didn't|(?:will|would) not|won't|wouldn't|(?:is|are|was|were) (?:unable to|not able to|not (?:allowed|permitted|authorized) to))(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*\s*$/iu;
-const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE =
-  /(?:^|\b)(?:no\s+(?:(?:local|lower[- ]level|agent-facing)\s+)?(?:skill|rule|policy|instruction|instructions|guidance)|nothing|neither\s+(?:skill|rule|policy|instruction|instructions))\s+(?:(?:may|can|will|should|must)(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*|(?:is|are|was|were)\s+(?:allowed|permitted|authorized)\s+to)\s*$/iu;
+const INSTRUCTION_HIERARCHY_ACTOR_SOURCE = String.raw`(?:skills?|rules?|polic(?:y|ies)|instructions?|guidance|workflows?|agents?|helpers?)`;
+const INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE = String.raw`(?:(?:(?:this|that|the|any|a|an|local|lower[- ]level|agent-facing)\s+){0,3}${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})`;
+const INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE = String.raw`(?:may|can|will|should|must)(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*`;
+const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE = new RegExp(
+  String.raw`(?:^|\b)(?:no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}(?:\s+(?:(?:in|within|under|that|which|who)\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}))?\s+(?:${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:is|are|was|were)\s+(?:allowed|permitted|authorized)\s+to)|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+nor\s+(?:its\s+)?${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:nothing|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|under\s+no\s+circumstances\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}|it\s+is\s+(?:forbidden|prohibited|not\s+(?:allowed|permitted|authorized))\s+for\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+to)\s*$`,
+  "i",
+);
 const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE =
-  /\b(?:for example|explain why|the\s+(?:phrase|statement|prompt)|(?:incident|audit|review)\s+(?:report\s+)?(?:says?|states?|reads?|contains?|quotes?))\b[^.!?\n\r]{0,120}(?:["'`]\s*)?$/iu;
+  /\bfor example\b[^.!?\n\r]{0,120}(?:["'`“‘]\s*)?$|\bthe\s+(?:phrase|statement|prompt)\s+["'`“‘]\s*$|\b(?:(?:(?:the|a)\s+)?(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?))\s+(?:says?|states?|reads?|contains?|quotes?|not(?:e|es|ed|ing)|documents?|records?|explains?)\b[^.!?\n\r]{0,120}(?:["'`“‘]\s*)?$|\baccording\s+to\s+(?:(?:the|an?)\s+)?(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?)\b[^.!?\n\r]{0,120}$/iu;
 const INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE =
   /^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\s+(?:(?:this|these|a|an|the)\s+)?(?:local\s+)?(?:skill|rule|policy|instructions?|guidance|system|developer|platform|higher[- ]level|host[- ]agent)\b[^.!?;:—–\n\r]{0,100}$/iu;
+const INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE =
+  /^\s*(?:(?:verify|determine|check|assess|document|explain)\s+(?:whether|if)\b|explain\s+why\s+(?:(?:this|these|a|an|the)\s+)?(?:local\s+)?(?:skill|rule|policy|instructions?|guidance|system|developer|platform|higher[- ]level|host[- ]agent)\b)[^,.!?;:—–\n\r]{0,120}$/iu;
 
 type SafeguardBypassPattern = {
   pattern: RegExp;
@@ -4611,7 +4621,7 @@ function classifyRiskyShellOperation(
   const literalOutputOnly =
     effectiveExecutable !== undefined &&
     LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable) &&
-    !/(?:\$|`)/u.test(operation);
+    !hasBoundedShellCommandSubstitution(operation);
 
   const analysis = analyzeSecurityCommand({
     source: {
@@ -4621,12 +4631,7 @@ function classifyRiskyShellOperation(
       lines: operation.split(/\r?\n/u),
     },
   });
-  if (
-    !literalOutputOnly &&
-    effectiveExecutable !== undefined &&
-    UPLOAD_SHELL_EXECUTABLES.has(effectiveExecutable) &&
-    isUploadInstruction(analysis.destinationAnalysis)
-  ) {
+  if (!literalOutputOnly && isUploadInstruction(analysis.destinationAnalysis)) {
     kinds.push("security-sensitive-upload");
   }
   const sensitiveDataAnalysis =
@@ -4668,26 +4673,6 @@ const PRIVILEGED_SHELL_EXECUTABLES = new Set([
   "sudo",
   "systemctl",
 ]);
-const UPLOAD_SHELL_EXECUTABLES = new Set([
-  "attach",
-  "aws",
-  "az",
-  "copy",
-  "curl",
-  "gcloud",
-  "gh",
-  "post",
-  "publish",
-  "push",
-  "rsync",
-  "scp",
-  "send",
-  "share",
-  "submit",
-  "sync",
-  "upload",
-  "wget",
-]);
 const LITERAL_OUTPUT_SHELL_EXECUTABLES = new Set(["echo", "printf"]);
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
@@ -4700,15 +4685,15 @@ const SUDO_OPTION_WITH_VALUE_RE =
 function directShellExecutable(command: string): string | undefined {
   const words = shellCommandWords(command);
   if (words === undefined) return undefined;
-  return words[directShellExecutableIndex(words)]?.toLowerCase();
+  return normalizedShellExecutable(words[directShellExecutableIndex(words)]);
 }
 
 function effectiveShellExecutable(command: string): string | undefined {
   const words = shellCommandWords(command);
   if (words === undefined) return undefined;
   let index = directShellExecutableIndex(words);
-  if ((words[index] ?? "").toLowerCase() !== "sudo") {
-    return words[index]?.toLowerCase();
+  if (normalizedShellExecutable(words[index]) !== "sudo") {
+    return normalizedShellExecutable(words[index]);
   }
 
   index += 1;
@@ -4717,8 +4702,15 @@ function effectiveShellExecutable(command: string): string | undefined {
     index += 1;
     if (SUDO_OPTION_WITH_VALUE_RE.test(option)) index += 1;
   }
-  while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-  return words[index]?.toLowerCase();
+  index = wrappedShellExecutableIndex(words, index);
+  return normalizedShellExecutable(words[index]);
+}
+
+function normalizedShellExecutable(
+  word: string | undefined,
+): string | undefined {
+  if (word === undefined) return undefined;
+  return word.slice(word.lastIndexOf("/") + 1).toLowerCase();
 }
 
 function shellCommandWords(command: string): string[] | undefined {
@@ -4753,8 +4745,16 @@ function shellCommandWords(command: string): string[] | undefined {
 function directShellExecutableIndex(words: readonly string[]): number {
   let index = 0;
   while (SHELL_PRESENTATION_MARKER_RE.test(words[index] ?? "")) index += 1;
+  return wrappedShellExecutableIndex(words, index);
+}
+
+function wrappedShellExecutableIndex(
+  words: readonly string[],
+  startIndex: number,
+): number {
+  let index = startIndex;
   while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-  while (SHELL_WRAPPER_RE.test(words[index] ?? "")) {
+  while (SHELL_WRAPPER_RE.test(normalizedShellExecutable(words[index]) ?? "")) {
     index += 1;
     while ((words[index] ?? "").startsWith("-")) {
       const option = words[index] ?? "";
@@ -5494,7 +5494,8 @@ function hierarchyOverrideActionIsDefensive(
     INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(clausePrefix) ||
     INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE.test(clausePrefix) ||
     INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
-    INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE.test(clausePrefix)
+    INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE.test(clausePrefix) ||
+    INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE.test(clausePrefix)
   ) {
     return true;
   }

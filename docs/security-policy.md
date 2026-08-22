@@ -838,26 +838,31 @@ privileged, a security-sensitive upload, or a sensitive-data operation. A
 small prose grammar also covers an explicit risky-operation failure followed
 by either “ignore the error and continue” or “continue and ignore the error.”
 Destructive and privileged shell classification requires the risky executable
-in command position, and literal `echo` or `printf` command text is not promoted
-into this finding. Neither generic error handling nor a generic suppression is
-enough: capability probes, ordinary commands, `try/catch`, `set +e`, and stderr
-redirection remain outside the rule by themselves. Preserve the failure, stop
-and report the blocker, and add explicit verification or rollback where partial
-effects are possible.
+in command position. Static absolute paths and bounded wrappers retain that
+evidence, while uploads continue to reuse the existing destination analysis
+without a second tool allowlist. Literal `echo` or `printf` command text remains
+outside this finding when it contains ordinary variable interpolation; command
+substitution remains operational. Neither generic error handling nor a generic
+suppression is enough: capability probes, ordinary commands, `try/catch`,
+`set +e`, and stderr redirection remain outside the rule by themselves. Preserve
+the failure, stop and report the blocker, and add explicit verification or
+rollback where partial effects are possible.
 
 `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` covers a different authority boundary. It
 uses a small English grammar requiring both an override action—such as ignore,
 disregard, override, supersede, or take precedence over—and an explicit target
 such as previous, prior, earlier, preceding, system, developer, higher-level,
 platform-policy, or host-agent instructions. Persona wording alone is not a
-match. Correct higher-to-lower authority ordering, bounded hierarchy questions,
-attributed or illustrative phrases, direct prohibitions, inability statements,
-and negative-subject forms remain defensive. Structurally non-operational
-examples retain the existing Markdown security-view boundary. Hidden HTML and
-YAML-comment matches keep the existing hidden-operational diagnostic identity
-and record this rule as their underlying match. Remove the override claim,
-preserve host authority, and express the intended Skill behavior only within
-its local scope.
+match. Correct higher-to-lower authority ordering, direct or indirect bounded
+hierarchy questions, explicitly attributed or illustrative phrases, direct
+prohibitions, inability statements, and bounded negative-subject forms remain
+defensive. Merely mentioning a prompt, statement, or phrase before an override
+does not create an attribution exemption. Structurally non-operational examples
+retain the existing Markdown security-view boundary. Hidden HTML and YAML-
+comment matches keep the existing hidden-operational diagnostic identity and
+record this rule as their underlying match. Remove the override claim, preserve
+host authority, and express the intended Skill behavior only within its local
+scope.
 
 HTML comments remain excluded from the rendered-visible semantic projection;
 they are not treated as ordinary operational prose. Because an agent may read
