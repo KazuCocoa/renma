@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added `SEC-RISKY-OPERATION-ERROR-SUPPRESSION` for bounded shell and prose
+  instructions that explicitly hide failure from an already-recognized
+  destructive, privileged, upload, or sensitive-data operation.
+- Added `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` for explicit, bounded attempts to
+  supersede system, developer, platform, prior, or higher-level instructions
+  without treating ordinary persona wording as a violation.
+
 ### Changed
 
 - Made the pre-1.0 compatibility boundary explicit without changing stable CLI
