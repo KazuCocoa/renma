@@ -163,47 +163,81 @@ ${command}
   }
 });
 
-test("literal output piped into a shell remains operational", () => {
-  const cases = [
+test("pipeline inputs fail closed unless the consumer is proven literal-only", () => {
+  const cases: Array<{
+    disposition: "operational" | "unknown";
+    command: string;
+    diagnosticId: string;
+  }> = [
     {
+      disposition: "operational",
       command: 'echo "rm -rf /tmp/example" | sh',
       diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
     },
     {
+      disposition: "operational",
       command: 'printf "%s\\n" "sudo some-command" | bash',
       diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
     },
     {
+      disposition: "operational",
       command: 'echo "git reset --hard" | tee script.sh | zsh',
       diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
     },
     {
+      disposition: "operational",
       command: 'command printf "%s\\n" "chmod 777 output" | env bash -s',
       diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
     },
     {
+      disposition: "unknown",
       command: 'echo "rm -rf /tmp/example" | nice -n 5 sh',
       diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
     },
     {
+      disposition: "unknown",
       command: 'printf "%s\\n" "sudo some-command" | nohup -- bash',
       diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
     },
     {
+      disposition: "unknown",
       command: 'echo "git reset --hard" | timeout -s KILL 5 zsh',
       diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
     },
     {
+      disposition: "unknown",
       command: 'printf "%s\\n" "chmod 777 output" | stdbuf -o L sh',
       diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
     },
     {
+      disposition: "unknown",
       command: 'echo "rm -rf /tmp/example" | setsid -- sh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      disposition: "unknown",
+      command: 'echo "rm -rf /tmp/example" | bash --rcfile /dev/null',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      disposition: "unknown",
+      command:
+        'printf "%s\\n" "sudo some-command" | bash --init-file /dev/null',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      disposition: "unknown",
+      command: 'echo "rm -rf /tmp/example" | custom-launcher sh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      disposition: "unknown",
+      command: 'echo "rm -rf /tmp/example" | timeout 5 bash script.sh',
       diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
     },
   ];
 
-  for (const { command, diagnosticId } of cases) {
+  for (const { disposition, command, diagnosticId } of cases) {
     const finding = findingFor(
       findingsFor(`# Workflow
 
@@ -213,37 +247,35 @@ ${command}
 `),
       diagnosticId,
     );
-    assert.deepEqual(finding.evidence, {
-      path: "contexts/security/targeted.md",
-      startLine: 8,
-      endLine: 8,
-      snippet: command,
-    });
+    assert.deepEqual(
+      finding.evidence,
+      {
+        path: "contexts/security/targeted.md",
+        startLine: 8,
+        endLine: 8,
+        snippet: command,
+      },
+      `${disposition}: ${command}`,
+    );
   }
 
-  const safePipeline = findingsFor(`# Workflow
+  for (const command of [
+    'echo "rm -rf /tmp/example" | cat',
+    'printf "%s\\n" "sudo some-command" | tee output.txt',
+    'echo "rm -rf /tmp/example" | bash script.sh',
+  ]) {
+    const findings = findingsFor(`# Workflow
 
 \`\`\`bash
-echo "rm -rf /tmp/example" | cat
+${command}
 \`\`\`
 `);
-  assert.deepEqual(
-    safePipeline.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
-    [],
-  );
-
-  const safeWrappedPipeline = findingsFor(`# Workflow
-
-\`\`\`bash
-echo "rm -rf /tmp/example" | timeout 5 bash script.sh
-\`\`\`
-`);
-  assert.deepEqual(
-    safeWrappedPipeline.filter(({ id }) =>
-      RISKY_COMMAND_DIAGNOSTIC_IDS.has(id),
-    ),
-    [],
-  );
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
 
   const body = `# Workflow
 
@@ -306,6 +338,13 @@ test("shell code evaluators preserve nested destructive and privileged risks", (
     },
     {
       command: 'sudo timeout -k 1 5 bash -lc "git reset --hard"',
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
+    },
+    {
+      command: 'sudo custom-launcher sh -c "rm -rf /tmp/example"',
       diagnosticIds: [
         "SEC-DESTRUCTIVE-COMMAND",
         "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",

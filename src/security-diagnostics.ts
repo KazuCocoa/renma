@@ -4481,7 +4481,7 @@ function commandDetections(
 ): Detection[] {
   const detections: Detection[] = [];
   const defensiveAction = isDefensiveOrGuardedActionInstruction(line);
-  const shellCommandRiskKinds = classifyShellCommandRiskKinds(line, true);
+  const shellCommandRiskKinds = classifyShellCommandRiskKinds(line);
 
   const remoteScript = line.match(REMOTE_SCRIPT_RE);
   if (remoteScript && !hasPinnedRemoteScript(line) && !defensiveAction) {
@@ -4648,15 +4648,15 @@ function isShellPipelineBoundary(operator: string): boolean {
   return isShellCommandBoundary(operator) && operator !== "|";
 }
 
-function classifyShellCommandRiskKinds(
-  command: string,
-  allowConservativeFallback: boolean,
-): RiskyOperationKind[] {
+// This is a safety boundary, not a catalog of every shell utility. Only proven
+// literal-only paths suppress fallback matching; unfamiliar semantics stay
+// unknown and therefore fail closed.
+type ShellTextDisposition = "literal-only" | "operational" | "unknown";
+
+function classifyShellCommandRiskKinds(command: string): RiskyOperationKind[] {
   const tokenization = tokenizeBoundedShell(command);
   if (!tokenization.supported) {
-    return allowConservativeFallback
-      ? fallbackShellCommandRiskKinds(command)
-      : [];
+    return fallbackShellCommandRiskKinds(command);
   }
 
   const segments: Array<{ text: string; boundaryAfter?: string }> = [];
@@ -4673,14 +4673,14 @@ function classifyShellCommandRiskKinds(
   }
   segments.push({ text: command.slice(segmentStart).trim() });
 
-  const shellPipelineInputSegments = shellPipelineInputSegmentIndexes(segments);
+  const shellPipelineInputDispositions =
+    shellPipelineInputSegmentDispositions(segments);
   const kinds = new Set<RiskyOperationKind>();
   for (const [index, segment] of segments.entries()) {
     addShellCommandSegmentRiskKinds(
       kinds,
       segment.text,
-      allowConservativeFallback,
-      shellPipelineInputSegments.has(index),
+      shellPipelineInputDispositions.get(index),
     );
   }
 
@@ -4692,8 +4692,7 @@ function classifyShellCommandRiskKinds(
 function addShellCommandSegmentRiskKinds(
   kinds: Set<RiskyOperationKind>,
   segment: string,
-  allowConservativeFallback: boolean,
-  shellPipelineInput: boolean,
+  shellPipelineInputDisposition: ShellTextDisposition | undefined,
 ): void {
   if (!segment) return;
 
@@ -4714,76 +4713,108 @@ function addShellCommandSegmentRiskKinds(
     kinds.add("privileged-command");
   }
 
-  const hasOperationalEvaluation =
-    hasBoundedShellOperationalSubstitution(segment) ||
-    shellPipelineInput ||
-    hasShellCodeEvaluation(segment, effectiveExecutable);
-  if (!allowConservativeFallback && !hasOperationalEvaluation) return;
-  const commandPositionEstablished =
-    destructivePattern !== undefined ||
-    privilegedPattern !== undefined ||
-    (effectiveExecutable !== undefined &&
-      LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable));
-  if (commandPositionEstablished && !hasOperationalEvaluation) {
+  const disposition = shellSegmentTextDisposition(
+    segment,
+    effectiveExecutable,
+    shellPipelineInputDisposition,
+  );
+  if (disposition === "literal-only") {
     return;
   }
   for (const kind of fallbackShellCommandRiskKinds(segment)) kinds.add(kind);
 }
 
-function shellPipelineInputSegmentIndexes(
+function shellPipelineInputSegmentDispositions(
   segments: readonly { text: string; boundaryAfter?: string }[],
-): ReadonlySet<number> {
-  const indexes = new Set<number>();
+): ReadonlyMap<number, ShellTextDisposition> {
+  const dispositions = new Map<number, ShellTextDisposition>();
   let pipelineStart = 0;
   for (const [index, segment] of segments.entries()) {
     if (segment.boundaryAfter === "|") continue;
 
     for (let sink = pipelineStart + 1; sink <= index; sink += 1) {
-      if (!isShellPipelineCodeConsumer(segments[sink]?.text ?? "")) continue;
+      const disposition = shellPipelineConsumerDisposition(
+        segments[sink]?.text ?? "",
+      );
+      if (disposition === "literal-only") continue;
       for (let input = pipelineStart; input < sink; input += 1) {
-        indexes.add(input);
+        const current = dispositions.get(input);
+        if (current !== "operational") {
+          dispositions.set(input, disposition);
+        }
       }
     }
     pipelineStart = index + 1;
   }
-  return indexes;
+  return dispositions;
 }
 
-function hasShellCodeEvaluation(
+function shellSegmentTextDisposition(
   segment: string,
   effectiveExecutable: string | undefined,
-): boolean {
-  if (effectiveExecutable === "eval") return true;
+  shellPipelineInputDisposition: ShellTextDisposition | undefined,
+): ShellTextDisposition {
+  if (
+    hasBoundedShellOperationalSubstitution(segment) ||
+    shellPipelineInputDisposition === "operational"
+  ) {
+    return "operational";
+  }
+  if (shellPipelineInputDisposition === "unknown") return "unknown";
+  if (effectiveExecutable === "eval") return "operational";
   if (
     effectiveExecutable === undefined ||
     !SHELL_CODE_EXECUTABLES.has(effectiveExecutable)
   ) {
-    return false;
+    return effectiveExecutable !== undefined &&
+      SHELL_LITERAL_ARGUMENT_EXECUTABLES.has(effectiveExecutable)
+      ? "literal-only"
+      : "unknown";
   }
 
   const words = shellCommandWords(segment);
-  if (words === undefined) return true;
+  if (words === undefined) return "unknown";
   const executableIndex = effectiveShellExecutableIndex(words);
-  return words
-    .slice(executableIndex + 1)
-    .some((word) => word === "--command" || /^-[^-]*c/u.test(word));
+  for (let index = executableIndex + 1; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (word === "--command" || /^-[^-]*c/u.test(word)) {
+      return "operational";
+    }
+    if (word === "--") return "literal-only";
+    if (word === "-s") continue;
+    if (word === "-O" || word === "-o") {
+      index += 1;
+      continue;
+    }
+    if (word.startsWith("-")) return "unknown";
+    return "literal-only";
+  }
+  return "literal-only";
 }
 
-function isShellPipelineCodeConsumer(segment: string): boolean {
+function shellPipelineConsumerDisposition(
+  segment: string,
+): ShellTextDisposition {
   const words = shellCommandWords(segment);
-  if (words === undefined) return false;
+  if (words === undefined) return "unknown";
   const executableIndex = effectiveShellExecutableIndex(words);
   const executable = normalizedShellExecutable(words[executableIndex]);
-  if (executable === undefined || !SHELL_CODE_EXECUTABLES.has(executable)) {
-    return false;
+  if (executable === undefined) return "unknown";
+  if (SHELL_LITERAL_PIPELINE_CONSUMERS.has(executable)) {
+    return "literal-only";
+  }
+  if (!SHELL_CODE_EXECUTABLES.has(executable)) {
+    return "unknown";
   }
 
   let readsStandardInput = false;
   for (let index = executableIndex + 1; index < words.length; index += 1) {
     const word = words[index] ?? "";
-    if (word === "--command" || /^-[^-]*c/u.test(word)) return false;
+    if (word === "--command" || /^-[^-]*c/u.test(word)) return "unknown";
     if (word === "--") {
-      return readsStandardInput || index + 1 === words.length;
+      return readsStandardInput || index + 1 === words.length
+        ? "operational"
+        : "literal-only";
     }
     if (word === "-s" || /^-[^-]*s/u.test(word)) {
       readsStandardInput = true;
@@ -4793,10 +4824,10 @@ function isShellPipelineCodeConsumer(segment: string): boolean {
       index += 1;
       continue;
     }
-    if (word.startsWith("-")) continue;
-    return readsStandardInput;
+    if (word.startsWith("-")) return "unknown";
+    return readsStandardInput ? "operational" : "literal-only";
   }
-  return true;
+  return "operational";
 }
 
 function fallbackShellCommandRiskKinds(command: string): RiskyOperationKind[] {
@@ -4810,10 +4841,7 @@ function classifyRiskyShellOperation(
   operation: string,
   sensitiveDataOperation = operation,
 ): RiskyOperationKind[] {
-  const kinds: RiskyOperationKind[] = classifyShellCommandRiskKinds(
-    operation,
-    false,
-  );
+  const kinds: RiskyOperationKind[] = classifyShellCommandRiskKinds(operation);
   const effectiveExecutable = effectiveShellExecutable(operation);
   const literalOutputOnly =
     effectiveExecutable !== undefined &&
@@ -4854,6 +4882,24 @@ function classifyRiskyShellOperation(
 }
 
 const LITERAL_OUTPUT_SHELL_EXECUTABLES = new Set(["echo", "printf"]);
+// Keep this allowlist limited to commands whose arguments are not evaluated as
+// shell code. Wrappers and launchers do not belong here.
+const SHELL_LITERAL_ARGUMENT_EXECUTABLES = new Set([
+  ...LITERAL_OUTPUT_SHELL_EXECUTABLES,
+  "cat",
+  "chmod",
+  "chown",
+  "drop",
+  "git",
+  "kubectl",
+  "launchctl",
+  "mount",
+  "rm",
+  "systemctl",
+  "tee",
+  "truncate",
+]);
+const SHELL_LITERAL_PIPELINE_CONSUMERS = new Set(["cat", "tee"]);
 const SHELL_CODE_EXECUTABLES = new Set([
   "bash",
   "dash",
@@ -4865,11 +4911,8 @@ const SHELL_CODE_EXECUTABLES = new Set([
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
-const SHELL_WRAPPER_RE = /^(?:command|env|nice|nohup|setsid|stdbuf|timeout)$/iu;
+const SHELL_WRAPPER_RE = /^(?:command|env)$/iu;
 const SHELL_WRAPPER_OPTION_WITH_VALUE_RE = /^(?:-u|--unset|-C|--chdir)$/u;
-const NICE_OPTION_WITH_VALUE_RE = /^(?:-n|--adjustment)$/u;
-const STDBUF_OPTION_WITH_VALUE_RE = /^(?:-[ioe]|--(?:input|output|error))$/u;
-const TIMEOUT_OPTION_WITH_VALUE_RE = /^(?:-k|--kill-after|-s|--signal)$/u;
 const SUDO_OPTION_WITH_VALUE_RE =
   /^(?:-[ughpCTRD]|--(?:user|group|host|prompt|chdir|command-timeout|chroot))$/u;
 
@@ -4956,30 +4999,16 @@ function wrappedShellExecutableIndex(
       const option = words[index] ?? "";
       index += 1;
       if (option === "--") break;
-      if (shellWrapperOptionConsumesValue(wrapper, option)) index += 1;
+      if (shellWrapperOptionConsumesValue(option)) index += 1;
     }
-    if (wrapper === "timeout" && words[index] !== undefined) {
-      index += 1;
-    }
-    if (wrapper === "command" || wrapper === "env") {
-      while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-    }
+    while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   }
   return index;
 }
 
-function shellWrapperOptionConsumesValue(
-  wrapper: string,
-  option: string,
-): boolean {
+function shellWrapperOptionConsumesValue(option: string): boolean {
   if (option.includes("=")) return false;
-  if (wrapper === "command" || wrapper === "env") {
-    return SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option);
-  }
-  if (wrapper === "nice") return NICE_OPTION_WITH_VALUE_RE.test(option);
-  if (wrapper === "stdbuf") return STDBUF_OPTION_WITH_VALUE_RE.test(option);
-  if (wrapper === "timeout") return TIMEOUT_OPTION_WITH_VALUE_RE.test(option);
-  return false;
+  return SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option);
 }
 
 function shellCommandRiskPatterns(
@@ -6357,7 +6386,7 @@ function requiresLineLocalApprovalGuard(line: string): boolean {
     (SECRET_ACTION_RE.test(line) && SECRET_WORD_RE.test(line)) ||
     (referencesSensitiveFile(line) &&
       !isSafeSensitiveHandlingInstruction(line)) ||
-    classifyShellCommandRiskKinds(line, true).length > 0
+    classifyShellCommandRiskKinds(line).length > 0
   );
 }
 

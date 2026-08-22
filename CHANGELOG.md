@@ -23,11 +23,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
-- Destructive and privileged shell diagnostics now require executable
-  command-position evidence when bounded shell parsing succeeds. Quoted command
-  text passed to literal-output commands is no longer treated as execution;
-  shell `-c`/`eval` contexts and literal output piped into a shell remain
-  operational.
+- Destructive and privileged shell diagnostics now classify bounded shell text
+  as literal-only, operational, or unknown. Quoted risky text is suppressed
+  only along proven literal-only command and data paths; shell `-c`/`eval`
+  contexts and standard input consumed as shell code remain operational, while
+  unrecognized wrappers, consumers, and shell options use conservative
+  matching.
 - Bounded negative-subject safeguard instructions such as “No Skill … may
   bypass” no longer overlap with `SEC-SAFEGUARD-BYPASS-INSTRUCTION`; a later
   independently expressed bypass remains reportable.
