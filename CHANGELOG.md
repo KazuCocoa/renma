@@ -25,7 +25,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Destructive and privileged shell diagnostics now require executable
   command-position evidence when bounded shell parsing succeeds. Quoted command
-  text passed to literal-output commands is no longer treated as execution.
+  text passed to literal-output commands is no longer treated as execution;
+  shell `-c`/`eval` contexts and literal output piped into a shell remain
+  operational.
 - Bounded negative-subject safeguard instructions such as “No Skill … may
   bypass” no longer overlap with `SEC-SAFEGUARD-BYPASS-INSTRUCTION`; a later
   independently expressed bypass remains reportable.

@@ -163,6 +163,137 @@ ${command}
   }
 });
 
+test("literal output piped into a shell remains operational", () => {
+  const cases = [
+    {
+      command: 'echo "rm -rf /tmp/example" | sh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: 'printf "%s\\n" "sudo some-command" | bash',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      command: 'echo "git reset --hard" | tee script.sh | zsh',
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: 'command printf "%s\\n" "chmod 777 output" | env bash -s',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+  ];
+
+  for (const { command, diagnosticId } of cases) {
+    const finding = findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      diagnosticId,
+    );
+    assert.deepEqual(finding.evidence, {
+      path: "contexts/security/targeted.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: command,
+    });
+  }
+
+  const safePipeline = findingsFor(`# Workflow
+
+\`\`\`bash
+echo "rm -rf /tmp/example" | cat
+\`\`\`
+`);
+  assert.deepEqual(
+    safePipeline.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+    [],
+  );
+
+  const body = `# Workflow
+
+\`\`\`bash
+echo "rm -rf /tmp/example" | sh
+\`\`\`
+`;
+  const withoutPolicy = securityDiagnosticFindings([contextArtifact(body)]);
+  assert.equal(
+    withoutPolicy.some(({ id }) => id === "SEC-MISSING-POLICY-METADATA"),
+    true,
+  );
+
+  const approvalRequired = securityDiagnosticFindings([
+    contextArtifact(`---
+allowed_data: public
+requires_human_approval: true
+---
+
+${body}`),
+  ]);
+  assert.equal(
+    approvalRequired.some(
+      ({ id }) => id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+    true,
+  );
+});
+
+test("shell code evaluators preserve nested destructive and privileged risks", () => {
+  const cases: Array<{ command: string; diagnosticIds: string[] }> = [
+    {
+      command: 'sh -c "rm -rf /tmp/example"',
+      diagnosticIds: ["SEC-DESTRUCTIVE-COMMAND"],
+    },
+    {
+      command: 'sudo sh -c "rm -rf /tmp/example"',
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
+    },
+    {
+      command: 'sudo bash -lc "git reset --hard"',
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
+    },
+    {
+      command: 'command eval "sudo some-command"',
+      diagnosticIds: ["SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD"],
+    },
+  ];
+
+  for (const { command, diagnosticIds } of cases) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    for (const diagnosticId of diagnosticIds) {
+      const finding = findingFor(findings, diagnosticId);
+      assert.equal(finding.evidence.snippet, command);
+    }
+  }
+
+  const suppressed = findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+sudo sh -c "rm -rf /tmp/example" || true
+\`\`\`
+`),
+    RISKY_SUPPRESSION_ID,
+  );
+  assert.deepEqual(suppressed.details?.operationKinds, [
+    "destructive-command",
+    "privileged-command",
+  ]);
+});
+
 test("process substitutions remain operational inside literal-output commands", () => {
   const cases = [
     {

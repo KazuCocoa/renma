@@ -4659,24 +4659,30 @@ function classifyShellCommandRiskKinds(
       : [];
   }
 
-  const kinds = new Set<RiskyOperationKind>();
+  const segments: Array<{ text: string; boundaryAfter?: string }> = [];
   let segmentStart = 0;
   for (const token of tokenization.tokens) {
     if (token.kind !== "operator" || !isShellCommandBoundary(token.value)) {
       continue;
     }
-    addShellCommandSegmentRiskKinds(
-      kinds,
-      command.slice(segmentStart, token.start).trim(),
-      allowConservativeFallback,
-    );
+    segments.push({
+      text: command.slice(segmentStart, token.start).trim(),
+      boundaryAfter: token.value,
+    });
     segmentStart = token.end;
   }
-  addShellCommandSegmentRiskKinds(
-    kinds,
-    command.slice(segmentStart).trim(),
-    allowConservativeFallback,
-  );
+  segments.push({ text: command.slice(segmentStart).trim() });
+
+  const shellPipelineInputSegments = shellPipelineInputSegmentIndexes(segments);
+  const kinds = new Set<RiskyOperationKind>();
+  for (const [index, segment] of segments.entries()) {
+    addShellCommandSegmentRiskKinds(
+      kinds,
+      segment.text,
+      allowConservativeFallback,
+      shellPipelineInputSegments.has(index),
+    );
+  }
 
   return (["destructive-command", "privileged-command"] as const).filter(
     (kind) => kinds.has(kind),
@@ -4687,6 +4693,7 @@ function addShellCommandSegmentRiskKinds(
   kinds: Set<RiskyOperationKind>,
   segment: string,
   allowConservativeFallback: boolean,
+  shellPipelineInput: boolean,
 ): void {
   if (!segment) return;
 
@@ -4707,18 +4714,89 @@ function addShellCommandSegmentRiskKinds(
     kinds.add("privileged-command");
   }
 
-  const hasOperationalSubstitution =
-    hasBoundedShellOperationalSubstitution(segment);
-  if (!allowConservativeFallback && !hasOperationalSubstitution) return;
+  const hasOperationalEvaluation =
+    hasBoundedShellOperationalSubstitution(segment) ||
+    shellPipelineInput ||
+    hasShellCodeEvaluation(segment, effectiveExecutable);
+  if (!allowConservativeFallback && !hasOperationalEvaluation) return;
   const commandPositionEstablished =
     destructivePattern !== undefined ||
     privilegedPattern !== undefined ||
     (effectiveExecutable !== undefined &&
       LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable));
-  if (commandPositionEstablished && !hasOperationalSubstitution) {
+  if (commandPositionEstablished && !hasOperationalEvaluation) {
     return;
   }
   for (const kind of fallbackShellCommandRiskKinds(segment)) kinds.add(kind);
+}
+
+function shellPipelineInputSegmentIndexes(
+  segments: readonly { text: string; boundaryAfter?: string }[],
+): ReadonlySet<number> {
+  const indexes = new Set<number>();
+  let pipelineStart = 0;
+  for (const [index, segment] of segments.entries()) {
+    if (segment.boundaryAfter === "|") continue;
+
+    for (let sink = pipelineStart + 1; sink <= index; sink += 1) {
+      if (!isShellPipelineCodeConsumer(segments[sink]?.text ?? "")) continue;
+      for (let input = pipelineStart; input < sink; input += 1) {
+        indexes.add(input);
+      }
+    }
+    pipelineStart = index + 1;
+  }
+  return indexes;
+}
+
+function hasShellCodeEvaluation(
+  segment: string,
+  effectiveExecutable: string | undefined,
+): boolean {
+  if (effectiveExecutable === "eval") return true;
+  if (
+    effectiveExecutable === undefined ||
+    !SHELL_CODE_EXECUTABLES.has(effectiveExecutable)
+  ) {
+    return false;
+  }
+
+  const words = shellCommandWords(segment);
+  if (words === undefined) return true;
+  const executableIndex = effectiveShellExecutableIndex(words);
+  return words
+    .slice(executableIndex + 1)
+    .some((word) => word === "--command" || /^-[^-]*c/u.test(word));
+}
+
+function isShellPipelineCodeConsumer(segment: string): boolean {
+  const words = shellCommandWords(segment);
+  if (words === undefined) return false;
+  const executableIndex = effectiveShellExecutableIndex(words);
+  const executable = normalizedShellExecutable(words[executableIndex]);
+  if (executable === undefined || !SHELL_CODE_EXECUTABLES.has(executable)) {
+    return false;
+  }
+
+  let readsStandardInput = false;
+  for (let index = executableIndex + 1; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (word === "--command" || /^-[^-]*c/u.test(word)) return false;
+    if (word === "--") {
+      return readsStandardInput || index + 1 === words.length;
+    }
+    if (word === "-s" || /^-[^-]*s/u.test(word)) {
+      readsStandardInput = true;
+      continue;
+    }
+    if (word === "-O" || word === "-o") {
+      index += 1;
+      continue;
+    }
+    if (word.startsWith("-")) continue;
+    return readsStandardInput;
+  }
+  return true;
 }
 
 function fallbackShellCommandRiskKinds(command: string): RiskyOperationKind[] {
@@ -4776,6 +4854,14 @@ function classifyRiskyShellOperation(
 }
 
 const LITERAL_OUTPUT_SHELL_EXECUTABLES = new Set(["echo", "printf"]);
+const SHELL_CODE_EXECUTABLES = new Set([
+  "bash",
+  "dash",
+  "fish",
+  "ksh",
+  "sh",
+  "zsh",
+]);
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
@@ -4793,9 +4879,13 @@ function directShellExecutable(command: string): string | undefined {
 function effectiveShellExecutable(command: string): string | undefined {
   const words = shellCommandWords(command);
   if (words === undefined) return undefined;
+  return normalizedShellExecutable(words[effectiveShellExecutableIndex(words)]);
+}
+
+function effectiveShellExecutableIndex(words: readonly string[]): number {
   let index = directShellExecutableIndex(words);
   if (normalizedShellExecutable(words[index]) !== "sudo") {
-    return normalizedShellExecutable(words[index]);
+    return index;
   }
 
   index += 1;
@@ -4805,7 +4895,7 @@ function effectiveShellExecutable(command: string): string | undefined {
     if (SUDO_OPTION_WITH_VALUE_RE.test(option)) index += 1;
   }
   index = wrappedShellExecutableIndex(words, index);
-  return normalizedShellExecutable(words[index]);
+  return index;
 }
 
 function normalizedShellExecutable(
