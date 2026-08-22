@@ -143,6 +143,9 @@ test("literal-output arguments do not become destructive or privileged commands"
     '/usr/bin/printf "%s\\n" "sudo some-command" || :',
     'echo ">(rm -rf /tmp/example)"',
     'printf "%s\\n" "<(sudo some-command)"',
+    'echo "=(rm -rf /tmp/example)"',
+    'printf "%s\\n" "=(sudo some-command)"',
+    'OUTPUT="=(rm -rf /tmp/example)" echo "$OUTPUT"',
   ];
 
   for (const command of commands) {
@@ -163,20 +166,37 @@ ${command}
 test("process substitutions remain operational inside literal-output commands", () => {
   const cases = [
     {
+      language: "bash",
       command: "echo data > >(rm -rf /tmp/example)",
       diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
     },
     {
+      language: "bash",
       command: 'printf "%s\\n" data < <(sudo some-command)',
       diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
     },
+    {
+      language: "zsh",
+      command: "echo =(rm -rf /tmp/example)",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      language: "zsh",
+      command: 'printf "%s\\n" =(sudo some-command)',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      language: "zsh",
+      command: "OUTPUT==(rm -rf /tmp/example) echo ready",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
   ];
 
-  for (const { command, diagnosticId } of cases) {
+  for (const { language, command, diagnosticId } of cases) {
     const finding = findingFor(
       findingsFor(`# Workflow
 
-\`\`\`bash
+\`\`\`${language}
 ${command}
 \`\`\`
 `),
@@ -189,6 +209,33 @@ ${command}
       snippet: command,
     });
   }
+
+  const zshBody = `# Workflow
+
+\`\`\`zsh
+echo =(rm -rf /tmp/example)
+\`\`\`
+`;
+  const withoutPolicy = securityDiagnosticFindings([contextArtifact(zshBody)]);
+  assert.equal(
+    withoutPolicy.some(({ id }) => id === "SEC-MISSING-POLICY-METADATA"),
+    true,
+  );
+
+  const approvalRequired = securityDiagnosticFindings([
+    contextArtifact(`---
+allowed_data: public
+requires_human_approval: true
+---
+
+${zshBody}`),
+  ]);
+  assert.equal(
+    approvalRequired.some(
+      ({ id }) => id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+    true,
+  );
 });
 
 test("literal-output command text does not create policy requirements", () => {
