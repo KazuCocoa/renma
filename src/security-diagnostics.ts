@@ -68,6 +68,7 @@ import {
   positiveDisclosureActions,
   type SecurityCommandAnalysis,
 } from "./security-command/index.js";
+import { tokenizeBoundedShell } from "./security-command/shell.js";
 import {
   disclosureClauseRangesIntersectingRange,
   disclosureRangeIsExplicitlyProhibited,
@@ -867,6 +868,78 @@ const RULES = {
     confidence: "high",
     riskClass: "violation",
   },
+  riskyOperationErrorSuppression: {
+    id: DIAGNOSTIC_IDS.SEC_RISKY_OPERATION_ERROR_SUPPRESSION,
+    category: "safety",
+    title: "Risky operation failure is explicitly suppressed",
+    whyItMatters:
+      "Hiding failure from a destructive, privileged, upload, or sensitive-data operation can make an agent continue after an incomplete, unsafe, or partially applied action.",
+    remediation:
+      "Preserve the failure, stop the workflow, and report the blocker. Add explicit verification and rollback guidance where a partial operation is possible.",
+    repairConstraints: [
+      {
+        kind: "must_not_change",
+        text: "Do not replace the reported failure path with another suppression or ignored exit status.",
+      },
+      {
+        kind: "must_preserve",
+        text: "Keep the underlying security classification and any required human approval at least as strict.",
+      },
+      {
+        kind: "allowed_change",
+        text: "Add explicit verification or rollback after preserving and reporting the original failure.",
+      },
+    ],
+    verificationStepsV2: [
+      { text: "Run renma scan.", command: "renma scan" },
+      {
+        text: "Confirm the risky operation no longer discards or ignores its failure.",
+      },
+      {
+        text: "Confirm failure stops the workflow and partial effects are verified or rolled back.",
+      },
+    ],
+    llmHint:
+      "Remove the suppression attached to the risky operation. Preserve its non-zero failure, stop and report the blocker, add explicit verification or rollback when needed, and rerun renma scan.",
+    confidence: "high",
+    riskClass: "violation",
+  },
+  instructionHierarchyOverride: {
+    id: DIAGNOSTIC_IDS.SEC_INSTRUCTION_HIERARCHY_OVERRIDE,
+    category: "safety",
+    title: "Instruction attempts to override higher-authority guidance",
+    whyItMatters:
+      "Agent-facing instructions that claim precedence over system, developer, platform, or other higher-level instructions can redirect the host agent around its governing authority and safety policy.",
+    remediation:
+      "Remove the hierarchy override, preserve host system and developer authority, and express only the Skill's intended local behavior without claiming higher priority.",
+    repairConstraints: [
+      {
+        kind: "must_not_change",
+        text: "Do not replace the override with a weaker synonym that still supersedes higher-authority instructions.",
+      },
+      {
+        kind: "must_preserve",
+        text: "Preserve system, developer, platform-policy, and host-agent instruction authority.",
+      },
+      {
+        kind: "allowed_change",
+        text: "State bounded local behavior and routing conditions without making an instruction-priority claim.",
+      },
+    ],
+    verificationStepsV2: [
+      { text: "Run renma scan.", command: "renma scan" },
+      {
+        text: "Confirm the agent-facing text no longer claims to ignore, override, or supersede higher-authority instructions.",
+      },
+      {
+        text: "Confirm the intended local behavior remains subordinate to host instructions and policy.",
+      },
+    ],
+    llmHint:
+      "Remove the hierarchy-override claim. Rewrite only the intended local Skill behavior, explicitly preserve system and developer authority, and rerun renma scan.",
+    confidence: "high",
+    riskClass: "violation",
+  },
   untrustedContentAsInstruction: {
     id: DIAGNOSTIC_IDS.SEC_UNTRUSTED_CONTENT_AS_INSTRUCTION,
     category: "safety",
@@ -1299,6 +1372,57 @@ const CREDENTIAL_HEADER_RE =
   /\bAuthorization:\s*Bearer\s+(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
 const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
+
+type RiskyOperationKind =
+  | "destructive-command"
+  | "privileged-command"
+  | "security-sensitive-upload"
+  | "sensitive-data-operation";
+
+type RiskyShellFailureSuppression = {
+  start: number;
+  suppression: "|| true" | "|| :";
+  operationKinds: RiskyOperationKind[];
+};
+
+// These forms intentionally require a recognized risky-operation class and a
+// bounded, explicit ignore-failure continuation. Generic error handling and
+// generic `|| true` remain outside this diagnostic.
+const RISKY_OPERATION_PROSE_TARGET_SOURCE = String.raw`(?:destructive|privileged|security[- ]sensitive|sensitive[- ]data)\s+(?:operation|command|action)|external\s+upload(?:\s+(?:operation|command|action))?|sudo\s+(?:operation|command|invocation)`;
+const RISKY_OPERATION_FAILURE_SOURCE = String.raw`(?:fails?|failed|failure|errors?|returns?\s+(?:a\s+)?non[- ]zero\s+(?:status|exit(?:\s+status)?))`;
+const RISKY_OPERATION_SUPPRESSION_SOURCE = String.raw`(?:ignore|disregard|suppress)`;
+const RISKY_OPERATION_CONTINUATION_SOURCE = String.raw`(?:continue|proceed)`;
+const RISKY_OPERATION_ERROR_TARGET_SOURCE = String.raw`(?:the\s+)?(?:errors?|failures?|non[- ]zero\s+(?:status|exit(?:\s+status)?))`;
+const LOCAL_INSTRUCTION_TEXT_SOURCE = String.raw`[^.;:!?—–\n\r]`;
+const RISKY_OPERATION_FAILURE_SUPPRESSION_PATTERNS: readonly RegExp[] = [
+  new RegExp(
+    String.raw`\b(?:if|when)\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:${RISKY_OPERATION_PROSE_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,50}\b(?:${RISKY_OPERATION_FAILURE_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,80}\b(?:${RISKY_OPERATION_SUPPRESSION_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,40}\b(?:${RISKY_OPERATION_ERROR_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:and\s+)?(?:${RISKY_OPERATION_CONTINUATION_SOURCE})\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:${RISKY_OPERATION_SUPPRESSION_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,40}\b(?:${RISKY_OPERATION_ERROR_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:from|of)\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:${RISKY_OPERATION_PROSE_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:and\s+)?(?:${RISKY_OPERATION_CONTINUATION_SOURCE})\b`,
+    "i",
+  ),
+];
+const RISKY_OPERATION_SUPPRESSION_ACTION_RE =
+  /^(?:ignore|disregard|suppress)/iu;
+
+// This is an intentionally small English grammar. It recognizes explicit
+// authority supersession, not persona statements or broad prompt injection.
+const INSTRUCTION_AUTHORITY_TARGET_SOURCE = String.raw`(?:all\s+)?(?:previous|prior)(?:\s+(?:(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?|higher[- ]level|platform|host[- ]agent))?\s+(?:safety\s+)?instructions?|(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?\s+instructions?|system\s+prompts?|higher[- ](?:level|authority)\s+(?:safety\s+)?instructions?|platform\s+(?:policy|policies|instructions?)|host[- ]agent\s+(?:instruction\s+hierarchy|instructions?)`;
+const DIRECT_INSTRUCTION_HIERARCHY_OVERRIDE_RE = new RegExp(
+  String.raw`\b(?:ignore|disregard|override|supersede)\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
+  "i",
+);
+const PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE = new RegExp(
+  String.raw`\b(?:take\s+precedence\s+over|override|supersede)\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
+  "i",
+);
+const INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE =
+  /^(?:ignore|disregard|override|supersede|take\s+precedence\s+over)/iu;
+const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE =
+  /\b(?:cannot|can't|can not|(?:do|does|did) not|don't|doesn't|didn't|(?:will|would) not|won't|wouldn't|(?:is|are|was|were) (?:unable to|not able to))\s*$/iu;
+
 type SafeguardBypassPattern = {
   pattern: RegExp;
   /** Presence opts this pattern into bounded immediate next-clause association. */
@@ -1385,7 +1509,7 @@ const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
   },
 ];
 const SAFEGUARD_ACTION_PREDICATE_RE =
-  /(?<![\p{L}\p{N}_-])(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
+  /(?<![\p{L}\p{N}_-])(ignore[ds]?|disregard(?:s|ed|ing)?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|supersede(?:s|d)?|take\s+precedence\s+over|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
 const SAFEGUARD_PROHIBITION_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
 const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
@@ -2954,7 +3078,10 @@ function securityLineDetections(
         ...(logicalCommand !== undefined && logicalCommandStart
           ? commandRiskDetections.map((detection) => ({
               ...detection,
-              ...evidence,
+              ...(detection.metadata.id ===
+              RULES.riskyOperationErrorSuppression.id
+                ? logicalShellCommandEvidence(logicalCommand)
+                : evidence),
             }))
           : commandRiskDetections),
       );
@@ -3151,11 +3278,13 @@ const CANONICAL_DESCRIPTION_ROUTING_LITERAL_RISK_IDS = new Set<DiagnosticId>([
   DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
   DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION,
   DIAGNOSTIC_IDS.SEC_FORBIDDEN_INPUT_INSTRUCTION,
+  DIAGNOSTIC_IDS.SEC_INSTRUCTION_HIERARCHY_OVERRIDE,
   DIAGNOSTIC_IDS.SEC_INSTRUCTION_VIOLATES_POLICY,
   DIAGNOSTIC_IDS.SEC_MISSING_HUMAN_APPROVAL_GUARD,
   DIAGNOSTIC_IDS.SEC_NO_REDACTION_INSTRUCTION,
   DIAGNOSTIC_IDS.SEC_OVERBROAD_CONTEXT_INSTRUCTION,
   DIAGNOSTIC_IDS.SEC_PRIVILEGED_COMMAND_WITHOUT_GUARD,
+  DIAGNOSTIC_IDS.SEC_RISKY_OPERATION_ERROR_SUPPRESSION,
   DIAGNOSTIC_IDS.SEC_SAFEGUARD_BYPASS_INSTRUCTION,
   DIAGNOSTIC_IDS.SEC_SECRET_MATERIAL_INSTRUCTION,
   DIAGNOSTIC_IDS.SEC_SENSITIVE_FILE_REFERENCE,
@@ -4326,6 +4455,22 @@ function commandDetections(
     });
   }
 
+  if (!defensiveAction) {
+    for (const suppression of riskyShellFailureSuppressions(line)) {
+      detections.push({
+        metadata: RULES.riskyOperationErrorSuppression,
+        severity: "high",
+        startLine: lineNumber,
+        snippet: line,
+        dedupeKey: `${RULES.riskyOperationErrorSuppression.id}:${lineNumber}:${suppression.start}`,
+        details: {
+          suppressionKind: suppression.suppression,
+          operationKinds: suppression.operationKinds,
+        },
+      });
+    }
+  }
+
   if (
     PRIVILEGED_COMMAND_RE.test(line) &&
     !hasCommandRiskGuard &&
@@ -4362,6 +4507,117 @@ function commandDetections(
   }
 
   return detections;
+}
+
+function riskyShellFailureSuppressions(
+  command: string,
+): RiskyShellFailureSuppression[] {
+  const tokenization = tokenizeBoundedShell(command);
+  if (!tokenization.supported) return [];
+
+  const suppressions: RiskyShellFailureSuppression[] = [];
+  for (const [index, token] of tokenization.tokens.entries()) {
+    if (token.kind !== "operator" || token.value !== "||") continue;
+    const suppressor = tokenization.tokens[index + 1];
+    if (
+      suppressor?.kind !== "word" ||
+      (suppressor.value !== "true" && suppressor.value !== ":")
+    ) {
+      continue;
+    }
+
+    const previousBoundary = [...tokenization.tokens.slice(0, index)]
+      .reverse()
+      .find(
+        (candidate) =>
+          candidate.kind === "operator" &&
+          isShellCommandBoundary(candidate.value),
+      );
+    const previousPipelineBoundary = [...tokenization.tokens.slice(0, index)]
+      .reverse()
+      .find(
+        (candidate) =>
+          candidate.kind === "operator" &&
+          isShellPipelineBoundary(candidate.value),
+      );
+    const operationStart = previousBoundary?.end ?? 0;
+    const pipelineStart = previousPipelineBoundary?.end ?? 0;
+    const operation = command.slice(operationStart, token.start).trim();
+    const sensitiveDataOperation = command
+      .slice(pipelineStart, token.start)
+      .trim();
+    if (!operation) continue;
+    const operationKinds = classifyRiskyShellOperation(
+      operation,
+      sensitiveDataOperation,
+    );
+    if (operationKinds.length === 0) continue;
+
+    suppressions.push({
+      start: pipelineStart,
+      suppression: suppressor.value === "true" ? "|| true" : "|| :",
+      operationKinds,
+    });
+  }
+  return suppressions;
+}
+
+function isShellCommandBoundary(operator: string): boolean {
+  return (
+    operator === ";" ||
+    operator === "|" ||
+    operator === "||" ||
+    operator === "&&" ||
+    operator === "&"
+  );
+}
+
+function isShellPipelineBoundary(operator: string): boolean {
+  return isShellCommandBoundary(operator) && operator !== "|";
+}
+
+function classifyRiskyShellOperation(
+  operation: string,
+  sensitiveDataOperation = operation,
+): RiskyOperationKind[] {
+  const kinds: RiskyOperationKind[] = [];
+  if (DESTRUCTIVE_COMMAND_RE.test(operation)) {
+    kinds.push("destructive-command");
+  }
+  if (PRIVILEGED_COMMAND_RE.test(operation)) {
+    kinds.push("privileged-command");
+  }
+
+  const analysis = analyzeSecurityCommand({
+    source: {
+      text: operation,
+      startLine: 1,
+      endLine: operation.split(/\r?\n/u).length,
+      lines: operation.split(/\r?\n/u),
+    },
+  });
+  if (isUploadInstruction(analysis.destinationAnalysis)) {
+    kinds.push("security-sensitive-upload");
+  }
+  const sensitiveDataAnalysis =
+    sensitiveDataOperation === operation
+      ? analysis
+      : analyzeSecurityCommand({
+          source: {
+            text: sensitiveDataOperation,
+            startLine: 1,
+            endLine: sensitiveDataOperation.split(/\r?\n/u).length,
+            lines: sensitiveDataOperation.split(/\r?\n/u),
+          },
+        });
+  if (
+    (sensitiveDataAnalysis.sensitiveSources.length > 0 &&
+      sensitiveDataAnalysis.sinks.length > 0) ||
+    CREDENTIAL_ARG_ANY_RE.test(sensitiveDataOperation)
+  ) {
+    kinds.push("sensitive-data-operation");
+  }
+  return kinds;
 }
 
 function dependencyFindingDetails(
@@ -4861,6 +5117,48 @@ function semanticInstructionDetections(
     });
   }
 
+  const riskyFailureSuppression =
+    unsafeRiskyOperationFailureSuppression(instructionText);
+  if (riskyFailureSuppression !== undefined) {
+    const evidence =
+      options.evidence ??
+      semanticSpanEvidence(
+        instructionLines,
+        lineOffsets,
+        firstLine,
+        riskyFailureSuppression.start,
+        riskyFailureSuppression.end,
+      );
+    detections.push({
+      metadata: RULES.riskyOperationErrorSuppression,
+      severity: "high",
+      ...evidence,
+      dedupeKey: `${RULES.riskyOperationErrorSuppression.id}:${firstLine}:${riskyFailureSuppression.start}`,
+      details: {
+        suppressionKind: "explicit-prose-failure-continuation",
+      },
+    });
+  }
+
+  const hierarchyOverride = unsafeInstructionHierarchyOverride(instructionText);
+  if (hierarchyOverride !== undefined) {
+    const evidence =
+      options.evidence ??
+      semanticSpanEvidence(
+        instructionLines,
+        lineOffsets,
+        firstLine,
+        hierarchyOverride.start,
+        hierarchyOverride.end,
+      );
+    detections.push({
+      metadata: RULES.instructionHierarchyOverride,
+      severity: "high",
+      ...evidence,
+      dedupeKey: `${RULES.instructionHierarchyOverride.id}:${firstLine}:${hierarchyOverride.start}`,
+    });
+  }
+
   const sentences = semanticSentenceSpans(instructionText);
   const reviewGuardText = markdownView.inlineCodeProse(unit, instructionText);
   const untrustedAction = untrustedExecutionActions(sentences).find(
@@ -4967,6 +5265,88 @@ function unsafeSafeguardClause(text: string): string | undefined {
   return undefined;
 }
 
+type UnsafeBoundedActionMatch = {
+  start: number;
+  end: number;
+};
+
+function unsafeRiskyOperationFailureSuppression(
+  text: string,
+): UnsafeBoundedActionMatch | undefined {
+  return firstUnsafeBoundedActionMatch(
+    text,
+    RISKY_OPERATION_FAILURE_SUPPRESSION_PATTERNS,
+    RISKY_OPERATION_SUPPRESSION_ACTION_RE,
+  );
+}
+
+function unsafeInstructionHierarchyOverride(
+  text: string,
+): UnsafeBoundedActionMatch | undefined {
+  return firstUnsafeBoundedActionMatch(
+    text,
+    [
+      DIRECT_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
+      PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
+    ],
+    INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE,
+    hierarchyOverrideActionIsNegated,
+  );
+}
+
+function firstUnsafeBoundedActionMatch(
+  text: string,
+  patterns: readonly RegExp[],
+  recognizedAction: RegExp,
+  additionalProhibition?: (text: string, actionStart: number) => boolean,
+): UnsafeBoundedActionMatch | undefined {
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  const actions = safeguardActionPolarities(
+    analysisText,
+    additionalProhibition,
+  );
+  for (const pattern of patterns) {
+    for (const match of overlappingPatternMatches(analysisText, pattern)) {
+      const end = match.start + match.text.length;
+      const unsafeAction = actions.some(
+        (action) =>
+          action.start >= match.start &&
+          action.start < end &&
+          recognizedAction.test(analysisText.slice(action.start, action.end)) &&
+          !action.prohibited,
+      );
+      if (unsafeAction) {
+        return {
+          start: match.start,
+          end,
+        };
+      }
+    }
+  }
+  return undefined;
+}
+
+function hierarchyOverrideActionIsNegated(
+  text: string,
+  actionStart: number,
+): boolean {
+  const boundedPrefix = text.slice(Math.max(0, actionStart - 120), actionStart);
+  const boundary = Math.max(
+    boundedPrefix.lastIndexOf("."),
+    boundedPrefix.lastIndexOf(";"),
+    boundedPrefix.lastIndexOf(":"),
+    boundedPrefix.lastIndexOf("!"),
+    boundedPrefix.lastIndexOf("?"),
+    boundedPrefix.lastIndexOf("—"),
+    boundedPrefix.lastIndexOf("–"),
+    boundedPrefix.lastIndexOf("\n"),
+    boundedPrefix.lastIndexOf("\r"),
+  );
+  return INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(
+    boundedPrefix.slice(boundary + 1),
+  );
+}
+
 /** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
 function safeguardMarkdownPresentationProjection(text: string): string {
   if (!/[*_]/u.test(text)) return text;
@@ -5063,6 +5443,7 @@ function overlappingPatternMatches(
 
 function safeguardActionPolarities(
   text: string,
+  additionalProhibition?: (text: string, actionStart: number) => boolean,
 ): Array<{ start: number; end: number; prohibited: boolean }> {
   const actions = [...text.matchAll(SAFEGUARD_ACTION_PREDICATE_RE)].flatMap(
     (match) =>
@@ -5079,6 +5460,10 @@ function safeguardActionPolarities(
 
   for (const [index, action] of actions.entries()) {
     const previous = actions[index - 1];
+    if (additionalProhibition?.(text, action.start) ?? false) {
+      action.prohibited = true;
+      continue;
+    }
     const localStart = previous?.end ?? Math.max(0, action.start - 120);
     const localPrefix = text.slice(localStart, action.start);
     const prohibitions = [...localPrefix.matchAll(SAFEGUARD_PROHIBITION_RE)];
@@ -5155,6 +5540,25 @@ function semanticLineEvidence(
     startLine: firstLine + lineIndex,
     endLine: firstLine + lineIndex,
     snippet: lines[lineIndex] ?? "",
+  };
+}
+
+function semanticSpanEvidence(
+  lines: string[],
+  lineOffsets: number[],
+  firstLine: number,
+  start: number,
+  end: number,
+): DetectionEvidence {
+  const startLineIndex = semanticLineIndexAtOffset(lineOffsets, start);
+  const endLineIndex = semanticLineIndexAtOffset(
+    lineOffsets,
+    Math.max(start, end - 1),
+  );
+  return {
+    startLine: firstLine + startLineIndex,
+    endLine: firstLine + endLineIndex,
+    snippet: lines.slice(startLineIndex, endLineIndex + 1).join("\n"),
   };
 }
 

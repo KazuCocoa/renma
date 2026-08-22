@@ -966,6 +966,34 @@ padding, tab, ordered-marker, and lazy-continuation boundaries. Frontmatter is
 excluded from parser state while the parser's source positions are offset back
 to original artifact line numbers.
 
+`SEC-RISKY-OPERATION-ERROR-SUPPRESSION` reports explicit failure suppression
+only when the same bounded instruction contains an operation Renma already
+classifies as destructive, privileged, a security-sensitive upload, or a
+sensitive-data operation. Supported shell associations are the unquoted
+`|| true` and `|| :` branches immediately attached to the recognized operation;
+logical backslash continuations retain their complete source range. A separate
+bounded prose grammar covers statements such as “If the destructive operation
+fails, ignore the error and continue.” Generic `|| true`, capability probes,
+ordinary error handling, `set +e`, `try/catch`, and stderr redirection do not
+produce this finding by themselves. Direct prohibitions remain defensive. The
+repair is to preserve the failure, stop and report the blocker, and explicitly
+verify or roll back partial effects rather than substituting another
+suppression.
+
+`SEC-INSTRUCTION-HIERARCHY-OVERRIDE` reports an explicit attempt to ignore,
+disregard, override, supersede, or take precedence over a narrow set of
+higher-authority targets: previous or prior instructions, system instructions
+or prompt, developer instructions, higher-level instructions, platform policy,
+or the host-agent instruction hierarchy. This is a bounded English recognizer,
+not a general prompt-injection or multilingual classifier. Ordinary persona
+wording such as “You are an experienced code reviewer” is outside the rule.
+Direct prohibitions remain defensive, and quoted or non-operational unsafe
+examples follow the existing Markdown security-view boundaries. A recognized
+override inside an HTML or YAML frontmatter comment remains hidden operational
+evidence under the existing hidden-comment diagnostic rather than becoming a
+rendered-visible finding. Repair removes the priority claim, preserves system
+and developer authority, and states only the intended local behavior.
+
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
 Markdown authoritative or executes its embedded commands without review. Safe
@@ -1326,6 +1354,7 @@ written during scanning.
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`                | Instructions request forbidden input.                | Content asks for secrets or other disallowed sensitive values.                                     | Remove the request or replace it with safe placeholder guidance.                                       |
 | `SEC-HIDDEN-FRONTMATTER-INSTRUCTION`             | YAML frontmatter comment hides an operational instruction. | Raw eligible agent-facing Markdown contains a bounded recognized security-sensitive instruction that metadata consumers ignore. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |
 | `SEC-HIDDEN-OPERATIONAL-INSTRUCTION`             | HTML comment hides an operational instruction.       | Raw agent-visible source contains a bounded recognized security-sensitive instruction that rendered Markdown omits. | Remove it or make intentional guidance visible with explicit policy and safeguards.                     |
+| `SEC-INSTRUCTION-HIERARCHY-OVERRIDE`             | Instructions attempt to supersede higher authority.  | Agent-facing text explicitly ignores, overrides, supersedes, or claims precedence over system, developer, platform, prior, or higher-level instructions. | Remove the hierarchy override, preserve host authority, and state only bounded local behavior.          |
 | `SEC-INSTRUCTION-VIOLATES-POLICY`                | Instruction conflicts with active policy.            | Asset content violates a configured security profile.                                              | Update the instruction or policy metadata so they agree.                                               |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA`          | Canonical Skill security metadata is invalid.        | A recognized `metadata.renma.*` field has an invalid boolean, list, or profile encoding.            | Confirm the intended policy and replace it with the exact documented string encoding; do not guess.    |
 | `SEC-INVALID-RENMA-POLICY-METADATA`              | Non-Skill Renma security metadata is invalid.        | A recognized top-level policy field is malformed, duplicated, ambiguous, or has an unsupported YAML value shape. | Repair the exact Renma YAML declaration after confirming intent; do not infer a permissive value.       |
@@ -1339,6 +1368,7 @@ written during scanning.
 | `SEC-POLICY-PROFILE-NOT-FOUND`                   | Referenced policy profile is missing.                | Metadata names a profile renma cannot resolve.                                                     | Add the profile or correct the reference.                                                              |
 | `SEC-PREDICTABLE-TEMP-PATH`                      | Command uses a predictable temp path.                | Examples write to fixed `/tmp` paths or similar locations.                                         | Use a unique temporary directory or safe temp-file helper.                                             |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`           | Privileged command lacks guardrails.                 | Content runs `sudo` or equivalent privileged actions without checks.                               | Add prerequisites, confirmation, and rollback guidance.                                                |
+| `SEC-RISKY-OPERATION-ERROR-SUPPRESSION`           | Risky operation failure is explicitly ignored.       | A destructive, privileged, upload, or sensitive-data operation uses a bounded shell or prose failure-suppression form. | Preserve the failure, stop and report it, and verify or roll back partial effects.                       |
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`               | Instructions explicitly bypass a security safeguard. | Content disables checks, weakens policy, skips approval, suppresses warnings, or uses a riskier fallback. | Preserve the safeguard, stop and report missing authority, and verify again without policy relaxation. |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`                | Instructions expose or request secret material.      | Content includes or asks for private keys, tokens, or credentials.                                 | Remove secret material and describe secure handling instead.                                           |
 | `SEC-SENSITIVE-FILE-REFERENCE`                   | Instructions reference sensitive files.              | Content points at credentials, keys, or local secret paths.                                        | Replace with safe examples or redacted placeholders.                                                   |

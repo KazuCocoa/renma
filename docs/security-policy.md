@@ -831,6 +831,28 @@ finite auxiliary or copula also starts a new polarity scope, so a later `to`
 inside that finite clause is not treated as a purpose complement of the earlier
 prohibited action.
 
+Renma separately reports `SEC-RISKY-OPERATION-ERROR-SUPPRESSION` when an
+unquoted `|| true` or `|| :` is immediately attached to a shell operation that
+the existing command and data-flow analysis already classifies as destructive,
+privileged, a security-sensitive upload, or a sensitive-data operation. A
+small prose grammar also covers an explicit risky-operation failure followed
+by “ignore the error and continue.” Neither generic error handling nor a
+generic suppression is enough: capability probes, ordinary commands,
+`try/catch`, `set +e`, and stderr redirection remain outside the rule by
+themselves. Preserve the failure, stop and report the blocker, and add explicit
+verification or rollback where partial effects are possible.
+
+`SEC-INSTRUCTION-HIERARCHY-OVERRIDE` covers a different authority boundary. It
+uses a small English grammar requiring both an override action—such as ignore,
+disregard, override, supersede, or take precedence over—and an explicit target
+such as previous, system, developer, higher-level, platform-policy, or
+host-agent instructions. Persona wording alone is not a match. Direct
+prohibitions and structurally non-operational examples remain defensive under
+the existing Markdown security view. Hidden HTML and YAML-comment matches keep
+the existing hidden-operational diagnostic identity and record this rule as
+their underlying match. Remove the override claim, preserve host authority,
+and express the intended Skill behavior only within its local scope.
+
 HTML comments remain excluded from the rendered-visible semantic projection;
 they are not treated as ordinary operational prose. Because an agent may read
 the raw Markdown source, Renma separately projects each real HTML-comment span
@@ -1227,6 +1249,8 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`       | An upload target is not in upload approvals.                                                                                         | Use an approved upload target or update upload approvals intentionally.                                                                                                                                                                                                                                                                                                     | Body, canonical Skill `description`, metadata, or config |
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION`         | The asset asks for data listed in its forbidden-input policy.                                                                        | Remove the request or replace it with redaction and placeholder guidance.                                                                                                                                                                                                                                                                                                   | Body, canonical Skill `description`, or metadata |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body or canonical Skill `description`      |
+| `SEC-INSTRUCTION-HIERARCHY-OVERRIDE`      | Agent-facing text explicitly attempts to supersede system, developer, prior, platform, or other higher-authority instructions.       | Remove the hierarchy override, preserve host authority, and express only bounded local behavior.                                                                                                                                                                                                                                                                            | Body or canonical Skill `description`      |
+| `SEC-RISKY-OPERATION-ERROR-SUPPRESSION`   | Failure from a recognized destructive, privileged, upload, or sensitive-data operation is explicitly ignored.                       | Preserve the failure, stop and report the blocker, and verify or roll back partial effects.                                                                                                                                                                                                                                                                                  | Body or canonical Skill `description`      |
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text or canonical Skill `description` |
 | `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body text or canonical Skill `description` |
 | `SEC-EXECUTABLE-AS-POLICY-AUTHORITY`      | A recognized inline Skill helper decides whether a security-relevant operation is allowed, approved, authorized, or safe.            | Keep the authorization decision in reviewed Skill instructions and declarative Renma policy; use executable output only as bounded evidence.                                                                                                                                                                                                                                | Canonical Skill body                        |
