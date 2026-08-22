@@ -69,7 +69,7 @@ import {
   type SecurityCommandAnalysis,
 } from "./security-command/index.js";
 import {
-  hasBoundedShellCommandSubstitution,
+  hasBoundedShellOperationalSubstitution,
   tokenizeBoundedShell,
 } from "./security-command/shell.js";
 import {
@@ -4707,16 +4707,15 @@ function addShellCommandSegmentRiskKinds(
     kinds.add("privileged-command");
   }
 
-  if (!allowConservativeFallback) return;
+  const hasOperationalSubstitution =
+    hasBoundedShellOperationalSubstitution(segment);
+  if (!allowConservativeFallback && !hasOperationalSubstitution) return;
   const commandPositionEstablished =
     destructivePattern !== undefined ||
     privilegedPattern !== undefined ||
     (effectiveExecutable !== undefined &&
       LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable));
-  if (
-    commandPositionEstablished &&
-    !hasBoundedShellCommandSubstitution(segment)
-  ) {
+  if (commandPositionEstablished && !hasOperationalSubstitution) {
     return;
   }
   for (const kind of fallbackShellCommandRiskKinds(segment)) kinds.add(kind);
@@ -4741,7 +4740,7 @@ function classifyRiskyShellOperation(
   const literalOutputOnly =
     effectiveExecutable !== undefined &&
     LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable) &&
-    !hasBoundedShellCommandSubstitution(operation);
+    !hasBoundedShellOperationalSubstitution(operation);
 
   const analysis = analyzeSecurityCommand({
     source: {
@@ -6244,8 +6243,7 @@ function requiresLineLocalApprovalGuard(line: string): boolean {
     (SECRET_ACTION_RE.test(line) && SECRET_WORD_RE.test(line)) ||
     (referencesSensitiveFile(line) &&
       !isSafeSensitiveHandlingInstruction(line)) ||
-    PRIVILEGED_COMMAND_RE.test(line) ||
-    DESTRUCTIVE_COMMAND_RE.test(line)
+    classifyShellCommandRiskKinds(line, true).length > 0
   );
 }
 

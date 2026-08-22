@@ -6,6 +6,7 @@ export type ShellToken = {
   end: number;
   quoted: boolean;
   commandSubstitution: boolean;
+  processSubstitution: boolean;
 };
 
 export type ShellTokenization = {
@@ -31,6 +32,9 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
 
     const operator = shellOperatorAt(input, cursor);
     if (operator !== undefined) {
+      const processSubstitution =
+        (operator === "<" || operator === ">") &&
+        input[cursor + operator.length] === "(";
       tokens.push({
         kind: "operator",
         value: operator,
@@ -39,6 +43,7 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
         end: cursor + operator.length,
         quoted: false,
         commandSubstitution: false,
+        processSubstitution,
       });
       cursor += operator.length;
       continue;
@@ -114,17 +119,21 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
       end: cursor,
       quoted,
       commandSubstitution,
+      processSubstitution: false,
     });
   }
 
   return { tokens, supported: true };
 }
 
-export function hasBoundedShellCommandSubstitution(input: string): boolean {
+export function hasBoundedShellOperationalSubstitution(input: string): boolean {
   const tokenization = tokenizeBoundedShell(input);
   return (
     !tokenization.supported ||
-    tokenization.tokens.some(({ commandSubstitution }) => commandSubstitution)
+    tokenization.tokens.some(
+      ({ commandSubstitution, processSubstitution }) =>
+        commandSubstitution || processSubstitution,
+    )
   );
 }
 

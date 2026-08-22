@@ -141,6 +141,8 @@ test("literal-output arguments do not become destructive or privileged commands"
     'echo "$prefix: rm -rf /tmp/example"',
     'command echo "rm -rf /tmp/example" || true',
     '/usr/bin/printf "%s\\n" "sudo some-command" || :',
+    'echo ">(rm -rf /tmp/example)"',
+    'printf "%s\\n" "<(sudo some-command)"',
   ];
 
   for (const command of commands) {
@@ -154,6 +156,76 @@ ${command}
       findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
       [],
       command,
+    );
+  }
+});
+
+test("process substitutions remain operational inside literal-output commands", () => {
+  const cases = [
+    {
+      command: "echo data > >(rm -rf /tmp/example)",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: 'printf "%s\\n" data < <(sudo some-command)',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+  ];
+
+  for (const { command, diagnosticId } of cases) {
+    const finding = findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      diagnosticId,
+    );
+    assert.deepEqual(finding.evidence, {
+      path: "contexts/security/targeted.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: command,
+    });
+  }
+});
+
+test("literal-output command text does not create policy requirements", () => {
+  const commands = [
+    'echo "rm -rf /tmp/example"',
+    'printf "%s\\n" "sudo some-command"',
+  ];
+  const body = `# Workflow
+
+\`\`\`bash
+${commands.join("\n")}
+\`\`\`
+`;
+  const withoutPolicy = securityDiagnosticFindings([contextArtifact(body)]);
+  assert.equal(
+    withoutPolicy.some(({ id }) => id === "SEC-MISSING-POLICY-METADATA"),
+    false,
+  );
+
+  const approvalRequired = securityDiagnosticFindings([
+    contextArtifact(`---
+allowed_data: public
+requires_human_approval: true
+---
+
+${body}`),
+  ]);
+  assert.equal(
+    approvalRequired.some(
+      ({ id }) => id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+    false,
+  );
+  for (const findings of [withoutPolicy, approvalRequired]) {
+    assert.equal(
+      findings.some(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      false,
     );
   }
 });
