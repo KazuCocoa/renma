@@ -18,10 +18,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   supersede system, developer, platform, prior, or higher-level instructions
   without treating ordinary persona wording, correct authority ordering,
   bounded questions, explicit attribution, or defensive statements as
-  violations; bare prompt mentions cannot suppress an operational override.
+  violations; bare prompt mentions and earlier independent clauses cannot
+  suppress an operational override.
 
 ### Changed
 
+- Bounded negative-subject safeguard instructions such as “No Skill … may
+  bypass” no longer overlap with `SEC-SAFEGUARD-BYPASS-INSTRUCTION`; a later
+  independently expressed bypass remains reportable.
 - Made the pre-1.0 compatibility boundary explicit without changing stable CLI
   behavior or stable JSON output: scan JSON now uses an explicit wire
   projection, supported TypeScript entrypoints have a checked declaration

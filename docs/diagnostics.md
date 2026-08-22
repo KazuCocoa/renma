@@ -950,7 +950,8 @@ multiline shell analysis removes quote markers only in its logical-command
 projection; diagnostic evidence retains the exact quoted source lines. Routing
 does not cross an unrelated structural boundary. Safeguard polarity attaches a
 prohibition to the directly governed action and bounded coordinated predicates;
-a later independently expressed unsafe action is evaluated separately.
+bounded “No Skill … may” actor clauses are also defensive. A later independently
+expressed unsafe action is evaluated separately.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
@@ -997,13 +998,15 @@ not a general prompt-injection or multilingual classifier. Ordinary persona
 wording, correct statements that higher authority supersedes lower authority,
 direct or indirect bounded hierarchy questions, and explicitly attributed or
 illustrative phrases are outside the rule. A bare mention of “the prompt,” “the
-statement,” or “the phrase” is not attribution by itself. Direct prohibitions
+statement,” or “the phrase” is not attribution by itself, and an attribution or
+illustrative cue does not govern a later independent clause. Direct prohibitions
 and bounded inability or negative-subject forms remain defensive, including
-locally qualified Skill subjects. Quoted or non-operational unsafe examples
-follow the existing Markdown security-view boundaries. A recognized override
-inside an HTML or YAML frontmatter comment remains hidden operational evidence
-under the existing hidden-comment diagnostic rather than becoming a rendered-
-visible finding. Repair removes the priority claim, preserves system and
+locally qualified Skill subjects, but their polarity stops at the governed action
+and does not cross a later finite clause. Quoted or non-operational unsafe
+examples follow the existing Markdown security-view boundaries. A recognized
+override inside an HTML or YAML frontmatter comment remains hidden operational
+evidence under the existing hidden-comment diagnostic rather than becoming a
+rendered-visible finding. Repair removes the priority claim, preserves system and
 developer authority, and states only the intended local behavior.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external

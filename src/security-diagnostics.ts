@@ -1433,12 +1433,20 @@ const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE =
 const INSTRUCTION_HIERARCHY_ACTOR_SOURCE = String.raw`(?:skills?|rules?|polic(?:y|ies)|instructions?|guidance|workflows?|agents?|helpers?)`;
 const INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE = String.raw`(?:(?:(?:this|that|the|any|a|an|local|lower[- ]level|agent-facing)\s+){0,3}${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})`;
 const INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE = String.raw`(?:may|can|will|should|must)(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*`;
-const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE = new RegExp(
-  String.raw`(?:^|\b)(?:no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}(?:\s+(?:(?:in|within|under|that|which|who)\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}))?\s+(?:${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:is|are|was|were)\s+(?:allowed|permitted|authorized)\s+to)|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+nor\s+(?:its\s+)?${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:nothing|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|under\s+no\s+circumstances\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}|it\s+is\s+(?:forbidden|prohibited|not\s+(?:allowed|permitted|authorized))\s+for\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+to)\s*$`,
+const NEGATED_ACTOR_ACTION_SUBJECT_RE = new RegExp(
+  String.raw`(?:^|\b)(?:no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+(?:${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:is|are|was|were)\s+(?:allowed|permitted|authorized)\s+to)|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+nor\s+(?:its\s+)?${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:nothing|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|under\s+no\s+circumstances\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}|it\s+is\s+(?:forbidden|prohibited|not\s+(?:allowed|permitted|authorized))\s+for\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+to)\s*$`,
   "i",
 );
-const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE =
-  /\bfor example\b[^.!?\n\r]{0,120}(?:["'`“‘]\s*)?$|\bthe\s+(?:phrase|statement|prompt)\s+["'`“‘]\s*$|\b(?:(?:(?:the|a)\s+)?(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?))\s+(?:says?|states?|reads?|contains?|quotes?|not(?:e|es|ed|ing)|documents?|records?|explains?)\b[^.!?\n\r]{0,120}(?:["'`“‘]\s*)?$|\baccording\s+to\s+(?:(?:the|an?)\s+)?(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?)\b[^.!?\n\r]{0,120}$/iu;
+const INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE = String.raw`(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?)`;
+const INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE = String.raw`(?:(?!\b(?:but|then|however|therefore)\b)[^,.;:!?—–\n\r])`;
+const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE = new RegExp(
+  String.raw`\bfor\s+example\s*,?\s*(?:["'\u0060“‘]\s*)?$|\bthe\s+(?:phrase|statement|prompt)\s+["'\u0060“‘]\s*$|\b(?:(?:(?:the|a)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE})\s+(?:says?|states?|reads?|contains?|quotes?|not(?:e|es|ed|ing)|documents?|records?|explains?)\b\s*(?:[:,]\s*)?${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}(?:["'\u0060“‘]\s*)?$|\baccording\s+to\s+(?:(?:the|an?)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE}\b\s*,?\s*${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}$`,
+  "i",
+);
+const QUALIFIED_NEGATED_ACTOR_ACTION_SUBJECT_RE = new RegExp(
+  String.raw`^\s*no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+(?:(?:in|within|under|that|which|who)\b)(?:(?!\b(?:but|then|however|therefore)\b)[^,.;:!?—–\n\r]){0,60}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s*$`,
+  "i",
+);
 const INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE =
   /^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\s+(?:(?:this|these|a|an|the)\s+)?(?:local\s+)?(?:skill|rule|policy|instructions?|guidance|system|developer|platform|higher[- ]level|host[- ]agent)\b[^.!?;:—–\n\r]{0,100}$/iu;
 const INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE =
@@ -5383,7 +5391,10 @@ function semanticInstructionDetections(
 
 function unsafeSafeguardClause(text: string): string | undefined {
   const analysisText = safeguardMarkdownPresentationProjection(text);
-  const actions = safeguardActionPolarities(analysisText);
+  const actions = safeguardActionPolarities(
+    analysisText,
+    negatedActorActionIsDefensive,
+  );
   for (const {
     pattern,
     immediateContinuationCondition,
@@ -5489,10 +5500,10 @@ function hierarchyOverrideActionIsDefensive(
   actionStart: number,
 ): boolean {
   const boundedPrefix = text.slice(Math.max(0, actionStart - 180), actionStart);
-  const clausePrefix = hierarchyOverrideClausePrefix(boundedPrefix);
+  const clausePrefix = boundedActionClausePrefix(boundedPrefix);
   if (
     INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(clausePrefix) ||
-    INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE.test(clausePrefix) ||
+    negatedActorClauseIsDefensive(clausePrefix) ||
     INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
     INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE.test(clausePrefix) ||
     INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE.test(clausePrefix)
@@ -5525,7 +5536,24 @@ function hierarchyOverrideActionIsDefensive(
   );
 }
 
-function hierarchyOverrideClausePrefix(boundedPrefix: string): string {
+function negatedActorActionIsDefensive(
+  text: string,
+  actionStart: number,
+): boolean {
+  const boundedPrefix = text.slice(Math.max(0, actionStart - 180), actionStart);
+  return negatedActorClauseIsDefensive(
+    boundedActionClausePrefix(boundedPrefix),
+  );
+}
+
+function negatedActorClauseIsDefensive(clausePrefix: string): boolean {
+  return (
+    NEGATED_ACTOR_ACTION_SUBJECT_RE.test(clausePrefix) ||
+    QUALIFIED_NEGATED_ACTOR_ACTION_SUBJECT_RE.test(clausePrefix)
+  );
+}
+
+function boundedActionClausePrefix(boundedPrefix: string): string {
   const boundary = Math.max(
     boundedPrefix.lastIndexOf("."),
     boundedPrefix.lastIndexOf(";"),

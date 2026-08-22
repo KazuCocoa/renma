@@ -823,9 +823,10 @@ examples, HTML-comment content, and fenced or blockquoted prose clearly marked
 as an unsafe or negative example do not become semantic bypass findings.
 Safeguard polarity is evaluated at each action predicate. A prohibition applies
 to the action it directly governs and may continue through bounded grammatical
-coordination or a dependent infinitival-purpose complement, but it does not
-hide a later independently expressed unsafe action across punctuation,
-conditional wording, fallback wording, or another clause boundary.
+coordination or a dependent infinitival-purpose complement. Bounded “No Skill …
+may” actor clauses are also defensive, but they do not hide a later independently
+expressed unsafe action across punctuation, conditional wording, fallback
+wording, or another clause boundary.
 Hard clause terminators end direct prohibition lookup. A new subject plus a
 finite auxiliary or copula also starts a new polarity scope, so a later `to`
 inside that finite clause is not treated as a purpose complement of the earlier
@@ -857,12 +858,13 @@ match. Correct higher-to-lower authority ordering, direct or indirect bounded
 hierarchy questions, explicitly attributed or illustrative phrases, direct
 prohibitions, inability statements, and bounded negative-subject forms remain
 defensive. Merely mentioning a prompt, statement, or phrase before an override
-does not create an attribution exemption. Structurally non-operational examples
-retain the existing Markdown security-view boundary. Hidden HTML and YAML-
-comment matches keep the existing hidden-operational diagnostic identity and
-record this rule as their underlying match. Remove the override claim, preserve
-host authority, and express the intended Skill behavior only within its local
-scope.
+does not create an attribution exemption. Attribution, illustrative context,
+and negative-subject polarity stop before an independently coordinated or later
+finite clause. Structurally non-operational examples retain the existing
+Markdown security-view boundary. Hidden HTML and YAML-comment matches keep the
+existing hidden-operational diagnostic identity and record this rule as their
+underlying match. Remove the override claim, preserve host authority, and
+express the intended Skill behavior only within its local scope.
 
 HTML comments remain excluded from the rendered-visible semantic projection;
 they are not treated as ordinary operational prose. Because an agent may read
