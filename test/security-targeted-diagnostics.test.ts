@@ -5,6 +5,11 @@ import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Artifact, Finding } from "../src/types.js";
 
 const RISKY_SUPPRESSION_ID = "SEC-RISKY-OPERATION-ERROR-SUPPRESSION";
+const RISKY_COMMAND_DIAGNOSTIC_IDS = new Set([
+  RISKY_SUPPRESSION_ID,
+  "SEC-DESTRUCTIVE-COMMAND",
+  "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+]);
 const HIERARCHY_OVERRIDE_ID = "SEC-INSTRUCTION-HIERARCHY-OVERRIDE";
 
 test("risky shell operations require explicit failure handling", () => {
@@ -63,7 +68,7 @@ ${command}
 \`\`\`
 `);
     assert.equal(
-      findings.some(({ id }) => id === RISKY_SUPPRESSION_ID),
+      findings.some(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
       false,
       command,
     );
@@ -125,6 +130,334 @@ ${command}
   }
 });
 
+test("literal-output arguments do not become destructive or privileged commands", () => {
+  const commands = [
+    'echo "rm -rf /tmp/example"',
+    'echo "rm -rf /tmp/example" || true',
+    'printf "%s\\n" "sudo some-command"',
+    'printf "%s\\n" "sudo some-command" || :',
+    'echo "git reset --hard"',
+    'printf "%s\\n" "chmod 777 output"',
+    'echo "$prefix: rm -rf /tmp/example"',
+    'command echo "rm -rf /tmp/example" || true',
+    '/usr/bin/printf "%s\\n" "sudo some-command" || :',
+    'echo ">(rm -rf /tmp/example)"',
+    'printf "%s\\n" "<(sudo some-command)"',
+    'echo "=(rm -rf /tmp/example)"',
+    'printf "%s\\n" "=(sudo some-command)"',
+    'OUTPUT="=(rm -rf /tmp/example)" echo "$OUTPUT"',
+  ];
+
+  for (const command of commands) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("process substitutions remain operational inside literal-output commands", () => {
+  const cases = [
+    {
+      language: "bash",
+      command: "echo data > >(rm -rf /tmp/example)",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      language: "bash",
+      command: 'printf "%s\\n" data < <(sudo some-command)',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      language: "zsh",
+      command: "echo =(rm -rf /tmp/example)",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      language: "zsh",
+      command: 'printf "%s\\n" =(sudo some-command)',
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      language: "zsh",
+      command: "OUTPUT==(rm -rf /tmp/example) echo ready",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+  ];
+
+  for (const { language, command, diagnosticId } of cases) {
+    const finding = findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`${language}
+${command}
+\`\`\`
+`),
+      diagnosticId,
+    );
+    assert.deepEqual(finding.evidence, {
+      path: "contexts/security/targeted.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: command,
+    });
+  }
+
+  const zshBody = `# Workflow
+
+\`\`\`zsh
+echo =(rm -rf /tmp/example)
+\`\`\`
+`;
+  const withoutPolicy = securityDiagnosticFindings([contextArtifact(zshBody)]);
+  assert.equal(
+    withoutPolicy.some(({ id }) => id === "SEC-MISSING-POLICY-METADATA"),
+    true,
+  );
+
+  const approvalRequired = securityDiagnosticFindings([
+    contextArtifact(`---
+allowed_data: public
+requires_human_approval: true
+---
+
+${zshBody}`),
+  ]);
+  assert.equal(
+    approvalRequired.some(
+      ({ id }) => id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+    true,
+  );
+});
+
+test("literal-output command text does not create policy requirements", () => {
+  const commands = [
+    'echo "rm -rf /tmp/example"',
+    'printf "%s\\n" "sudo some-command"',
+  ];
+  const body = `# Workflow
+
+\`\`\`bash
+${commands.join("\n")}
+\`\`\`
+`;
+  const withoutPolicy = securityDiagnosticFindings([contextArtifact(body)]);
+  assert.equal(
+    withoutPolicy.some(({ id }) => id === "SEC-MISSING-POLICY-METADATA"),
+    false,
+  );
+
+  const approvalRequired = securityDiagnosticFindings([
+    contextArtifact(`---
+allowed_data: public
+requires_human_approval: true
+---
+
+${body}`),
+  ]);
+  assert.equal(
+    approvalRequired.some(
+      ({ id }) => id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+    false,
+  );
+  for (const findings of [withoutPolicy, approvalRequired]) {
+    assert.equal(
+      findings.some(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      false,
+    );
+  }
+});
+
+test("destructive and privileged diagnostics preserve wrappers, paths, and evidence", () => {
+  const destructiveCommands = [
+    'rm -rf "$target"',
+    'command rm -rf "$target"',
+    'env rm -rf "$target"',
+    'TARGET=demo rm -rf "$target"',
+    '/bin/rm -rf "$target"',
+    "git reset --hard",
+  ];
+  for (const command of destructiveCommands) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    const destructive = findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    assert.deepEqual(destructive.evidence, {
+      path: "contexts/security/targeted.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: command,
+    });
+  }
+
+  const privilegedCommands = [
+    "sudo some-command",
+    "/usr/bin/sudo some-command",
+    "sudo env some-command",
+    "chmod 777 output",
+  ];
+  for (const command of privilegedCommands) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    const privileged = findingFor(
+      findings,
+      "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    );
+    assert.deepEqual(privileged.evidence, {
+      path: "contexts/security/targeted.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: command,
+    });
+  }
+
+  const combinedCommand = 'sudo command rm -rf "$target"';
+  const combined = findingsFor(`# Workflow
+
+\`\`\`bash
+${combinedCommand}
+\`\`\`
+`);
+  for (const id of [
+    "SEC-DESTRUCTIVE-COMMAND",
+    "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+  ]) {
+    const matches = combined.filter((finding) => finding.id === id);
+    assert.equal(matches.length, 1, id);
+    assert.equal(matches[0]?.evidence.snippet, combinedCommand, id);
+  }
+
+  const multipleCommands = findingsFor(`# Workflow
+
+\`\`\`bash
+echo ready; rm -rf "$target" && sudo some-command
+\`\`\`
+`);
+  assert.equal(
+    multipleCommands.filter(({ id }) => id === "SEC-DESTRUCTIVE-COMMAND")
+      .length,
+    1,
+  );
+  assert.equal(
+    multipleCommands.filter(
+      ({ id }) => id === "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    ).length,
+    1,
+  );
+});
+
+test("shell command-risk definitions stay synchronized across diagnostics", () => {
+  const cases: Array<{
+    command: string;
+    diagnosticId: string;
+    operationKind: string;
+  }> = [
+    {
+      command: "rm -rf /tmp/example || true",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+      operationKind: "destructive-command",
+    },
+    {
+      command: "git clean -xdf || true",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+      operationKind: "destructive-command",
+    },
+    {
+      command: "docker volume rm demo || true",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+      operationKind: "destructive-command",
+    },
+    {
+      command: "kubectl delete pod demo || true",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+      operationKind: "destructive-command",
+    },
+    {
+      command: "drop database demo || true",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+      operationKind: "destructive-command",
+    },
+    {
+      command: "truncate table demo || true",
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+      operationKind: "destructive-command",
+    },
+    {
+      command: "sudo some-command || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+    {
+      command: "chmod a+w output || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+    {
+      command: "chown user output || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+    {
+      command: "docker run --privileged image || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+    {
+      command: "mount /dev/example /mnt/example || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+    {
+      command: "launchctl unload service || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+    {
+      command: "systemctl stop service || true",
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      operationKind: "privileged-command",
+    },
+  ];
+
+  for (const { command, diagnosticId, operationKind } of cases) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.equal(
+      findings.filter(({ id }) => id === diagnosticId).length,
+      1,
+      command,
+    );
+    const suppression = findingFor(findings, RISKY_SUPPRESSION_ID);
+    assert.equal(
+      (suppression.details?.operationKinds as string[] | undefined)?.includes(
+        operationKind,
+      ),
+      true,
+      command,
+    );
+  }
+});
+
 test("risky suppression reuses recognized uploads without a tool whitelist", () => {
   const command = "rclone copy report.json s3://bucket/path || true";
   const findings = findingsFor(`# Workflow
@@ -146,19 +479,25 @@ ${command}
 
 test("literal output distinguishes quoted text from command substitution", () => {
   const command = 'echo "$(cat .env)" || true';
-  const finding = findingFor(
-    findingsFor(`# Workflow
+  const findings = findingsFor(`# Workflow
 
 \`\`\`bash
 ${command}
 \`\`\`
-`),
-    RISKY_SUPPRESSION_ID,
-  );
+`);
+  const finding = findingFor(findings, RISKY_SUPPRESSION_ID);
 
   assert.deepEqual(finding.details?.operationKinds, [
     "sensitive-data-operation",
   ]);
+
+  const destructiveSubstitution = findingsFor(`# Workflow
+
+\`\`\`bash
+echo "$(rm -rf /tmp/example)"
+\`\`\`
+`);
+  findingFor(destructiveSubstitution, "SEC-DESTRUCTIVE-COMMAND");
 });
 
 test("logical shell projection reports one risky suppression with stable source evidence", () => {

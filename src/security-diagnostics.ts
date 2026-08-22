@@ -69,7 +69,7 @@ import {
   type SecurityCommandAnalysis,
 } from "./security-command/index.js";
 import {
-  hasBoundedShellCommandSubstitution,
+  hasBoundedShellOperationalSubstitution,
   tokenizeBoundedShell,
 } from "./security-command/shell.js";
 import {
@@ -1363,10 +1363,38 @@ const GUARDED_ACTION_RE =
   /\b(only|unless|after|with|before)\b.{0,80}\b(approval|approved|confirmation|confirm|human review|maintainer review|redact|redacted|redaction|dry[- ]run|backup|rollback)\b|\b(redact|redacted|redaction|approval|approved|confirmation|confirm|human review|maintainer review|dry[- ]run|backup|rollback)\b.{0,80}\b(before|after|upload|send|post|put|share|sudo|rm\s+-|git\s+reset|git\s+clean|delete|install|add)\b/i;
 const REMOTE_SCRIPT_RE =
   /\b(curl|wget)\b[^\n]*?(https?:\/\/[^\s|`'")]+)[^\n]*\|\s*(sh|bash|zsh)\b/i;
-const PRIVILEGED_COMMAND_RE =
-  /\b(sudo|chmod\s+(777|666|\+w|a\+w)|chown\b|docker\s+run\b[^\n]*(--privileged|-v\s+\/|--pid=host)|mount\b|launchctl\b|systemctl\b)\b/i;
-const DESTRUCTIVE_COMMAND_RE =
-  /\b(rm\s+-[^\n]*[rf][^\n]*|git\s+reset\s+--hard|git\s+clean\s+-[^\n]*[xdf][^\n]*|docker\s+(?:rm|rmi|system\s+prune|volume\s+rm)\b|kubectl\s+delete\b|drop\s+database|truncate\s+table)\b/i;
+const PRIVILEGED_SHELL_COMMAND_DEFINITIONS = [
+  ["sudo", String.raw`sudo`],
+  ["chmod", String.raw`chmod\s+(?:777|666|\+w|a\+w)`],
+  ["chown", String.raw`chown`],
+  [
+    "docker",
+    String.raw`docker\s+run\b[^\n]*(?:--privileged|-v\s+\/|--pid=host)`,
+  ],
+  ["mount", String.raw`mount`],
+  ["launchctl", String.raw`launchctl`],
+  ["systemctl", String.raw`systemctl`],
+] as const;
+const DESTRUCTIVE_SHELL_COMMAND_DEFINITIONS = [
+  ["rm", String.raw`rm\s+-[^\n]*[rf][^\n]*`],
+  ["git", String.raw`git\s+reset\s+--hard|git\s+clean\s+-[^\n]*[xdf][^\n]*`],
+  ["docker", String.raw`docker\s+(?:rm|rmi|system\s+prune|volume\s+rm)\b`],
+  ["kubectl", String.raw`kubectl\s+delete\b`],
+  ["drop", String.raw`drop\s+database`],
+  ["truncate", String.raw`truncate\s+table`],
+] as const;
+const PRIVILEGED_SHELL_COMMAND_PATTERNS = shellCommandRiskPatterns(
+  PRIVILEGED_SHELL_COMMAND_DEFINITIONS,
+);
+const DESTRUCTIVE_SHELL_COMMAND_PATTERNS = shellCommandRiskPatterns(
+  DESTRUCTIVE_SHELL_COMMAND_DEFINITIONS,
+);
+const PRIVILEGED_COMMAND_RE = shellCommandRiskFallbackPattern(
+  PRIVILEGED_SHELL_COMMAND_DEFINITIONS,
+);
+const DESTRUCTIVE_COMMAND_RE = shellCommandRiskFallbackPattern(
+  DESTRUCTIVE_SHELL_COMMAND_DEFINITIONS,
+);
 const CREDENTIAL_ARG_RE =
   /--?(token|password|passwd|secret|credential|api[-_]?key|key|cert|certificate|signing[-_]?key|auth)(=|\s+)(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
 const CREDENTIAL_ARG_ANY_RE =
@@ -4453,6 +4481,7 @@ function commandDetections(
 ): Detection[] {
   const detections: Detection[] = [];
   const defensiveAction = isDefensiveOrGuardedActionInstruction(line);
+  const shellCommandRiskKinds = classifyShellCommandRiskKinds(line, true);
 
   const remoteScript = line.match(REMOTE_SCRIPT_RE);
   if (remoteScript && !hasPinnedRemoteScript(line) && !defensiveAction) {
@@ -4515,7 +4544,7 @@ function commandDetections(
   }
 
   if (
-    PRIVILEGED_COMMAND_RE.test(line) &&
+    shellCommandRiskKinds.includes("privileged-command") &&
     !hasCommandRiskGuard &&
     !defensiveAction
   ) {
@@ -4528,7 +4557,7 @@ function commandDetections(
   }
 
   if (
-    DESTRUCTIVE_COMMAND_RE.test(line) &&
+    shellCommandRiskKinds.includes("destructive-command") &&
     !hasCommandRiskGuard &&
     !defensiveAction
   ) {
@@ -4619,31 +4648,99 @@ function isShellPipelineBoundary(operator: string): boolean {
   return isShellCommandBoundary(operator) && operator !== "|";
 }
 
+function classifyShellCommandRiskKinds(
+  command: string,
+  allowConservativeFallback: boolean,
+): RiskyOperationKind[] {
+  const tokenization = tokenizeBoundedShell(command);
+  if (!tokenization.supported) {
+    return allowConservativeFallback
+      ? fallbackShellCommandRiskKinds(command)
+      : [];
+  }
+
+  const kinds = new Set<RiskyOperationKind>();
+  let segmentStart = 0;
+  for (const token of tokenization.tokens) {
+    if (token.kind !== "operator" || !isShellCommandBoundary(token.value)) {
+      continue;
+    }
+    addShellCommandSegmentRiskKinds(
+      kinds,
+      command.slice(segmentStart, token.start).trim(),
+      allowConservativeFallback,
+    );
+    segmentStart = token.end;
+  }
+  addShellCommandSegmentRiskKinds(
+    kinds,
+    command.slice(segmentStart).trim(),
+    allowConservativeFallback,
+  );
+
+  return (["destructive-command", "privileged-command"] as const).filter(
+    (kind) => kinds.has(kind),
+  );
+}
+
+function addShellCommandSegmentRiskKinds(
+  kinds: Set<RiskyOperationKind>,
+  segment: string,
+  allowConservativeFallback: boolean,
+): void {
+  if (!segment) return;
+
+  const executable = directShellExecutable(segment);
+  const effectiveExecutable = effectiveShellExecutable(segment);
+  const destructivePattern =
+    effectiveExecutable === undefined
+      ? undefined
+      : DESTRUCTIVE_SHELL_COMMAND_PATTERNS.get(effectiveExecutable);
+  const privilegedPattern =
+    executable === undefined
+      ? undefined
+      : PRIVILEGED_SHELL_COMMAND_PATTERNS.get(executable);
+  if (destructivePattern?.test(segment) === true) {
+    kinds.add("destructive-command");
+  }
+  if (privilegedPattern?.test(segment) === true) {
+    kinds.add("privileged-command");
+  }
+
+  const hasOperationalSubstitution =
+    hasBoundedShellOperationalSubstitution(segment);
+  if (!allowConservativeFallback && !hasOperationalSubstitution) return;
+  const commandPositionEstablished =
+    destructivePattern !== undefined ||
+    privilegedPattern !== undefined ||
+    (effectiveExecutable !== undefined &&
+      LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable));
+  if (commandPositionEstablished && !hasOperationalSubstitution) {
+    return;
+  }
+  for (const kind of fallbackShellCommandRiskKinds(segment)) kinds.add(kind);
+}
+
+function fallbackShellCommandRiskKinds(command: string): RiskyOperationKind[] {
+  const kinds: RiskyOperationKind[] = [];
+  if (DESTRUCTIVE_COMMAND_RE.test(command)) kinds.push("destructive-command");
+  if (PRIVILEGED_COMMAND_RE.test(command)) kinds.push("privileged-command");
+  return kinds;
+}
+
 function classifyRiskyShellOperation(
   operation: string,
   sensitiveDataOperation = operation,
 ): RiskyOperationKind[] {
-  const kinds: RiskyOperationKind[] = [];
-  const executable = directShellExecutable(operation);
+  const kinds: RiskyOperationKind[] = classifyShellCommandRiskKinds(
+    operation,
+    false,
+  );
   const effectiveExecutable = effectiveShellExecutable(operation);
-  if (
-    effectiveExecutable !== undefined &&
-    DESTRUCTIVE_SHELL_EXECUTABLES.has(effectiveExecutable) &&
-    DESTRUCTIVE_COMMAND_RE.test(operation)
-  ) {
-    kinds.push("destructive-command");
-  }
-  if (
-    executable !== undefined &&
-    PRIVILEGED_SHELL_EXECUTABLES.has(executable) &&
-    PRIVILEGED_COMMAND_RE.test(operation)
-  ) {
-    kinds.push("privileged-command");
-  }
   const literalOutputOnly =
     effectiveExecutable !== undefined &&
     LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable) &&
-    !hasBoundedShellCommandSubstitution(operation);
+    !hasBoundedShellOperationalSubstitution(operation);
 
   const analysis = analyzeSecurityCommand({
     source: {
@@ -4678,23 +4775,6 @@ function classifyRiskyShellOperation(
   return kinds;
 }
 
-const DESTRUCTIVE_SHELL_EXECUTABLES = new Set([
-  "docker",
-  "drop",
-  "git",
-  "kubectl",
-  "rm",
-  "truncate",
-]);
-const PRIVILEGED_SHELL_EXECUTABLES = new Set([
-  "chmod",
-  "chown",
-  "docker",
-  "launchctl",
-  "mount",
-  "sudo",
-  "systemctl",
-]);
 const LITERAL_OUTPUT_SHELL_EXECUTABLES = new Set(["echo", "printf"]);
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
@@ -4786,6 +4866,26 @@ function wrappedShellExecutableIndex(
     while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   }
   return index;
+}
+
+function shellCommandRiskPatterns(
+  definitions: readonly (readonly [string, string])[],
+): ReadonlyMap<string, RegExp> {
+  return new Map(
+    definitions.map(([executable, source]) => [
+      executable,
+      new RegExp(String.raw`\b(?:${source})\b`, "i"),
+    ]),
+  );
+}
+
+function shellCommandRiskFallbackPattern(
+  definitions: readonly (readonly [string, string])[],
+): RegExp {
+  const alternatives = definitions
+    .map(([, source]) => `(?:${source})`)
+    .join("|");
+  return new RegExp(String.raw`\b(?:${alternatives})\b`, "i");
 }
 
 function dependencyFindingDetails(
@@ -6143,8 +6243,7 @@ function requiresLineLocalApprovalGuard(line: string): boolean {
     (SECRET_ACTION_RE.test(line) && SECRET_WORD_RE.test(line)) ||
     (referencesSensitiveFile(line) &&
       !isSafeSensitiveHandlingInstruction(line)) ||
-    PRIVILEGED_COMMAND_RE.test(line) ||
-    DESTRUCTIVE_COMMAND_RE.test(line)
+    classifyShellCommandRiskKinds(line, true).length > 0
   );
 }
 
