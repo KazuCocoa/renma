@@ -1438,13 +1438,27 @@ const NEGATED_ACTOR_ACTION_SUBJECT_RE = new RegExp(
   "i",
 );
 const INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE = String.raw`(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?)`;
-const INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE = String.raw`(?:(?!\b(?:but|then|however|therefore)\b)[^,.;:!?—–\n\r])`;
-const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE = new RegExp(
-  String.raw`\bfor\s+example\s*,?\s*(?:["'\u0060“‘]\s*)?$|\bthe\s+(?:phrase|statement|prompt)\s+["'\u0060“‘]\s*$|\b(?:(?:(?:the|a)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE})\s+(?:says?|states?|reads?|contains?|quotes?|not(?:e|es|ed|ing)|documents?|records?|explains?)\b\s*(?:[:,]\s*)?${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}(?:["'\u0060“‘]\s*)?$|\baccording\s+to\s+(?:(?:the|an?)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE}\b\s*,?\s*${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}$`,
+const INSTRUCTION_HIERARCHY_ATTRIBUTION_VERB_SOURCE = String.raw`(?:says?|states?|reads?|contains?|quotes?|not(?:e|es|ed|ing)|documents?|records?|explains?)`;
+const INSTRUCTION_HIERARCHY_DISCUSSION_QUOTE_SOURCE = [
+  String.raw`"[^"\n\r]{0,160}`,
+  String.raw`'[^'\n\r]{0,160}`,
+  String.raw`\u0060[^\u0060\n\r]{0,160}`,
+  String.raw`“[^”\n\r]{0,160}`,
+  String.raw`‘[^’\n\r]{0,160}`,
+].join("|");
+const INSTRUCTION_HIERARCHY_QUOTED_DISCUSSION_PREFIX_RE = new RegExp(
+  String.raw`(?:\bfor\s+example\s*,?|\bthe\s+(?:phrase|statement|prompt)|\b(?:(?:(?:the|a)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE})\s+${INSTRUCTION_HIERARCHY_ATTRIBUTION_VERB_SOURCE}\b\s*(?:[:,])?)\s*(?:${INSTRUCTION_HIERARCHY_DISCUSSION_QUOTE_SOURCE})$`,
   "i",
 );
+const INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE = String.raw`(?:(?!\b(?:but|then|however|therefore|yet|so)\b)[^,.;:!?—–\n\r])`;
+const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE = new RegExp(
+  String.raw`\bfor\s+example\s*,?\s*(?:["'\u0060“‘]\s*)?$|\bthe\s+(?:phrase|statement|prompt)\s+["'\u0060“‘]\s*$|\b(?:(?:(?:the|a)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE})\s+${INSTRUCTION_HIERARCHY_ATTRIBUTION_VERB_SOURCE}\b\s*(?:[:,]\s*)?${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}(?:["'\u0060“‘]\s*)?$|\baccording\s+to\s+(?:(?:the|an?)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE}\b\s*,?\s*${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}$`,
+  "i",
+);
+const INSTRUCTION_HIERARCHY_FINITE_SUBJECT_SOURCE = String.raw`(?:i|you|he|she|it|we|they|(?:(?:this|that|these|those|the|a|an|local|lower[- ]level|agent-facing)\s+){0,3}${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})`;
+const INSTRUCTION_HIERARCHY_INDEPENDENT_CONTINUATION_SOURCE = String.raw`(?:${INSTRUCTION_HIERARCHY_FINITE_SUBJECT_SOURCE}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|${INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_SOURCE})`;
 const QUALIFIED_NEGATED_ACTOR_ACTION_SUBJECT_RE = new RegExp(
-  String.raw`^\s*no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+(?:(?:in|within|under|that|which|who)\b)(?:(?!\b(?:but|then|however|therefore)\b)[^,.;:!?—–\n\r]){0,60}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s*$`,
+  String.raw`^\s*no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+(?:(?:in|within|under|that|which|who)\b)(?:(?!\b(?:but|then|however|therefore|yet|so)\b\s*(?:${INSTRUCTION_HIERARCHY_INDEPENDENT_CONTINUATION_SOURCE})\b)[^,.;:!?—–\n\r]){0,60}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s*$`,
   "i",
 );
 const INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE =
@@ -5504,6 +5518,7 @@ function hierarchyOverrideActionIsDefensive(
   if (
     INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(clausePrefix) ||
     negatedActorClauseIsDefensive(clausePrefix) ||
+    INSTRUCTION_HIERARCHY_QUOTED_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
     INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
     INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE.test(clausePrefix) ||
     INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE.test(clausePrefix)
