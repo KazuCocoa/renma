@@ -5,6 +5,7 @@ export type ShellToken = {
   start: number;
   end: number;
   quoted: boolean;
+  commandSubstitution: boolean;
 };
 
 export type ShellTokenization = {
@@ -37,6 +38,7 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
         start: cursor,
         end: cursor + operator.length,
         quoted: false,
+        commandSubstitution: false,
       });
       cursor += operator.length;
       continue;
@@ -46,6 +48,7 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
     let value = "";
     let quote: "'" | '"' | undefined;
     let quoted = false;
+    let commandSubstitution = false;
     while (cursor < input.length) {
       const character = input[cursor] ?? "";
       if (quote !== undefined) {
@@ -62,6 +65,13 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
           value += next;
           cursor += 2;
           continue;
+        }
+        if (
+          quote === '"' &&
+          (character === "`" ||
+            (character === "$" && input[cursor + 1] === "("))
+        ) {
+          commandSubstitution = true;
         }
         value += character;
         cursor += 1;
@@ -82,6 +92,12 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
         cursor += 2;
         continue;
       }
+      if (
+        character === "`" ||
+        (character === "$" && input[cursor + 1] === "(")
+      ) {
+        commandSubstitution = true;
+      }
       if (/\s/u.test(character) || OPERATOR_CHARACTERS.has(character)) {
         break;
       }
@@ -97,10 +113,19 @@ export function tokenizeBoundedShell(input: string): ShellTokenization {
       start,
       end: cursor,
       quoted,
+      commandSubstitution,
     });
   }
 
   return { tokens, supported: true };
+}
+
+export function hasBoundedShellCommandSubstitution(input: string): boolean {
+  const tokenization = tokenizeBoundedShell(input);
+  return (
+    !tokenization.supported ||
+    tokenization.tokens.some(({ commandSubstitution }) => commandSubstitution)
+  );
 }
 
 function shellOperatorAt(input: string, offset: number): string | undefined {

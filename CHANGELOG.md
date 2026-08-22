@@ -10,13 +10,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Added `SEC-RISKY-OPERATION-ERROR-SUPPRESSION` for bounded shell and prose
   instructions that explicitly hide failure from an already-recognized
-  destructive, privileged, upload, or sensitive-data operation.
+  destructive, privileged, upload, or sensitive-data operation. Destructive
+  and privileged shell evidence requires the risky executable in command
+  position instead of a quoted argument mention, while static executable paths,
+  bounded wrappers, and existing upload classification remain supported.
 - Added `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` for explicit, bounded attempts to
   supersede system, developer, platform, prior, or higher-level instructions
-  without treating ordinary persona wording as a violation.
+  without treating ordinary persona wording, correct authority ordering,
+  bounded questions, explicit attribution, or defensive statements as
+  violations; bare prompt mentions and earlier independent clauses cannot
+  suppress an operational override.
 
 ### Changed
 
+- Bounded negative-subject safeguard instructions such as “No Skill … may
+  bypass” no longer overlap with `SEC-SAFEGUARD-BYPASS-INSTRUCTION`; a later
+  independently expressed bypass remains reportable.
 - Made the pre-1.0 compatibility boundary explicit without changing stable CLI
   behavior or stable JSON output: scan JSON now uses an explicit wire
   projection, supported TypeScript entrypoints have a checked declaration

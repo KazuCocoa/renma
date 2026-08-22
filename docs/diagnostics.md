@@ -950,7 +950,8 @@ multiline shell analysis removes quote markers only in its logical-command
 projection; diagnostic evidence retains the exact quoted source lines. Routing
 does not cross an unrelated structural boundary. Safeguard polarity attaches a
 prohibition to the directly governed action and bounded coordinated predicates;
-a later independently expressed unsafe action is evaluated separately.
+bounded “No Skill … may” actor clauses are also defensive. A later independently
+expressed unsafe action is evaluated separately.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
@@ -971,28 +972,42 @@ only when the same bounded instruction contains an operation Renma already
 classifies as destructive, privileged, a security-sensitive upload, or a
 sensitive-data operation. Supported shell associations are the unquoted
 `|| true` and `|| :` branches immediately attached to the recognized operation;
-logical backslash continuations retain their complete source range. A separate
-bounded prose grammar covers statements such as “If the destructive operation
-fails, ignore the error and continue.” Generic `|| true`, capability probes,
-ordinary error handling, `set +e`, `try/catch`, and stderr redirection do not
-produce this finding by themselves. Direct prohibitions remain defensive. The
-repair is to preserve the failure, stop and report the blocker, and explicitly
-verify or roll back partial effects rather than substituting another
-suppression.
+logical backslash continuations retain their complete source range. Destructive
+and privileged shell evidence requires the risky executable in command position;
+static absolute paths and bounded `command`, `env`, assignment, and `sudo`
+wrappers preserve that executable evidence. Upload classification continues to
+use the existing destination analysis rather than a separate tool allowlist.
+Quoting risky command text as a literal argument to `echo` or `printf`, including
+ordinary variable interpolation, does not establish that operation; command
+substitution remains operational. A separate bounded prose grammar covers both
+“If the destructive operation fails, ignore the error and continue” and the
+coordinated reverse order “continue and ignore the error.” Generic `|| true`,
+capability probes, ordinary error handling, `set +e`, `try/catch`, and stderr
+redirection do not produce this finding by themselves. Direct prohibitions
+remain defensive. The repair is to preserve the failure, stop and report the
+blocker, and explicitly verify or roll back partial effects rather than
+substituting another suppression.
 
 `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` reports an explicit attempt to ignore,
 disregard, override, supersede, or take precedence over a narrow set of
-higher-authority targets: previous or prior instructions, system instructions
-or prompt, developer instructions, higher-level instructions, platform policy,
-or the host-agent instruction hierarchy. This is a bounded English recognizer,
+higher-authority targets: previous, prior, earlier, or preceding instructions;
+system or developer instructions or prompts; higher-level instructions;
+platform policy; or the host-agent instruction hierarchy. Base and bounded
+declarative verb forms are recognized. This is a bounded English recognizer,
 not a general prompt-injection or multilingual classifier. Ordinary persona
-wording such as “You are an experienced code reviewer” is outside the rule.
-Direct prohibitions remain defensive, and quoted or non-operational unsafe
+wording, correct statements that higher authority supersedes lower authority,
+direct or indirect bounded hierarchy questions, and explicitly attributed or
+illustrative phrases are outside the rule. A bare mention of “the prompt,” “the
+statement,” or “the phrase” is not attribution by itself, and an attribution or
+illustrative cue does not govern a later independent clause. Direct prohibitions
+and bounded inability or negative-subject forms remain defensive, including
+locally qualified Skill subjects, but their polarity stops at the governed action
+and does not cross a later finite clause. Quoted or non-operational unsafe
 examples follow the existing Markdown security-view boundaries. A recognized
 override inside an HTML or YAML frontmatter comment remains hidden operational
 evidence under the existing hidden-comment diagnostic rather than becoming a
-rendered-visible finding. Repair removes the priority claim, preserves system
-and developer authority, and states only the intended local behavior.
+rendered-visible finding. Repair removes the priority claim, preserves system and
+developer authority, and states only the intended local behavior.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched

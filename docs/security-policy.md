@@ -823,9 +823,10 @@ examples, HTML-comment content, and fenced or blockquoted prose clearly marked
 as an unsafe or negative example do not become semantic bypass findings.
 Safeguard polarity is evaluated at each action predicate. A prohibition applies
 to the action it directly governs and may continue through bounded grammatical
-coordination or a dependent infinitival-purpose complement, but it does not
-hide a later independently expressed unsafe action across punctuation,
-conditional wording, fallback wording, or another clause boundary.
+coordination or a dependent infinitival-purpose complement. Bounded “No Skill …
+may” actor clauses are also defensive, but they do not hide a later independently
+expressed unsafe action across punctuation, conditional wording, fallback
+wording, or another clause boundary.
 Hard clause terminators end direct prohibition lookup. A new subject plus a
 finite auxiliary or copula also starts a new polarity scope, so a later `to`
 inside that finite clause is not treated as a purpose complement of the earlier
@@ -836,22 +837,34 @@ unquoted `|| true` or `|| :` is immediately attached to a shell operation that
 the existing command and data-flow analysis already classifies as destructive,
 privileged, a security-sensitive upload, or a sensitive-data operation. A
 small prose grammar also covers an explicit risky-operation failure followed
-by “ignore the error and continue.” Neither generic error handling nor a
-generic suppression is enough: capability probes, ordinary commands,
-`try/catch`, `set +e`, and stderr redirection remain outside the rule by
-themselves. Preserve the failure, stop and report the blocker, and add explicit
-verification or rollback where partial effects are possible.
+by either “ignore the error and continue” or “continue and ignore the error.”
+Destructive and privileged shell classification requires the risky executable
+in command position. Static absolute paths and bounded wrappers retain that
+evidence, while uploads continue to reuse the existing destination analysis
+without a second tool allowlist. Literal `echo` or `printf` command text remains
+outside this finding when it contains ordinary variable interpolation; command
+substitution remains operational. Neither generic error handling nor a generic
+suppression is enough: capability probes, ordinary commands, `try/catch`,
+`set +e`, and stderr redirection remain outside the rule by themselves. Preserve
+the failure, stop and report the blocker, and add explicit verification or
+rollback where partial effects are possible.
 
 `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` covers a different authority boundary. It
 uses a small English grammar requiring both an override action—such as ignore,
 disregard, override, supersede, or take precedence over—and an explicit target
-such as previous, system, developer, higher-level, platform-policy, or
-host-agent instructions. Persona wording alone is not a match. Direct
-prohibitions and structurally non-operational examples remain defensive under
-the existing Markdown security view. Hidden HTML and YAML-comment matches keep
-the existing hidden-operational diagnostic identity and record this rule as
-their underlying match. Remove the override claim, preserve host authority,
-and express the intended Skill behavior only within its local scope.
+such as previous, prior, earlier, preceding, system, developer, higher-level,
+platform-policy, or host-agent instructions. Persona wording alone is not a
+match. Correct higher-to-lower authority ordering, direct or indirect bounded
+hierarchy questions, explicitly attributed or illustrative phrases, direct
+prohibitions, inability statements, and bounded negative-subject forms remain
+defensive. Merely mentioning a prompt, statement, or phrase before an override
+does not create an attribution exemption. Attribution, illustrative context,
+and negative-subject polarity stop before an independently coordinated or later
+finite clause. Structurally non-operational examples retain the existing
+Markdown security-view boundary. Hidden HTML and YAML-comment matches keep the
+existing hidden-operational diagnostic identity and record this rule as their
+underlying match. Remove the override claim, preserve host authority, and
+express the intended Skill behavior only within its local scope.
 
 HTML comments remain excluded from the rendered-visible semantic projection;
 they are not treated as ordinary operational prose. Because an agent may read
