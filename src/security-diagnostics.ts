@@ -1403,25 +1403,36 @@ const RISKY_OPERATION_FAILURE_SUPPRESSION_PATTERNS: readonly RegExp[] = [
     String.raw`\b(?:${RISKY_OPERATION_SUPPRESSION_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,40}\b(?:${RISKY_OPERATION_ERROR_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:from|of)\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:${RISKY_OPERATION_PROSE_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:and\s+)?(?:${RISKY_OPERATION_CONTINUATION_SOURCE})\b`,
     "i",
   ),
+  new RegExp(
+    String.raw`\b(?:if|when)\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,60}\b(?:${RISKY_OPERATION_PROSE_TARGET_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,50}\b(?:${RISKY_OPERATION_FAILURE_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,80}\b(?:${RISKY_OPERATION_CONTINUATION_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,40}\b(?:and\s+|then\s+)?(?:${RISKY_OPERATION_SUPPRESSION_SOURCE})\b${LOCAL_INSTRUCTION_TEXT_SOURCE}{0,40}\b(?:${RISKY_OPERATION_ERROR_TARGET_SOURCE})\b`,
+    "i",
+  ),
 ];
 const RISKY_OPERATION_SUPPRESSION_ACTION_RE =
   /^(?:ignore|disregard|suppress)/iu;
 
 // This is an intentionally small English grammar. It recognizes explicit
 // authority supersession, not persona statements or broad prompt injection.
-const INSTRUCTION_AUTHORITY_TARGET_SOURCE = String.raw`(?:all\s+)?(?:previous|prior)(?:\s+(?:(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?|higher[- ]level|platform|host[- ]agent))?\s+(?:safety\s+)?instructions?|(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?\s+instructions?|system\s+prompts?|higher[- ](?:level|authority)\s+(?:safety\s+)?instructions?|platform\s+(?:policy|policies|instructions?)|host[- ]agent\s+(?:instruction\s+hierarchy|instructions?)`;
+const INSTRUCTION_AUTHORITY_TARGET_SOURCE = String.raw`(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)(?:\s+(?:(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?|higher[- ]level|platform|host[- ]agent))?\s+(?:safety\s+)?(?:instructions?|prompts?)|(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?\s+(?:instructions?|prompts?)|higher[- ](?:level|authority)\s+(?:safety\s+)?instructions?|platform\s+(?:policy|policies|instructions?)|host[- ]agent\s+(?:instruction\s+hierarchy|instructions?)`;
+const INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_SOURCE = String.raw`(?:ignore(?:s|ing)?|disregard(?:s|ing)?|override(?:s|ing)?|supersede(?:s|ing)?)`;
 const DIRECT_INSTRUCTION_HIERARCHY_OVERRIDE_RE = new RegExp(
-  String.raw`\b(?:ignore|disregard|override|supersede)\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
+  String.raw`\b(?:${INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_SOURCE})\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
   "i",
 );
 const PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE = new RegExp(
-  String.raw`\b(?:take\s+precedence\s+over|override|supersede)\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
+  String.raw`\b(?:takes?\s+precedence\s+over|override(?:s|ing)?|supersede(?:s|ing)?)\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
   "i",
 );
 const INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE =
-  /^(?:ignore|disregard|override|supersede|take\s+precedence\s+over)/iu;
+  /^(?:ignore(?:s|ing)?|disregard(?:s|ing)?|override(?:s|ing)?|supersede(?:s|ing)?|takes?\s+precedence\s+over)/iu;
 const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE =
-  /\b(?:cannot|can't|can not|(?:do|does|did) not|don't|doesn't|didn't|(?:will|would) not|won't|wouldn't|(?:is|are|was|were) (?:unable to|not able to))\s*$/iu;
+  /\b(?:cannot|can't|can not|can\s+never|may\s+not|(?:do|does|did) not|don't|doesn't|didn't|(?:will|would) not|won't|wouldn't|(?:is|are|was|were) (?:unable to|not able to|not (?:allowed|permitted|authorized) to))(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*\s*$/iu;
+const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE =
+  /(?:^|\b)(?:no\s+(?:(?:local|lower[- ]level|agent-facing)\s+)?(?:skill|rule|policy|instruction|instructions|guidance)|nothing|neither\s+(?:skill|rule|policy|instruction|instructions))\s+(?:(?:may|can|will|should|must)(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*|(?:is|are|was|were)\s+(?:allowed|permitted|authorized)\s+to)\s*$/iu;
+const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE =
+  /\b(?:for example|explain why|the\s+(?:phrase|statement|prompt)|(?:incident|audit|review)\s+(?:report\s+)?(?:says?|states?|reads?|contains?|quotes?))\b[^.!?\n\r]{0,120}(?:["'`]\s*)?$/iu;
+const INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE =
+  /^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\s+(?:(?:this|these|a|an|the)\s+)?(?:local\s+)?(?:skill|rule|policy|instructions?|guidance|system|developer|platform|higher[- ]level|host[- ]agent)\b[^.!?;:—–\n\r]{0,100}$/iu;
 
 type SafeguardBypassPattern = {
   pattern: RegExp;
@@ -1509,7 +1520,7 @@ const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
   },
 ];
 const SAFEGUARD_ACTION_PREDICATE_RE =
-  /(?<![\p{L}\p{N}_-])(ignore[ds]?|disregard(?:s|ed|ing)?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override|supersede(?:s|d)?|take\s+precedence\s+over|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
+  /(?<![\p{L}\p{N}_-])(ignore[ds]?|disregard(?:s|ed|ing)?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override(?:s|ing)?|supersede(?:s|d|ing)?|takes?\s+precedence\s+over|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
 const SAFEGUARD_PROHIBITION_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
 const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
@@ -4581,12 +4592,26 @@ function classifyRiskyShellOperation(
   sensitiveDataOperation = operation,
 ): RiskyOperationKind[] {
   const kinds: RiskyOperationKind[] = [];
-  if (DESTRUCTIVE_COMMAND_RE.test(operation)) {
+  const executable = directShellExecutable(operation);
+  const effectiveExecutable = effectiveShellExecutable(operation);
+  if (
+    effectiveExecutable !== undefined &&
+    DESTRUCTIVE_SHELL_EXECUTABLES.has(effectiveExecutable) &&
+    DESTRUCTIVE_COMMAND_RE.test(operation)
+  ) {
     kinds.push("destructive-command");
   }
-  if (PRIVILEGED_COMMAND_RE.test(operation)) {
+  if (
+    executable !== undefined &&
+    PRIVILEGED_SHELL_EXECUTABLES.has(executable) &&
+    PRIVILEGED_COMMAND_RE.test(operation)
+  ) {
     kinds.push("privileged-command");
   }
+  const literalOutputOnly =
+    effectiveExecutable !== undefined &&
+    LITERAL_OUTPUT_SHELL_EXECUTABLES.has(effectiveExecutable) &&
+    !/(?:\$|`)/u.test(operation);
 
   const analysis = analyzeSecurityCommand({
     source: {
@@ -4596,7 +4621,12 @@ function classifyRiskyShellOperation(
       lines: operation.split(/\r?\n/u),
     },
   });
-  if (isUploadInstruction(analysis.destinationAnalysis)) {
+  if (
+    !literalOutputOnly &&
+    effectiveExecutable !== undefined &&
+    UPLOAD_SHELL_EXECUTABLES.has(effectiveExecutable) &&
+    isUploadInstruction(analysis.destinationAnalysis)
+  ) {
     kinds.push("security-sensitive-upload");
   }
   const sensitiveDataAnalysis =
@@ -4611,13 +4641,129 @@ function classifyRiskyShellOperation(
           },
         });
   if (
-    (sensitiveDataAnalysis.sensitiveSources.length > 0 &&
+    !literalOutputOnly &&
+    ((sensitiveDataAnalysis.sensitiveSources.length > 0 &&
       sensitiveDataAnalysis.sinks.length > 0) ||
-    CREDENTIAL_ARG_ANY_RE.test(sensitiveDataOperation)
+      CREDENTIAL_ARG_ANY_RE.test(sensitiveDataOperation))
   ) {
     kinds.push("sensitive-data-operation");
   }
   return kinds;
+}
+
+const DESTRUCTIVE_SHELL_EXECUTABLES = new Set([
+  "docker",
+  "drop",
+  "git",
+  "kubectl",
+  "rm",
+  "truncate",
+]);
+const PRIVILEGED_SHELL_EXECUTABLES = new Set([
+  "chmod",
+  "chown",
+  "docker",
+  "launchctl",
+  "mount",
+  "sudo",
+  "systemctl",
+]);
+const UPLOAD_SHELL_EXECUTABLES = new Set([
+  "attach",
+  "aws",
+  "az",
+  "copy",
+  "curl",
+  "gcloud",
+  "gh",
+  "post",
+  "publish",
+  "push",
+  "rsync",
+  "scp",
+  "send",
+  "share",
+  "submit",
+  "sync",
+  "upload",
+  "wget",
+]);
+const LITERAL_OUTPUT_SHELL_EXECUTABLES = new Set(["echo", "printf"]);
+const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
+const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
+const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
+const SHELL_WRAPPER_RE = /^(?:command|env)$/iu;
+const SHELL_WRAPPER_OPTION_WITH_VALUE_RE = /^(?:-u|--unset|-C|--chdir)$/u;
+const SUDO_OPTION_WITH_VALUE_RE =
+  /^(?:-[ughpCTRD]|--(?:user|group|host|prompt|chdir|command-timeout|chroot))$/u;
+
+function directShellExecutable(command: string): string | undefined {
+  const words = shellCommandWords(command);
+  if (words === undefined) return undefined;
+  return words[directShellExecutableIndex(words)]?.toLowerCase();
+}
+
+function effectiveShellExecutable(command: string): string | undefined {
+  const words = shellCommandWords(command);
+  if (words === undefined) return undefined;
+  let index = directShellExecutableIndex(words);
+  if ((words[index] ?? "").toLowerCase() !== "sudo") {
+    return words[index]?.toLowerCase();
+  }
+
+  index += 1;
+  while ((words[index] ?? "").startsWith("-")) {
+    const option = words[index] ?? "";
+    index += 1;
+    if (SUDO_OPTION_WITH_VALUE_RE.test(option)) index += 1;
+  }
+  while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
+  return words[index]?.toLowerCase();
+}
+
+function shellCommandWords(command: string): string[] | undefined {
+  const tokenization = tokenizeBoundedShell(command);
+  if (!tokenization.supported) return undefined;
+
+  const words: string[] = [];
+  let skipRedirectionTarget = false;
+  for (const [index, token] of tokenization.tokens.entries()) {
+    if (token.kind === "operator") {
+      skipRedirectionTarget = SHELL_REDIRECTION_OPERATOR_RE.test(token.value);
+      continue;
+    }
+    const next = tokenization.tokens[index + 1];
+    if (
+      /^\d+$/u.test(token.value) &&
+      next?.kind === "operator" &&
+      SHELL_REDIRECTION_OPERATOR_RE.test(next.value) &&
+      token.end === next.start
+    ) {
+      continue;
+    }
+    if (skipRedirectionTarget) {
+      skipRedirectionTarget = false;
+      continue;
+    }
+    words.push(token.value);
+  }
+  return words;
+}
+
+function directShellExecutableIndex(words: readonly string[]): number {
+  let index = 0;
+  while (SHELL_PRESENTATION_MARKER_RE.test(words[index] ?? "")) index += 1;
+  while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
+  while (SHELL_WRAPPER_RE.test(words[index] ?? "")) {
+    index += 1;
+    while ((words[index] ?? "").startsWith("-")) {
+      const option = words[index] ?? "";
+      index += 1;
+      if (SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option)) index += 1;
+    }
+    while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
+  }
+  return index;
 }
 
 function dependencyFindingDetails(
@@ -5290,7 +5436,7 @@ function unsafeInstructionHierarchyOverride(
       PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
     ],
     INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE,
-    hierarchyOverrideActionIsNegated,
+    hierarchyOverrideActionIsDefensive,
   );
 }
 
@@ -5326,11 +5472,59 @@ function firstUnsafeBoundedActionMatch(
   return undefined;
 }
 
-function hierarchyOverrideActionIsNegated(
+const HIGHER_AUTHORITY_SUBJECT_RE =
+  /(?:higher[- ](?:level|authority)\s+(?:safety\s+)?instructions?|host[- ]agent\s+(?:instruction\s+hierarchy|instructions?))\s*$/iu;
+const PLATFORM_AUTHORITY_SUBJECT_RE =
+  /platform\s+(?:policy|policies|instructions?)\s*$/iu;
+const SYSTEM_AUTHORITY_SUBJECT_RE = /system\s+(?:instructions?|prompts?)\s*$/iu;
+const LOWER_THAN_HIGHER_AUTHORITY_TARGET_RE =
+  /^(?:(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)\b|(?:system|developer)\b|platform\s+(?:policy|policies|instructions?))/iu;
+const LOWER_THAN_PLATFORM_AUTHORITY_TARGET_RE =
+  /^(?:(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)\b|(?:system|developer)\b)/iu;
+const LOWER_THAN_SYSTEM_AUTHORITY_TARGET_RE =
+  /^(?:(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)\b|developer\b)/iu;
+
+function hierarchyOverrideActionIsDefensive(
   text: string,
   actionStart: number,
 ): boolean {
-  const boundedPrefix = text.slice(Math.max(0, actionStart - 120), actionStart);
+  const boundedPrefix = text.slice(Math.max(0, actionStart - 180), actionStart);
+  const clausePrefix = hierarchyOverrideClausePrefix(boundedPrefix);
+  if (
+    INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(clausePrefix) ||
+    INSTRUCTION_HIERARCHY_OVERRIDE_NEGATED_SUBJECT_RE.test(clausePrefix) ||
+    INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
+    INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE.test(clausePrefix)
+  ) {
+    return true;
+  }
+
+  const actionRemainder = text.slice(actionStart, actionStart + 240);
+  const action = INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE.exec(actionRemainder);
+  if (action === null) return false;
+  const target = actionRemainder
+    .slice(action[0].length)
+    .trimStart()
+    .replace(/^the\s+/iu, "");
+  if (
+    HIGHER_AUTHORITY_SUBJECT_RE.test(clausePrefix) &&
+    LOWER_THAN_HIGHER_AUTHORITY_TARGET_RE.test(target)
+  ) {
+    return true;
+  }
+  if (
+    PLATFORM_AUTHORITY_SUBJECT_RE.test(clausePrefix) &&
+    LOWER_THAN_PLATFORM_AUTHORITY_TARGET_RE.test(target)
+  ) {
+    return true;
+  }
+  return (
+    SYSTEM_AUTHORITY_SUBJECT_RE.test(clausePrefix) &&
+    LOWER_THAN_SYSTEM_AUTHORITY_TARGET_RE.test(target)
+  );
+}
+
+function hierarchyOverrideClausePrefix(boundedPrefix: string): string {
   const boundary = Math.max(
     boundedPrefix.lastIndexOf("."),
     boundedPrefix.lastIndexOf(";"),
@@ -5342,9 +5536,7 @@ function hierarchyOverrideActionIsNegated(
     boundedPrefix.lastIndexOf("\n"),
     boundedPrefix.lastIndexOf("\r"),
   );
-  return INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(
-    boundedPrefix.slice(boundary + 1),
-  );
+  return boundedPrefix.slice(boundary + 1);
 }
 
 /** Mask only parsed Markdown emphasis delimiters while retaining every offset. */

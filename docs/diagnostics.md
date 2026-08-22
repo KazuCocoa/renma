@@ -971,28 +971,34 @@ only when the same bounded instruction contains an operation Renma already
 classifies as destructive, privileged, a security-sensitive upload, or a
 sensitive-data operation. Supported shell associations are the unquoted
 `|| true` and `|| :` branches immediately attached to the recognized operation;
-logical backslash continuations retain their complete source range. A separate
-bounded prose grammar covers statements such as “If the destructive operation
-fails, ignore the error and continue.” Generic `|| true`, capability probes,
-ordinary error handling, `set +e`, `try/catch`, and stderr redirection do not
-produce this finding by themselves. Direct prohibitions remain defensive. The
-repair is to preserve the failure, stop and report the blocker, and explicitly
-verify or roll back partial effects rather than substituting another
+logical backslash continuations retain their complete source range. Destructive
+and privileged shell evidence requires the risky executable in command position;
+quoting risky command text as a literal argument to `echo` or `printf` does not
+establish that operation. A separate bounded prose grammar covers both “If the
+destructive operation fails, ignore the error and continue” and the coordinated
+reverse order “continue and ignore the error.” Generic `|| true`, capability
+probes, ordinary error handling, `set +e`, `try/catch`, and stderr redirection do
+not produce this finding by themselves. Direct prohibitions remain defensive.
+The repair is to preserve the failure, stop and report the blocker, and
+explicitly verify or roll back partial effects rather than substituting another
 suppression.
 
 `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` reports an explicit attempt to ignore,
 disregard, override, supersede, or take precedence over a narrow set of
-higher-authority targets: previous or prior instructions, system instructions
-or prompt, developer instructions, higher-level instructions, platform policy,
-or the host-agent instruction hierarchy. This is a bounded English recognizer,
+higher-authority targets: previous, prior, earlier, or preceding instructions;
+system or developer instructions or prompts; higher-level instructions;
+platform policy; or the host-agent instruction hierarchy. Base and bounded
+declarative verb forms are recognized. This is a bounded English recognizer,
 not a general prompt-injection or multilingual classifier. Ordinary persona
-wording such as “You are an experienced code reviewer” is outside the rule.
-Direct prohibitions remain defensive, and quoted or non-operational unsafe
-examples follow the existing Markdown security-view boundaries. A recognized
-override inside an HTML or YAML frontmatter comment remains hidden operational
-evidence under the existing hidden-comment diagnostic rather than becoming a
-rendered-visible finding. Repair removes the priority claim, preserves system
-and developer authority, and states only the intended local behavior.
+wording, correct statements that higher authority supersedes lower authority,
+bounded hierarchy questions, and attributed or explicitly illustrative phrases
+are outside the rule. Direct prohibitions and bounded inability or negative-
+subject forms remain defensive, and quoted or non-operational unsafe examples
+follow the existing Markdown security-view boundaries. A recognized override
+inside an HTML or YAML frontmatter comment remains hidden operational evidence
+under the existing hidden-comment diagnostic rather than becoming a rendered-
+visible finding. Repair removes the priority claim, preserves system and
+developer authority, and states only the intended local behavior.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched

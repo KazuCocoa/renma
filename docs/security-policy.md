@@ -836,22 +836,28 @@ unquoted `|| true` or `|| :` is immediately attached to a shell operation that
 the existing command and data-flow analysis already classifies as destructive,
 privileged, a security-sensitive upload, or a sensitive-data operation. A
 small prose grammar also covers an explicit risky-operation failure followed
-by “ignore the error and continue.” Neither generic error handling nor a
-generic suppression is enough: capability probes, ordinary commands,
-`try/catch`, `set +e`, and stderr redirection remain outside the rule by
-themselves. Preserve the failure, stop and report the blocker, and add explicit
-verification or rollback where partial effects are possible.
+by either “ignore the error and continue” or “continue and ignore the error.”
+Destructive and privileged shell classification requires the risky executable
+in command position, and literal `echo` or `printf` command text is not promoted
+into this finding. Neither generic error handling nor a generic suppression is
+enough: capability probes, ordinary commands, `try/catch`, `set +e`, and stderr
+redirection remain outside the rule by themselves. Preserve the failure, stop
+and report the blocker, and add explicit verification or rollback where partial
+effects are possible.
 
 `SEC-INSTRUCTION-HIERARCHY-OVERRIDE` covers a different authority boundary. It
 uses a small English grammar requiring both an override action—such as ignore,
 disregard, override, supersede, or take precedence over—and an explicit target
-such as previous, system, developer, higher-level, platform-policy, or
-host-agent instructions. Persona wording alone is not a match. Direct
-prohibitions and structurally non-operational examples remain defensive under
-the existing Markdown security view. Hidden HTML and YAML-comment matches keep
-the existing hidden-operational diagnostic identity and record this rule as
-their underlying match. Remove the override claim, preserve host authority,
-and express the intended Skill behavior only within its local scope.
+such as previous, prior, earlier, preceding, system, developer, higher-level,
+platform-policy, or host-agent instructions. Persona wording alone is not a
+match. Correct higher-to-lower authority ordering, bounded hierarchy questions,
+attributed or illustrative phrases, direct prohibitions, inability statements,
+and negative-subject forms remain defensive. Structurally non-operational
+examples retain the existing Markdown security-view boundary. Hidden HTML and
+YAML-comment matches keep the existing hidden-operational diagnostic identity
+and record this rule as their underlying match. Remove the override claim,
+preserve host authority, and express the intended Skill behavior only within
+its local scope.
 
 HTML comments remain excluded from the rendered-visible semantic projection;
 they are not treated as ordinary operational prose. Because an agent may read
