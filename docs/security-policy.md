@@ -859,8 +859,20 @@ without a second tool allowlist. Literal `echo` or `printf` command text remains
 outside this finding when it contains ordinary variable interpolation and is
 not executed through the bounded static-file correlation described above. A
 matching generated-script consumer retains its destructive or privileged
-operation kind when `|| true` or `|| :` suppresses that consumer; command
-substitution remains operational. Neither generic error handling nor a generic
+operation kind when `|| true` or `|| :` suppresses that consumer. Reconstructed
+bytes are classified one logical shell command at a time, ignoring blank and
+comment/shebang lines while preserving backslash continuations. Facts for exact
+static paths survive only modeled non-mutating commands: bounded mutations and
+unknown commands invalidate affected proofs, and direct working-directory
+changes invalidate relative but not otherwise unaffected absolute facts.
+Sequential and success branches use successful post-state; failure and
+background branches retain only pre-existing facts not invalidated by the
+operand's possible effects. The generated consumer shares the ordinary
+assignment, `command`, `env`, and `sudo` executable resolver; only direct
+current-shell `source`/`.` forms count as builtin execution. Paths containing
+`..` and paths requiring `~`, variable, substitution, glob, symlink, or
+filesystem resolution remain unsupported. Command substitution remains
+operational. Neither generic error handling nor a generic
 suppression is enough: capability probes, ordinary commands, `try/catch`,
 `set +e`, and stderr redirection remain outside the rule by themselves. Preserve
 the failure, stop and report the blocker, and add explicit verification or

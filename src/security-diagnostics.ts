@@ -72,7 +72,17 @@ import {
   hasBoundedShellOperationalSubstitution,
   tokenizeBoundedShell,
 } from "./security-command/shell.js";
-import { boundedGeneratedScriptExecutions } from "./security-command/generated-script.js";
+import {
+  boundedGeneratedScriptExecutions,
+  generatedLogicalShellCommands,
+} from "./security-command/generated-script.js";
+import {
+  directShellExecutable,
+  effectiveShellExecutable,
+  effectiveShellExecutableIndex,
+  normalizeShellExecutable,
+  shellCommandWords,
+} from "./security-command/shell-command.js";
 import {
   disclosureClauseRangesIntersectingRange,
   disclosureRangeIsExplicitlyProhibited,
@@ -3113,7 +3123,13 @@ function securityLineDetections(
     detections.push(...predictableTempDetections(line, lineNumber));
   }
 
-  if (commandLine && !quotedProse) {
+  const generatedScriptContinuation =
+    logicalCommand !== undefined &&
+    !logicalCommandStart &&
+    boundedGeneratedScriptExecutions(logicalCommand.shellProjection.projection)
+      .length > 0;
+
+  if (commandLine && !quotedProse && !generatedScriptContinuation) {
     const operationalBlockquote =
       prepared.markdownView.isOperationalBlockQuotedLine(index);
     if (operationalBlockquote && logicalCommand !== undefined) {
@@ -3146,12 +3162,21 @@ function securityLineDetections(
             ? logicalSecurityAnalysis
             : undefined,
       );
+      const logicalGeneratedScriptRiskKinds =
+        logicalCommand !== undefined && logicalCommandStart
+          ? new Set(generatedScriptRiskKinds(commandText))
+          : undefined;
       detections.push(
         ...(logicalCommand !== undefined && logicalCommandStart
           ? commandRiskDetections.map((detection) => ({
               ...detection,
               ...(detection.metadata.id ===
-              RULES.riskyOperationErrorSuppression.id
+                RULES.riskyOperationErrorSuppression.id ||
+              (detection.metadata.id === RULES.destructiveCommand.id &&
+                logicalGeneratedScriptRiskKinds?.has("destructive-command")) ||
+              (detection.metadata.id ===
+                RULES.privilegedCommandWithoutGuard.id &&
+                logicalGeneratedScriptRiskKinds?.has("privileged-command"))
                 ? logicalShellCommandEvidence(logicalCommand)
                 : evidence),
             }))
@@ -4710,11 +4735,12 @@ function generatedScriptRiskKinds(
   const kinds = new Set<RiskyOperationKind>();
   for (const execution of boundedGeneratedScriptExecutions(command)) {
     if (execution.consumerSpan.start < consumerStart) continue;
-    for (const kind of classifyShellCommandRiskKinds(
+    for (const logicalCommand of generatedLogicalShellCommands(
       execution.shellText,
-      false,
     )) {
-      kinds.add(kind);
+      for (const kind of classifyShellCommandRiskKinds(logicalCommand, false)) {
+        kinds.add(kind);
+      }
     }
   }
   return (["destructive-command", "privileged-command"] as const).filter(
@@ -4831,7 +4857,7 @@ function shellPipelineConsumerDisposition(
   const words = shellCommandWords(segment);
   if (words === undefined) return "unknown";
   const executableIndex = effectiveShellExecutableIndex(words);
-  const executable = normalizedShellExecutable(words[executableIndex]);
+  const executable = normalizeShellExecutable(words[executableIndex]);
   if (executable === undefined) return "unknown";
   if (SHELL_LITERAL_PIPELINE_CONSUMERS.has(executable)) {
     return "literal-only";
@@ -4938,109 +4964,6 @@ const SHELL_CODE_EXECUTABLES = new Set([
   "sh",
   "zsh",
 ]);
-const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
-const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
-const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
-const SHELL_WRAPPER_RE = /^(?:command|env)$/iu;
-const SHELL_WRAPPER_OPTION_WITH_VALUE_RE = /^(?:-u|--unset|-C|--chdir)$/u;
-const SUDO_OPTION_WITH_VALUE_RE =
-  /^(?:-[ughpCTRD]|--(?:user|group|host|prompt|chdir|command-timeout|chroot))$/u;
-
-function directShellExecutable(command: string): string | undefined {
-  const words = shellCommandWords(command);
-  if (words === undefined) return undefined;
-  return normalizedShellExecutable(words[directShellExecutableIndex(words)]);
-}
-
-function effectiveShellExecutable(command: string): string | undefined {
-  const words = shellCommandWords(command);
-  if (words === undefined) return undefined;
-  return normalizedShellExecutable(words[effectiveShellExecutableIndex(words)]);
-}
-
-function effectiveShellExecutableIndex(words: readonly string[]): number {
-  let index = directShellExecutableIndex(words);
-  if (normalizedShellExecutable(words[index]) !== "sudo") {
-    return index;
-  }
-
-  index += 1;
-  while ((words[index] ?? "").startsWith("-")) {
-    const option = words[index] ?? "";
-    index += 1;
-    if (SUDO_OPTION_WITH_VALUE_RE.test(option)) index += 1;
-  }
-  index = wrappedShellExecutableIndex(words, index);
-  return index;
-}
-
-function normalizedShellExecutable(
-  word: string | undefined,
-): string | undefined {
-  if (word === undefined) return undefined;
-  return word.slice(word.lastIndexOf("/") + 1).toLowerCase();
-}
-
-function shellCommandWords(command: string): string[] | undefined {
-  const tokenization = tokenizeBoundedShell(command);
-  if (!tokenization.supported) return undefined;
-
-  const words: string[] = [];
-  let skipRedirectionTarget = false;
-  for (const [index, token] of tokenization.tokens.entries()) {
-    if (token.kind === "operator") {
-      skipRedirectionTarget = SHELL_REDIRECTION_OPERATOR_RE.test(token.value);
-      continue;
-    }
-    const next = tokenization.tokens[index + 1];
-    if (
-      /^\d+$/u.test(token.value) &&
-      next?.kind === "operator" &&
-      SHELL_REDIRECTION_OPERATOR_RE.test(next.value) &&
-      token.end === next.start
-    ) {
-      continue;
-    }
-    if (skipRedirectionTarget) {
-      skipRedirectionTarget = false;
-      continue;
-    }
-    words.push(token.value);
-  }
-  return words;
-}
-
-function directShellExecutableIndex(words: readonly string[]): number {
-  let index = 0;
-  while (SHELL_PRESENTATION_MARKER_RE.test(words[index] ?? "")) index += 1;
-  return wrappedShellExecutableIndex(words, index);
-}
-
-function wrappedShellExecutableIndex(
-  words: readonly string[],
-  startIndex: number,
-): number {
-  let index = startIndex;
-  while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-  while (SHELL_WRAPPER_RE.test(normalizedShellExecutable(words[index]) ?? "")) {
-    const wrapper = normalizedShellExecutable(words[index]) ?? "";
-    index += 1;
-    while ((words[index] ?? "").startsWith("-")) {
-      const option = words[index] ?? "";
-      index += 1;
-      if (option === "--") break;
-      if (shellWrapperOptionConsumesValue(option)) index += 1;
-    }
-    while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-  }
-  return index;
-}
-
-function shellWrapperOptionConsumesValue(option: string): boolean {
-  if (option.includes("=")) return false;
-  return SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option);
-}
-
 function shellCommandRiskPatterns(
   definitions: readonly (readonly [string, string])[],
 ): ReadonlyMap<string, RegExp> {

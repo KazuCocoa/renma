@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify-release-ref:
-    name: Verify release tag and main identity
+    name: Verify release ref and metadata
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

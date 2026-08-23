@@ -1,4 +1,13 @@
+import {
+  resolveShellExecutableWords,
+  shellCommandWordTokens,
+  type ShellExecutableResolution,
+} from "./shell-command.js";
 import { tokenizeBoundedShell, type ShellToken } from "./shell.js";
+import {
+  activeShellContinuation,
+  projectShellContinuations,
+} from "../security-destination/logical-shell.js";
 
 export type BoundedGeneratedScriptExecution = {
   path: string;
@@ -11,7 +20,12 @@ type Segment = {
   start: number;
   end: number;
   boundaryAfter?: string;
-  tokens: ShellToken[];
+  text: string;
+};
+
+type StaticPath = {
+  absolute: boolean;
+  key: string;
 };
 
 type StaticOutput = {
@@ -21,25 +35,50 @@ type StaticOutput = {
 
 type FileWrite = {
   mode: "append" | "overwrite";
-  path: string;
+  path: StaticPath;
+};
+
+type BoundedShellEffects = {
+  cwdMayChange: boolean;
+  exactMutatedPaths: Set<string>;
+  unknownFileMutation: boolean;
 };
 
 type ParsedSegment = {
-  words: ShellToken[];
+  resolution: ShellExecutableResolution;
   stdoutRedirected: boolean;
   stdoutWrite?: FileWrite;
+  redirectionEffects: BoundedShellEffects;
+  wordTokens: ShellToken[];
+  words: string[];
+};
+
+type TeeSummary = {
+  effects: BoundedShellEffects;
+  writes: FileWrite[];
 };
 
 const COMMAND_BOUNDARIES = new Set([";", "|", "||", "&&", "&"]);
+const OUTPUT_REDIRECTION_OPERATORS = new Set([">", ">>", "&>"]);
 const SHELL_EXECUTABLES = new Set(["bash", "dash", "fish", "ksh", "sh", "zsh"]);
-const PRESENTATION_MARKERS = new Set(["$", ">", "%"]);
-const ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
+const PROVEN_NON_MUTATING_EXECUTABLES = new Set([
+  ":",
+  "[",
+  "cat",
+  "echo",
+  "false",
+  "printf",
+  "pwd",
+  "test",
+  "true",
+]);
 
 /**
- * Correlate only shell text that is statically produced, written to an exact
- * path, and consumed from that same path later in one bounded shell input.
- * This intentionally does not read files, resolve variables, or model general
- * shell data flow.
+ * Correlate only statically reconstructed shell text written to an exact path
+ * and consumed later in the same bounded shell input. Facts survive only
+ * modeled non-mutating operations and are invalidated by bounded file or cwd
+ * effects. No filesystem state, variables, symlinks, or cross-input flow is
+ * resolved.
  */
 export function boundedGeneratedScriptExecutions(
   input: string,
@@ -48,16 +87,75 @@ export function boundedGeneratedScriptExecutions(
   if (!tokenization.supported) return [];
 
   const segments = commandSegments(input, tokenization.tokens);
-  const files = new Map<string, StaticOutput>();
+  let files = new Map<string, StaticOutput>();
   const executions: BoundedGeneratedScriptExecution[] = [];
   let pipelineOutput: StaticOutput | undefined;
+  let operandEntry = cloneFiles(files);
+  let operandEffects = emptyEffects();
 
   for (const [index, segment] of segments.entries()) {
     const receivesPipeline = segments[index - 1]?.boundaryAfter === "|";
-    if (!receivesPipeline) pipelineOutput = undefined;
+    if (!receivesPipeline) {
+      pipelineOutput = undefined;
+      operandEntry = cloneFiles(files);
+      operandEffects = emptyEffects();
+    }
 
-    const parsed = parseSegment(segment);
-    const produced = staticLiteralOutput(parsed.words, segment);
+    const parsed = parseSegment(segment.text);
+    if (parsed === undefined) {
+      const effects = unknownEffects();
+      applyInvalidations(files, effects);
+      mergeEffects(operandEffects, effects);
+      pipelineOutput = undefined;
+      files = branchExitFiles(
+        files,
+        operandEntry,
+        operandEffects,
+        segment.boundaryAfter,
+      );
+      continue;
+    }
+
+    const produced = staticLiteralOutput(parsed, segment);
+    const successfulRedirectionEffects = effectsPreservingKnownAppends(
+      parsed.redirectionEffects,
+      parsed.stdoutWrite === undefined ? [] : [parsed.stdoutWrite],
+      produced,
+    );
+    applyInvalidations(files, successfulRedirectionEffects);
+    mergeEffects(operandEffects, parsed.redirectionEffects);
+
+    const tee = teeSummary(parsed);
+    if (tee !== undefined) {
+      applyInvalidations(
+        files,
+        effectsPreservingKnownAppends(tee.effects, tee.writes, pipelineOutput),
+      );
+      mergeEffects(operandEffects, tee.effects);
+    }
+
+    if (!receivesPipeline) {
+      const consumerPath = staticScriptConsumerPath(parsed);
+      const output =
+        consumerPath === undefined ? undefined : files.get(consumerPath.key);
+      if (consumerPath !== undefined && output !== undefined) {
+        executions.push({
+          path: consumerPath.key,
+          shellText: output.shellText,
+          producerSpan: Object.freeze({ ...output.producerSpan }),
+          consumerSpan: Object.freeze({
+            start: segment.start,
+            end: segment.end,
+          }),
+        });
+      }
+    }
+
+    if (tee === undefined) {
+      const effects = commandEffects(parsed);
+      applyInvalidations(files, effects);
+      mergeEffects(operandEffects, effects);
+    }
 
     if (produced !== undefined) {
       if (!parsed.stdoutRedirected) {
@@ -68,9 +166,8 @@ export function boundedGeneratedScriptExecutions(
         }
         pipelineOutput = undefined;
       }
-    } else if (receivesPipeline && isTeeCommand(parsed.words)) {
-      const teeWrites = teeFileWrites(parsed.words);
-      for (const write of teeWrites) {
+    } else if (receivesPipeline && tee !== undefined) {
+      for (const write of tee.writes) {
         applyFileWrite(files, write, pipelineOutput);
       }
       if (parsed.stdoutRedirected) {
@@ -82,41 +179,60 @@ export function boundedGeneratedScriptExecutions(
     } else if (
       receivesPipeline &&
       pipelineOutput !== undefined &&
-      isBareCatCommand(parsed.words) &&
+      isBareCatCommand(parsed) &&
       !parsed.stdoutRedirected
     ) {
       // A bare cat preserves the proven literal pipeline bytes.
     } else {
-      if (parsed.stdoutWrite !== undefined) {
-        applyFileWrite(files, parsed.stdoutWrite, undefined);
-      }
       pipelineOutput = undefined;
     }
 
-    // Commands in one pipeline are concurrent, so require the consumer to
-    // begin a later command separated by a non-pipeline boundary.
-    if (!receivesPipeline) {
-      const consumerPath = staticScriptConsumerPath(parsed.words);
-      const output =
-        consumerPath === undefined ? undefined : files.get(consumerPath);
-      if (consumerPath !== undefined && output !== undefined) {
-        executions.push({
-          path: consumerPath,
-          shellText: output.shellText,
-          producerSpan: Object.freeze({ ...output.producerSpan }),
-          consumerSpan: Object.freeze({
-            start: segment.start,
-            end: segment.end,
-          }),
-        });
-      }
-    }
-    if (segment.boundaryAfter === "||" || segment.boundaryAfter === "&") {
-      files.clear();
-    }
+    files = branchExitFiles(
+      files,
+      operandEntry,
+      operandEffects,
+      segment.boundaryAfter,
+    );
   }
 
   return Object.freeze(executions.map((execution) => Object.freeze(execution)));
+}
+
+/** Project reconstructed bytes into independently classifiable shell commands. */
+export function generatedLogicalShellCommands(shellText: string): string[] {
+  const physicalLines = shellText.split(/\r?\n/u);
+  const commands: string[] = [];
+  let index = 0;
+
+  while (index < physicalLines.length) {
+    const first = physicalLines[index] ?? "";
+    if (first.trim().length === 0 || first.trimStart().startsWith("#")) {
+      index += 1;
+      continue;
+    }
+
+    const lines = [first];
+    let quote: "'" | '"' | undefined;
+    let cursor = index;
+    while (cursor < physicalLines.length) {
+      const continuation = activeShellContinuation(
+        physicalLines[cursor] ?? "",
+        quote,
+      );
+      if (!continuation.active || cursor + 1 >= physicalLines.length) break;
+      quote = continuation.quote;
+      cursor += 1;
+      lines.push(physicalLines[cursor] ?? "");
+    }
+
+    const projection = projectShellContinuations(
+      lines.join("\n"),
+    ).projection.trim();
+    if (projection.length > 0) commands.push(projection);
+    index = cursor + 1;
+  }
+
+  return commands;
 }
 
 function commandSegments(
@@ -125,55 +241,67 @@ function commandSegments(
 ): Segment[] {
   const segments: Segment[] = [];
   let start = 0;
-  let memberTokens: ShellToken[] = [];
 
   for (const token of tokens) {
     if (token.kind !== "operator" || !COMMAND_BOUNDARIES.has(token.value)) {
-      memberTokens.push(token);
       continue;
     }
     segments.push({
       start,
       end: token.start,
       boundaryAfter: token.value,
-      tokens: memberTokens,
+      text: input.slice(start, token.start),
     });
     start = token.end;
-    memberTokens = [];
   }
-  segments.push({ start, end: input.length, tokens: memberTokens });
+  segments.push({
+    start,
+    end: input.length,
+    text: input.slice(start),
+  });
   return segments;
 }
 
-function parseSegment(segment: Segment): ParsedSegment {
-  const words: ShellToken[] = [];
+function parseSegment(segment: string): ParsedSegment | undefined {
+  const wordTokens = shellCommandWordTokens(segment);
+  const tokenization = tokenizeBoundedShell(segment);
+  if (wordTokens === undefined || !tokenization.supported) return undefined;
+
+  const words = wordTokens.map(({ value }) => value);
+  const resolution = resolveShellExecutableWords(words);
+  const redirectionEffects = emptyEffects();
   let stdoutRedirected = false;
   let stdoutWrite: FileWrite | undefined;
 
-  for (let index = 0; index < segment.tokens.length; index += 1) {
-    const token = segment.tokens[index];
-    if (token?.kind !== "operator") {
-      if (token !== undefined) words.push(token);
+  for (const [index, token] of tokenization.tokens.entries()) {
+    if (
+      token.kind !== "operator" ||
+      !OUTPUT_REDIRECTION_OPERATORS.has(token.value)
+    ) {
       continue;
     }
-
-    const target = segment.tokens[index + 1];
-    if (target?.kind !== "word") continue;
-    const descriptor = words[words.length - 1];
-    const explicitDescriptor =
-      descriptor !== undefined &&
-      /^\d+$/u.test(descriptor.value) &&
-      descriptor.end === token.start
-        ? Number(descriptor.value)
+    const target = tokenization.tokens[index + 1];
+    if (target?.kind !== "word") {
+      redirectionEffects.unknownFileMutation = true;
+      continue;
+    }
+    const previous = tokenization.tokens[index - 1];
+    const descriptor =
+      previous?.kind === "word" &&
+      /^\d+$/u.test(previous.value) &&
+      previous.end === token.start
+        ? Number(previous.value)
         : undefined;
-    if (explicitDescriptor !== undefined) words.pop();
-
-    if (
-      (token.value === ">" || token.value === ">>") &&
-      (explicitDescriptor === undefined || explicitDescriptor === 1)
-    ) {
+    const path = normalizedStaticPath(target);
+    if (path === undefined) {
+      redirectionEffects.unknownFileMutation = true;
+    } else {
+      redirectionEffects.exactMutatedPaths.add(path.key);
+    }
+    const redirectsStdout =
+      token.value === "&>" || descriptor === undefined || descriptor === 1;
+    if (redirectsStdout) {
       stdoutRedirected = true;
-      const path = normalizedStaticPath(target);
       stdoutWrite =
         path === undefined
           ? undefined
@@ -182,27 +310,29 @@ function parseSegment(segment: Segment): ParsedSegment {
               path,
             };
     }
-    index += 1;
   }
 
   return {
-    words,
+    resolution,
     stdoutRedirected,
     ...(stdoutWrite === undefined ? {} : { stdoutWrite }),
+    redirectionEffects,
+    wordTokens,
+    words,
   };
 }
 
 function staticLiteralOutput(
-  words: readonly ShellToken[],
+  parsed: ParsedSegment,
   segment: Segment,
 ): StaticOutput | undefined {
-  const executable = effectiveExecutable(words);
-  if (executable === undefined) return undefined;
-  const args = words.slice(executable.index + 1);
+  const { effectiveExecutable, effectiveIndex } = parsed.resolution;
+  const args = parsed.wordTokens.slice(effectiveIndex + 1);
   let shellText: string | undefined;
 
-  if (executable.name === "echo") shellText = staticEchoOutput(args);
-  else if (executable.name === "printf") shellText = staticPrintfOutput(args);
+  if (effectiveExecutable === "echo") shellText = staticEchoOutput(args);
+  else if (effectiveExecutable === "printf")
+    shellText = staticPrintfOutput(args);
   if (shellText === undefined) return undefined;
 
   return {
@@ -221,7 +351,7 @@ function staticEchoOutput(args: readonly ShellToken[]): string | undefined {
 }
 
 function staticPrintfOutput(args: readonly ShellToken[]): string | undefined {
-  let index = args[0]?.value === "--" ? 1 : 0;
+  const index = args[0]?.value === "--" ? 1 : 0;
   if ((args[index]?.value ?? "").startsWith("-")) return undefined;
   const format = args[index];
   if (format === undefined) return undefined;
@@ -313,16 +443,21 @@ function staticPrintfEscape(
   return undefined;
 }
 
-function teeFileWrites(words: readonly ShellToken[]): FileWrite[] {
-  const executable = effectiveExecutable(words);
-  if (executable?.name !== "tee") return [];
+function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
+  if (parsed.resolution.effectiveExecutable !== "tee") return undefined;
+  const effects = emptyEffects();
+  const writes: FileWrite[] = [];
   let mode: FileWrite["mode"] = "overwrite";
   let options = true;
-  const writes: FileWrite[] = [];
 
-  for (const token of words.slice(executable.index + 1)) {
+  for (const token of parsed.wordTokens.slice(
+    parsed.resolution.effectiveIndex + 1,
+  )) {
     const value = staticWordValue(token);
-    if (value === undefined) continue;
+    if (value === undefined) {
+      effects.unknownFileMutation = true;
+      continue;
+    }
     if (options && value === "--") {
       options = false;
       continue;
@@ -340,83 +475,223 @@ function teeFileWrites(words: readonly ShellToken[]): FileWrite[] {
     ) {
       continue;
     }
-    if (options && value.startsWith("-")) return [];
+    if (options && value.startsWith("-")) {
+      effects.unknownFileMutation = true;
+      continue;
+    }
     options = false;
     const path = normalizeStaticPath(value);
-    if (path !== undefined) writes.push({ mode, path });
+    if (path === undefined) {
+      effects.unknownFileMutation = true;
+      continue;
+    }
+    effects.exactMutatedPaths.add(path.key);
+    writes.push({ mode, path });
   }
-  return writes;
-}
-
-function isTeeCommand(words: readonly ShellToken[]): boolean {
-  return effectiveExecutable(words)?.name === "tee";
-}
-
-function isBareCatCommand(words: readonly ShellToken[]): boolean {
-  const executable = effectiveExecutable(words);
-  return executable?.name === "cat" && words.length === executable.index + 1;
+  return { effects, writes };
 }
 
 function staticScriptConsumerPath(
-  words: readonly ShellToken[],
-): string | undefined {
-  const executable = effectiveExecutable(words);
-  if (executable === undefined) return undefined;
-  let index = executable.index + 1;
-  if (words[index]?.value === "--") index += 1;
-  else if ((words[index]?.value ?? "").startsWith("-")) return undefined;
-
+  parsed: ParsedSegment,
+): StaticPath | undefined {
+  const { effectiveExecutable, effectiveIndex, executionCwdMayChange } =
+    parsed.resolution;
   if (
-    !SHELL_EXECUTABLES.has(executable.name) &&
-    executable.name !== "source" &&
-    executable.name !== "."
+    effectiveExecutable === undefined ||
+    (!SHELL_EXECUTABLES.has(effectiveExecutable) &&
+      effectiveExecutable !== "source" &&
+      effectiveExecutable !== ".")
   ) {
     return undefined;
   }
-  const path = words[index];
-  return path === undefined ? undefined : normalizedStaticPath(path);
+  if (
+    (effectiveExecutable === "source" || effectiveExecutable === ".") &&
+    !canInvokeCurrentShellBuiltin(parsed.resolution)
+  ) {
+    return undefined;
+  }
+
+  let index = effectiveIndex + 1;
+  if (parsed.words[index] === "--") index += 1;
+  else if ((parsed.words[index] ?? "").startsWith("-")) return undefined;
+  const token = parsed.wordTokens[index];
+  if (token === undefined) return undefined;
+  const path = normalizedStaticPath(token);
+  if (path === undefined || (!path.absolute && executionCwdMayChange)) {
+    return undefined;
+  }
+  return path;
 }
 
-function effectiveExecutable(
-  words: readonly ShellToken[],
-): { index: number; name: string } | undefined {
-  let index = 0;
-  if (PRESENTATION_MARKERS.has(words[index]?.value ?? "")) index += 1;
-  while (ASSIGNMENT_RE.test(words[index]?.value ?? "")) index += 1;
+function commandEffects(parsed: ParsedSegment): BoundedShellEffects {
+  const executable = parsed.resolution.effectiveExecutable;
+  if (executable === undefined) return unknownEffects();
+  if (PROVEN_NON_MUTATING_EXECUTABLES.has(executable)) return emptyEffects();
+  if (
+    (executable === "cd" || executable === "pushd" || executable === "popd") &&
+    canInvokeCurrentShellBuiltin(parsed.resolution)
+  ) {
+    return { ...emptyEffects(), cwdMayChange: true };
+  }
 
-  for (const wrapper of ["command", "env"] as const) {
-    if (normalizedExecutable(words[index]) !== wrapper) continue;
-    index += 1;
-    if (words[index]?.value === "--") index += 1;
-    if (wrapper === "env") {
-      while (ASSIGNMENT_RE.test(words[index]?.value ?? "")) index += 1;
+  const operands = parsed.wordTokens.slice(
+    parsed.resolution.effectiveIndex + 1,
+  );
+  if (executable === "cp" || executable === "install") {
+    return twoOperandMutationEffects(operands, false);
+  }
+  if (executable === "mv") return twoOperandMutationEffects(operands, true);
+  if (executable === "rm" || executable === "unlink") {
+    return removalEffects(operands, executable === "unlink");
+  }
+  if (executable === "truncate") return truncateEffects(operands);
+  if (executable === "sed") return inPlaceSedEffects(operands);
+  return unknownEffects();
+}
+
+function twoOperandMutationEffects(
+  tokens: readonly ShellToken[],
+  mutatesSource: boolean,
+): BoundedShellEffects {
+  const values = tokens[0]?.value === "--" ? tokens.slice(1) : tokens;
+  if (
+    values.length !== 2 ||
+    values.some(({ value }) => value.startsWith("-"))
+  ) {
+    return unknownEffects();
+  }
+  const paths = values.map(normalizedStaticPath);
+  if (paths.some((path) => path === undefined)) return unknownEffects();
+  return effectsForPaths(
+    mutatesSource
+      ? (paths as StaticPath[])
+      : [(paths as StaticPath[])[1] as StaticPath],
+  );
+}
+
+function removalEffects(
+  tokens: readonly ShellToken[],
+  exactlyOne: boolean,
+): BoundedShellEffects {
+  let options = true;
+  const paths: StaticPath[] = [];
+  for (const token of tokens) {
+    const value = staticWordValue(token);
+    if (value === undefined) return unknownEffects();
+    if (options && value === "--") {
+      options = false;
+      continue;
     }
+    if (options && value.startsWith("-")) continue;
+    options = false;
+    const path = normalizeStaticPath(value);
+    if (path === undefined) return unknownEffects();
+    paths.push(path);
   }
-
-  if (normalizedExecutable(words[index]) === "sudo") {
-    index += 1;
-    if (words[index]?.value === "--") index += 1;
-    else if ((words[index]?.value ?? "").startsWith("-")) return undefined;
+  if (paths.length === 0 || (exactlyOne && paths.length !== 1)) {
+    return unknownEffects();
   }
-
-  const name = normalizedExecutable(words[index]);
-  return name === undefined ? undefined : { index, name };
+  return effectsForPaths(paths);
 }
 
-function normalizedExecutable(
-  token: ShellToken | undefined,
-): string | undefined {
-  const value = token === undefined ? undefined : staticWordValue(token);
-  if (value === undefined || value.length === 0) return undefined;
-  return value.split("/").pop()?.toLowerCase();
+function truncateEffects(tokens: readonly ShellToken[]): BoundedShellEffects {
+  const paths: StaticPath[] = [];
+  let index = 0;
+  while (index < tokens.length) {
+    const value = staticWordValue(tokens[index] as ShellToken);
+    if (value === undefined) return unknownEffects();
+    if (value === "--") {
+      index += 1;
+      break;
+    }
+    if (
+      value === "-s" ||
+      value === "--size" ||
+      value === "-r" ||
+      value === "--reference"
+    ) {
+      index += 2;
+      continue;
+    }
+    if (value.startsWith("--size=") || value.startsWith("--reference=")) {
+      index += 1;
+      continue;
+    }
+    if (value.startsWith("-")) return unknownEffects();
+    break;
+  }
+  for (; index < tokens.length; index += 1) {
+    const path = normalizedStaticPath(tokens[index] as ShellToken);
+    if (path === undefined) return unknownEffects();
+    paths.push(path);
+  }
+  return paths.length === 0 ? unknownEffects() : effectsForPaths(paths);
 }
 
-function normalizedStaticPath(token: ShellToken): string | undefined {
+function inPlaceSedEffects(tokens: readonly ShellToken[]): BoundedShellEffects {
+  let inPlace = false;
+  let scriptSuppliedByOption = false;
+  let index = 0;
+  for (; index < tokens.length; index += 1) {
+    const value = staticWordValue(tokens[index] as ShellToken);
+    if (value === undefined) return unknownEffects();
+    if (value === "--") {
+      index += 1;
+      break;
+    }
+    if (
+      value === "-i" ||
+      value === "--in-place" ||
+      /^-i.+/u.test(value) ||
+      value.startsWith("--in-place=")
+    ) {
+      inPlace = true;
+      continue;
+    }
+    if (
+      value === "-e" ||
+      value === "--expression" ||
+      value === "-f" ||
+      value === "--file"
+    ) {
+      scriptSuppliedByOption = true;
+      index += 1;
+      if (index >= tokens.length) return unknownEffects();
+      continue;
+    }
+    if (value.startsWith("-")) return unknownEffects();
+    break;
+  }
+  if (!inPlace) return emptyEffects();
+  if (!scriptSuppliedByOption) index += 1;
+  const paths: StaticPath[] = [];
+  for (; index < tokens.length; index += 1) {
+    const path = normalizedStaticPath(tokens[index] as ShellToken);
+    if (path === undefined) return unknownEffects();
+    paths.push(path);
+  }
+  return paths.length === 0 ? unknownEffects() : effectsForPaths(paths);
+}
+
+function canInvokeCurrentShellBuiltin(
+  resolution: ShellExecutableResolution,
+): boolean {
+  return !resolution.sudo && !resolution.wrappers.includes("env");
+}
+
+function isBareCatCommand(parsed: ParsedSegment): boolean {
+  return (
+    parsed.resolution.effectiveExecutable === "cat" &&
+    parsed.words.length === parsed.resolution.effectiveIndex + 1
+  );
+}
+
+function normalizedStaticPath(token: ShellToken): StaticPath | undefined {
   const value = staticWordValue(token);
   return value === undefined ? undefined : normalizeStaticPath(value);
 }
 
-function normalizeStaticPath(value: string): string | undefined {
+function normalizeStaticPath(value: string): StaticPath | undefined {
   if (
     value.length === 0 ||
     value === "." ||
@@ -430,19 +705,12 @@ function normalizeStaticPath(value: string): string | undefined {
   const absolute = value.startsWith("/");
   const components: string[] = [];
   for (const component of value.split("/")) {
+    if (component === "..") return undefined;
     if (component.length === 0 || component === ".") continue;
-    if (component === "..") {
-      if (components.length > 0 && components[components.length - 1] !== "..") {
-        components.pop();
-      } else if (!absolute) {
-        components.push(component);
-      }
-      continue;
-    }
     components.push(component);
   }
-  const normalized = `${absolute ? "/" : ""}${components.join("/")}`;
-  return normalized.length === 0 || normalized === "/" ? undefined : normalized;
+  const key = `${absolute ? "/" : ""}${components.join("/")}`;
+  return key.length === 0 || key === "/" ? undefined : { absolute, key };
 }
 
 function staticWordValue(token: ShellToken): string | undefined {
@@ -486,29 +754,103 @@ function staticWordValue(token: ShellToken): string | undefined {
   return quote === undefined ? token.value : undefined;
 }
 
+function branchExitFiles(
+  successFiles: Map<string, StaticOutput>,
+  entryFiles: ReadonlyMap<string, StaticOutput>,
+  effects: BoundedShellEffects,
+  boundary: string | undefined,
+): Map<string, StaticOutput> {
+  if (boundary !== "||" && boundary !== "&") return successFiles;
+  const branchFiles = cloneFiles(entryFiles);
+  applyInvalidations(branchFiles, effects);
+  return branchFiles;
+}
+
+function applyInvalidations(
+  files: Map<string, StaticOutput>,
+  effects: BoundedShellEffects,
+): void {
+  if (effects.unknownFileMutation) files.clear();
+  else {
+    for (const path of effects.exactMutatedPaths) files.delete(path);
+  }
+  if (effects.cwdMayChange) {
+    for (const path of files.keys()) {
+      if (!path.startsWith("/")) files.delete(path);
+    }
+  }
+}
+
 function applyFileWrite(
   files: Map<string, StaticOutput>,
   write: FileWrite,
   output: StaticOutput | undefined,
 ): void {
   if (output === undefined) {
-    files.delete(write.path);
+    files.delete(write.path.key);
     return;
   }
   if (write.mode === "overwrite") {
-    files.set(write.path, output);
+    files.set(write.path.key, output);
     return;
   }
-  const existing = files.get(write.path);
-  if (existing === undefined) {
-    files.delete(write.path);
-    return;
-  }
-  files.set(write.path, {
+  const existing = files.get(write.path.key);
+  if (existing === undefined) return;
+  files.set(write.path.key, {
     shellText: existing.shellText + output.shellText,
     producerSpan: {
       start: existing.producerSpan.start,
       end: output.producerSpan.end,
     },
   });
+}
+
+function effectsPreservingKnownAppends(
+  effects: BoundedShellEffects,
+  writes: readonly FileWrite[],
+  output: StaticOutput | undefined,
+): BoundedShellEffects {
+  if (output === undefined || !writes.some(({ mode }) => mode === "append")) {
+    return effects;
+  }
+  const exactMutatedPaths = new Set(effects.exactMutatedPaths);
+  for (const write of writes) {
+    if (write.mode === "append") exactMutatedPaths.delete(write.path.key);
+  }
+  return { ...effects, exactMutatedPaths };
+}
+
+function effectsForPaths(paths: readonly StaticPath[]): BoundedShellEffects {
+  const effects = emptyEffects();
+  for (const path of paths) effects.exactMutatedPaths.add(path.key);
+  return effects;
+}
+
+function emptyEffects(): BoundedShellEffects {
+  return {
+    cwdMayChange: false,
+    exactMutatedPaths: new Set<string>(),
+    unknownFileMutation: false,
+  };
+}
+
+function unknownEffects(): BoundedShellEffects {
+  return { ...emptyEffects(), unknownFileMutation: true };
+}
+
+function mergeEffects(
+  target: BoundedShellEffects,
+  source: BoundedShellEffects,
+): void {
+  target.cwdMayChange ||= source.cwdMayChange;
+  target.unknownFileMutation ||= source.unknownFileMutation;
+  for (const path of source.exactMutatedPaths) {
+    target.exactMutatedPaths.add(path);
+  }
+}
+
+function cloneFiles(
+  files: ReadonlyMap<string, StaticOutput>,
+): Map<string, StaticOutput> {
+  return new Map(files);
 }

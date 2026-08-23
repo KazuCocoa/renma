@@ -281,6 +281,190 @@ ${command}
   }
 });
 
+test("multi-line generated scripts classify each logical command with outer evidence", () => {
+  const destructiveCommand = `printf '%s\\n' \\
+  'echo ready' \\
+  'rm -rf /tmp/example' \\
+  > run.sh; sh run.sh`;
+  const destructive = findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${destructiveCommand}
+\`\`\`
+`),
+    "SEC-DESTRUCTIVE-COMMAND",
+  );
+  assert.deepEqual(destructive.evidence, {
+    path: "contexts/security/targeted.md",
+    startLine: 8,
+    endLine: 11,
+    snippet: destructiveCommand,
+  });
+
+  const privilegedCommand = `printf '%s\\n' \\
+  '#!/bin/sh' \\
+  'sudo some-command' \\
+  > run.sh; sh run.sh`;
+  const privileged = findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${privilegedCommand}
+\`\`\`
+`),
+    "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+  );
+  assert.deepEqual(privileged.evidence, {
+    path: "contexts/security/targeted.md",
+    startLine: 8,
+    endLine: 11,
+    snippet: privilegedCommand,
+  });
+
+  const suppressedCommand = `printf '%s\\n' \\
+  '#!/bin/sh' \\
+  'echo ready' \\
+  'git reset --hard' \\
+  > run.sh; sh run.sh || true`;
+  const suppressedFindings = findingsFor(`# Workflow
+
+\`\`\`bash
+${suppressedCommand}
+\`\`\`
+`);
+  const suppressedDestructive = findingFor(
+    suppressedFindings,
+    "SEC-DESTRUCTIVE-COMMAND",
+  );
+  const suppression = findingFor(suppressedFindings, RISKY_SUPPRESSION_ID);
+  assert.equal(suppressedDestructive.evidence.snippet, suppressedCommand);
+  assert.equal(suppression.evidence.snippet, suppressedCommand);
+  assert.deepEqual(suppression.details?.operationKinds, [
+    "destructive-command",
+  ]);
+});
+
+test("multi-line generated literal presentation remains non-operational", () => {
+  const commands = [
+    `printf '%s\\n' \\
+  '#!/bin/sh' \\
+  'echo "rm -rf /tmp/example"' \\
+  > run.sh; sh run.sh`,
+    `printf '%s\\n' \\
+  '#!/bin/sh' \\
+  'printf "%s\\n" "sudo some-command"' \\
+  > run.sh; sh run.sh`,
+  ];
+
+  for (const command of commands) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("generated script line continuations remain one logical command", () => {
+  const command = `printf '%s\\n' \\
+  'rm -rf \\' \\
+  '  /tmp/example' \\
+  > run.sh; sh run.sh`;
+  const finding = findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+    "SEC-DESTRUCTIVE-COMMAND",
+  );
+  assert.equal(finding.evidence.snippet, command);
+});
+
+test("generated script facts do not survive mutations or relative cwd changes", () => {
+  const commands = [
+    `echo 'rm -rf /tmp/example' > run.sh; cp safe.sh run.sh; sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; mv safe.sh run.sh; sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; rm run.sh; sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; install safe.sh run.sh; sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; sed -i 's/rm/echo/' run.sh; sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; cd /tmp; sh run.sh`,
+    `echo 'rm -rf /tmp/example' > a/../run.sh; sh run.sh`,
+  ];
+  for (const command of commands) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("generated consumers reuse canonical env and sudo wrapper resolution", () => {
+  const positive = [
+    `echo 'rm -rf /tmp/example' > run.sh; env -i sh run.sh`,
+    `echo 'rm -rf /tmp/example' > /tmp/run.sh; env -C /tmp sh /tmp/run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; sudo -u root sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; sudo --user=root sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; command env -- sh run.sh`,
+  ];
+  for (const command of positive) {
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+  }
+
+  const envBuiltin = `echo 'rm -rf /tmp/example' > run.sh; env source run.sh`;
+  assert.deepEqual(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${envBuiltin}
+\`\`\`
+`).filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+    [],
+    envBuiltin,
+  );
+
+  const sudoBuiltin = `echo 'rm -rf /tmp/example' > run.sh; sudo source run.sh`;
+  const sudoFindings = findingsFor(`# Workflow
+
+\`\`\`bash
+${sudoBuiltin}
+\`\`\`
+`);
+  assert.equal(
+    sudoFindings.some(({ id }) => id === "SEC-DESTRUCTIVE-COMMAND"),
+    false,
+  );
+  assert.equal(
+    sudoFindings.some(
+      ({ id }) => id === "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    ),
+    true,
+  );
+});
+
 test("pipeline inputs fail closed unless the consumer is proven literal-only", () => {
   const cases: Array<{
     disposition: "operational" | "unknown";
