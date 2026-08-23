@@ -2569,13 +2569,18 @@ Run npm test.
   const repeated = await scan(root);
   assert.equal(formatText(repeated), textReport);
   assert.equal(formatJson(repeated), formatJson(result));
-  const jsonFinding = (
+  const jsonDiagnostic = (
     JSON.parse(formatJson(result)) as {
-      findings: Array<{ id: string; details?: Record<string, unknown> }>;
+      diagnostics: Array<{
+        code: string;
+        details?: Record<string, unknown>;
+      }>;
     }
-  ).findings.find((finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET");
-  assert.equal(jsonFinding?.details?.warningThreshold, 6400);
-  assert.equal(jsonFinding?.details?.highThreshold, 8000);
+  ).diagnostics.find(
+    (diagnostic) => diagnostic.code === "QUAL-SKILL-TOKEN-BUDGET",
+  );
+  assert.equal(jsonDiagnostic?.details?.warningThreshold, 6400);
+  assert.equal(jsonDiagnostic?.details?.highThreshold, 8000);
 });
 
 test("oversized Skills without headings retain manual semantic guidance", async () => {

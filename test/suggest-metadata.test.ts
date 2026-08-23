@@ -586,7 +586,11 @@ test("explicit suggest-metadata migrates historical Skill entrypoints without op
   );
   const report = JSON.parse(jsonScan.stdout) as {
     agentSkills: { results: Array<{ path: string }> };
-    diagnostics: Array<{ code?: string; path: string; message: string }>;
+    diagnostics: Array<{
+      code: string;
+      location?: { path?: string };
+      message: string;
+    }>;
   };
 
   for (const entry of fixtures) {
@@ -606,7 +610,7 @@ test("explicit suggest-metadata migrates historical Skill entrypoints without op
       report.diagnostics.some(
         (diagnostic) =>
           diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
-          diagnostic.path === entry.source,
+          diagnostic.location?.path === entry.source,
       ),
       entry.source,
     );
@@ -680,7 +684,7 @@ description: Review ${name} inputs. Use when ${name} inputs need review.
   );
   const report = JSON.parse(jsonResult.stdout) as {
     agentSkills: { results: Array<{ path: string }> };
-    diagnostics: Array<{ code?: string; path: string }>;
+    diagnostics: Array<{ code: string; location?: { path?: string } }>;
   };
 
   for (const [source] of fixtures) {
@@ -693,7 +697,7 @@ description: Review ${name} inputs. Use when ${name} inputs need review.
       report.diagnostics.some(
         (diagnostic) =>
           diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
-          diagnostic.path === source,
+          diagnostic.location?.path === source,
       ),
       source,
     );

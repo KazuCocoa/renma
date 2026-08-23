@@ -30,6 +30,7 @@
       "SecurityAnalysisCoverageState": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageState",
       "SecurityAnalysisCoverageSurfaceCounts": "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverageSurfaceCounts",
       "Severity": "types/diagnostics.d.ts#Severity",
+      "SuppressedDiagnosticEvidence": "types/diagnostics.d.ts#SuppressedDiagnosticEvidence",
       "SuppressedFindingEvidence": "types/diagnostics.d.ts#SuppressedFindingEvidence",
       "SuppressionConfig": "types/diagnostics.d.ts#SuppressionConfig",
       "SuppressionExpiration": "types/diagnostics.d.ts#SuppressionExpiration",
@@ -57,6 +58,7 @@
       "ReviewBundle": "types/diagnostics.d.ts#ReviewBundle",
       "RiskClass": "types/diagnostics.d.ts#RiskClass",
       "Severity": "types/diagnostics.d.ts#Severity",
+      "SuppressedDiagnosticEvidence": "types/diagnostics.d.ts#SuppressedDiagnosticEvidence",
       "SuppressedFindingEvidence": "types/diagnostics.d.ts#SuppressedFindingEvidence",
       "SuppressionConfig": "types/diagnostics.d.ts#SuppressionConfig",
       "SuppressionExpiration": "types/diagnostics.d.ts#SuppressionExpiration",
@@ -800,6 +802,15 @@
       ],
       "references": []
     },
+    "types/diagnostics.d.ts#SuppressedDiagnosticEvidence": {
+      "declarations": [
+        "export interface SuppressedDiagnosticEvidence { suppression: SuppressedFindingEvidence[\"suppression\"]; diagnostic: DiagnosticV2; }"
+      ],
+      "references": [
+        "types/diagnostics.d.ts#DiagnosticV2",
+        "types/diagnostics.d.ts#SuppressedFindingEvidence"
+      ]
+    },
     "types/diagnostics.d.ts#SuppressedFindingEvidence": {
       "declarations": [
         "export interface SuppressedFindingEvidence { suppression: { id: string; matchedPath: string; reason: string; expires: SuppressionExpiration; }; finding: Finding; }"
@@ -828,12 +839,12 @@
       "references": []
     },
     "types/scan-result.d.ts#SCAN_JSON_SCHEMA_VERSION": {
-      "declarations": ["SCAN_JSON_SCHEMA_VERSION: \"renma.scan.v1\""],
+      "declarations": ["SCAN_JSON_SCHEMA_VERSION: \"renma.scan.v2\""],
       "references": []
     },
     "types/scan-result.d.ts#ScanJsonDocument": {
       "declarations": [
-        "export interface ScanJsonDocument { schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION; root: string; configPath?: string; scanBoundary: EffectiveScanBoundaryEvidence; inspectionCoverage: InspectionCoverage; securityAnalysisCoverage: SecurityAnalysisCoverage; scannedFileCount: number; format: \"json\"; agentSkills: AgentSkillsValidationSummary; contextLens?: ContextLensSummary; executableSurfaceInventory?: ExecutableSurfaceInventory; securityPolicyInventory?: SecurityPolicyInventorySummary; trustGraph?: TrustGraph; findings: Finding[]; suppressedFindings: SuppressedFindingEvidence[]; diagnostics: Diagnostic[]; diagnosticsV2: DiagnosticV2[]; reviewBundles: ReviewBundle[]; exitThreshold: Severity; }"
+        "export interface ScanJsonDocument { schemaVersion: typeof SCAN_JSON_SCHEMA_VERSION; root: string; configPath?: string; scanBoundary: EffectiveScanBoundaryEvidence; inspectionCoverage: InspectionCoverage; securityAnalysisCoverage: SecurityAnalysisCoverage; scannedFileCount: number; format: \"json\"; agentSkills: AgentSkillsValidationSummary; contextLens?: ContextLensSummary; executableSurfaceInventory?: ExecutableSurfaceInventory; securityPolicyInventory?: SecurityPolicyInventorySummary; trustGraph?: TrustGraph; diagnostics: DiagnosticV2[]; suppressedDiagnostics: SuppressedDiagnosticEvidence[]; reviewBundles: ReviewBundle[]; exitThreshold: Severity; }"
       ],
       "references": [
         "agent-skills.d.ts#AgentSkillsValidationSummary",
@@ -843,12 +854,10 @@
         "scan-boundary.d.ts#EffectiveScanBoundaryEvidence",
         "security-policy-inventory.d.ts#SecurityPolicyInventorySummary",
         "trust-graph.d.ts#TrustGraph",
-        "types/diagnostics.d.ts#Diagnostic",
         "types/diagnostics.d.ts#DiagnosticV2",
-        "types/diagnostics.d.ts#Finding",
         "types/diagnostics.d.ts#ReviewBundle",
         "types/diagnostics.d.ts#Severity",
-        "types/diagnostics.d.ts#SuppressedFindingEvidence",
+        "types/diagnostics.d.ts#SuppressedDiagnosticEvidence",
         "types/scan-result.d.ts#SCAN_JSON_SCHEMA_VERSION",
         "types/security-analysis-coverage.d.ts#SecurityAnalysisCoverage"
       ]

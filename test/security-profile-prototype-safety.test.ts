@@ -131,20 +131,25 @@ test("JSON and strict CLI scans return complete structured missing-profile resul
     assert.equal(result.code, 1, args.join(" "));
     assert.equal(result.stderr, "", args.join(" "));
     const document = JSON.parse(result.stdout) as Record<string, unknown> & {
-      findings: Array<{ id: string; evidence: { path: string } }>;
+      diagnostics: Array<{
+        code: string;
+        location?: { path?: string };
+      }>;
     };
-    assert.equal(document.schemaVersion, "renma.scan.v1");
+    assert.equal(document.schemaVersion, "renma.scan.v2");
     assert.equal(document.format, "json");
     assert.equal(document.scannedFileCount, PROTOTYPE_PROPERTY_NAMES.length);
     assert.ok(Array.isArray(document.diagnostics));
-    assert.ok(Array.isArray(document.diagnosticsV2));
+    assert.ok(Array.isArray(document.suppressedDiagnostics));
     assert.equal(typeof document.inspectionCoverage, "object");
     assert.equal(typeof document.securityAnalysisCoverage, "object");
     assert.equal(typeof document.securityPolicyInventory, "object");
     assert.deepEqual(
-      document.findings
-        .filter((finding) => finding.id === "SEC-POLICY-PROFILE-NOT-FOUND")
-        .map((finding) => finding.evidence.path),
+      document.diagnostics
+        .filter(
+          (diagnostic) => diagnostic.code === "SEC-POLICY-PROFILE-NOT-FOUND",
+        )
+        .map((diagnostic) => diagnostic.location?.path),
       PROTOTYPE_PROPERTY_NAMES.map(
         (_, index) => `contexts/prototype-profiles/${index}.md`,
       ),

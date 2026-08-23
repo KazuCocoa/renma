@@ -12,11 +12,12 @@ import type {
   Finding,
   ReviewBundle,
   Severity,
+  SuppressedDiagnosticEvidence,
   SuppressedFindingEvidence,
 } from "./diagnostics.js";
 
 /** Stable schema identifier for the serialized scan JSON document. */
-export const SCAN_JSON_SCHEMA_VERSION = "renma.scan.v1" as const;
+export const SCAN_JSON_SCHEMA_VERSION = "renma.scan.v2" as const;
 
 /** Core result returned by a scan operation before wire-format serialization. */
 export interface ScanResult {
@@ -55,10 +56,8 @@ export interface ScanJsonDocument {
   executableSurfaceInventory?: ExecutableSurfaceInventory;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
   trustGraph?: TrustGraph;
-  findings: Finding[];
-  suppressedFindings: SuppressedFindingEvidence[];
-  diagnostics: Diagnostic[];
-  diagnosticsV2: DiagnosticV2[];
+  diagnostics: DiagnosticV2[];
+  suppressedDiagnostics: SuppressedDiagnosticEvidence[];
   reviewBundles: ReviewBundle[];
   exitThreshold: Severity;
 }

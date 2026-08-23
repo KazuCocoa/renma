@@ -137,7 +137,7 @@ production modules import the cohesive owner under `src/types/` directly:
 - `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
   permitted to import Agent Skills, Context Lens, Executable Surface Inventory,
   Security Policy Inventory, and Trust Graph result types. The public
-  `ScanJsonDocument` explicitly lists the top-level `renma.scan.v1` wire fields,
+  `ScanJsonDocument` explicitly lists the top-level `renma.scan.v2` wire fields,
   and `toScanJsonDocument()` projects only those fields with literal
   `format: "json"`. Internal `ScanResult` additions therefore do not become
   public JSON additions implicitly.

@@ -77,10 +77,11 @@ concerns.
 
 ## LLM-Actionable Diagnostics V2
 
-`renma scan --json` includes an additive `diagnosticsV2` array. Existing
-`findings` and `diagnostics` fields remain compatible; v2 is a normalized view
-for LLM-assisted repair, code review tools, and humans who want explicit repair
-guardrails.
+`renma scan --json` uses the `renma.scan.v2` contract. Its canonical
+`diagnostics` array is the normalized view for LLM-assisted repair, code review
+tools, and humans who want explicit repair guardrails. The pre-1.0 `findings`,
+legacy `diagnostics`, and transitional `diagnosticsV2` wire fields were removed
+instead of preserving three overlapping representations.
 
 Each v2 diagnostic includes:
 
@@ -571,8 +572,9 @@ Renma currently groups duplicate IDs by duplicated id, unresolved references by
 source, orphaned context assets separately from hard validation errors, and
 dependency/reference issues by affected source. Bundles are generated from
 structured `details` facts and source locations first, with human-facing prose
-parsing used only as a legacy fallback. Suppressed findings are omitted from both
-`diagnosticsV2` and `reviewBundles`.
+parsing used only as a legacy fallback. Suppressed diagnostics are omitted from
+both the active `diagnostics` array and `reviewBundles`; they remain available
+in `suppressedDiagnostics` with their suppression evidence.
 
 Example:
 
@@ -660,34 +662,24 @@ informational invocation resolution and review behavior. Findings, Readiness,
 Security Policy Inventory, CI verdicts, suppression metadata, and exit
 thresholds are unchanged.
 
-### Finding and evidence JSON contract
+### Diagnostic and location JSON contract
 
-Each `findings` entry contains these required fields:
+Each `diagnostics` entry contains `version`, `code`, `severity`, and `message`.
+It may also include `location`, `relatedLocations`, `repairPolicy`,
+`repairConstraints`, `verificationSteps`, `llmHint`, and structured `details`.
+Rule-specific finding severity, category, confidence, risk class, remediation,
+and rationale remain available as structured `details` where applicable.
+Consumers must tolerate absent optional fields and additive fields they do not
+recognize.
 
-- `id`, the stable scan finding identifier;
-- `title`, the concise human-readable finding title;
-- `category`, one of `quality`, `safety`, `structure`, or `maintenance`;
-- `severity` and `confidence`;
-- `evidence`;
-- `whyItMatters`; and
-- `remediation`.
-
-A Finding may also include `riskClass`, `constraints`, `repairConstraints`,
-`verificationSteps`, `verificationStepsV2`, `llmHint`, and structured `details`.
-`repairConstraints` and `verificationStepsV2` carry typed semantics;
-`constraints` and `verificationSteps` are legacy text compatibility projections
-of those typed objects. Consumers must tolerate absent optional fields and
-additive fields they do not recognize.
-
-`evidence` always contains `path`, `startLine`, `endLine`, and `snippet`.
-Line numbers are one-based and inclusive. Paths identify the scanned source
+A `location` contains `path` and may include one-based inclusive `startLine`
+and `endLine` values plus a `snippet`. Paths identify the scanned source
 reported by Renma; consumers should not parse `snippet` to recover identity or
-location. Renma anchors diagnostics to the most specific source evidence it has.
-When a diagnostic represents missing document-level guidance, the location
-identifies the affected document scope rather than pretending the missing
-content exists at a source line. Findings use stable source order: evidence path
-first, then start line. That order is for deterministic review and does not
-replace severity or confidence when prioritizing work.
+location. Renma anchors diagnostics to the most specific source evidence it
+has. When a diagnostic represents missing document-level guidance, the
+location identifies the affected document scope rather than pretending the
+missing content exists at a source line. Diagnostic order is deterministic but
+does not replace severity when prioritizing work.
 
 ## Discovery Diagnostics
 

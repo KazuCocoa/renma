@@ -12,6 +12,8 @@ import type {
   Finding,
   RepairConstraint,
   ReviewBundle,
+  SuppressedDiagnosticEvidence,
+  SuppressedFindingEvidence,
   VerificationStep,
 } from "./types/diagnostics.js";
 
@@ -36,6 +38,20 @@ export function createDiagnosticsV2(input: {
     ...input.findings.map(findingToDiagnosticV2),
     ...input.diagnostics.map(rawDiagnosticToDiagnosticV2),
   ].sort(compareDiagnosticsV2);
+}
+
+/** Convert retained finding suppressions into the canonical scan diagnostic shape. */
+export function createSuppressedDiagnostics(
+  suppressed: SuppressedFindingEvidence[],
+): SuppressedDiagnosticEvidence[] {
+  return suppressed
+    .map((item, index) => ({
+      suppression: item.suppression,
+      diagnostic: findingToDiagnosticV2(item.finding, index),
+    }))
+    .sort((left, right) =>
+      compareDiagnosticsV2(left.diagnostic, right.diagnostic),
+    );
 }
 
 /** Build deterministic review bundles from LLM-actionable diagnostics. */
