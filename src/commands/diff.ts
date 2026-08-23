@@ -462,10 +462,20 @@ async function executeDiffWithProjection(
     const fromCollected = fromSnapshotResult.value;
     const toCollected = toSnapshotResult.value;
     if (includeSkillDiscovery) {
+      const targetLocalInspectedPaths =
+        options.includeCiEvidence === true
+          ? toCollected.repositorySnapshot.evidenceBoundaryInspectedPaths[1]
+          : undefined;
+      const targetLocalSnapshot = targetLocalInspectedPaths
+        ? withSuppressedFindingsLimitedToPaths(
+            toCollected.snapshot,
+            targetLocalInspectedPaths,
+          )
+        : toCollected.snapshot;
       const localReport = buildDiffReport(
         repoRoot,
         fromCollected.snapshot,
-        toCollected.snapshot,
+        targetLocalSnapshot,
       );
       let report = localReport;
       let effectiveCiBoundary: EffectiveCiScanBoundaryEvidence | undefined;
@@ -1745,6 +1755,18 @@ function projectDiffSnapshot(
     CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION
       ? { effectiveBoundary: scanResult.scanBoundary }
       : {}),
+  };
+}
+
+function withSuppressedFindingsLimitedToPaths(
+  snapshot: DiffSnapshot,
+  inspectedPaths: ReadonlySet<string>,
+): DiffSnapshot {
+  return {
+    ...snapshot,
+    suppressedFindings: (snapshot.suppressedFindings ?? []).filter((item) =>
+      inspectedPaths.has(item.finding.evidence.path),
+    ),
   };
 }
 

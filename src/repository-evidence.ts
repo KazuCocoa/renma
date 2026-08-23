@@ -61,6 +61,7 @@ export interface RepositorySnapshotCore {
   readonly config: ScanConfig;
   readonly configPath?: string;
   readonly evidenceBoundarySources: ScanBoundarySource[];
+  readonly evidenceBoundaryInspectedPaths: ReadonlyArray<ReadonlySet<string>>;
   readonly repositoryPathConfig: ScanConfig;
   readonly artifacts: Artifact[];
   readonly documents: ParsedDocument[];
@@ -112,6 +113,7 @@ export interface RepositorySnapshot extends RepositoryEvidence {
   core: RepositorySnapshotCore;
   config: ScanConfig;
   evidenceBoundarySources: ScanBoundarySource[];
+  evidenceBoundaryInspectedPaths: ReadonlyArray<ReadonlySet<string>>;
   artifacts: Artifact[];
   documents: ParsedDocument[];
   repositoryPaths: ReadonlySet<string>;
@@ -209,6 +211,9 @@ export async function collectRepositorySnapshotCore(
     evidenceBoundarySources,
   );
   const artifacts = [...discovery.artifacts];
+  const evidenceBoundaryInspectedPaths = discovery.artifactPathsBySource.map(
+    (paths) => new Set(paths),
+  );
   const discoveryDiagnostics = [...discovery.diagnostics];
   const skippedPathStates = new Map(discovery.skippedPathStates);
   const blockedTraversalPaths = new Set(discovery.blockedTraversalPaths);
@@ -249,6 +254,14 @@ export async function collectRepositorySnapshotCore(
       evidenceBoundarySources,
       candidates,
     );
+    for (const [
+      sourceIndex,
+      paths,
+    ] of explicit.artifactPathsBySource.entries()) {
+      const inspectedPaths = evidenceBoundaryInspectedPaths[sourceIndex];
+      if (!inspectedPaths) continue;
+      for (const artifactPath of paths) inspectedPaths.add(artifactPath);
+    }
     discoveryDiagnostics.push(...explicit.diagnostics);
     for (const [candidate, state] of explicit.skippedPathStates) {
       skippedPathStates.set(candidate, state);
@@ -300,6 +313,7 @@ export async function collectRepositorySnapshotCore(
     config,
     ...(configPath ? { configPath } : {}),
     evidenceBoundarySources,
+    evidenceBoundaryInspectedPaths,
     repositoryPathConfig: evidenceBoundaryConfig(
       config,
       evidenceBoundarySources,
@@ -368,10 +382,11 @@ async function discoverWithBoundarySources(
   root: string,
   semanticConfig: ScanConfig,
   sources: readonly ScanBoundarySource[],
-): Promise<Awaited<ReturnType<typeof discoverArtifacts>>> {
-  if (sources.length === 1) {
-    return discoverArtifacts(root, boundaryConfig(semanticConfig, sources[0]!));
+): Promise<
+  Awaited<ReturnType<typeof discoverArtifacts>> & {
+    artifactPathsBySource: ReadonlyArray<ReadonlySet<string>>;
   }
+> {
   const discoveries = await Promise.all(
     sources.map((source) =>
       discoverArtifacts(root, boundaryConfig(semanticConfig, source)),
@@ -423,6 +438,10 @@ async function discoverWithBoundarySources(
     blockedTraversalPaths,
     traversedDirectoryPaths,
     excludedSupportDirectoryPaths,
+    artifactPathsBySource: discoveries.map(
+      (discovery) =>
+        new Set(discovery.artifacts.map((artifact) => artifact.path)),
+    ),
   };
 }
 
@@ -431,7 +450,11 @@ async function inspectExplicitWithBoundarySources(
   semanticConfig: ScanConfig,
   sources: readonly ScanBoundarySource[],
   candidatePaths: readonly string[],
-): Promise<ExplicitArtifactInspectionResult> {
+): Promise<
+  ExplicitArtifactInspectionResult & {
+    artifactPathsBySource: ReadonlyArray<ReadonlySet<string>>;
+  }
+> {
   const inspections = await Promise.all(
     sources.map((source) =>
       inspectExplicitRepositoryArtifacts(
@@ -471,6 +494,10 @@ async function inspectExplicitWithBoundarySources(
       .map(([, diagnostic]) => diagnostic),
     skippedPathStates,
     blockedTraversalPaths,
+    artifactPathsBySource: inspections.map(
+      (inspection) =>
+        new Set(inspection.artifacts.map((artifact) => artifact.path)),
+    ),
   };
 }
 
@@ -643,6 +670,7 @@ function createRepositorySnapshot(
     ...(core.configPath ? { configPath: core.configPath } : {}),
     config: core.config,
     evidenceBoundarySources: core.evidenceBoundarySources,
+    evidenceBoundaryInspectedPaths: core.evidenceBoundaryInspectedPaths,
     artifacts: core.artifacts,
     documents: core.documents,
     repositoryPaths,

@@ -280,6 +280,45 @@ test("a target-only suppression remains visible and cannot erase enforcement evi
   }
 });
 
+test("target-local suppression evidence excludes paths retained only by the base boundary", async () => {
+  const repo = await createRepo(
+    { globs: ["skills/**/SKILL.md"] },
+    secretBody(),
+  );
+  try {
+    await writeConfig(repo, {
+      globs: ["contexts/**/*.md"],
+      suppressions: [suppression(["skills/demo/**"], "never")],
+    });
+    await commit(repo, "narrow target boundary and add suppression");
+
+    const targetLocal = await scan(repo, { format: "json" });
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+    assert.equal(
+      targetLocal.suppressedFindings.some((item) =>
+        isLiteralSecret(item.finding),
+      ),
+      false,
+    );
+    assert.equal(
+      report.diff.findings.suppressed.to.some((item) =>
+        isLiteralSecret(item.finding),
+      ),
+      false,
+    );
+    assert.equal(
+      report.scanBoundaryPolicy.effectiveBoundary?.inspectedPaths.includes(
+        "skills/demo/SKILL.md",
+      ),
+      true,
+    );
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("finding reduction beside a new suppression is not praised as remediation", async () => {
   const repo = await createRepo(
     { globs: ["skills/**/SKILL.md"] },
