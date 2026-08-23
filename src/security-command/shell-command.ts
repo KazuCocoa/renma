@@ -10,6 +10,9 @@ type ShellExecutableResolution = {
 
 type ShellExecutionDisposition = "proven" | "not-executed" | "unknown";
 
+type SudoOptionExecutionDisposition =
+  ShellExecutionDisposition | "executes-when-command-remains";
+
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
@@ -52,13 +55,19 @@ export function resolveShellExecutableWords(
 
   index = direct.index + 1;
   let sudoExecutionDisposition: ShellExecutionDisposition = "proven";
+  let sudoExecutionDependsOnCommand = false;
   while ((words[index] ?? "").startsWith("-")) {
     const option = words[index] ?? "";
     index += 1;
-    sudoExecutionDisposition = combineExecutionDispositions(
-      sudoExecutionDisposition,
-      sudoOptionExecutionDisposition(option),
-    );
+    const optionExecutionDisposition = sudoOptionExecutionDisposition(option);
+    if (optionExecutionDisposition === "executes-when-command-remains") {
+      sudoExecutionDependsOnCommand = true;
+    } else {
+      sudoExecutionDisposition = combineExecutionDispositions(
+        sudoExecutionDisposition,
+        optionExecutionDisposition,
+      );
+    }
     if (SUDO_OPTION_WITH_VALUE_RE.test(option)) {
       if ((words[index] ?? "").length === 0) {
         sudoExecutionDisposition = combineExecutionDispositions(
@@ -71,6 +80,12 @@ export function resolveShellExecutableWords(
   }
   const effective = wrappedShellExecutableResolution(words, index);
   const effectiveExecutable = normalizeShellExecutable(words[effective.index]);
+  const dualModeExecutionDisposition: ShellExecutionDisposition =
+    sudoExecutionDependsOnCommand
+      ? effectiveExecutable === undefined
+        ? "not-executed"
+        : "proven"
+      : "proven";
   return {
     directIndex: direct.index,
     effectiveIndex: effective.index,
@@ -79,6 +94,7 @@ export function resolveShellExecutableWords(
     executionDisposition: combineExecutionDispositions(
       direct.executionDisposition,
       sudoExecutionDisposition,
+      dualModeExecutionDisposition,
       effective.executionDisposition,
     ),
   };
@@ -215,19 +231,21 @@ function wrapperOptionExecutionDisposition(
 
 function sudoOptionExecutionDisposition(
   option: string,
-): ShellExecutionDisposition {
+): SudoOptionExecutionDisposition {
   if (option === "--") return "proven";
   if (option.startsWith("--")) {
     const equals = option.indexOf("=");
     const name = option.slice(0, equals < 0 ? undefined : equals);
     const attachedValue = equals < 0 ? undefined : option.slice(equals + 1);
+    if (name === "--reset-timestamp") {
+      return "executes-when-command-remains";
+    }
     if (
       new Set([
         "--help",
         "--version",
         "--list",
         "--validate",
-        "--reset-timestamp",
         "--remove-timestamp",
       ]).has(name)
     ) {
@@ -264,7 +282,8 @@ function sudoOptionExecutionDisposition(
   }
   if (!option.startsWith("-") || option === "-") return "unknown";
   const flags = option.slice(1);
-  if (/[hVlvkK]/u.test(flags)) return "not-executed";
+  if (/[VlvK]/u.test(flags)) return "not-executed";
+  if (/[hk]/u.test(flags)) return "executes-when-command-remains";
   if (/^[AbBEHinPSs]+$/u.test(flags)) return "proven";
   if (
     /^-[ughpCTRD].+/u.test(option) ||

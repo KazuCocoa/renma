@@ -186,6 +186,75 @@ ${command}
   }
 });
 
+test("sudo dual-mode options execute when a target command remains", () => {
+  for (const command of [
+    "sudo -k rm -rf /tmp/example",
+    "sudo --reset-timestamp rm -rf /tmp/example",
+    "sudo -h remote.example rm -rf /tmp/example",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    findingFor(findings, "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD");
+  }
+});
+
+test("sudo dual-mode suppressions retain deterministic operation kinds", () => {
+  for (const command of [
+    "sudo -k rm -rf /tmp/example || true",
+    "sudo --reset-timestamp rm -rf /tmp/example || true",
+    "sudo -h remote.example rm -rf /tmp/example || true",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    findingFor(findings, "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD");
+    assert.deepEqual(
+      findingFor(findings, RISKY_SUPPRESSION_ID).details?.operationKinds,
+      ["destructive-command", "privileged-command"],
+      command,
+    );
+  }
+});
+
+test("standalone sudo administrative modes remain non-executing", () => {
+  for (const command of [
+    "sudo -k",
+    "sudo --reset-timestamp",
+    "sudo -h",
+    "sudo -h remote.example",
+    "sudo -V",
+    "sudo --version",
+    "sudo -l",
+    "sudo --list",
+    "sudo -v",
+    "sudo --validate",
+    "sudo -K",
+    "sudo --remove-timestamp",
+    "sudo --help",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
 test("executing and unknown wrapper options cannot bypass command risk", () => {
   for (const command of [
     "env -v rm -rf /tmp/example",
