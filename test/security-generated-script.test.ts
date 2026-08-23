@@ -4,6 +4,10 @@ import test from "node:test";
 import {
   boundedGeneratedScriptExecutions,
   generatedLogicalShellCommands,
+  MAX_GENERATED_SCRIPT_BYTES,
+  MAX_GENERATED_SCRIPT_COMMANDS,
+  MAX_GENERATED_SCRIPT_EXECUTIONS,
+  MAX_TRACKED_GENERATED_FILES,
 } from "../src/security-command/generated-script.js";
 import {
   resolveShellExecutableWords,
@@ -134,6 +138,7 @@ test("generated consumers share the canonical wrapper and sudo resolver", () => 
     `echo 'rm -rf /tmp/example' > /tmp/run.sh; env -C /tmp sh /tmp/run.sh`,
     `echo 'rm -rf /tmp/example' > run.sh; sudo -u root sh run.sh`,
     `echo 'rm -rf /tmp/example' > run.sh; sudo --user=root sh run.sh`,
+    `echo 'rm -rf /tmp/example' > run.sh; sudo --non-interactive sh run.sh`,
     `echo 'rm -rf /tmp/example' > run.sh; command env -- sh run.sh`,
   ];
   for (const command of positive) {
@@ -200,4 +205,138 @@ test("printf reconstruction preserves multi-line comments, shebangs, and script 
     "echo ready",
     "rm -rf /tmp/example",
   ]);
+});
+
+test("generated-script reconstruction has deterministic resource bounds", () => {
+  const oversized = "x".repeat(MAX_GENERATED_SCRIPT_BYTES + 1);
+  assert.deepEqual(
+    boundedGeneratedScriptExecutions(
+      `printf '%s' '${oversized}' > run.sh; sh run.sh`,
+    ),
+    [],
+  );
+  const boundedCommands = generatedLogicalShellCommands(
+    [
+      "rm -rf /tmp/early-evidence",
+      ...Array.from({ length: MAX_GENERATED_SCRIPT_COMMANDS }, () => "echo ok"),
+    ].join("\n"),
+  );
+  assert.equal(boundedCommands.length, MAX_GENERATED_SCRIPT_COMMANDS);
+  assert.equal(boundedCommands[0], "rm -rf /tmp/early-evidence");
+  const files = Array.from(
+    { length: MAX_TRACKED_GENERATED_FILES + 1 },
+    (_, index) =>
+      `echo '${index === 0 ? "rm -rf /tmp/early-evidence" : "ok"}' > f${index}.sh`,
+  );
+  const retainedFileExecution = boundedGeneratedScriptExecutions(
+    `${files.join(";")}; sh f0.sh`,
+  );
+  assert.equal(retainedFileExecution.length, 1);
+  assert.equal(
+    retainedFileExecution[0]?.shellText,
+    "rm -rf /tmp/early-evidence\n",
+  );
+  const executionPairs = Array.from(
+    { length: MAX_GENERATED_SCRIPT_EXECUTIONS + 1 },
+    (_, index) => `echo unsafe > e${index}.sh; sh e${index}.sh`,
+  );
+  const boundedExecutions = boundedGeneratedScriptExecutions(
+    executionPairs.join(";"),
+  );
+  assert.equal(boundedExecutions.length, MAX_GENERATED_SCRIPT_EXECUTIONS);
+  assert.equal(boundedExecutions[0]?.shellText, "unsafe\n");
+});
+
+test("ambiguous multiline quotes and heredocs are not projected as generated commands", () => {
+  assert.deepEqual(
+    generatedLogicalShellCommands("echo 'safe\nrm -rf /tmp/x'"),
+    [],
+  );
+  assert.deepEqual(
+    generatedLogicalShellCommands("cat <<EOF\nrm -rf /tmp/x\nEOF\n"),
+    [],
+  );
+});
+
+test("a successful left side remains a possible state after || completes", () => {
+  assert.equal(
+    boundedGeneratedScriptExecutions(
+      `echo 'rm -rf /tmp/x' > run.sh || true; sh run.sh`,
+    ).length,
+    1,
+  );
+  assert.deepEqual(
+    boundedGeneratedScriptExecutions(
+      `echo 'rm -rf /tmp/x' > run.sh || sh run.sh`,
+    ),
+    [],
+  );
+});
+
+test("non-executing resolver modes and unsupported tee options do not correlate", () => {
+  for (const consumer of [
+    "command -v sh run.sh",
+    "command -V sh run.sh",
+    "command -pv sh run.sh",
+    "command --help sh run.sh",
+    "env --help sh run.sh",
+    "env --version sh run.sh",
+    "env --unknown sh run.sh",
+    "sudo -V sh run.sh",
+    "sudo -l sh run.sh",
+    "sudo -h sh run.sh",
+    "sudo -nv sh run.sh",
+    "sudo -Vh sh run.sh",
+    "sudo --list=user sh run.sh",
+    "sudo --validate=true sh run.sh",
+    "sudo --login=bogus sh run.sh",
+    "sudo --set-home=x sh run.sh",
+    "sudo --non-interactive=x sh run.sh",
+    "sudo --stdin=x sh run.sh",
+    "sudo --shell=x sh run.sh",
+    "sudo --user= sh run.sh",
+    "sudo --chdir= sh run.sh",
+  ]) {
+    assert.deepEqual(
+      boundedGeneratedScriptExecutions(`echo unsafe > run.sh; ${consumer}`),
+      [],
+      consumer,
+    );
+  }
+  assert.deepEqual(
+    boundedGeneratedScriptExecutions(
+      `echo unsafe | tee --not-a-real-option run.sh; sh run.sh`,
+    ),
+    [],
+  );
+  for (const consumer of [
+    `sudo --user '' sh /run.sh`,
+    `sudo -u '' sh /run.sh`,
+    `sudo --group '' sh /run.sh`,
+    `sudo --chroot '' sh /run.sh`,
+    `env --chdir= sh /run.sh`,
+    `env -C '' sh /run.sh`,
+    `env --unset '' sh /run.sh`,
+    `env --split-string '' sh /run.sh`,
+  ]) {
+    assert.deepEqual(
+      boundedGeneratedScriptExecutions(`echo unsafe > /run.sh; ${consumer}`),
+      [],
+      consumer,
+    );
+  }
+});
+
+test("path correlation rejects search, root, cwd, and directory ambiguities", () => {
+  for (const command of [
+    `echo unsafe > run.sh; source run.sh`,
+    `echo unsafe > /run.sh; sudo -R /tmp sh /run.sh`,
+    `echo unsafe > run.sh; sudo --login sh run.sh`,
+    `echo unsafe > run.sh; sudo -i sh run.sh`,
+    `echo unsafe > run.sh; env -C/tmp cp safe run.sh; sh run.sh`,
+    `echo unsafe > run.sh; sudo -D/tmp mv safe run.sh; sh run.sh`,
+    `echo unsafe > dir/run.sh; cp safe dir; sh dir/run.sh`,
+  ]) {
+    assert.deepEqual(boundedGeneratedScriptExecutions(command), [], command);
+  }
 });

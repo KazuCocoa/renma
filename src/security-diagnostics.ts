@@ -4612,6 +4612,7 @@ function riskyShellFailureSuppressions(
 ): RiskyShellFailureSuppression[] {
   const tokenization = tokenizeBoundedShell(command);
   if (!tokenization.supported) return [];
+  const generatedExecutions = boundedGeneratedScriptExecutions(command);
 
   const suppressions: RiskyShellFailureSuppression[] = [];
   for (const [index, token] of tokenization.tokens.entries()) {
@@ -4649,8 +4650,10 @@ function riskyShellFailureSuppressions(
       operation,
       sensitiveDataOperation,
     );
-    const generatedScriptKinds = generatedScriptRiskKinds(
-      command.slice(0, token.start),
+    const generatedScriptKinds = generatedScriptExecutionRiskKinds(
+      generatedExecutions.filter(
+        ({ consumerSpan }) => consumerSpan.end <= token.start,
+      ),
       operationStart,
     );
     for (const kind of generatedScriptKinds) {
@@ -4732,8 +4735,18 @@ function generatedScriptRiskKinds(
   command: string,
   consumerStart = 0,
 ): RiskyOperationKind[] {
+  return generatedScriptExecutionRiskKinds(
+    boundedGeneratedScriptExecutions(command),
+    consumerStart,
+  );
+}
+
+function generatedScriptExecutionRiskKinds(
+  executions: ReturnType<typeof boundedGeneratedScriptExecutions>,
+  consumerStart = 0,
+): RiskyOperationKind[] {
   const kinds = new Set<RiskyOperationKind>();
-  for (const execution of boundedGeneratedScriptExecutions(command)) {
+  for (const execution of executions) {
     if (execution.consumerSpan.start < consumerStart) continue;
     for (const logicalCommand of generatedLogicalShellCommands(
       execution.shellText,

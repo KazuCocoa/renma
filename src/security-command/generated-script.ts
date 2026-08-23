@@ -30,8 +30,14 @@ type StaticPath = {
 
 type StaticOutput = {
   shellText: string;
+  byteLength: number;
   producerSpan: { start: number; end: number };
 };
+
+export const MAX_GENERATED_SCRIPT_BYTES = 64 * 1024;
+export const MAX_GENERATED_SCRIPT_COMMANDS = 256;
+export const MAX_TRACKED_GENERATED_FILES = 64;
+export const MAX_GENERATED_SCRIPT_EXECUTIONS = 64;
 
 type FileWrite = {
   mode: "append" | "overwrite";
@@ -92,6 +98,7 @@ export function boundedGeneratedScriptExecutions(
   let pipelineOutput: StaticOutput | undefined;
   let operandEntry = cloneFiles(files);
   let operandEffects = emptyEffects();
+  let pendingOrSuccess: Map<string, StaticOutput> | undefined;
 
   for (const [index, segment] of segments.entries()) {
     const receivesPipeline = segments[index - 1]?.boundaryAfter === "|";
@@ -107,12 +114,22 @@ export function boundedGeneratedScriptExecutions(
       applyInvalidations(files, effects);
       mergeEffects(operandEffects, effects);
       pipelineOutput = undefined;
+      const successfulFiles = cloneFiles(files);
       files = branchExitFiles(
         files,
         operandEntry,
         operandEffects,
         segment.boundaryAfter,
       );
+      if (segment.boundaryAfter === "||") {
+        pendingOrSuccess =
+          pendingOrSuccess === undefined
+            ? successfulFiles
+            : mergeMayFiles(pendingOrSuccess, successfulFiles);
+      } else if (pendingOrSuccess !== undefined) {
+        files = mergeMayFiles(pendingOrSuccess, files);
+        pendingOrSuccess = undefined;
+      }
       continue;
     }
 
@@ -139,6 +156,7 @@ export function boundedGeneratedScriptExecutions(
       const output =
         consumerPath === undefined ? undefined : files.get(consumerPath.key);
       if (consumerPath !== undefined && output !== undefined) {
+        if (executions.length >= MAX_GENERATED_SCRIPT_EXECUTIONS) break;
         executions.push({
           path: consumerPath.key,
           shellText: output.shellText,
@@ -187,12 +205,22 @@ export function boundedGeneratedScriptExecutions(
       pipelineOutput = undefined;
     }
 
+    const successfulFiles = cloneFiles(files);
     files = branchExitFiles(
       files,
       operandEntry,
       operandEffects,
       segment.boundaryAfter,
     );
+    if (segment.boundaryAfter === "||") {
+      pendingOrSuccess =
+        pendingOrSuccess === undefined
+          ? successfulFiles
+          : mergeMayFiles(pendingOrSuccess, successfulFiles);
+    } else if (pendingOrSuccess !== undefined) {
+      files = mergeMayFiles(pendingOrSuccess, files);
+      pendingOrSuccess = undefined;
+    }
   }
 
   return Object.freeze(executions.map((execution) => Object.freeze(execution)));
@@ -200,6 +228,13 @@ export function boundedGeneratedScriptExecutions(
 
 /** Project reconstructed bytes into independently classifiable shell commands. */
 export function generatedLogicalShellCommands(shellText: string): string[] {
+  if (
+    utf8ByteLength(shellText) > MAX_GENERATED_SCRIPT_BYTES ||
+    /(^|[;&|]\s*)[^\n]*<<-?\s*[^<&\s]/mu.test(shellText) ||
+    hasQuoteAcrossPhysicalLine(shellText)
+  ) {
+    return [];
+  }
   const physicalLines = shellText.split(/\r?\n/u);
   const commands: string[] = [];
   let index = 0;
@@ -228,11 +263,31 @@ export function generatedLogicalShellCommands(shellText: string): string[] {
     const projection = projectShellContinuations(
       lines.join("\n"),
     ).projection.trim();
-    if (projection.length > 0) commands.push(projection);
+    if (projection.length > 0) {
+      if (!tokenizeBoundedShell(projection).supported) return [];
+      if (commands.length >= MAX_GENERATED_SCRIPT_COMMANDS) break;
+      commands.push(projection);
+    }
     index = cursor + 1;
   }
 
   return commands;
+}
+
+function hasQuoteAcrossPhysicalLine(input: string): boolean {
+  let quote: "'" | '"' | undefined;
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (character === "\n" && quote !== undefined) return true;
+    if (quote === "'") {
+      if (character === "'") quote = undefined;
+    } else if (quote === '"') {
+      if (character === '"') quote = undefined;
+      else if (character === "\\") index += 1;
+    } else if (character === "'" || character === '"') quote = character;
+    else if (character === "\\") index += 1;
+  }
+  return quote !== undefined;
 }
 
 function commandSegments(
@@ -337,6 +392,7 @@ function staticLiteralOutput(
 
   return {
     shellText,
+    byteLength: utf8ByteLength(shellText),
     producerSpan: { start: segment.start, end: segment.end },
   };
 }
@@ -371,8 +427,15 @@ function renderStaticPrintf(
   values: readonly string[],
 ): string | undefined {
   let output = "";
+  let outputBytes = 0;
   let valueIndex = 0;
   let repeats = 0;
+  const append = (addition: string): boolean => {
+    outputBytes += utf8ByteLength(addition);
+    if (outputBytes > MAX_GENERATED_SCRIPT_BYTES) return false;
+    output += addition;
+    return true;
+  };
 
   do {
     let conversions = 0;
@@ -381,24 +444,24 @@ function renderStaticPrintf(
       if (character === "%") {
         const next = format[index + 1];
         if (next === "%") {
-          output += "%";
+          if (!append("%")) return undefined;
           index += 1;
           continue;
         }
         if (next !== "s") return undefined;
-        output += values[valueIndex] ?? "";
+        if (!append(values[valueIndex] ?? "")) return undefined;
         valueIndex += 1;
         conversions += 1;
         index += 1;
         continue;
       }
       if (character !== "\\") {
-        output += character;
+        if (!append(character)) return undefined;
         continue;
       }
       const escape = staticPrintfEscape(format, index);
       if (escape === undefined) return undefined;
-      output += escape.value;
+      if (!append(escape.value)) return undefined;
       index = escape.end - 1;
     }
     repeats += 1;
@@ -406,6 +469,10 @@ function renderStaticPrintf(
   } while (valueIndex < values.length && repeats <= values.length);
 
   return output;
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
 }
 
 function staticPrintfEscape(
@@ -449,6 +516,7 @@ function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
   const writes: FileWrite[] = [];
   let mode: FileWrite["mode"] = "overwrite";
   let options = true;
+  let supported = true;
 
   for (const token of parsed.wordTokens.slice(
     parsed.resolution.effectiveIndex + 1,
@@ -477,6 +545,7 @@ function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
     }
     if (options && value.startsWith("-")) {
       effects.unknownFileMutation = true;
+      supported = false;
       continue;
     }
     options = false;
@@ -488,14 +557,20 @@ function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
     effects.exactMutatedPaths.add(path.key);
     writes.push({ mode, path });
   }
-  return { effects, writes };
+  return { effects, writes: supported ? writes : [] };
 }
 
 function staticScriptConsumerPath(
   parsed: ParsedSegment,
 ): StaticPath | undefined {
-  const { effectiveExecutable, effectiveIndex, executionCwdMayChange } =
-    parsed.resolution;
+  const {
+    effectiveExecutable,
+    effectiveIndex,
+    executionCwdMayChange,
+    executionRootMayChange,
+    executionProven,
+  } = parsed.resolution;
+  if (!executionProven) return undefined;
   if (
     effectiveExecutable === undefined ||
     (!SHELL_EXECUTABLES.has(effectiveExecutable) &&
@@ -517,13 +592,26 @@ function staticScriptConsumerPath(
   const token = parsed.wordTokens[index];
   if (token === undefined) return undefined;
   const path = normalizedStaticPath(token);
-  if (path === undefined || (!path.absolute && executionCwdMayChange)) {
+  if (
+    path === undefined ||
+    (!path.absolute && executionCwdMayChange) ||
+    (path.absolute && executionRootMayChange) ||
+    ((effectiveExecutable === "source" || effectiveExecutable === ".") &&
+      !token.value.includes("/"))
+  ) {
     return undefined;
   }
   return path;
 }
 
 function commandEffects(parsed: ParsedSegment): BoundedShellEffects {
+  if (
+    !parsed.resolution.executionProven ||
+    parsed.resolution.executionCwdMayChange ||
+    parsed.resolution.executionRootMayChange
+  ) {
+    return unknownEffects();
+  }
   const executable = parsed.resolution.effectiveExecutable;
   if (executable === undefined) return unknownEffects();
   if (PROVEN_NON_MUTATING_EXECUTABLES.has(executable)) return emptyEffects();
@@ -772,7 +860,13 @@ function applyInvalidations(
 ): void {
   if (effects.unknownFileMutation) files.clear();
   else {
-    for (const path of effects.exactMutatedPaths) files.delete(path);
+    for (const path of effects.exactMutatedPaths) {
+      files.delete(path);
+      const descendantPrefix = `${path.replace(/\/$/u, "")}/`;
+      for (const trackedPath of files.keys()) {
+        if (trackedPath.startsWith(descendantPrefix)) files.delete(trackedPath);
+      }
+    }
   }
   if (effects.cwdMayChange) {
     for (const path of files.keys()) {
@@ -791,18 +885,48 @@ function applyFileWrite(
     return;
   }
   if (write.mode === "overwrite") {
+    if (
+      !files.has(write.path.key) &&
+      files.size >= MAX_TRACKED_GENERATED_FILES
+    ) {
+      return;
+    }
     files.set(write.path.key, output);
     return;
   }
   const existing = files.get(write.path.key);
   if (existing === undefined) return;
+  const byteLength = existing.byteLength + output.byteLength;
+  if (byteLength > MAX_GENERATED_SCRIPT_BYTES) {
+    files.delete(write.path.key);
+    return;
+  }
   files.set(write.path.key, {
     shellText: existing.shellText + output.shellText,
+    byteLength,
     producerSpan: {
       start: existing.producerSpan.start,
       end: output.producerSpan.end,
     },
   });
+}
+
+function mergeMayFiles(
+  first: ReadonlyMap<string, StaticOutput>,
+  second: ReadonlyMap<string, StaticOutput>,
+): Map<string, StaticOutput> {
+  const merged = cloneFiles(first);
+  for (const [path, output] of second) {
+    const existing = merged.get(path);
+    if (existing === undefined) {
+      if (merged.size >= MAX_TRACKED_GENERATED_FILES) continue;
+      merged.set(path, output);
+    } else if (existing.shellText !== output.shellText) {
+      // Multiple possible byte sequences cannot be represented exactly.
+      merged.delete(path);
+    }
+  }
+  return merged;
 }
 
 function effectsPreservingKnownAppends(
