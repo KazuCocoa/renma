@@ -31,6 +31,19 @@ source-of-truth status, or maintenance cadence is also sufficient.
 Correctness importance alone does not create a Context boundary: detail used
 only by one workflow can remain in that Skill or justified Skill-local support.
 
+A Context Asset is a Git-reviewed governance entry point for independently
+maintained knowledge and its authoritative sources. The authoritative content
+may live directly in the Context Repository or in an external governed system,
+such as another Git repository, a documentation or specification system, or
+Confluence. The asset can define scope, applicability, ownership, lifecycle,
+summarized constraints, reviewed references, and consultation instructions
+without duplicating the complete external source into `contexts/`.
+
+Renma governs the repository evidence; it does not fetch or validate referenced
+external content. A reference to an authoritative source is not proof that the
+source was consulted, permission to access it, or evidence that its contents
+were validated.
+
 A **Context Lens** records how one or more Context Assets should be interpreted
 for a purpose. It is a static repository relationship, not a runtime selector or
 prompt template.

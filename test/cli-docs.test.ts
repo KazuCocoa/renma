@@ -239,7 +239,19 @@ test("README preserves the Context Repository philosophy", async () => {
   );
   assert.match(
     readme,
-    /A Context Repository is a Git-reviewed source of truth/,
+    /A Context Asset is a Git-reviewed governance\s+entry point for independently maintained knowledge and its authoritative\s+sources/,
+  );
+  assert.match(
+    readme,
+    /authoritative content may live directly in the Context Repository or in an\s+external governed system/,
+  );
+  assert.match(
+    readme,
+    /does not require duplicating\s+external source material into `contexts\/`/,
+  );
+  assert.match(
+    readme,
+    /not\s+proof that the source was consulted, validation of its contents, permission to\s+access it/,
   );
   assert.match(readme, /reusable knowledge/);
   assert.match(readme, /https:\/\/kazucocoa\.blog\/context-repository\//);

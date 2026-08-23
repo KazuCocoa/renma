@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added a concise public security policy covering supported versions, private
+  vulnerability reporting, and coordinated disclosure without promising a
+  response SLA.
 - Added `SEC-RISKY-OPERATION-ERROR-SUPPRESSION` for bounded shell and prose
   instructions that explicitly hide failure from an already-recognized
   destructive, privileged, upload, or sensitive-data operation. Destructive
@@ -23,6 +26,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Clarified that a Context Asset is a Git-reviewed governance entry point for
+  independently maintained knowledge whose authoritative content may remain in
+  an external governed system without being copied into `contexts/`.
+- Defined the 1.x diagnostic and rule evolution policy, including stable-ID,
+  severity, and behavioral CI compatibility expectations for patch, minor, and
+  major releases.
+- Release preparation now verifies both the document-level and root-package
+  versions in lockfile v3 against the target release version.
 - Destructive and privileged shell diagnostics now classify bounded shell text
   as literal-only, operational, or unknown. Quoted risky text is suppressed
   only along proven literal-only command and data paths; shell `-c`/`eval`

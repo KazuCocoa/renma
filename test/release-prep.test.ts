@@ -279,6 +279,74 @@ test("release-prep accepts checked-in consumer examples independently of caller 
     result.stdout,
     /PASS GitHub Actions example retains every maintained npx --no-install renma invocation/,
   );
+  assert.match(result.stdout, /PASS package-lock\.json version matches target/);
+  assert.match(
+    result.stdout,
+    /PASS package-lock\.json root package version at packages\[""\]\.version matches target/,
+  );
+});
+
+test("release-prep rejects a stale package-lock document version", async (t) => {
+  const packageVersion = packageJsonVersion();
+  const root = await currentConsumerExamplesFixture(t, packageVersion);
+  await mutateReleaseFile(root, "package-lock.json", (content) => {
+    const lock = JSON.parse(content) as { version: string };
+    lock.version = "0.0.1";
+    return `${JSON.stringify(lock, null, 2)}\n`;
+  });
+
+  const result = runReleasePrepCheckOnly(root, packageVersion);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stdout,
+    /FAIL package-lock\.json version matches target .* \(found "0\.0\.1"\)/,
+  );
+  assert.match(
+    result.stdout,
+    /PASS package-lock\.json root package version at packages\[""\]\.version matches target/,
+  );
+});
+
+test("release-prep rejects a stale package-lock root package version", async (t) => {
+  const packageVersion = packageJsonVersion();
+  const root = await currentConsumerExamplesFixture(t, packageVersion);
+  await mutateReleaseFile(root, "package-lock.json", (content) => {
+    const lock = JSON.parse(content) as {
+      packages: Record<string, { version: string }>;
+    };
+    const rootPackage = lock.packages[""];
+    assert.ok(rootPackage);
+    rootPackage.version = "0.0.1";
+    return `${JSON.stringify(lock, null, 2)}\n`;
+  });
+
+  const result = runReleasePrepCheckOnly(root, packageVersion);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /PASS package-lock\.json version matches target/);
+  assert.match(
+    result.stdout,
+    /FAIL package-lock\.json root package version at packages\[""\]\.version matches target .* \(found "0\.0\.1"\)/,
+  );
+});
+
+test("release-prep fails closed when the package-lock root package is missing", async (t) => {
+  const packageVersion = packageJsonVersion();
+  const root = await currentConsumerExamplesFixture(t, packageVersion);
+  await mutateReleaseFile(root, "package-lock.json", (content) => {
+    const lock = JSON.parse(content) as { packages: Record<string, unknown> };
+    delete lock.packages[""];
+    return `${JSON.stringify(lock, null, 2)}\n`;
+  });
+
+  const result = runReleasePrepCheckOnly(root, packageVersion);
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stdout,
+    /FAIL package-lock\.json root package version at packages\[""\]\.version matches target .* \(found missing\)/,
+  );
 });
 
 test("release-prep rejects stale maintained consumer pins during check-only finalization", async (t) => {
@@ -348,6 +416,18 @@ test("release-prep accepts correct consumer pins for a derived next-version fixt
     result.stdout,
     new RegExp(
       `PASS consumer pin examples/github-actions/renma-ci-report\\.yml matches renma@${escapeRegExp(nextVersion)}`,
+    ),
+  );
+  assert.match(
+    result.stdout,
+    new RegExp(
+      `PASS package-lock\\.json version matches target "${escapeRegExp(nextVersion)}"`,
+    ),
+  );
+  assert.match(
+    result.stdout,
+    new RegExp(
+      `PASS package-lock\\.json root package version at packages\\[""\\]\\.version matches target "${escapeRegExp(nextVersion)}"`,
     ),
   );
   assert.match(result.stdout, /PASS only release files changed/);
@@ -506,6 +586,21 @@ function runReleasePrep(root: string) {
   return runReleasePrepForVersion(root, "0.32.0", "v0.31.0");
 }
 
+function runReleasePrepCheckOnly(root: string, version: string) {
+  return spawnSync(
+    "node",
+    [
+      path.resolve("tools/release-prep.mjs"),
+      "--check-only",
+      "--version",
+      version,
+      "--from",
+      "v0.0.0",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+}
+
 function runReleasePrepForVersion(
   root: string,
   version: string,
@@ -601,7 +696,7 @@ async function currentConsumerExamplesFixture(
   );
   await writeFile(
     path.join(root, "package-lock.json"),
-    `${JSON.stringify({ name: "renma", version: packageVersion }, null, 2)}\n`,
+    `${JSON.stringify(lockfileFixture(packageVersion), null, 2)}\n`,
   );
   await writeFile(
     path.join(root, "CHANGELOG.md"),
@@ -637,7 +732,7 @@ async function writeReleaseFixtureFiles(
   );
   await writeFile(
     path.join(root, "package-lock.json"),
-    `${JSON.stringify({ name: "renma", version: packageVersion }, null, 2)}\n`,
+    `${JSON.stringify(lockfileFixture(packageVersion), null, 2)}\n`,
   );
   await writeFile(
     path.join(root, "CHANGELOG.md"),
@@ -695,6 +790,28 @@ function nextPatchVersion(version: string): string {
   const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/u);
   assert.ok(match, `expected stable package version, got ${version}`);
   return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+}
+
+function packageJsonVersion(): string {
+  return (
+    JSON.parse(readFileSync("package.json", "utf8")) as {
+      version: string;
+    }
+  ).version;
+}
+
+function lockfileFixture(version: string) {
+  return {
+    name: "renma",
+    version,
+    lockfileVersion: 3,
+    packages: {
+      "": {
+        name: "renma",
+        version,
+      },
+    },
+  };
 }
 
 function escapeRegExp(value: string): string {
