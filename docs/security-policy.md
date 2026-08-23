@@ -574,35 +574,17 @@ command and data paths, such as direct output through `echo` or `printf`.
 Command substitution, shell `-c`/`eval` contexts, and standard input consumed as
 shell code remain operational; unrecognized wrappers, consumers, and shell
 options use conservative matching. Wrapper execution is tracked separately as
-proven, known not executed, or unknown: only the first state can establish a
-generated producer or consumer, while unknown options retain command-risk
-fallback instead of being assumed inert. Within one bounded logical shell
-command, Renma also correlates statically known `echo`/`printf` output written
-by an ordinary stdout redirection or captured by `tee` with a later `sh`, `bash`,
-`dash`, `ksh`, `zsh`, `fish`, `source`, or `.` consumer of the exact normalized
-static path. The generated text then reuses the same command-position-aware
-destructive and privileged classification. This is not filesystem or general
-shell data-flow analysis: Renma does not resolve variables or symlinks, inspect
-existing file content, correlate different bounded commands, or treat a write
-as executable without the matching later consumer. Relative `tee` operands do
-not cross a wrapper working-directory change, and no `tee` operand crosses a
-possible chroot; absolute operands may cross only a working-directory change.
-Generated reconstruction stops at 64 KiB, 256 projected commands, 64 tracked
-files, 64 executions, or 8 alternatives per path. Hitting a bound or
-unsupported generated syntax records an incomplete internal result. Retained
-proven commands are still classified, but incomplete generated analysis does
-not convert raw text inside literal arguments into destructive or privileged
-execution evidence. The same analysis object, including its completeness, is
-shared with risky-suppression association and logical evidence projection.
-Common shell file-execution options such as `--noprofile`, `--norc`, `-e`,
-`-f`, `-O <value>`, and `-o <value>` preserve exact-path correlation; `-c`,
-standard-input, no-execution, help, and version modes do not consume the file,
-while unknown options leave the generated analysis incomplete. A standalone
-`-` terminates options for the supported Bourne-family consumers. Bash long
-options must precede its single-character options; an invalid reversed order
-does not establish file execution. Bash-compatible `-t` (`onecmd`) execution
-classifies only the first projected generated command. Local quotation
-or bounded source attribution such as “the incident report says:” or “the audit
+proven, known not executed, or unknown. Known lookup, help, and version modes do
+not produce direct command-risk findings, while unknown options retain
+conservative matching.
+
+Renma analyzes directly expressed shell operations. It does not reconstruct
+command text written to a file and later executed as a generated script.
+Indirect execution through generated files requires human review or a
+dedicated shell-analysis tool.
+
+Local quotation or bounded source attribution such as “the incident report
+says:” or “the audit
 states:” keeps a blockquote inert even beneath a generic instruction heading;
 attribution does not need to contain the word “quote.” An explicit local
 execution route takes precedence. A routed blockquote is analyzed as an
@@ -876,23 +858,11 @@ Destructive and privileged shell classification requires the risky executable
 in command position. Static absolute paths and bounded wrappers retain that
 evidence, while uploads continue to reuse the existing destination analysis
 without a second tool allowlist. Literal `echo` or `printf` command text remains
-outside this finding when it contains ordinary variable interpolation and is
-not executed through the bounded static-file correlation described above. A
-matching generated-script consumer retains its destructive or privileged
-operation kind when `|| true` or `|| :` suppresses that consumer. Reconstructed
-bytes are classified one logical shell command at a time, ignoring blank and
-comment/shebang lines while preserving backslash continuations. Facts for exact
-static paths survive only modeled non-mutating commands: bounded mutations and
-unknown commands invalidate affected proofs, and direct working-directory
-changes invalidate relative but not otherwise unaffected absolute facts.
-Sequential and success branches use successful post-state; failure and
-background branches retain only pre-existing facts not invalidated by the
-operand's possible effects. The generated consumer shares the ordinary
-assignment, `command`, `env`, and `sudo` executable resolver; only direct
-current-shell `source`/`.` forms count as builtin execution. Paths containing
-`..` and paths requiring `~`, variable, substitution, glob, symlink, or
-filesystem resolution remain unsupported. Command substitution remains
-operational. Neither generic error handling nor a generic
+outside this finding when it contains ordinary variable interpolation.
+Command substitution remains operational. Command text written to a file and
+later executed is outside core analysis, so suppressing failure from that
+unanalyzed generated file does not establish this finding by itself. Neither
+generic error handling nor a generic
 suppression is enough: capability probes, ordinary commands, `try/catch`,
 `set +e`, and stderr redirection remain outside the rule by themselves. Preserve
 the failure, stop and report the blocker, and add explicit verification or

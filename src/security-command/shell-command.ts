@@ -1,18 +1,14 @@
 import { tokenizeBoundedShell, type ShellToken } from "./shell.js";
 
-export type ShellExecutableResolution = {
+type ShellExecutableResolution = {
   directIndex: number;
   effectiveIndex: number;
   directExecutable?: string;
   effectiveExecutable?: string;
-  wrappers: readonly string[];
-  sudo: boolean;
-  executionCwdMayChange: boolean;
-  executionRootMayChange: boolean;
   executionDisposition: ShellExecutionDisposition;
 };
 
-export type ShellExecutionDisposition = "proven" | "not-executed" | "unknown";
+type ShellExecutionDisposition = "proven" | "not-executed" | "unknown";
 
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
@@ -50,17 +46,11 @@ export function resolveShellExecutableWords(
       ...(directExecutable === undefined
         ? {}
         : { effectiveExecutable: directExecutable }),
-      wrappers: Object.freeze([...direct.wrappers]),
-      sudo: false,
-      executionCwdMayChange: direct.cwdMayChange,
-      executionRootMayChange: false,
       executionDisposition: direct.executionDisposition,
     };
   }
 
   index = direct.index + 1;
-  let sudoCwdMayChange = false;
-  let sudoRootMayChange = false;
   let sudoExecutionDisposition: ShellExecutionDisposition = "proven";
   while ((words[index] ?? "").startsWith("-")) {
     const option = words[index] ?? "";
@@ -69,25 +59,6 @@ export function resolveShellExecutableWords(
       sudoExecutionDisposition,
       sudoOptionExecutionDisposition(option),
     );
-    if (
-      option === "-D" ||
-      option === "--chdir" ||
-      option.startsWith("--chdir=") ||
-      (option.startsWith("-D") && option.length > 2) ||
-      option === "--login" ||
-      option === "-i" ||
-      (/^-[^-]*i/u.test(option) && option.length > 2)
-    ) {
-      sudoCwdMayChange = true;
-    }
-    if (
-      option === "-R" ||
-      option === "--chroot" ||
-      option.startsWith("--chroot=") ||
-      (option.startsWith("-R") && option.length > 2)
-    ) {
-      sudoRootMayChange = true;
-    }
     if (SUDO_OPTION_WITH_VALUE_RE.test(option)) {
       if ((words[index] ?? "").length === 0) {
         sudoExecutionDisposition = combineExecutionDispositions(
@@ -105,11 +76,6 @@ export function resolveShellExecutableWords(
     effectiveIndex: effective.index,
     directExecutable,
     ...(effectiveExecutable === undefined ? {} : { effectiveExecutable }),
-    wrappers: Object.freeze([...direct.wrappers, ...effective.wrappers]),
-    sudo: true,
-    executionCwdMayChange:
-      direct.cwdMayChange || sudoCwdMayChange || effective.cwdMayChange,
-    executionRootMayChange: sudoRootMayChange,
     executionDisposition: combineExecutionDispositions(
       direct.executionDisposition,
       sudoExecutionDisposition,
@@ -124,11 +90,11 @@ export function effectiveShellExecutableIndex(
   return resolveShellExecutableWords(words).effectiveIndex;
 }
 
-export function directShellExecutableIndex(words: readonly string[]): number {
+function directShellExecutableIndex(words: readonly string[]): number {
   return resolveShellExecutableWords(words).directIndex;
 }
 
-export function normalizeShellExecutable(
+function normalizeShellExecutable(
   word: string | undefined,
 ): string | undefined {
   if (word === undefined) return undefined;
@@ -139,9 +105,7 @@ export function shellCommandWords(command: string): string[] | undefined {
   return shellCommandWordTokens(command)?.map(({ value }) => value);
 }
 
-export function shellCommandWordTokens(
-  command: string,
-): ShellToken[] | undefined {
+function shellCommandWordTokens(command: string): ShellToken[] | undefined {
   const tokenization = tokenizeBoundedShell(command);
   if (!tokenization.supported) return undefined;
 
@@ -175,18 +139,13 @@ function wrappedShellExecutableResolution(
   startIndex: number,
 ): {
   index: number;
-  wrappers: string[];
-  cwdMayChange: boolean;
   executionDisposition: ShellExecutionDisposition;
 } {
   let index = startIndex;
-  const wrappers: string[] = [];
-  let cwdMayChange = false;
   let executionDisposition: ShellExecutionDisposition = "proven";
   while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   while (SHELL_WRAPPER_RE.test(normalizeShellExecutable(words[index]) ?? "")) {
     const wrapper = normalizeShellExecutable(words[index]) ?? "";
-    wrappers.push(wrapper);
     index += 1;
     while ((words[index] ?? "").startsWith("-")) {
       const option = words[index] ?? "";
@@ -196,15 +155,6 @@ function wrappedShellExecutableResolution(
         executionDisposition,
         wrapperOptionExecutionDisposition(wrapper, option),
       );
-      if (
-        wrapper === "env" &&
-        (option === "-C" ||
-          option === "--chdir" ||
-          option.startsWith("--chdir=") ||
-          (option.startsWith("-C") && option.length > 2))
-      ) {
-        cwdMayChange = true;
-      }
       if (shellWrapperOptionConsumesValue(option)) {
         if ((words[index] ?? "").length === 0) {
           executionDisposition = combineExecutionDispositions(
@@ -217,7 +167,7 @@ function wrappedShellExecutableResolution(
     }
     while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   }
-  return { index, wrappers, cwdMayChange, executionDisposition };
+  return { index, executionDisposition };
 }
 
 function shellWrapperOptionConsumesValue(option: string): boolean {

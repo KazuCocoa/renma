@@ -451,22 +451,23 @@ reanalyze that command.
 `src/security-command/shell-command.ts` owns the shared shell-wrapper
 resolution state. Execution is a three-way disposition—`proven`,
 `not-executed`, or `unknown`—so an explicitly inert lookup/help mode is not
-conflated with an unrecognized option that may still execute. Only `proven`
-resolution can establish generated-script producer, `tee`, consumer, or
-mutation evidence; ordinary command risk uses conservative fallback for
-`unknown`. `src/security-command/generated-script.ts` returns bounded values
-with completeness and stable limitation reasons. Bytes, command count, tracked
-files, executions, alternatives, and unsupported generated shell syntax cannot
-silently become an empty complete result. Shell file consumers separately
-resolve common no-value and value-taking execution options, known non-file or
-non-execution modes, and unknown options. Diagnostic projection shares one
-generated-risk analysis across ordinary command risk, risky suppression, and
-logical evidence. It classifies retained proven commands while preserving
-incompleteness as a separate state; it does not turn unparsed literal arguments
-into destructive or privileged evidence through raw-substring fallback. `tee`
-operand identity additionally rejects relative paths across a possible cwd
-change and every operand across a possible root change, without applying the
-wrapper context to shell-owned redirections.
+conflated with an unrecognized option that may still execute. Direct command
+risk uses conservative fallback for `unknown`.
+
+Renma analyzes directly expressed shell operations. It does not reconstruct
+command text written to a file and later executed as a generated script.
+Indirect execution through generated files requires human review or a
+dedicated shell-analysis tool.
+
+Deeper indirect shell analysis, if pursued, is separate future work using a
+mature shell parser/AST or dedicated analysis engine, preferably through an
+optional or experimental analyzer, plugin, package, or external-tool adapter.
+That investigation must define supported dialects and versions—including POSIX
+shell versus Bash, dash, zsh, fish, and other implementations—source-range
+fidelity back to the original Markdown, parser maintenance and licensing,
+heredocs, compound commands, functions, substitutions, and redirections,
+resource and recursion limits, false-positive and false-negative behavior, and
+separate diagnostic confidence and compatibility contracts.
 
 `SEC-UNPINNED-DEPENDENCY-INSTALL` also retains its older bounded line-level
 fallback for Homebrew formula installs and Docker image pull/run commands.
