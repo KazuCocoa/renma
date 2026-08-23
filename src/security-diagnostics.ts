@@ -75,7 +75,6 @@ import {
 import {
   analyzeBoundedGeneratedScriptExecutions,
   analyzeGeneratedLogicalShellCommands,
-  boundedGeneratedScriptExecutions,
 } from "./security-command/generated-script.js";
 import {
   directShellExecutable,
@@ -3125,11 +3124,16 @@ function securityLineDetections(
     detections.push(...predictableTempDetections(line, lineNumber));
   }
 
+  const logicalGeneratedScriptRiskAnalysis =
+    logicalCommand === undefined
+      ? undefined
+      : analyzeGeneratedScriptRisks(logicalCommand.shellProjection.projection);
   const generatedScriptContinuation =
     logicalCommand !== undefined &&
     !logicalCommandStart &&
-    boundedGeneratedScriptExecutions(logicalCommand.shellProjection.projection)
-      .length > 0;
+    logicalGeneratedScriptRiskAnalysis !== undefined &&
+    (logicalGeneratedScriptRiskAnalysis.executions.length > 0 ||
+      !logicalGeneratedScriptRiskAnalysis.complete);
 
   if (commandLine && !quotedProse && !generatedScriptContinuation) {
     const operationalBlockquote =
@@ -3143,6 +3147,7 @@ function securityLineDetections(
             lineNumber,
             hasCommandRiskGuard,
             logicalSecurityAnalysis,
+            logicalGeneratedScriptRiskAnalysis,
           ).map((detection) => ({
             ...detection,
             ...commandEvidence,
@@ -3163,10 +3168,15 @@ function securityLineDetections(
           : logicalCommandStart
             ? logicalSecurityAnalysis
             : undefined,
+        logicalCommandStart ? logicalGeneratedScriptRiskAnalysis : undefined,
       );
       const logicalGeneratedScriptRiskKinds =
-        logicalCommand !== undefined && logicalCommandStart
-          ? new Set(generatedScriptRiskKinds(commandText))
+        logicalCommand !== undefined &&
+        logicalCommandStart &&
+        logicalGeneratedScriptRiskAnalysis !== undefined
+          ? new Set(
+              generatedScriptRiskKinds(logicalGeneratedScriptRiskAnalysis),
+            )
           : undefined;
       detections.push(
         ...(logicalCommand !== undefined && logicalCommandStart
@@ -4506,10 +4516,15 @@ function commandDetections(
   lineNumber: number,
   hasCommandRiskGuard: boolean,
   analysis?: SecurityCommandAnalysis,
+  generatedScriptAnalysis = analyzeGeneratedScriptRisks(line),
 ): Detection[] {
   const detections: Detection[] = [];
   const defensiveAction = isDefensiveOrGuardedActionInstruction(line);
-  const shellCommandRiskKinds = classifyShellCommandRiskKinds(line);
+  const shellCommandRiskKinds = classifyShellCommandRiskKinds(
+    line,
+    true,
+    generatedScriptAnalysis,
+  );
 
   const remoteScript = line.match(REMOTE_SCRIPT_RE);
   if (remoteScript && !hasPinnedRemoteScript(line) && !defensiveAction) {
@@ -4556,7 +4571,10 @@ function commandDetections(
   }
 
   if (!defensiveAction) {
-    for (const suppression of riskyShellFailureSuppressions(line)) {
+    for (const suppression of riskyShellFailureSuppressions(
+      line,
+      generatedScriptAnalysis,
+    )) {
       detections.push({
         metadata: RULES.riskyOperationErrorSuppression,
         severity: "high",
@@ -4611,10 +4629,10 @@ function commandDetections(
 
 function riskyShellFailureSuppressions(
   command: string,
+  generatedScriptAnalysis = analyzeGeneratedScriptRisks(command),
 ): RiskyShellFailureSuppression[] {
   const tokenization = tokenizeBoundedShell(command);
   if (!tokenization.supported) return [];
-  const generatedExecutions = boundedGeneratedScriptExecutions(command);
 
   const suppressions: RiskyShellFailureSuppression[] = [];
   for (const [index, token] of tokenization.tokens.entries()) {
@@ -4652,11 +4670,10 @@ function riskyShellFailureSuppressions(
       operation,
       sensitiveDataOperation,
     );
-    const generatedScriptKinds = generatedScriptExecutionRiskKinds(
-      generatedExecutions.filter(
-        ({ consumerSpan }) => consumerSpan.end <= token.start,
-      ),
+    const generatedScriptKinds = generatedScriptRiskKinds(
+      generatedScriptAnalysis,
       operationStart,
+      token.start,
     );
     for (const kind of generatedScriptKinds) {
       if (!operationKinds.includes(kind)) operationKinds.push(kind);
@@ -4691,9 +4708,21 @@ function isShellPipelineBoundary(operator: string): boolean {
 // unknown and therefore fail closed.
 type ShellTextDisposition = "literal-only" | "operational" | "unknown";
 
+type GeneratedScriptExecutionRisk = {
+  consumerSpan: Readonly<{ start: number; end: number }>;
+  kinds: readonly RiskyOperationKind[];
+  complete: boolean;
+};
+
+type GeneratedScriptRiskAnalysis = {
+  executions: readonly GeneratedScriptExecutionRisk[];
+  complete: boolean;
+};
+
 function classifyShellCommandRiskKinds(
   command: string,
   correlateGeneratedScripts = true,
+  generatedScriptAnalysis?: GeneratedScriptRiskAnalysis,
 ): RiskyOperationKind[] {
   const tokenization = tokenizeBoundedShell(command);
   if (!tokenization.supported) {
@@ -4725,7 +4754,9 @@ function classifyShellCommandRiskKinds(
     );
   }
   if (correlateGeneratedScripts) {
-    for (const kind of generatedScriptRiskKinds(command)) kinds.add(kind);
+    const generated =
+      generatedScriptAnalysis ?? analyzeGeneratedScriptRisks(command);
+    for (const kind of generatedScriptRiskKinds(generated)) kinds.add(kind);
   }
 
   return (["destructive-command", "privileged-command"] as const).filter(
@@ -4733,40 +4764,49 @@ function classifyShellCommandRiskKinds(
   );
 }
 
-function generatedScriptRiskKinds(
+function analyzeGeneratedScriptRisks(
   command: string,
-  consumerStart = 0,
-): RiskyOperationKind[] {
-  const analysis = analyzeBoundedGeneratedScriptExecutions(command);
-  const kinds = new Set(
-    generatedScriptExecutionRiskKinds(analysis.values, consumerStart),
-  );
-  if (!analysis.complete) {
-    for (const kind of fallbackShellCommandRiskKinds(command)) kinds.add(kind);
-  }
-  return (["destructive-command", "privileged-command"] as const).filter(
-    (kind) => kinds.has(kind),
-  );
-}
-
-function generatedScriptExecutionRiskKinds(
-  executions: ReturnType<typeof boundedGeneratedScriptExecutions>,
-  consumerStart = 0,
-): RiskyOperationKind[] {
-  const kinds = new Set<RiskyOperationKind>();
-  for (const execution of executions) {
-    if (execution.consumerSpan.start < consumerStart) continue;
-    const analysis = analyzeGeneratedLogicalShellCommands(execution.shellText);
-    for (const logicalCommand of analysis.values) {
+): GeneratedScriptRiskAnalysis {
+  const generated = analyzeBoundedGeneratedScriptExecutions(command);
+  const executions = generated.values.map((execution) => {
+    const projected = analyzeGeneratedLogicalShellCommands(execution.shellText);
+    const kinds = new Set<RiskyOperationKind>();
+    for (const logicalCommand of projected.values) {
       for (const kind of classifyShellCommandRiskKinds(logicalCommand, false)) {
         kinds.add(kind);
       }
     }
-    if (!analysis.complete) {
-      for (const kind of fallbackShellCommandRiskKinds(execution.shellText)) {
-        kinds.add(kind);
-      }
+    return Object.freeze({
+      consumerSpan: execution.consumerSpan,
+      kinds: Object.freeze(
+        (["destructive-command", "privileged-command"] as const).filter(
+          (kind) => kinds.has(kind),
+        ),
+      ),
+      complete: projected.complete,
+    });
+  });
+  return Object.freeze({
+    executions: Object.freeze(executions),
+    complete:
+      generated.complete && executions.every((execution) => execution.complete),
+  });
+}
+
+function generatedScriptRiskKinds(
+  analysis: GeneratedScriptRiskAnalysis,
+  consumerStart = 0,
+  consumerEnd = Number.POSITIVE_INFINITY,
+): RiskyOperationKind[] {
+  const kinds = new Set<RiskyOperationKind>();
+  for (const execution of analysis.executions) {
+    if (
+      execution.consumerSpan.start < consumerStart ||
+      execution.consumerSpan.end > consumerEnd
+    ) {
+      continue;
     }
+    for (const kind of execution.kinds) kinds.add(kind);
   }
   return (["destructive-command", "privileged-command"] as const).filter(
     (kind) => kinds.has(kind),

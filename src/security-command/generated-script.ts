@@ -42,6 +42,11 @@ type StaticPath = {
   key: string;
 };
 
+type StaticScriptConsumerResolution =
+  | { disposition: "proven"; path: StaticPath }
+  | { disposition: "not-executed" }
+  | { disposition: "unknown" };
+
 type StaticOutput = {
   shellText: string;
   byteLength: number;
@@ -103,6 +108,68 @@ const PROVEN_NON_MUTATING_EXECUTABLES = new Set([
   "pwd",
   "test",
   "true",
+]);
+const SHELL_FILE_EXECUTION_LONG_OPTIONS = new Map([
+  [
+    "bash",
+    new Set([
+      "--debugger",
+      "--login",
+      "--noediting",
+      "--noprofile",
+      "--norc",
+      "--posix",
+      "--restricted",
+      "--verbose",
+    ]),
+  ],
+  ["fish", new Set(["--interactive", "--login", "--no-config", "--private"])],
+]);
+const SHELL_FILE_EXECUTION_LONG_OPTIONS_WITH_VALUE = new Map([
+  ["bash", new Set(["--init-file", "--rcfile"])],
+  ["fish", new Set(["--debug-output", "--init-command"])],
+]);
+const SHELL_FILE_NON_EXECUTION_LONG_OPTIONS = new Set([
+  "--command",
+  "--help",
+  "--no-execute",
+  "--noexec",
+  "--version",
+]);
+const COMMON_SHELL_FILE_EXECUTION_SHORT_OPTIONS = new Set([
+  "e",
+  "f",
+  "u",
+  "v",
+  "x",
+]);
+const SHELL_FILE_EXECUTION_SHORT_OPTIONS = new Map([
+  [
+    "bash",
+    new Set([
+      "a",
+      "b",
+      "h",
+      "i",
+      "k",
+      "l",
+      "m",
+      "p",
+      "r",
+      "t",
+      "B",
+      "C",
+      "E",
+      "H",
+      "P",
+      "T",
+    ]),
+  ],
+  ["dash", new Set(["a", "b", "h", "i", "k", "l", "m", "p", "r", "t"])],
+  ["ksh", new Set(["a", "b", "h", "i", "k", "l", "m", "p", "r", "t"])],
+  ["sh", new Set(["a", "b", "h", "i", "k", "l", "m", "p", "r", "t"])],
+  ["zsh", new Set(["i", "l", "p", "r"])],
+  ["fish", new Set(["i", "l", "p", "N"])],
 ]);
 
 /**
@@ -188,18 +255,23 @@ export function analyzeBoundedGeneratedScriptExecutions(
       mergeEffects(operandEffects, tee.effects);
     }
 
-    if (!receivesPipeline) {
-      const consumerPath = staticScriptConsumerPath(parsed);
+    if (!receivesPipeline && files.size > 0) {
+      const consumer = resolveStaticScriptConsumer(parsed);
+      if (consumer.disposition === "unknown") {
+        limitations.add("unsupported-shell-syntax");
+      }
       const outputs =
-        consumerPath === undefined ? undefined : files.get(consumerPath.key);
-      if (consumerPath !== undefined && outputs !== undefined) {
+        consumer.disposition === "proven"
+          ? files.get(consumer.path.key)
+          : undefined;
+      if (consumer.disposition === "proven" && outputs !== undefined) {
         for (const output of outputs) {
           if (executions.length >= MAX_GENERATED_SCRIPT_EXECUTIONS) {
             limitations.add("executions");
             break;
           }
           executions.push({
-            path: consumerPath.key,
+            path: consumer.path.key,
             shellText: output.shellText,
             producerSpan: Object.freeze({ ...output.producerSpan }),
             consumerSpan: Object.freeze({
@@ -639,9 +711,9 @@ function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
   return { effects, writes: supported ? writes : [] };
 }
 
-function staticScriptConsumerPath(
+function resolveStaticScriptConsumer(
   parsed: ParsedSegment,
-): StaticPath | undefined {
+): StaticScriptConsumerResolution {
   const {
     effectiveExecutable,
     effectiveIndex,
@@ -649,27 +721,40 @@ function staticScriptConsumerPath(
     executionRootMayChange,
     executionDisposition,
   } = parsed.resolution;
-  if (executionDisposition !== "proven") return undefined;
+  if (executionDisposition === "not-executed") {
+    return { disposition: "not-executed" };
+  }
+  if (executionDisposition === "unknown") return { disposition: "unknown" };
   if (
     effectiveExecutable === undefined ||
     (!SHELL_EXECUTABLES.has(effectiveExecutable) &&
       effectiveExecutable !== "source" &&
       effectiveExecutable !== ".")
   ) {
-    return undefined;
+    return { disposition: "not-executed" };
   }
   if (
     (effectiveExecutable === "source" || effectiveExecutable === ".") &&
     !canInvokeCurrentShellBuiltin(parsed.resolution)
   ) {
-    return undefined;
+    return { disposition: "not-executed" };
   }
 
   let index = effectiveIndex + 1;
-  if (parsed.words[index] === "--") index += 1;
-  else if ((parsed.words[index] ?? "").startsWith("-")) return undefined;
+  if (SHELL_EXECUTABLES.has(effectiveExecutable)) {
+    const optionResolution = shellFileConsumerOperandIndex(
+      parsed.words,
+      index,
+      effectiveExecutable,
+    );
+    if (optionResolution.disposition !== "proven") return optionResolution;
+    index = optionResolution.index;
+  } else if (parsed.words[index] === "--") index += 1;
+  else if ((parsed.words[index] ?? "").startsWith("-")) {
+    return { disposition: "unknown" };
+  }
   const token = parsed.wordTokens[index];
-  if (token === undefined) return undefined;
+  if (token === undefined) return { disposition: "not-executed" };
   const path = normalizedStaticPath(token);
   if (
     path === undefined ||
@@ -678,9 +763,110 @@ function staticScriptConsumerPath(
     ((effectiveExecutable === "source" || effectiveExecutable === ".") &&
       !token.value.includes("/"))
   ) {
-    return undefined;
+    return { disposition: "not-executed" };
   }
-  return path;
+  return { disposition: "proven", path };
+}
+
+function shellFileConsumerOperandIndex(
+  words: readonly string[],
+  startIndex: number,
+  executable: string,
+):
+  | { disposition: "proven"; index: number }
+  | { disposition: "not-executed" }
+  | { disposition: "unknown" } {
+  let index = startIndex;
+  while (index < words.length) {
+    const option = words[index] ?? "";
+    if (option === "--") {
+      return { disposition: "proven", index: index + 1 };
+    }
+    if (!option.startsWith("-") && !option.startsWith("+")) break;
+
+    if (
+      SHELL_FILE_NON_EXECUTION_LONG_OPTIONS.has(option) ||
+      option.startsWith("--command=")
+    ) {
+      return { disposition: "not-executed" };
+    }
+    if (
+      SHELL_FILE_EXECUTION_LONG_OPTIONS.get(executable)?.has(option) === true
+    ) {
+      index += 1;
+      continue;
+    }
+    const longOptionName = option.split("=", 1)[0] ?? option;
+    if (
+      SHELL_FILE_EXECUTION_LONG_OPTIONS_WITH_VALUE.get(executable)?.has(
+        longOptionName,
+      ) === true
+    ) {
+      if (option.includes("=")) {
+        if (option.endsWith("=")) return { disposition: "not-executed" };
+        index += 1;
+        continue;
+      }
+      if ((words[index + 1] ?? "").length === 0) {
+        return { disposition: "not-executed" };
+      }
+      index += 2;
+      continue;
+    }
+    if (option.startsWith("--")) return { disposition: "unknown" };
+
+    const short = shortShellFileOptionResolution(option, executable);
+    if (short.disposition !== "proven") return short;
+    index += 1;
+    if (short.consumesNext) {
+      if ((words[index] ?? "").length === 0) {
+        return { disposition: "not-executed" };
+      }
+      index += 1;
+    }
+  }
+  return { disposition: "proven", index };
+}
+
+function shortShellFileOptionResolution(
+  option: string,
+  executable: string,
+):
+  | { disposition: "proven"; consumesNext: boolean }
+  | { disposition: "not-executed" }
+  | { disposition: "unknown" } {
+  if (!/^[+-][A-Za-z]+$/u.test(option)) return { disposition: "unknown" };
+  const flags = option.slice(1);
+  let consumesNext = false;
+
+  for (let index = 0; index < flags.length; index += 1) {
+    const flag = flags[index] ?? "";
+    if (
+      option.startsWith("-") &&
+      (flag === "c" || flag === "s" || flag === "n")
+    ) {
+      return { disposition: "not-executed" };
+    }
+    if (flag === "o" || flag === "O") {
+      if (flag === "O" && executable !== "bash") {
+        return { disposition: "unknown" };
+      }
+      consumesNext = index === flags.length - 1;
+      return { disposition: "proven", consumesNext };
+    }
+    if (flag === "n" && option.startsWith("+")) continue;
+    if (flag === "C" && executable === "fish") {
+      consumesNext = index === flags.length - 1;
+      return { disposition: "proven", consumesNext };
+    }
+    if (
+      !COMMON_SHELL_FILE_EXECUTION_SHORT_OPTIONS.has(flag) &&
+      SHELL_FILE_EXECUTION_SHORT_OPTIONS.get(executable)?.has(flag) !== true
+    ) {
+      return { disposition: "unknown" };
+    }
+  }
+  return { disposition: "proven", consumesNext };
 }
 
 function commandEffects(parsed: ParsedSegment): BoundedShellEffects {

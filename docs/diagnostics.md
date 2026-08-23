@@ -1018,10 +1018,14 @@ projected generated commands, 64 tracked generated files, 64 correlated
 executions, and 8 content alternatives per path. Limit hits and unsupported
 generated shell syntax are retained as an internal incomplete result rather
 than being indistinguishable from a complete result with no correlation.
-Already reconstructed commands are still classified; the original relevant
-shell text is also passed through the existing conservative destructive and
-privileged fallback so padding or an unsupported prefix cannot silently hide
-later risky text. Heredocs and ambiguous multiline quoting remain unsupported
+Already reconstructed commands are still classified. Incompleteness is shared
+with suppression association and logical evidence projection rather than
+turning raw substrings inside unparsed literal arguments into destructive or
+privileged findings. Common file-execution options such as `--noprofile`,
+`--norc`, `-e`, `-f`, `-O <value>`, and `-o <value>` retain correlation;
+command-string, standard-input, no-execution, help, and version modes do not.
+Unknown shell options make the generated result incomplete. Heredocs and
+ambiguous multiline quoting remain unsupported
 for generated-command projection.
 
 Paths may normalize `.` components, but any `..` component is rejected. Renma

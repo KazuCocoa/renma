@@ -157,6 +157,60 @@ test("generated consumers share the canonical wrapper and sudo resolver", () => 
   }
 });
 
+test("shell file consumers distinguish executing, inert, and unknown options", () => {
+  const executing = [
+    "bash --noprofile run.sh",
+    "bash --norc run.sh",
+    "sh -e run.sh",
+    "zsh -f run.sh",
+    "bash -O extglob run.sh",
+    "bash -o errexit run.sh",
+    "bash -euo pipefail run.sh",
+    "bash --rcfile profile run.sh",
+    "fish --no-config run.sh",
+    `fish -C 'echo ready' run.sh`,
+    "sh -- run.sh",
+  ];
+  for (const consumer of executing) {
+    const analysis = analyzeBoundedGeneratedScriptExecutions(
+      `echo unsafe > run.sh; ${consumer}`,
+    );
+    assert.equal(analysis.complete, true, consumer);
+    assert.equal(analysis.values.length, 1, consumer);
+  }
+
+  for (const consumer of [
+    "sh -n run.sh",
+    "fish --no-execute run.sh",
+    "sh -s run.sh",
+    `bash -c 'source run.sh'`,
+    "bash --command=source\\ run.sh",
+    "bash --help run.sh",
+  ]) {
+    const analysis = analyzeBoundedGeneratedScriptExecutions(
+      `echo unsafe > run.sh; ${consumer}`,
+    );
+    assert.equal(analysis.complete, true, consumer);
+    assert.deepEqual(analysis.values, [], consumer);
+  }
+
+  for (const consumer of [
+    "bash --future-option run.sh",
+    "sh --noprofile run.sh",
+    "zsh --norc run.sh",
+  ]) {
+    const unknown = analyzeBoundedGeneratedScriptExecutions(
+      `echo unsafe > run.sh; ${consumer}`,
+    );
+    assert.equal(unknown.complete, false, consumer);
+    assert.deepEqual(unknown.values, [], consumer);
+    assert.ok(
+      unknown.limitations.includes("unsupported-shell-syntax"),
+      consumer,
+    );
+  }
+});
+
 test("canonical resolver remains synchronized for wrappers, options, paths, and sudo", () => {
   const commands = [
     "env -i /bin/sh run.sh",

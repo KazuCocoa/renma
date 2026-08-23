@@ -255,7 +255,7 @@ ${command}
   }
 });
 
-test("generated-script analysis limits fail closed for hidden later risk", () => {
+test("generated-script limits retain proven evidence without raw-text findings", () => {
   const commandLimitedScript = [
     ...Array.from({ length: 256 }, () => "echo safe"),
     "rm -rf /tmp/after-command-limit",
@@ -282,16 +282,32 @@ test("generated-script analysis limits fail closed for hidden later risk", () =>
     alternativeLimited,
     unsupportedPrefix,
   ]) {
-    findingFor(
-      findingsFor(`# Workflow
+    const findings = findingsFor(`# Workflow
 
 \`\`\`bash
 ${command}
 \`\`\`
-`),
-      "SEC-DESTRUCTIVE-COMMAND",
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
     );
   }
+
+  const retainedRisk =
+    `printf '%s\\n' 'rm -rf /tmp/retained' ` +
+    `${Array.from({ length: 256 }, () => `'echo safe'`).join(" ")} ` +
+    `> run.sh; sh run.sh`;
+  findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${retainedRisk}
+\`\`\`
+`),
+    "SEC-DESTRUCTIVE-COMMAND",
+  );
 });
 
 test("static generated scripts retain destructive and privileged command risk", () => {
@@ -357,6 +373,49 @@ ${dotSource}
   );
 });
 
+test("generated scripts retain risk through common shell execution options", () => {
+  for (const consumer of [
+    "bash --noprofile run.sh",
+    "bash --norc run.sh",
+    "sh -e run.sh",
+    "zsh -f run.sh",
+    "bash -O extglob run.sh",
+    "bash -o errexit run.sh",
+    "bash -- run.sh",
+  ]) {
+    const command = `echo 'rm -rf /tmp/example' > run.sh; ${consumer}`;
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+  }
+
+  for (const consumer of [
+    "sh -n run.sh",
+    "sh -s run.sh",
+    `bash -c 'echo safe' run.sh`,
+    "bash --future-option run.sh",
+  ]) {
+    const command = `echo 'rm -rf /tmp/example' > run.sh; ${consumer}`;
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
 test("static generated-script correlation remains path-exact and execution-only", () => {
   const commands = [
     `echo 'rm -rf "$target"' > /tmp/example.txt; cat /tmp/example.txt`,
@@ -409,6 +468,43 @@ ${command}
     );
     assert.deepEqual(finding.details?.operationKinds, operationKinds, command);
     assert.equal(finding.evidence.snippet, command);
+  }
+});
+
+test("incomplete generated analysis is shared without raw suppression fallback", () => {
+  const alternatives = [
+    ...Array.from(
+      { length: 8 },
+      (_, index) => `echo 'echo safe ${index}' > run.sh`,
+    ),
+    `echo 'rm -rf /tmp/unretained' > run.sh`,
+  ];
+  const alternativeLimited = `${alternatives.join(" || ")}; sh run.sh || true`;
+  const trackedFiles = Array.from(
+    { length: 65 },
+    (_, index) => `echo safe > f${index}.sh`,
+  );
+  const lookupOnly = `${trackedFiles.join(";")}; command -v rm -rf /tmp/example`;
+  const unsupportedGeneratedText =
+    `printf '%s\\n' 'cat <<EOF' 'safe' 'EOF' ` +
+    `'echo "rm -rf /tmp/example"' > run.sh; sh run.sh || true`;
+
+  for (const command of [
+    alternativeLimited,
+    lookupOnly,
+    unsupportedGeneratedText,
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
   }
 });
 

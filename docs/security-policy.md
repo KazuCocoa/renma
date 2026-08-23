@@ -589,14 +589,20 @@ not cross a wrapper working-directory change, and no `tee` operand crosses a
 possible chroot; absolute operands may cross only a working-directory change.
 Generated reconstruction stops at 64 KiB, 256 projected commands, 64 tracked
 files, 64 executions, or 8 alternatives per path. Hitting a bound or
-unsupported generated syntax records an incomplete internal result and invokes
-conservative command-risk fallback over the relevant original text, so later
-risky text is not silently discarded. Local quotation or bounded source
-attribution such as “the incident report says:” or “the audit states:” keeps a
-blockquote inert even beneath a generic instruction heading; attribution does
-not need to contain the word “quote.” An explicit local execution route takes
-precedence. A routed blockquote is analyzed as an instruction only within that
-local structural boundary. For a
+unsupported generated syntax records an incomplete internal result. Retained
+proven commands are still classified, but incomplete generated analysis does
+not convert raw text inside literal arguments into destructive or privileged
+execution evidence. The same analysis object, including its completeness, is
+shared with risky-suppression association and logical evidence projection.
+Common shell file-execution options such as `--noprofile`, `--norc`, `-e`,
+`-f`, `-O <value>`, and `-o <value>` preserve exact-path correlation; `-c`,
+standard-input, no-execution, help, and version modes do not consume the file,
+while unknown options leave the generated analysis incomplete. Local quotation
+or bounded source attribution such as “the incident report says:” or “the audit
+states:” keeps a blockquote inert even beneath a generic instruction heading;
+attribution does not need to contain the word “quote.” An explicit local
+execution route takes precedence. A routed blockquote is analyzed as an
+instruction only within that local structural boundary. For a
 routed multiline shell instruction, quote markers are removed only from the
 logical-shell analysis projection, while findings retain the exact quoted
 source lines. Generic wording such as “handle this carefully” is not an

@@ -36,8 +36,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   inference.
 - Shell-wrapper execution evidence now distinguishes proven execution, known
   non-execution modes, and unknown options. Generated-script correlation also
-  records resource or syntax incompleteness and falls back conservatively,
-  while `tee` operands respect wrapper working-directory and root changes.
+  records resource or syntax incompleteness, recognizes common shell
+  file-execution options, shares completeness with suppression analysis, and
+  avoids raw-text risk findings for incomplete literal reconstruction, while
+  `tee` operands respect wrapper working-directory and root changes.
 - The npm publication workflow now blocks its OIDC-enabled publish job on the
   existing deterministic release metadata contract as well as exact annotated
   tag, `origin/main`, and package-version identity.

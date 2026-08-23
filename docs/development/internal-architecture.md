@@ -457,11 +457,16 @@ mutation evidence; ordinary command risk uses conservative fallback for
 `unknown`. `src/security-command/generated-script.ts` returns bounded values
 with completeness and stable limitation reasons. Bytes, command count, tracked
 files, executions, alternatives, and unsupported generated shell syntax cannot
-silently become an empty complete result. Diagnostic projection classifies
-retained commands and falls back over the relevant original shell text when the
-bounded result is incomplete. `tee` operand identity additionally rejects
-relative paths across a possible cwd change and every operand across a possible
-root change, without applying the wrapper context to shell-owned redirections.
+silently become an empty complete result. Shell file consumers separately
+resolve common no-value and value-taking execution options, known non-file or
+non-execution modes, and unknown options. Diagnostic projection shares one
+generated-risk analysis across ordinary command risk, risky suppression, and
+logical evidence. It classifies retained proven commands while preserving
+incompleteness as a separate state; it does not turn unparsed literal arguments
+into destructive or privileged evidence through raw-substring fallback. `tee`
+operand identity additionally rejects relative paths across a possible cwd
+change and every operand across a possible root change, without applying the
+wrapper context to shell-owned redirections.
 
 `SEC-UNPINNED-DEPENDENCY-INSTALL` also retains its older bounded line-level
 fallback for Homebrew formula installs and Docker image pull/run commands.
