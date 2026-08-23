@@ -43,6 +43,9 @@ Skills requirement, and it does not imply multi-repository federation.
 
 The current stabilization phase prioritizes:
 
+- applying the explicit [Renma 1.0 stabilization boundary](stabilization-1.0.md),
+  including precision-first local prose analysis, retained shell-family
+  structure, and the stable purpose of the `ci-report` integration;
 - keeping documentation aligned with executable command, schema, diagnostic,
   path, metadata, ordering, and compatibility contracts;
 - preserving one immutable repository-evidence snapshot per analyzed repository

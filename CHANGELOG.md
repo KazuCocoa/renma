@@ -6,6 +6,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Reduced prose-only safeguard-bypass, risky-failure-suppression,
+  instruction-hierarchy, and untrusted-content inference to explicit local
+  line or clause evidence and advisory severity. Structural POSIX shell,
+  PowerShell, and Windows batch analysis remains in place.
+- Documented the Renma 1.0 stabilization boundary, including retention of the
+  existing `ci-report` GitHub Actions workflow and the separation between
+  structural command evidence and incomplete natural-language review aids.
+
 ## [0.36.0] - 2026-08-23
 
 ### Added

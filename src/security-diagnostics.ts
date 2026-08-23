@@ -147,6 +147,7 @@ type RuleMetadata = {
 type Detection = {
   metadata: RuleMetadata;
   severity: Finding["severity"];
+  riskClass?: RiskClass;
   startLine: number;
   endLine?: number;
   snippet: string;
@@ -1446,9 +1447,6 @@ const RISKY_OPERATION_FAILURE_SUPPRESSION_PATTERNS: readonly RegExp[] = [
     "i",
   ),
 ];
-const RISKY_OPERATION_SUPPRESSION_ACTION_RE =
-  /^(?:ignore|disregard|suppress)/iu;
-
 // This is an intentionally small English grammar. It recognizes explicit
 // authority supersession, not persona statements or broad prompt injection.
 const INSTRUCTION_AUTHORITY_TARGET_SOURCE = String.raw`(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)(?:\s+(?:(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?|higher[- ]level|platform|host[- ]agent))?\s+(?:safety\s+)?(?:instructions?|prompts?)|(?:system|developer)(?:\s*(?:or|and|\/)\s*(?:system|developer))?\s+(?:instructions?|prompts?)|higher[- ](?:level|authority)\s+(?:safety\s+)?instructions?|platform\s+(?:policy|policies|instructions?)|host[- ]agent\s+(?:instruction\s+hierarchy|instructions?)`;
@@ -1461,54 +1459,6 @@ const PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE = new RegExp(
   String.raw`\b(?:takes?\s+precedence\s+over|override(?:s|ing)?|supersede(?:s|ing)?)\b[\t ]{1,16}(?:the\s+)?(?:${INSTRUCTION_AUTHORITY_TARGET_SOURCE})\b`,
   "i",
 );
-const INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE =
-  /^(?:ignore(?:s|ing)?|disregard(?:s|ing)?|override(?:s|ing)?|supersede(?:s|ing)?|takes?\s+precedence\s+over)/iu;
-const INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE =
-  /\b(?:cannot|can't|can not|can\s+never|may\s+not|(?:do|does|did) not|don't|doesn't|didn't|(?:will|would) not|won't|wouldn't|(?:is|are|was|were) (?:unable to|not able to|not (?:allowed|permitted|authorized) to))(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*\s*$/iu;
-const INSTRUCTION_HIERARCHY_ACTOR_SOURCE = String.raw`(?:skills?|rules?|polic(?:y|ies)|instructions?|guidance|workflows?|agents?|helpers?)`;
-const INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE = String.raw`(?:(?:(?:this|that|the|any|a|an|local|lower[- ]level|agent-facing)\s+){0,3}${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})`;
-const INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE = String.raw`(?:may|can|will|should|must)(?:\s+(?:ever|possibly|legitimately|lawfully|safely|actually))*`;
-const NEGATED_ACTOR_ACTION_SUBJECT_RE = new RegExp(
-  String.raw`(?:^|\b)(?:no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+(?:${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:is|are|was|were)\s+(?:allowed|permitted|authorized)\s+to)|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+nor\s+(?:its\s+)?${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|(?:nothing|neither\s+${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|under\s+no\s+circumstances\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}|it\s+is\s+(?:forbidden|prohibited|not\s+(?:allowed|permitted|authorized))\s+for\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+to)\s*$`,
-  "i",
-);
-const INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE = String.raw`(?:documentation|docs?|reviewer|maintainer|(?:incident|audit|review)(?:\s+report)?)`;
-const INSTRUCTION_HIERARCHY_ATTRIBUTION_VERB_SOURCE = String.raw`(?:says?|states?|reads?|contains?|quotes?|not(?:e|es|ed|ing)|documents?|records?|explains?)`;
-const INSTRUCTION_HIERARCHY_DISCUSSION_QUOTE_SOURCE = [
-  String.raw`"[^"\n\r]{0,160}`,
-  String.raw`'[^'\n\r]{0,160}`,
-  String.raw`\u0060[^\u0060\n\r]{0,160}`,
-  String.raw`“[^”\n\r]{0,160}`,
-  String.raw`‘[^’\n\r]{0,160}`,
-].join("|");
-const INSTRUCTION_HIERARCHY_QUOTED_DISCUSSION_PREFIX_RE = new RegExp(
-  String.raw`(?:\bfor\s+example\s*,?|\bthe\s+(?:phrase|statement|prompt)|\b(?:(?:(?:the|a)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE})\s+${INSTRUCTION_HIERARCHY_ATTRIBUTION_VERB_SOURCE}\b\s*(?:[:,])?)\s*(?:${INSTRUCTION_HIERARCHY_DISCUSSION_QUOTE_SOURCE})$`,
-  "i",
-);
-const INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE = String.raw`(?:(?!\b(?:but|then|however|therefore|yet|so)\b)[^,.;:!?—–\n\r])`;
-const INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE = new RegExp(
-  String.raw`\bfor\s+example\s*,?\s*(?:["'\u0060“‘]\s*)?$|\bthe\s+(?:phrase|statement|prompt)\s+["'\u0060“‘]\s*$|\b(?:(?:(?:the|a)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE})\s+${INSTRUCTION_HIERARCHY_ATTRIBUTION_VERB_SOURCE}\b\s*(?:[:,]\s*)?${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}(?:["'\u0060“‘]\s*)?$|\baccording\s+to\s+(?:(?:the|an?)\s+)?${INSTRUCTION_HIERARCHY_ATTRIBUTION_SUBJECT_SOURCE}\b\s*,?\s*${INSTRUCTION_HIERARCHY_ATTRIBUTED_TEXT_SOURCE}{0,120}$`,
-  "i",
-);
-const INSTRUCTION_HIERARCHY_FINITE_SUBJECT_SOURCE = String.raw`(?:i|you|he|she|it|we|they|(?:(?:this|that|these|those|the|a|an|local|lower[- ]level|agent-facing)\s+){0,3}${INSTRUCTION_HIERARCHY_ACTOR_SOURCE})`;
-const INSTRUCTION_HIERARCHY_INDEPENDENT_CONTINUATION_SOURCE = String.raw`(?:${INSTRUCTION_HIERARCHY_FINITE_SUBJECT_SOURCE}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}|${INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_SOURCE})`;
-const QUALIFIED_NEGATED_ACTOR_ACTION_SUBJECT_RE = new RegExp(
-  String.raw`^\s*no\s+${INSTRUCTION_HIERARCHY_ACTOR_REFERENCE_SOURCE}\s+(?:(?:in|within|under|that|which|who)\b)(?:(?!\b(?:but|then|however|therefore|yet|so)\b\s*(?:${INSTRUCTION_HIERARCHY_INDEPENDENT_CONTINUATION_SOURCE})\b)[^,.;:!?—–\n\r]){0,60}\s+${INSTRUCTION_HIERARCHY_NEGATED_MODAL_SOURCE}\s*$`,
-  "i",
-);
-const INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE =
-  /^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\s+(?:(?:this|these|a|an|the)\s+)?(?:local\s+)?(?:skill|rule|policy|instructions?|guidance|system|developer|platform|higher[- ]level|host[- ]agent)\b[^.!?;:—–\n\r]{0,100}$/iu;
-const INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE =
-  /^\s*(?:(?:verify|determine|check|assess|document|explain)\s+(?:whether|if)\b|explain\s+why\s+(?:(?:this|these|a|an|the)\s+)?(?:local\s+)?(?:skill|rule|policy|instructions?|guidance|system|developer|platform|higher[- ]level|host[- ]agent)\b)[^,.!?;:—–\n\r]{0,120}$/iu;
-
-type SafeguardBypassPattern = {
-  pattern: RegExp;
-  /** Presence opts this pattern into bounded immediate next-clause association. */
-  immediateContinuationCondition?: RegExp;
-  /** Only selected condition families treat restored approval as defensive. */
-  restoredApprovalGuardCanExempt?: boolean;
-};
-
 // These bounds keep each family within a reviewable local statement. They are
 // intentional grammar limits, not an attempt at synonym or coreference coverage.
 const SAFEGUARD_CONTROL_TARGET_SOURCE = String.raw`security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation`;
@@ -1540,80 +1490,33 @@ const HUMAN_NONRESPONSE_AUTOMATIC_ACTION_RE =
 const SUPPRESSION_TO_PASS_DIAGNOSTICS_RE =
   /\b(add|create|use)\b.{0,24}\b(?:a\s+)?suppression\b.{0,60}\b(pass|silence|clear|avoid)\b.{0,30}\b(diagnostics?|checks?|scan|warnings?|validation)\b/i;
 
-/** Bounded missing-approval or missing-review condition before an action. */
-const MISSING_APPROVAL_CONDITION_RE =
-  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,80}\b(?:approval|confirmation|authorization|review|user response|human response)\b[^.;:!?—–\n\r]{0,80}\b(?:unavailable|missing|cannot be obtained|can't be obtained|times? out|no response)\b/iu;
-/** Bounded permission or access failure condition before a privileged fallback. */
-const PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE =
-  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:permission|permissions|access)\b[^.;:!?—–\n\r]{0,60}\b(?:denied|unavailable|insufficient|missing)\b/iu;
-/** Bounded human nonresponse or nonapproval condition before a default action. */
-const HUMAN_NONRESPONSE_CONDITION_RE =
-  /\b(?:if|when)\b[^.;:!?—–\n\r]{0,100}\b(?:user|human|owner|reviewer)\b[^.;:!?—–\n\r]{0,60}\b(?:does not|doesn't|fails? to|never)\b[^.;:!?—–\n\r]{0,30}\b(?:respond|reply|confirm|approve)\b/iu;
-const SAFEGUARD_BYPASS_PATTERNS: readonly SafeguardBypassPattern[] = [
-  {
-    pattern: DIRECT_SAFEGUARD_DISABLEMENT_RE,
-  },
-  {
-    pattern: SAFEGUARD_FIRST_DISABLEMENT_RE,
-  },
-  {
-    pattern: ACTION_WITHOUT_APPROVAL_RE,
-  },
-  {
-    pattern: MISSING_APPROVAL_CONTINUATION_RE,
-    immediateContinuationCondition: MISSING_APPROVAL_CONDITION_RE,
-    restoredApprovalGuardCanExempt: true,
-  },
-  {
-    pattern: POLICY_WEAKENING_TO_SILENCE_DIAGNOSTICS_RE,
-  },
-  {
-    pattern: POST_HOC_APPROVAL_RE,
-  },
-  {
-    pattern: RISKIER_PERMISSION_FALLBACK_RE,
-    immediateContinuationCondition: PERMISSION_OR_ACCESS_FAILURE_CONDITION_RE,
-    // A riskier permission fallback remains fail-closed even when its action
-    // clause adds approval wording; restored approval is not a safe fallback.
-    restoredApprovalGuardCanExempt: false,
-  },
-  {
-    pattern: HUMAN_NONRESPONSE_AUTOMATIC_ACTION_RE,
-    immediateContinuationCondition: HUMAN_NONRESPONSE_CONDITION_RE,
-    restoredApprovalGuardCanExempt: false,
-  },
-  {
-    pattern: SUPPRESSION_TO_PASS_DIAGNOSTICS_RE,
-  },
+const SAFEGUARD_BYPASS_PATTERNS: readonly RegExp[] = [
+  DIRECT_SAFEGUARD_DISABLEMENT_RE,
+  SAFEGUARD_FIRST_DISABLEMENT_RE,
+  ACTION_WITHOUT_APPROVAL_RE,
+  MISSING_APPROVAL_CONTINUATION_RE,
+  POLICY_WEAKENING_TO_SILENCE_DIAGNOSTICS_RE,
+  POST_HOC_APPROVAL_RE,
+  RISKIER_PERMISSION_FALLBACK_RE,
+  HUMAN_NONRESPONSE_AUTOMATIC_ACTION_RE,
+  SUPPRESSION_TO_PASS_DIAGNOSTICS_RE,
 ];
-const SAFEGUARD_ACTION_PREDICATE_RE =
-  /(?<![\p{L}\p{N}_-])(ignore[ds]?|disregard(?:s|ed|ing)?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:es|ed|ing)?|continue|proceed|execute|run|apply|upload|delete|publish|weaken|relax|lower|loosen|override(?:s|ing)?|supersede(?:s|d|ing)?|takes?\s+precedence\s+over|change|obtain(?:ed)?|request(?:ed)?|record(?:ed)?|seek|get|ask for|fall back|fallback|switch|retry|use|add|create|automatically)\b/giu;
-const SAFEGUARD_PROHIBITION_RE =
-  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b/giu;
-const SAFEGUARD_HARD_SCOPE_BOUNDARY_RE = /[.;:!?—–\n\r]/u;
-const SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE = /^[\s,.;:!?—–]+$/u;
-const SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE =
-  /\b(?:if|when|unless|although|though|whereas|while|because|but|however|instead|otherwise|then|fallback|fall back)\b/iu;
-// A subject followed by a finite auxiliary/copula starts a new clause; a
-// trailing `to` in that clause does not make it a dependent purpose complement.
-const SAFEGUARD_FINITE_CLAUSE_RE =
-  /(?:^|\s)(?:(?:i|you|he|she|it|we|they|this|that|these|those)\b|(?:the|a|an)\s+[\p{L}\p{N}_-]+\b)\s+(?:am|is|are|was|were|be|being|been|has|have|had|do|does|did|can|could|may|might|must|shall|should|will|would)\b/iu;
-const SAFEGUARD_COMMA_ONLY_COORDINATION_BRIDGE_RE = /^\s*,\s*$/u;
-const SAFEGUARD_TRAILING_LIST_COMMA_BRIDGE_RE = /^[^,]{1,70},\s*$/u;
-const SAFEGUARD_CONJUNCTION_COORDINATION_BRIDGE_RE =
-  /^[^,]{0,70}(?:,\s*)?(?:and|or|nor)\s*$/iu;
-const SAFEGUARD_INFINITIVAL_PURPOSE_BRIDGE_RE =
-  /\b(?:(?:merely|only)\s+to|(?:in\s+order|so\s+as)\s+to|to)\s*$/iu;
 const DIRECT_DEFENSIVE_SEMANTIC_RE =
-  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat)\b/i;
+  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,32}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat|use)\b/i;
+const EXPLICIT_LOCAL_PROHIBITION_RE =
+  /(?:\b(?:do not|don't|never|cannot|can't|can not|will not|won't|may not|should not|must not|is not allowed to|is unable to)\b|\b(?:skill|rule|policy|instructions?|guidance)\b[^.;:!?—–\n\r]{0,40}\b(?:does not|doesn't)\b|\bno\b[^.;:!?—–\n\r]{0,80}\b(?:may|can|should|must|is allowed to)\b|\bunder no circumstances\b|\bit is forbidden\b[^.;:!?—–\n\r]{0,80}\bto\b)[^.;:!?—–\n\r]{0,120}\b(?:ignore|disregard|override|supersede|take\s+precedence|bypass|circumvent|skip|disable|deactivate|suppress|weaken|continue|proceed|execute|run|apply|follow|obey|adopt|treat|add|create|use)\b/iu;
+const ATTRIBUTED_DISCUSSION_RE =
+  /\b(?:(?:the|a)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b[^.!?;—–\n\r]{0,48}\b(?:says?|states?|reads?|notes?|noted|documents?|records?|reports?|explains?)\b|\baccording to\s+(?:(?:the|an?)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b/iu;
+const ILLUSTRATIVE_DISCUSSION_RE =
+  /\bfor example\b|\bthe (?:phrase|statement|prompt)\b/iu;
+const NON_OPERATIONAL_DISCUSSION_RE =
+  /\b(?:approval|safeguard)-bypass\s+(?:requests?|instructions?|wording|examples?)\b|^\s*(?:explain|review|verify|determine|check|assess|document)\b|^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\b[^.!?;:—–\n\r]{0,180}\?\s*$/iu;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 // Bounds associate the source and action within one local instruction while
 // deliberately stopping short of general natural-language coreference.
 const UNTRUSTED_EXECUTION_ACTION_RE =
   /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}?\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}?\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}?\b(it|them|the content|the instructions?)\b.{0,40}?\b(verbatim|exactly|without review)\b/i;
-const UNTRUSTED_ACTION_VERB_RE =
-  /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting|treat|regard|accept)\b/i;
 const EXECUTABLE_POLICY_AUTHORITY_DELEGATION_RE =
   /^[\s`*_).,:;\]–—-]{0,24}(?:(?:(?:and\s+)?use\s+(?:its|the\s+helper(?:'s)?)\s+(?:result|output|exit\s+code)\s+to)|to)\s+(?<decision>(?:determine|decide|establish)\s+(?:if|whether)\b.{0,160}?\b(?:is|are|would\s+be|may\s+be|can\s+be)\s+(?:allowed|permitted|approved|authorized|safe)\b)/i;
 const EXECUTABLE_POLICY_AUTHORITY_SECURITY_CONCEPT_RE = new RegExp(
@@ -1635,23 +1538,6 @@ const UNTRUSTED_CONTENT_REVIEW_GUARD_RE = new RegExp(
 );
 // Review guards govern only executable action verbs. `treat`, `regard`, and
 // `accept` describe trust assignment and are intentionally not review targets.
-const UNTRUSTED_REVIEW_ORDERING_RE = new RegExp(
-  String.raw`\b(${UNTRUSTED_REVIEW_ORDERING_SOURCE})\b`,
-  "i",
-);
-const UNTRUSTED_REVIEW_TARGET_ACTION_RE = new RegExp(
-  String.raw`\b(${UNTRUSTED_REVIEW_TARGET_ACTION_SOURCE})\b`,
-  "i",
-);
-const SEMANTIC_SENTENCE_BOUNDARY_RE = /[.!?]+(?=\s+|$)/;
-const BROAD_REVIEW_GUARD_SCOPE_RE =
-  /\b(all|each|every)\b.{0,40}\b(proposed\s+)?(actions?|instructions?|steps?)\b|\bproposed actions?\b/i;
-const CONTRADICTORY_REVIEW_ACTION_RE = new RegExp(
-  String.raw`\b(regardless of|irrespective of|despite)\b.{0,60}\b${REVIEW_VOCABULARY_SOURCE}\b|\beven (?:if|when)\b.{0,60}\b${REVIEW_VOCABULARY_SOURCE}\b.{0,40}\b(fails?|failed|rejects?|rejected|blocks?|blocked|is negative)\b|\bwithout\b.{0,30}\b${REVIEW_VOCABULARY_SOURCE}\b|\b(ignore|disregard|bypass|skip|omit)\b.{0,50}\b${REVIEW_VOCABULARY_SOURCE}\b`,
-  "i",
-);
-const DIRECT_DEFENSIVE_ACTION_PREFIX_RE =
-  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}$/i;
 const RECURSIVE_EXTERNAL_TRAVERSAL_RE =
   /\b(recursive|recursively)\b.{0,100}\b(follow|traverse|crawl|visit|open|fetch|read|inspect)\b.{0,100}\b(external links?|links?|related issues?|attachments?|pages?|sources?|documents?)\b|\b(follow|traverse|crawl|visit|open|fetch|read|inspect)\b.{0,80}\b(external links?|links?|related issues?|attachments?|pages?|sources?|documents?)\b.{0,80}\b(recursive|recursively|repeat|until (?:none|no more|exhausted))\b|\bkeep\b.{0,30}\b(following|traversing|opening|visiting)\b.{0,60}\b(external links?|links?|related issues?|attachments?|pages?|sources?)\b/i;
 const TRAVERSAL_BOUNDARY_PATTERNS = [
@@ -5407,120 +5293,65 @@ function semanticInstructionDetections(
       ? (unit.contentStartLine ?? unit.startLine)
       : unit.startLine;
   const instructionLines = unit.lines.map((line) => line.trim());
+  if (!instructionLines.some((line) => line.length > 0)) return detections;
+
+  // Prose diagnostics are deliberately line-local. The command analyzers own
+  // structural shell-family evidence; this path must not infer subjects,
+  // guards, or intent across sentences or soft-wrapped lines.
+  for (const [lineIndex, line] of instructionLines.entries()) {
+    if (!line) continue;
+    const evidence =
+      options.evidence ??
+      semanticLineEvidence(instructionLines, firstLine, lineIndex);
+
+    if (unsafeSafeguardClause(line) !== undefined) {
+      detections.push({
+        metadata: RULES.safeguardBypassInstruction,
+        severity: "medium",
+        riskClass: "advisory",
+        ...evidence,
+        dedupeKey: `${RULES.safeguardBypassInstruction.id}:${evidence.startLine}`,
+      });
+    }
+
+    const riskyFailureSuppression =
+      unsafeRiskyOperationFailureSuppression(line);
+    if (riskyFailureSuppression !== undefined) {
+      detections.push({
+        metadata: RULES.riskyOperationErrorSuppression,
+        severity: "medium",
+        riskClass: "advisory",
+        ...evidence,
+        dedupeKey: `${RULES.riskyOperationErrorSuppression.id}:${evidence.startLine}:${riskyFailureSuppression.start}`,
+        details: {
+          suppressionKind: "explicit-prose-failure-continuation",
+        },
+      });
+    }
+
+    const hierarchyOverride = unsafeInstructionHierarchyOverride(line);
+    if (hierarchyOverride !== undefined) {
+      detections.push({
+        metadata: RULES.instructionHierarchyOverride,
+        severity: "medium",
+        riskClass: "advisory",
+        ...evidence,
+        dedupeKey: `${RULES.instructionHierarchyOverride.id}:${evidence.startLine}:${hierarchyOverride.start}`,
+      });
+    }
+
+    if (explicitUntrustedContentInstruction(line)) {
+      detections.push({
+        metadata: RULES.untrustedContentAsInstruction,
+        severity: "medium",
+        riskClass: "advisory",
+        ...evidence,
+        dedupeKey: `${RULES.untrustedContentAsInstruction.id}:${evidence.startLine}`,
+      });
+    }
+  }
+
   const instructionText = instructionLines.join(" ");
-  if (!instructionText.trim()) return detections;
-  const lineOffsets = instructionLines.map((_, index) =>
-    instructionLines
-      .slice(0, index)
-      .reduce((offset, line) => offset + line.length + 1, 0),
-  );
-  const windowEvidence = options.evidence ?? {
-    startLine: firstLine,
-    endLine: firstLine + instructionLines.length - 1,
-    snippet: instructionLines.join("\n"),
-  };
-
-  const safeguardLineIndex = instructionLines.findIndex(
-    (line) => unsafeSafeguardClause(line) !== undefined,
-  );
-  const safeguardWindowMatches =
-    unsafeSafeguardClause(instructionText) !== undefined;
-  if (safeguardLineIndex >= 0 || safeguardWindowMatches) {
-    const evidence =
-      options.evidence !== undefined
-        ? options.evidence
-        : safeguardLineIndex >= 0
-          ? semanticLineEvidence(
-              instructionLines,
-              firstLine,
-              safeguardLineIndex,
-            )
-          : windowEvidence;
-    detections.push({
-      metadata: RULES.safeguardBypassInstruction,
-      severity: "high",
-      ...evidence,
-      dedupeKey: `${RULES.safeguardBypassInstruction.id}:${evidence.startLine}`,
-    });
-  }
-
-  const riskyFailureSuppression =
-    unsafeRiskyOperationFailureSuppression(instructionText);
-  if (riskyFailureSuppression !== undefined) {
-    const evidence =
-      options.evidence ??
-      semanticSpanEvidence(
-        instructionLines,
-        lineOffsets,
-        firstLine,
-        riskyFailureSuppression.start,
-        riskyFailureSuppression.end,
-      );
-    detections.push({
-      metadata: RULES.riskyOperationErrorSuppression,
-      severity: "high",
-      ...evidence,
-      dedupeKey: `${RULES.riskyOperationErrorSuppression.id}:${firstLine}:${riskyFailureSuppression.start}`,
-      details: {
-        suppressionKind: "explicit-prose-failure-continuation",
-      },
-    });
-  }
-
-  const hierarchyOverride = unsafeInstructionHierarchyOverride(instructionText);
-  if (hierarchyOverride !== undefined) {
-    const evidence =
-      options.evidence ??
-      semanticSpanEvidence(
-        instructionLines,
-        lineOffsets,
-        firstLine,
-        hierarchyOverride.start,
-        hierarchyOverride.end,
-      );
-    detections.push({
-      metadata: RULES.instructionHierarchyOverride,
-      severity: "high",
-      ...evidence,
-      dedupeKey: `${RULES.instructionHierarchyOverride.id}:${firstLine}:${hierarchyOverride.start}`,
-    });
-  }
-
-  const sentences = semanticSentenceSpans(instructionText);
-  const reviewGuardText = markdownView.inlineCodeProse(unit, instructionText);
-  const untrustedAction = untrustedExecutionActions(sentences).find(
-    (action) =>
-      UNTRUSTED_CONTENT_SOURCE_RE.test(instructionText.slice(0, action.end)) &&
-      !isDefensiveUntrustedAction(sentences, action) &&
-      !hasPrecedingReviewGuard(sentences, action, reviewGuardText),
-  );
-  if (untrustedAction !== undefined) {
-    const actionLineIndex = semanticLineIndexAtOffset(
-      lineOffsets,
-      untrustedAction.start,
-    );
-    const actionLineStart = lineOffsets[actionLineIndex] ?? 0;
-    const actionLine = instructionLines[actionLineIndex] ?? "";
-    const untrustedContentOnLine = UNTRUSTED_CONTENT_SOURCE_RE.test(
-      instructionText.slice(
-        actionLineStart,
-        actionLineStart + actionLine.length,
-      ),
-    );
-    const evidence = untrustedContentOnLine
-      ? semanticLineEvidence(instructionLines, firstLine, actionLineIndex)
-      : {
-          startLine: firstLine,
-          endLine: firstLine + actionLineIndex,
-          snippet: instructionLines.slice(0, actionLineIndex + 1).join("\n"),
-        };
-    detections.push({
-      metadata: RULES.untrustedContentAsInstruction,
-      severity: "high",
-      ...evidence,
-      dedupeKey: `${RULES.untrustedContentAsInstruction.id}:${firstLine}:${untrustedAction.start}:${untrustedAction.end}`,
-    });
-  }
 
   for (const [lineIndex, line] of instructionLines.entries()) {
     if (
@@ -5564,32 +5395,18 @@ function semanticInstructionDetections(
 
 function unsafeSafeguardClause(text: string): string | undefined {
   const analysisText = safeguardMarkdownPresentationProjection(text);
-  const actions = safeguardActionPolarities(
-    analysisText,
-    negatedActorActionIsDefensive,
-  );
-  for (const {
-    pattern,
-    immediateContinuationCondition,
-    restoredApprovalGuardCanExempt,
-  } of SAFEGUARD_BYPASS_PATTERNS) {
-    for (const match of overlappingPatternMatches(analysisText, pattern)) {
-      const matchEnd = match.start + match.text.length;
-      const matchedActions = actions.filter(
-        ({ start }) =>
-          start >= match.start &&
-          start < matchEnd &&
-          isSafeguardPatternActionAssociated(
-            analysisText,
-            match.start,
-            start,
-            immediateContinuationCondition,
-            restoredApprovalGuardCanExempt ?? false,
-          ),
-      );
-      if (matchedActions.some(({ prohibited }) => !prohibited)) {
-        return text.slice(match.start, matchEnd);
-      }
+  for (const clause of localClauseRanges(analysisText)) {
+    if (
+      /\b(?:do not|don't|never|must not|should not)\b/iu.test(clause.text) ||
+      isExplicitlyNonOperationalProse(clause.text)
+    ) {
+      continue;
+    }
+    for (const pattern of SAFEGUARD_BYPASS_PATTERNS) {
+      const match = pattern.exec(clause.text);
+      if (match?.index === undefined) continue;
+      const start = clause.start + match.index;
+      return text.slice(start, start + match[0].length);
     }
   }
   return undefined;
@@ -5600,146 +5417,147 @@ type UnsafeBoundedActionMatch = {
   end: number;
 };
 
+type UnsafeLocalActionMatch = UnsafeBoundedActionMatch & {
+  clauseStart: number;
+  clauseEnd: number;
+};
+
 function unsafeRiskyOperationFailureSuppression(
   text: string,
 ): UnsafeBoundedActionMatch | undefined {
-  return firstUnsafeBoundedActionMatch(
+  const match = firstExplicitLocalMatch(
     text,
     RISKY_OPERATION_FAILURE_SUPPRESSION_PATTERNS,
-    RISKY_OPERATION_SUPPRESSION_ACTION_RE,
   );
+  return match === undefined ||
+    isExplicitlyNonOperationalProse(
+      text.slice(match.clauseStart, match.clauseEnd),
+    )
+    ? undefined
+    : match;
 }
 
 function unsafeInstructionHierarchyOverride(
   text: string,
 ): UnsafeBoundedActionMatch | undefined {
-  return firstUnsafeBoundedActionMatch(
-    text,
-    [
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  for (const clause of localClauseRanges(analysisText)) {
+    if (isExplicitlyNonOperationalProse(clause.text)) continue;
+    const localMatch = firstPatternMatch(clause.text, [
       DIRECT_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
       PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
-    ],
-    INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE,
-    hierarchyOverrideActionIsDefensive,
-  );
-}
-
-function firstUnsafeBoundedActionMatch(
-  text: string,
-  patterns: readonly RegExp[],
-  recognizedAction: RegExp,
-  additionalProhibition?: (text: string, actionStart: number) => boolean,
-): UnsafeBoundedActionMatch | undefined {
-  const analysisText = safeguardMarkdownPresentationProjection(text);
-  const actions = safeguardActionPolarities(
-    analysisText,
-    additionalProhibition,
-  );
-  for (const pattern of patterns) {
-    for (const match of overlappingPatternMatches(analysisText, pattern)) {
-      const end = match.start + match.text.length;
-      const unsafeAction = actions.some(
-        (action) =>
-          action.start >= match.start &&
-          action.start < end &&
-          recognizedAction.test(analysisText.slice(action.start, action.end)) &&
-          !action.prohibited,
-      );
-      if (unsafeAction) {
-        return {
-          start: match.start,
-          end,
-        };
-      }
+    ]);
+    if (localMatch === undefined) continue;
+    const prefix = clause.text.slice(0, localMatch.start).trimEnd();
+    if (
+      prefix.length !== 0 &&
+      !/(?:\b(?:this|that|these|those|local)\s+(?:skill|rule|policy|instructions?|guidance)|\b(?:you|we|i)|\bthe\s+prompt)\s*$/iu.test(
+        prefix,
+      ) &&
+      !/\b(?:and|but|then|yet|to)\s*$/iu.test(prefix)
+    ) {
+      continue;
     }
+    return {
+      start: clause.start + localMatch.start,
+      end: clause.start + localMatch.end,
+    };
   }
   return undefined;
 }
 
-const HIGHER_AUTHORITY_SUBJECT_RE =
-  /(?:higher[- ](?:level|authority)\s+(?:safety\s+)?instructions?|host[- ]agent\s+(?:instruction\s+hierarchy|instructions?))\s*$/iu;
-const PLATFORM_AUTHORITY_SUBJECT_RE =
-  /platform\s+(?:policy|policies|instructions?)\s*$/iu;
-const SYSTEM_AUTHORITY_SUBJECT_RE = /system\s+(?:instructions?|prompts?)\s*$/iu;
-const LOWER_THAN_HIGHER_AUTHORITY_TARGET_RE =
-  /^(?:(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)\b|(?:system|developer)\b|platform\s+(?:policy|policies|instructions?))/iu;
-const LOWER_THAN_PLATFORM_AUTHORITY_TARGET_RE =
-  /^(?:(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)\b|(?:system|developer)\b)/iu;
-const LOWER_THAN_SYSTEM_AUTHORITY_TARGET_RE =
-  /^(?:(?:(?:all|any|every)\s+)?(?:previous|prior|earlier|preceding)\b|developer\b)/iu;
+function explicitUntrustedContentInstruction(text: string): boolean {
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  return localClauseRanges(analysisText).some(
+    (clause) =>
+      UNTRUSTED_CONTENT_SOURCE_RE.test(clause.text) &&
+      UNTRUSTED_EXECUTION_ACTION_RE.test(clause.text) &&
+      !isExplicitlyNonOperationalProse(clause.text) &&
+      !UNTRUSTED_CONTENT_REVIEW_GUARD_RE.test(clause.text),
+  );
+}
 
-function hierarchyOverrideActionIsDefensive(
-  text: string,
-  actionStart: number,
-): boolean {
-  const boundedPrefix = text.slice(Math.max(0, actionStart - 180), actionStart);
-  const clausePrefix = boundedActionClausePrefix(boundedPrefix);
-  if (
-    INSTRUCTION_HIERARCHY_OVERRIDE_NEGATION_RE.test(clausePrefix) ||
-    negatedActorClauseIsDefensive(clausePrefix) ||
-    INSTRUCTION_HIERARCHY_QUOTED_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
-    INSTRUCTION_HIERARCHY_DISCUSSION_PREFIX_RE.test(boundedPrefix) ||
-    INSTRUCTION_HIERARCHY_QUESTION_SUBJECT_RE.test(clausePrefix) ||
-    INSTRUCTION_HIERARCHY_INDIRECT_QUESTION_PREFIX_RE.test(clausePrefix)
-  ) {
-    return true;
-  }
-
-  const actionRemainder = text.slice(actionStart, actionStart + 240);
-  const action = INSTRUCTION_HIERARCHY_OVERRIDE_ACTION_RE.exec(actionRemainder);
-  if (action === null) return false;
-  const target = actionRemainder
-    .slice(action[0].length)
-    .trimStart()
-    .replace(/^the\s+/iu, "");
-  if (
-    HIGHER_AUTHORITY_SUBJECT_RE.test(clausePrefix) &&
-    LOWER_THAN_HIGHER_AUTHORITY_TARGET_RE.test(target)
-  ) {
-    return true;
-  }
-  if (
-    PLATFORM_AUTHORITY_SUBJECT_RE.test(clausePrefix) &&
-    LOWER_THAN_PLATFORM_AUTHORITY_TARGET_RE.test(target)
-  ) {
-    return true;
-  }
+function isExplicitlyNonOperationalProse(text: string): boolean {
   return (
-    SYSTEM_AUTHORITY_SUBJECT_RE.test(clausePrefix) &&
-    LOWER_THAN_SYSTEM_AUTHORITY_TARGET_RE.test(target)
+    DIRECT_DEFENSIVE_SEMANTIC_RE.test(text) ||
+    EXPLICIT_LOCAL_PROHIBITION_RE.test(text) ||
+    ATTRIBUTED_DISCUSSION_RE.test(text) ||
+    ILLUSTRATIVE_DISCUSSION_RE.test(text) ||
+    NON_OPERATIONAL_DISCUSSION_RE.test(text)
   );
 }
 
-function negatedActorActionIsDefensive(
+function firstExplicitLocalMatch(
   text: string,
-  actionStart: number,
-): boolean {
-  const boundedPrefix = text.slice(Math.max(0, actionStart - 180), actionStart);
-  return negatedActorClauseIsDefensive(
-    boundedActionClausePrefix(boundedPrefix),
-  );
+  patterns: readonly RegExp[],
+): UnsafeLocalActionMatch | undefined {
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  for (const clause of localClauseRanges(analysisText)) {
+    const match = firstPatternMatch(clause.text, patterns);
+    if (match === undefined) continue;
+    return {
+      start: clause.start + match.start,
+      end: clause.start + match.end,
+      clauseStart: clause.start,
+      clauseEnd: clause.start + clause.text.length,
+    };
+  }
+  return undefined;
 }
 
-function negatedActorClauseIsDefensive(clausePrefix: string): boolean {
+function firstPatternMatch(
+  text: string,
+  patterns: readonly RegExp[],
+): UnsafeBoundedActionMatch | undefined {
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match?.index === undefined) continue;
+    return { start: match.index, end: match.index + match[0].length };
+  }
+  return undefined;
+}
+
+function localClauseRanges(
+  text: string,
+): Array<{ start: number; text: string }> {
+  const clauses: Array<{ start: number; text: string }> = [];
+  for (const sentence of text.matchAll(/[^.!?;—–\n\r]+[.!?;—–]?/gu)) {
+    let localStart = 0;
+    for (const continuation of sentence[0].matchAll(
+      /,\s*(?=(?:(?:and\s+)?then|but|yet|however)\b)/giu,
+    )) {
+      if (isInsideQuotedDiscussion(sentence[0], continuation.index)) continue;
+      const localEnd = continuation.index + continuation[0].length;
+      clauses.push({
+        start: sentence.index + localStart,
+        text: sentence[0].slice(localStart, localEnd),
+      });
+      localStart = localEnd;
+    }
+    clauses.push({
+      start: sentence.index + localStart,
+      text: sentence[0].slice(localStart),
+    });
+  }
+  return clauses;
+}
+
+function isInsideQuotedDiscussion(text: string, offset: number): boolean {
+  for (const quoted of text.matchAll(
+    /"[^"\n\r]*"|'[^'\n\r]*'|`[^`\n\r]*`|“[^”\n\r]*”|‘[^’\n\r]*’/gu,
+  )) {
+    if (quoted.index < offset && offset < quoted.index + quoted[0].length) {
+      return true;
+    }
+  }
+  const prefix = text.slice(0, offset);
   return (
-    NEGATED_ACTOR_ACTION_SUBJECT_RE.test(clausePrefix) ||
-    QUALIFIED_NEGATED_ACTOR_ACTION_SUBJECT_RE.test(clausePrefix)
+    /(?:^|[\s(:,])"[^"\n\r]*$/u.test(prefix) ||
+    /(?:^|[\s(:,])'[^'\n\r]*$/u.test(prefix) ||
+    /(?:^|[\s(:,])`[^`\n\r]*$/u.test(prefix) ||
+    prefix.lastIndexOf("“") > prefix.lastIndexOf("”") ||
+    prefix.lastIndexOf("‘") > prefix.lastIndexOf("’")
   );
-}
-
-function boundedActionClausePrefix(boundedPrefix: string): string {
-  const boundary = Math.max(
-    boundedPrefix.lastIndexOf("."),
-    boundedPrefix.lastIndexOf(";"),
-    boundedPrefix.lastIndexOf(":"),
-    boundedPrefix.lastIndexOf("!"),
-    boundedPrefix.lastIndexOf("?"),
-    boundedPrefix.lastIndexOf("—"),
-    boundedPrefix.lastIndexOf("–"),
-    boundedPrefix.lastIndexOf("\n"),
-    boundedPrefix.lastIndexOf("\r"),
-  );
-  return boundedPrefix.slice(boundary + 1);
 }
 
 /** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
@@ -5774,158 +5592,6 @@ function safeguardMarkdownPresentationProjection(text: string): string {
   return projected.join("");
 }
 
-function isSafeguardPatternActionAssociated(
-  text: string,
-  matchStart: number,
-  actionStart: number,
-  immediateContinuationCondition: RegExp | undefined,
-  restoredApprovalGuardCanExempt: boolean,
-): boolean {
-  const prefix = text.slice(matchStart, actionStart);
-  const crossesHardBoundary = SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(prefix);
-  if (immediateContinuationCondition === undefined) {
-    return !crossesHardBoundary;
-  }
-  if (!crossesHardBoundary) {
-    return (
-      !restoredApprovalGuardCanExempt ||
-      !safeguardActionHasExplicitApprovalGuard(text, actionStart)
-    );
-  }
-
-  const condition = immediateContinuationCondition.exec(prefix);
-  if (condition?.index === undefined) return false;
-  const bridge = prefix.slice(condition.index + condition[0].length);
-  if (!SAFEGUARD_IMMEDIATE_CLAUSE_SEPARATOR_RE.test(bridge)) {
-    return false;
-  }
-  // Approval restoration is an explicit per-family policy, not a universal
-  // exemption from conditional safeguard-bypass recognition.
-  if (!restoredApprovalGuardCanExempt) return true;
-
-  return !safeguardActionHasExplicitApprovalGuard(text, actionStart);
-}
-
-function safeguardActionHasExplicitApprovalGuard(
-  text: string,
-  actionStart: number,
-): boolean {
-  const actionRemainder = text.slice(actionStart, actionStart + 160);
-  const nextBoundary = actionRemainder.search(SAFEGUARD_HARD_SCOPE_BOUNDARY_RE);
-  const actionClause =
-    nextBoundary === -1
-      ? actionRemainder
-      : actionRemainder.slice(0, nextBoundary);
-  return hasExplicitHumanApprovalGuard(actionClause);
-}
-
-function overlappingPatternMatches(
-  text: string,
-  pattern: RegExp,
-): Array<{ text: string; start: number }> {
-  const matches: Array<{ text: string; start: number }> = [];
-  const flags = pattern.flags.replace(/[gy]/gu, "");
-  let cursor = 0;
-  while (cursor < text.length) {
-    const match = new RegExp(pattern.source, flags).exec(text.slice(cursor));
-    if (match?.index === undefined) break;
-    const start = cursor + match.index;
-    matches.push({ text: match[0], start });
-    cursor = start + 1;
-  }
-  return matches;
-}
-
-function safeguardActionPolarities(
-  text: string,
-  additionalProhibition?: (text: string, actionStart: number) => boolean,
-): Array<{ start: number; end: number; prohibited: boolean }> {
-  const actions = [...text.matchAll(SAFEGUARD_ACTION_PREDICATE_RE)].flatMap(
-    (match) =>
-      match.index === undefined
-        ? []
-        : [
-            {
-              start: match.index,
-              end: match.index + match[0].length,
-              prohibited: false,
-            },
-          ],
-  );
-
-  for (const [index, action] of actions.entries()) {
-    const previous = actions[index - 1];
-    if (additionalProhibition?.(text, action.start) ?? false) {
-      action.prohibited = true;
-      continue;
-    }
-    const localStart = previous?.end ?? Math.max(0, action.start - 120);
-    const localPrefix = text.slice(localStart, action.start);
-    const prohibitions = [...localPrefix.matchAll(SAFEGUARD_PROHIBITION_RE)];
-    const directProhibition = prohibitions[prohibitions.length - 1];
-    if (directProhibition?.index !== undefined) {
-      const directBridge = localPrefix.slice(
-        directProhibition.index + directProhibition[0].length,
-      );
-      action.prohibited = isDirectSafeguardProhibitionBridge(directBridge);
-      continue;
-    }
-    if (
-      previous?.prohibited === true &&
-      (isCoordinatedSafeguardActionBridge(
-        text.slice(previous.end, action.start),
-      ) ||
-        isDependentInfinitivalPurposeBridge(
-          text.slice(previous.end, action.start),
-        ))
-    ) {
-      action.prohibited = true;
-    }
-  }
-
-  return actions;
-}
-
-function isCoordinatedSafeguardActionBridge(bridge: string): boolean {
-  if (
-    bridge.length > 80 ||
-    SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(bridge) ||
-    bridge.trim().length === 0
-  ) {
-    return false;
-  }
-  if (SAFEGUARD_COMMA_ONLY_COORDINATION_BRIDGE_RE.test(bridge)) return true;
-  if (SAFEGUARD_TRAILING_LIST_COMMA_BRIDGE_RE.test(bridge)) return true;
-  return SAFEGUARD_CONJUNCTION_COORDINATION_BRIDGE_RE.test(bridge);
-}
-
-function isDirectSafeguardProhibitionBridge(bridge: string): boolean {
-  return (
-    bridge.length <= 80 &&
-    !hasSafeguardClauseBoundary(bridge) &&
-    !SAFEGUARD_FINITE_CLAUSE_RE.test(bridge)
-  );
-}
-
-function isDependentInfinitivalPurposeBridge(bridge: string): boolean {
-  if (
-    bridge.length > 80 ||
-    /,/u.test(bridge) ||
-    hasSafeguardClauseBoundary(bridge) ||
-    SAFEGUARD_FINITE_CLAUSE_RE.test(bridge)
-  ) {
-    return false;
-  }
-  return SAFEGUARD_INFINITIVAL_PURPOSE_BRIDGE_RE.test(bridge);
-}
-
-function hasSafeguardClauseBoundary(bridge: string): boolean {
-  return (
-    SAFEGUARD_HARD_SCOPE_BOUNDARY_RE.test(bridge) ||
-    SAFEGUARD_GRAMMATICAL_SCOPE_BOUNDARY_RE.test(bridge)
-  );
-}
-
 function semanticLineEvidence(
   lines: string[],
   firstLine: number,
@@ -5936,231 +5602,6 @@ function semanticLineEvidence(
     endLine: firstLine + lineIndex,
     snippet: lines[lineIndex] ?? "",
   };
-}
-
-function semanticSpanEvidence(
-  lines: string[],
-  lineOffsets: number[],
-  firstLine: number,
-  start: number,
-  end: number,
-): DetectionEvidence {
-  const startLineIndex = semanticLineIndexAtOffset(lineOffsets, start);
-  const endLineIndex = semanticLineIndexAtOffset(
-    lineOffsets,
-    Math.max(start, end - 1),
-  );
-  return {
-    startLine: firstLine + startLineIndex,
-    endLine: firstLine + endLineIndex,
-    snippet: lines.slice(startLineIndex, endLineIndex + 1).join("\n"),
-  };
-}
-
-function semanticLineIndexAtOffset(
-  lineOffsets: number[],
-  offset: number,
-): number {
-  for (let index = lineOffsets.length - 1; index >= 0; index -= 1) {
-    if ((lineOffsets[index] ?? 0) <= offset) return index;
-  }
-  return 0;
-}
-
-type SemanticTextSpan = {
-  text: string;
-  start: number;
-  end: number;
-};
-
-type UntrustedActionVerb =
-  | "execute"
-  | "run"
-  | "apply"
-  | "follow"
-  | "obey"
-  | "adopt"
-  | "treat"
-  | "regard"
-  | "accept";
-
-type UntrustedExecutionAction = SemanticTextSpan & {
-  sentenceIndex: number;
-  verb: UntrustedActionVerb;
-};
-
-/**
- * `matchAll` requires a global expression. Return a fresh instance so repeated
- * sentence analysis cannot share mutable `lastIndex` state.
- */
-function cloneWithGlobalFlag(pattern: RegExp): RegExp {
-  const flags = pattern.global ? pattern.flags : `${pattern.flags}g`;
-  return new RegExp(pattern.source, flags);
-}
-
-function semanticSentenceSpans(text: string): SemanticTextSpan[] {
-  const sentences: SemanticTextSpan[] = [];
-  let start = 0;
-  for (const boundary of text.matchAll(
-    cloneWithGlobalFlag(SEMANTIC_SENTENCE_BOUNDARY_RE),
-  )) {
-    const end = (boundary.index ?? 0) + boundary[0].length;
-    appendTrimmedSemanticSpan(sentences, text, start, end);
-    start = end;
-  }
-  appendTrimmedSemanticSpan(sentences, text, start, text.length);
-  return sentences;
-}
-
-function appendTrimmedSemanticSpan(
-  spans: SemanticTextSpan[],
-  text: string,
-  start: number,
-  end: number,
-): void {
-  while (start < end && /\s/.test(text[start] ?? "")) start += 1;
-  while (end > start && /\s/.test(text[end - 1] ?? "")) end -= 1;
-  if (start < end) spans.push({ text: text.slice(start, end), start, end });
-}
-
-function untrustedExecutionActions(
-  sentences: SemanticTextSpan[],
-): UntrustedExecutionAction[] {
-  const actions: UntrustedExecutionAction[] = [];
-  for (const [sentenceIndex, sentence] of sentences.entries()) {
-    const pattern = cloneWithGlobalFlag(UNTRUSTED_EXECUTION_ACTION_RE);
-    for (const match of sentence.text.matchAll(pattern)) {
-      const text = match[0] ?? "";
-      const verb = untrustedActionVerb(text);
-      if (verb === undefined) continue;
-      const start = sentence.start + (match.index ?? 0);
-      actions.push({
-        text,
-        start,
-        end: start + text.length,
-        sentenceIndex,
-        verb,
-      });
-    }
-  }
-  return actions;
-}
-
-function untrustedActionVerb(text: string): UntrustedActionVerb | undefined {
-  const match = text.match(UNTRUSTED_ACTION_VERB_RE);
-  const verb = match?.[1]?.toLowerCase() ?? "";
-  if (verb.startsWith("execut")) return "execute";
-  if (verb.startsWith("run")) return "run";
-  if (verb.startsWith("appl")) return "apply";
-  if (verb.startsWith("follow")) return "follow";
-  if (verb.startsWith("obey")) return "obey";
-  if (verb.startsWith("adopt")) return "adopt";
-  if (verb === "treat" || verb === "regard" || verb === "accept") return verb;
-  return undefined;
-}
-
-function isDefensiveUntrustedAction(
-  sentences: SemanticTextSpan[],
-  action: UntrustedExecutionAction,
-): boolean {
-  const sentence = sentences[action.sentenceIndex];
-  if (sentence === undefined) return false;
-  const actionStart = action.start - sentence.start;
-  return DIRECT_DEFENSIVE_ACTION_PREFIX_RE.test(
-    sentence.text.slice(0, actionStart),
-  );
-}
-
-function hasPrecedingReviewGuard(
-  sentences: SemanticTextSpan[],
-  action: UntrustedExecutionAction,
-  guardText: string,
-): boolean {
-  const sentence = sentences[action.sentenceIndex];
-  if (sentence === undefined) return false;
-  if (CONTRADICTORY_REVIEW_ACTION_RE.test(sentence.text)) return false;
-
-  const guardSentences = semanticSentenceSpans(guardText);
-  const guardActionSentence = guardSentences.find(
-    (candidate) =>
-      candidate.start <= action.start && action.start < candidate.end,
-  );
-  if (guardActionSentence === undefined) return false;
-
-  const sameSentenceGuards = reviewGuardActions(guardActionSentence);
-  if (
-    sameSentenceGuards.some(
-      (guard) =>
-        guard.start < action.start &&
-        guard.targetStart === action.start &&
-        guard.verb === action.verb,
-    )
-  ) {
-    return true;
-  }
-
-  const precedingSentence = guardSentences.findLast(
-    (candidate) => candidate.end <= guardActionSentence.start,
-  );
-  return (
-    precedingSentence !== undefined &&
-    reviewGuardActions(precedingSentence).some(
-      (guard) =>
-        guard.verb === action.verb &&
-        reviewGuardScopeCovers(precedingSentence.text, sentence.text),
-    )
-  );
-}
-
-function reviewGuardScopeCovers(
-  guardSentence: string,
-  actionSentence: string,
-): boolean {
-  if (BROAD_REVIEW_GUARD_SCOPE_RE.test(guardSentence)) return true;
-  const actionSources = untrustedSourceSpans(actionSentence);
-  if (actionSources.length === 0) return false;
-  const guardSources = new Set(untrustedSourceSpans(guardSentence));
-  return actionSources.some((source) => guardSources.has(source));
-}
-
-function untrustedSourceSpans(text: string): string[] {
-  const pattern = cloneWithGlobalFlag(UNTRUSTED_CONTENT_SOURCE_RE);
-  return [...text.matchAll(pattern)].map((match) =>
-    (match[0] ?? "").toLowerCase(),
-  );
-}
-
-function reviewGuardActions(
-  sentence: SemanticTextSpan,
-): Array<
-  SemanticTextSpan & { targetStart: number; verb: UntrustedActionVerb }
-> {
-  const guards: Array<{
-    text: string;
-    start: number;
-    end: number;
-    targetStart: number;
-    verb: UntrustedActionVerb;
-  }> = [];
-  const pattern = cloneWithGlobalFlag(UNTRUSTED_CONTENT_REVIEW_GUARD_RE);
-  for (const match of sentence.text.matchAll(pattern)) {
-    const text = match[0] ?? "";
-    const before = text.search(UNTRUSTED_REVIEW_ORDERING_RE);
-    if (before < 0) continue;
-    const targetText = text.slice(before);
-    const target = targetText.match(UNTRUSTED_REVIEW_TARGET_ACTION_RE);
-    const verb = untrustedActionVerb(target?.[0] ?? "");
-    if (target === null || verb === undefined) continue;
-    const start = sentence.start + (match.index ?? 0);
-    guards.push({
-      text,
-      start,
-      end: start + text.length,
-      targetStart: start + before + (target.index ?? 0),
-      verb,
-    });
-  }
-  return guards;
 }
 
 function matchesDisallowedCommand(line: string, command: string): boolean {
@@ -6488,7 +5929,7 @@ function findingFromDetection(
     verificationStepsV2: detection.metadata.verificationStepsV2,
     llmHint: detection.metadata.llmHint,
     confidence: detection.metadata.confidence,
-    riskClass: detection.metadata.riskClass,
+    riskClass: detection.riskClass ?? detection.metadata.riskClass,
     ...(detection.details === undefined ? {} : { details: detection.details }),
   };
 }
