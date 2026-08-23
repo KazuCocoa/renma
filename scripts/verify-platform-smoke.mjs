@@ -33,16 +33,19 @@ try {
 }
 
 if (
-  document?.schemaVersion !== "renma.scan.v1" ||
+  document?.schemaVersion !== "renma.scan.v2" ||
   document?.format !== "json" ||
   path.resolve(document?.root ?? "") !== fixtureRoot ||
   document?.inspectionCoverage?.complete !== true ||
-  !Array.isArray(document?.findings) ||
-  !Array.isArray(document?.diagnosticsV2)
+  !Array.isArray(document?.diagnostics) ||
+  !Array.isArray(document?.suppressedDiagnostics) ||
+  "findings" in document ||
+  "suppressedFindings" in document ||
+  "diagnosticsV2" in document
 ) {
   throw new Error("Platform scan changed its representative JSON contract.");
 }
 
 process.stdout.write(
-  `Verified renma.scan.v1 machine-readable behavior on ${process.platform}.\n`,
+  `Verified renma.scan.v2 machine-readable behavior on ${process.platform}.\n`,
 );
