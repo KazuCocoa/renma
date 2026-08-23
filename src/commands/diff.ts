@@ -1713,7 +1713,7 @@ function projectDiffSnapshot(
     scanResult.findings,
     readinessDiagnosticsFromRepositorySnapshot(
       repositorySnapshot,
-      scanResult.diagnostics,
+      scanResult.rawDiagnostics,
       { includeSkillDiscovery: false },
     ),
     scanResult.contextLens,

@@ -140,7 +140,11 @@ production modules import the cohesive owner under `src/types/` directly:
   `ScanJsonDocument` explicitly lists the top-level `renma.scan.v2` wire fields,
   and `toScanJsonDocument()` projects only those fields with literal
   `format: "json"`. Internal `ScanResult` additions therefore do not become
-  public JSON additions implicitly.
+  public JSON additions implicitly. `ScanResult.diagnostics` is the canonical
+  normalized collection used by that serializer. Producer-level discovery and
+  parsing diagnostics remain internal as `rawDiagnostics` for strict policy,
+  Readiness/BOM/diff inputs, and text rendering. Their normalization and review
+  bundle projection are owned by `src/scan-diagnostics.ts`.
 
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
@@ -180,7 +184,7 @@ from the typed objects' `text` fields. The canonical typed values remain
 available internally for Diagnostics v2 even though legacy-only Finding
 producers are rejected.
 
-`createDiagnosticsV2()` never classifies a constraint from English verbs and
+`createScanDiagnostics()` never classifies a constraint from English verbs and
 never discovers commands from sentence prefixes. It consumes only the typed
 guidance, adds the established code-specific typed guardrails, and applies
 typed defaults only when a producer supplied no verification steps. Prose may

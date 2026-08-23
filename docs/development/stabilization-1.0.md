@@ -85,7 +85,10 @@ public producer authority.
 4. Select the 1.0 JSON contracts and remove obsolete pre-1.0 projections.
    Completed for scan as `renma.scan.v2`.
 5. Reorganize source directories, serializers, documentation, and tests behind
-   the settled public boundary.
+   the settled public boundary. Completed for scan: canonical diagnostics now
+   use `ScanResult.diagnostics`, producer-level evidence is explicitly internal
+   as `rawDiagnostics`, and scan normalization is owned by
+   `src/scan-diagnostics.ts`.
 6. Freeze compatibility only for the release-candidate contracts.
 
 Refactoring must follow deletion and contract selection. Renma should not

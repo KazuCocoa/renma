@@ -432,8 +432,8 @@ function scanResult(
     executableSurfaceInventory,
     findings: [],
     suppressedFindings: [],
+    rawDiagnostics: [],
     diagnostics: [],
-    diagnosticsV2: [],
     reviewBundles: [],
     exitThreshold: "high",
   };

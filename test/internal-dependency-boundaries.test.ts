@@ -184,7 +184,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "catalog-findings.ts",
       "declared-composition.ts",
       "declared-impact.ts",
-      "diagnostics-v2.ts",
+      "scan-diagnostics.ts",
       "executable-surface-ci-policy.ts",
       "executable-surface-diff.ts",
       "finding-repair-guidance.ts",

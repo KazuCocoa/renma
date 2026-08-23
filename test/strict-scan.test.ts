@@ -250,7 +250,7 @@ test("strict scan rejects a real error diagnostic without redefining normal scan
     ),
   );
 
-  assert.ok(result.diagnostics.some((item) => item.severity === "error"));
+  assert.ok(result.rawDiagnostics.some((item) => item.severity === "error"));
   assert.ok(
     evaluation.matches.some(
       (match) => match.id === STRICT_SCAN_MATCH_IDS.ERROR_DIAGNOSTIC,

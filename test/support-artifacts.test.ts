@@ -397,7 +397,7 @@ node scripts/run.mjs
 
   const result = await scan(root);
   assert.ok(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
         diagnostic.path === "skills/demo.skill.md",
@@ -523,7 +523,7 @@ Use assets/payload.txt and assets/other.txt.
     /INTERNAL_SECRET|EXTERNAL_SECRET|internal\.txt|external\.txt/,
   );
   const result = await scan(root);
-  const symlinkDiagnostics = result.diagnostics.filter(
+  const symlinkDiagnostics = result.rawDiagnostics.filter(
     (diagnostic) => diagnostic.code === "SUPPORT-SYMLINK-PATH",
   );
   assert.deepEqual(
@@ -551,7 +551,7 @@ Use assets/payload.txt and assets/other.txt.
         typeof finding.details?.sourcePath === "string",
     ),
   );
-  assert.match(JSON.stringify(result.diagnosticsV2), /SUPPORT-SYMLINK-PATH/);
+  assert.match(JSON.stringify(result.diagnostics), /SUPPORT-SYMLINK-PATH/);
   assert.match(JSON.stringify(result.trustGraph), /SUPPORT-SYMLINK-PATH/);
   assert.match(JSON.stringify(report.diagnostics), /SUPPORT-SYMLINK-PATH/);
 });
@@ -680,7 +680,7 @@ Use assets/large.bin as the fixture.
 
   const result = await scan(root);
   assert.ok(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.path === "skills/demo/assets/large.bin" &&
         /larger than max_file_size_bytes/.test(diagnostic.message),

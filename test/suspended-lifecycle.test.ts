@@ -537,7 +537,7 @@ test("isolated, required, and optional suspension states project through Readine
     ),
   );
   const requiredScan = await scan(required.root);
-  const requiredDiagnosticV2 = requiredScan.diagnosticsV2.find(
+  const requiredDiagnosticV2 = requiredScan.diagnostics.find(
     (diagnostic) =>
       diagnostic.code === DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
   );

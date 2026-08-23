@@ -11,7 +11,7 @@ import {
   CATALOG_FINDING_DIAGNOSTIC_CODES,
   catalogDiagnosticFindings,
 } from "../src/catalog-findings.js";
-import { createDiagnosticsV2 } from "../src/diagnostics-v2.js";
+import { createScanDiagnostics } from "../src/scan-diagnostics.js";
 import {
   DIAGNOSTIC_IDS,
   omitFromCatalogFindings,
@@ -81,7 +81,7 @@ test("every known metadata diagnostic has a registered code conversion", () => {
       ),
     );
     assert.deepEqual(
-      createDiagnosticsV2({ findings: finding, diagnostics: [] }).map(
+      createScanDiagnostics({ findings: finding, diagnostics: [] }).map(
         (diagnostic) => diagnostic.code,
       ),
       [code],

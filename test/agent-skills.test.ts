@@ -716,7 +716,7 @@ description: Review demo inputs. Use when demo inputs need review.
       skillPath,
     );
     assert.ok(
-      result.diagnostics.some(
+      result.rawDiagnostics.some(
         (diagnostic) =>
           diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
           diagnostic.path === skillPath,

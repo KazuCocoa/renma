@@ -1113,7 +1113,7 @@ test("metadata diagnostics add classification without changing severity", async 
     "context-root",
   );
   assert.equal(
-    result.diagnostics.some((diagnostic) =>
+    result.rawDiagnostics.some((diagnostic) =>
       diagnostic.code?.startsWith("CLASSIFICATION-"),
     ),
     false,

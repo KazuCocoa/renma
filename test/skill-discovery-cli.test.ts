@@ -777,10 +777,10 @@ test("authoritative unreachable warnings flow through scan, diagnostics v2, and 
     main(["graph", root, "--view", "discovery", "--format", "markdown"]),
   );
   const result = await scan(root);
-  const diagnostic = result.diagnostics.find(
+  const diagnostic = result.rawDiagnostics.find(
     (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
   );
-  const diagnosticV2 = result.diagnosticsV2.find(
+  const diagnosticV2 = result.diagnostics.find(
     (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
   );
 
@@ -842,10 +842,10 @@ test("explicit Discovery config false does not declare repository-wide adoption"
 test("Discovery route diagnostics flow through scan and diagnostics v2", async (t) => {
   const root = await routeFixture(t);
   const result = await scan(root);
-  const diagnostic = result.diagnostics.find(
+  const diagnostic = result.rawDiagnostics.find(
     (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
   );
-  const diagnosticV2 = result.diagnosticsV2.find(
+  const diagnosticV2 = result.diagnostics.find(
     (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
   ) as DiagnosticV2 | undefined;
 
@@ -937,7 +937,7 @@ test("route-cycle warnings propagate through scan, diagnostics v2, review bundle
     cycleCount?: unknown;
     cyclicSkillIds?: unknown;
   };
-  const diagnosticV2 = scanResult.diagnosticsV2.find(
+  const diagnosticV2 = scanResult.diagnostics.find(
     (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
   );
   const reviewBundle = scanResult.reviewBundles.find((bundle) =>
@@ -1467,7 +1467,7 @@ test("invalid canonical continuation declarations flow through scan", async () =
   );
 
   const result = await scan(root);
-  const diagnostic = result.diagnostics.find(
+  const diagnostic = result.rawDiagnostics.find(
     (item) =>
       item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_CONTINUATION_DECLARATION,
   );
@@ -1502,11 +1502,11 @@ test("publication warnings flow through scan, diagnostics v2, and review bundles
   );
 
   const result = await scan(root);
-  const diagnostic = result.diagnostics.find(
+  const diagnostic = result.rawDiagnostics.find(
     (item) =>
       item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
   );
-  const diagnosticV2 = result.diagnosticsV2.find(
+  const diagnosticV2 = result.diagnostics.find(
     (item) =>
       item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
   );

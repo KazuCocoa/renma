@@ -31,7 +31,7 @@ test("interactive-placeholder is a clean, ready thin Agent Skill example", async
     readiness(EXAMPLE_ROOT),
   ]);
 
-  assert.equal(scanResult.diagnostics.length, 0);
+  assert.equal(scanResult.rawDiagnostics.length, 0);
   assert.equal(scanResult.agentSkills.totalSkillCount, 1);
   assert.equal(scanResult.agentSkills.validSkillCount, 1);
   assert.equal(scanResult.agentSkills.invalidSkillCount, 0);

@@ -139,7 +139,7 @@ Perform the operation.
     assert.notEqual(finding.evidence.snippet, "---", id);
   }
 
-  const verificationDiagnostic = result.diagnosticsV2.find(
+  const verificationDiagnostic = result.diagnostics.find(
     (diagnostic) => diagnostic.code === "QUAL-MISSING-VERIFICATION",
   );
   assert.equal(verificationDiagnostic?.location?.startLine, 6);
@@ -1861,7 +1861,7 @@ ${repeatWords("example", 1000)}
     /effective 7200-token medium threshold/,
   );
 
-  const diagnosticV2 = result.diagnosticsV2.find(
+  const diagnosticV2 = result.diagnostics.find(
     (diagnostic) =>
       diagnostic.code === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
       diagnostic.location?.path === "skills/demo/references/large.md",
@@ -3563,8 +3563,8 @@ test("text report calls out clean scans", () => {
     },
     findings: [],
     suppressedFindings: [],
+    rawDiagnostics: [],
     diagnostics: [],
-    diagnosticsV2: [],
     reviewBundles: [],
     exitThreshold: "high",
   };

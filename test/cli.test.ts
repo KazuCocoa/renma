@@ -61,7 +61,7 @@ test("scan reports skills/demo/skill.md as migration-only", async () => {
   assert.equal(result.scannedFileCount, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.ok(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
         diagnostic.path === "skills/demo/skill.md",
@@ -82,7 +82,7 @@ test("scan reports skills/demo/foo.skill.md as migration-only", async () => {
   assert.equal(result.scannedFileCount, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.ok(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
         diagnostic.path === "skills/demo/foo.skill.md",
@@ -138,7 +138,7 @@ test("reserved skill-local support directories remain support paths, not skill n
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
   assert.equal(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.code ===
         "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR",
@@ -165,7 +165,7 @@ test("reserved support directory names are not classified as skills", async () =
     1,
   );
 
-  const diagnostic = result.diagnostics.find(
+  const diagnostic = result.rawDiagnostics.find(
     (item) =>
       item.code === "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR" &&
       item.path === "skills/examples/SKILL.md",
@@ -184,7 +184,7 @@ test("reserved support directory names are not classified as skills", async () =
     /use `skills\/example-review\/SKILL\.md` instead of `skills\/examples\/SKILL\.md`/,
   );
   assert.equal(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (item) =>
         item.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR" &&
         item.path === "skills/examples/SKILL.md",
@@ -192,7 +192,7 @@ test("reserved support directory names are not classified as skills", async () =
     false,
   );
 
-  const diagnosticV2 = result.diagnosticsV2.find(
+  const diagnosticV2 = result.diagnostics.find(
     (item) =>
       item.code === "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR" &&
       item.location?.path === "skills/examples/SKILL.md",
@@ -224,7 +224,7 @@ test("reserved support directory guidance applies under .agents/skills", async (
   assert.equal(result.securityPolicyInventory?.assetKinds.agent, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
   assert.ok(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.code ===
           "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR" &&
@@ -245,7 +245,7 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
   assert.equal(result.scannedFileCount, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.equal(result.findings.length, 0);
-  const guidanceDiagnostics = result.diagnostics.filter(
+  const guidanceDiagnostics = result.rawDiagnostics.filter(
     (diagnostic) =>
       diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
   );
@@ -272,7 +272,7 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
     skillMdDiagnostic?.llmHint ?? "",
     /No action is required unless this file is intended to be a Renma skill/,
   );
-  const skillMdV2 = result.diagnosticsV2.find(
+  const skillMdV2 = result.diagnostics.find(
     (diagnostic) =>
       diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR" &&
       diagnostic.location?.path === "skill.md",
@@ -293,7 +293,7 @@ test("top-level layout diagnostics preserve exact walked filename casing", async
     await writeFile(path.join(root, filename), "# Skill note\n");
     const result = await scan(root);
     assert.deepEqual(
-      result.diagnostics
+      result.rawDiagnostics
         .filter(
           (diagnostic) =>
             diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
@@ -319,7 +319,7 @@ test("skill-like files outside explicit skill directories are not classified as 
     1,
   );
   assert.ok(
-    result.diagnostics.some(
+    result.rawDiagnostics.some(
       (diagnostic) =>
         diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR" &&
         diagnostic.severity === "info" &&
@@ -335,7 +335,7 @@ test("scan does not select a skill root when neither explicit skill directory no
 
   assert.equal(result.scannedFileCount, 0);
   assert.equal(
-    result.diagnostics.some((diagnostic) =>
+    result.rawDiagnostics.some((diagnostic) =>
       diagnostic.code?.startsWith("LAYOUT-SKILL-LIKE"),
     ),
     false,

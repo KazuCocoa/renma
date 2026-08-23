@@ -204,7 +204,7 @@ export function buildBomReport(
     scanResult.findings,
     readinessDiagnosticsFromRepositorySnapshot(
       snapshot,
-      scanResult.diagnostics,
+      scanResult.rawDiagnostics,
       { includeSkillDiscovery: false },
     ),
     scanResult.contextLens,

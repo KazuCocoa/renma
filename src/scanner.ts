@@ -2,7 +2,10 @@ import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { catalogDiagnosticFindings } from "./catalog-findings.js";
 import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
-import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
+import {
+  createScanDiagnostics,
+  createReviewBundles,
+} from "./scan-diagnostics.js";
 import { copyFindingWith } from "./finding-repair-guidance.js";
 import {
   collectRepositorySnapshot,
@@ -154,7 +157,7 @@ export function scanFromRepositorySnapshot(
     ...skillDiscoveryDiagnostics,
     ...remainingDiagnostics,
   ];
-  const diagnosticsV2 = createDiagnosticsV2({
+  const diagnostics = createScanDiagnostics({
     findings: suppressed.findings,
     diagnostics: scanDiagnostics,
   });
@@ -199,9 +202,9 @@ export function scanFromRepositorySnapshot(
     trustGraph,
     findings: suppressed.findings,
     suppressedFindings: suppressed.suppressedFindings,
-    diagnostics: scanDiagnostics,
-    diagnosticsV2,
-    reviewBundles: createReviewBundles(diagnosticsV2),
+    rawDiagnostics: scanDiagnostics,
+    diagnostics,
+    reviewBundles: createReviewBundles(diagnostics),
     exitThreshold: snapshot.config.failOn,
   };
 }

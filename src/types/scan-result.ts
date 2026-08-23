@@ -35,8 +35,10 @@ export interface ScanResult {
   trustGraph?: TrustGraph;
   findings: Finding[];
   suppressedFindings: SuppressedFindingEvidence[];
-  diagnostics: Diagnostic[];
-  diagnosticsV2: DiagnosticV2[];
+  /** Producer-level diagnostics retained for internal policy and text output. */
+  rawDiagnostics: Diagnostic[];
+  /** Canonical normalized diagnostics used by the scan JSON contract. */
+  diagnostics: DiagnosticV2[];
   reviewBundles: ReviewBundle[];
   exitThreshold: Severity;
 }
