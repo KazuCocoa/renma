@@ -29,6 +29,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   contexts and standard input consumed as shell code remain operational, while
   unrecognized wrappers, consumers, and shell options use conservative
   matching.
+- Shell-wrapper execution evidence now distinguishes proven execution, known
+  non-execution modes, and unknown options, so lookup, help, or version modes
+  stay inert while unrecognized options retain conservative command-risk
+  matching.
+- The npm publication workflow now blocks its OIDC-enabled publish job on the
+  existing deterministic release metadata contract as well as exact annotated
+  tag, `origin/main`, and package-version identity.
 - Bounded negative-subject safeguard instructions such as “No Skill … may
   bypass” no longer overlap with `SEC-SAFEGUARD-BYPASS-INSTRUCTION`; a later
   independently expressed bypass remains reportable.

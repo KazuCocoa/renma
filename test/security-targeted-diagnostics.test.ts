@@ -163,6 +163,199 @@ ${command}
   }
 });
 
+test("non-executing wrapper modes do not classify their lookup targets", () => {
+  for (const command of [
+    "command -v rm -rf",
+    "command -V sudo some-command",
+    "env --help rm -rf /tmp/example",
+    "env --version rm -rf /tmp/example",
+    "sudo -V rm -rf /tmp/example",
+    "sudo -l rm -rf /tmp/example",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("sudo dual-mode options execute when a target command remains", () => {
+  for (const command of [
+    "sudo -k rm -rf /tmp/example",
+    "sudo --reset-timestamp rm -rf /tmp/example",
+    "sudo -h remote.example rm -rf /tmp/example",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    findingFor(findings, "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD");
+  }
+});
+
+test("sudo dual-mode suppressions retain deterministic operation kinds", () => {
+  for (const command of [
+    "sudo -k rm -rf /tmp/example || true",
+    "sudo --reset-timestamp rm -rf /tmp/example || true",
+    "sudo -h remote.example rm -rf /tmp/example || true",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    findingFor(findings, "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD");
+    assert.deepEqual(
+      findingFor(findings, RISKY_SUPPRESSION_ID).details?.operationKinds,
+      ["destructive-command", "privileged-command"],
+      command,
+    );
+  }
+});
+
+test("standalone sudo administrative modes remain non-executing", () => {
+  for (const command of [
+    "sudo -k",
+    "sudo --reset-timestamp",
+    "sudo -h",
+    "sudo -h remote.example",
+    "sudo -V",
+    "sudo --version",
+    "sudo -l",
+    "sudo --list",
+    "sudo -v",
+    "sudo --validate",
+    "sudo -K",
+    "sudo --remove-timestamp",
+    "sudo --help",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("executing and unknown wrapper options cannot bypass command risk", () => {
+  for (const command of [
+    "env -v rm -rf /tmp/example",
+    "env --debug rm -rf /tmp/example",
+    "env --future-option rm -rf /tmp/example",
+  ]) {
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+  }
+
+  for (const command of [
+    "sudo -A rm -rf /tmp/example || true",
+    "sudo -b rm -rf /tmp/example || true",
+    "sudo --future-option rm -rf /tmp/example || true",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    findingFor(findings, "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD");
+    assert.deepEqual(
+      findingFor(findings, RISKY_SUPPRESSION_ID).details?.operationKinds,
+      ["destructive-command", "privileged-command"],
+      command,
+    );
+  }
+});
+
+test("generated scripts are intentionally outside core analysis", () => {
+  for (const command of [
+    "echo 'rm -rf /tmp/example' > run.sh; sh run.sh",
+    "printf '%s\\n' 'sudo some-command' > run.sh; bash run.sh",
+    "echo 'git reset --hard' | tee run.sh; sh run.sh",
+    "echo 'rm -rf /tmp/example' > run.sh; sh run.sh || true",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("direct risky operations remain command-position findings", () => {
+  const cases: Array<{ command: string; diagnosticIds: string[] }> = [
+    {
+      command: "rm -rf /tmp/example",
+      diagnosticIds: ["SEC-DESTRUCTIVE-COMMAND"],
+    },
+    {
+      command: "sudo some-command",
+      diagnosticIds: ["SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD"],
+    },
+    {
+      command: "sudo rm -rf /tmp/example",
+      diagnosticIds: [
+        "SEC-DESTRUCTIVE-COMMAND",
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+      ],
+    },
+    {
+      command: "rm -rf /tmp/example || true",
+      diagnosticIds: ["SEC-DESTRUCTIVE-COMMAND", RISKY_SUPPRESSION_ID],
+    },
+    {
+      command: "sudo some-command || :",
+      diagnosticIds: [
+        "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+        RISKY_SUPPRESSION_ID,
+      ],
+    },
+  ];
+
+  for (const { command, diagnosticIds } of cases) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    for (const diagnosticId of diagnosticIds)
+      findingFor(findings, diagnosticId);
+  }
+});
+
 test("pipeline inputs fail closed unless the consumer is proven literal-only", () => {
   const cases: Array<{
     disposition: "operational" | "unknown";

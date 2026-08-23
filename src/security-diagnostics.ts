@@ -73,6 +73,13 @@ import {
   tokenizeBoundedShell,
 } from "./security-command/shell.js";
 import {
+  directShellExecutable,
+  effectiveShellExecutable,
+  effectiveShellExecutableIndex,
+  resolveShellExecutableWords,
+  shellCommandWords,
+} from "./security-command/shell-command.js";
+import {
   disclosureClauseRangesIntersectingRange,
   disclosureRangeIsExplicitlyProhibited,
 } from "./security-command/guards.js";
@@ -4683,7 +4690,6 @@ function classifyShellCommandRiskKinds(command: string): RiskyOperationKind[] {
       shellPipelineInputDispositions.get(index),
     );
   }
-
   return (["destructive-command", "privileged-command"] as const).filter(
     (kind) => kinds.has(kind),
   );
@@ -4696,8 +4702,19 @@ function addShellCommandSegmentRiskKinds(
 ): void {
   if (!segment) return;
 
-  const executable = directShellExecutable(segment);
-  const effectiveExecutable = effectiveShellExecutable(segment);
+  const words = shellCommandWords(segment);
+  const resolution =
+    words === undefined ? undefined : resolveShellExecutableWords(words);
+  if (resolution?.executionDisposition === "not-executed") return;
+  if (resolution?.executionDisposition === "unknown") {
+    for (const kind of fallbackShellCommandRiskKinds(segment)) kinds.add(kind);
+    return;
+  }
+
+  const executable =
+    resolution?.directExecutable ?? directShellExecutable(segment);
+  const effectiveExecutable =
+    resolution?.effectiveExecutable ?? effectiveShellExecutable(segment);
   const destructivePattern =
     effectiveExecutable === undefined
       ? undefined
@@ -4797,8 +4814,13 @@ function shellPipelineConsumerDisposition(
 ): ShellTextDisposition {
   const words = shellCommandWords(segment);
   if (words === undefined) return "unknown";
-  const executableIndex = effectiveShellExecutableIndex(words);
-  const executable = normalizedShellExecutable(words[executableIndex]);
+  const resolution = resolveShellExecutableWords(words);
+  if (resolution.executionDisposition === "not-executed") {
+    return "literal-only";
+  }
+  if (resolution.executionDisposition === "unknown") return "unknown";
+  const executableIndex = resolution.effectiveIndex;
+  const executable = resolution.effectiveExecutable;
   if (executable === undefined) return "unknown";
   if (SHELL_LITERAL_PIPELINE_CONSUMERS.has(executable)) {
     return "literal-only";
@@ -4905,109 +4927,6 @@ const SHELL_CODE_EXECUTABLES = new Set([
   "sh",
   "zsh",
 ]);
-const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
-const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
-const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
-const SHELL_WRAPPER_RE = /^(?:command|env)$/iu;
-const SHELL_WRAPPER_OPTION_WITH_VALUE_RE = /^(?:-u|--unset|-C|--chdir)$/u;
-const SUDO_OPTION_WITH_VALUE_RE =
-  /^(?:-[ughpCTRD]|--(?:user|group|host|prompt|chdir|command-timeout|chroot))$/u;
-
-function directShellExecutable(command: string): string | undefined {
-  const words = shellCommandWords(command);
-  if (words === undefined) return undefined;
-  return normalizedShellExecutable(words[directShellExecutableIndex(words)]);
-}
-
-function effectiveShellExecutable(command: string): string | undefined {
-  const words = shellCommandWords(command);
-  if (words === undefined) return undefined;
-  return normalizedShellExecutable(words[effectiveShellExecutableIndex(words)]);
-}
-
-function effectiveShellExecutableIndex(words: readonly string[]): number {
-  let index = directShellExecutableIndex(words);
-  if (normalizedShellExecutable(words[index]) !== "sudo") {
-    return index;
-  }
-
-  index += 1;
-  while ((words[index] ?? "").startsWith("-")) {
-    const option = words[index] ?? "";
-    index += 1;
-    if (SUDO_OPTION_WITH_VALUE_RE.test(option)) index += 1;
-  }
-  index = wrappedShellExecutableIndex(words, index);
-  return index;
-}
-
-function normalizedShellExecutable(
-  word: string | undefined,
-): string | undefined {
-  if (word === undefined) return undefined;
-  return word.slice(word.lastIndexOf("/") + 1).toLowerCase();
-}
-
-function shellCommandWords(command: string): string[] | undefined {
-  const tokenization = tokenizeBoundedShell(command);
-  if (!tokenization.supported) return undefined;
-
-  const words: string[] = [];
-  let skipRedirectionTarget = false;
-  for (const [index, token] of tokenization.tokens.entries()) {
-    if (token.kind === "operator") {
-      skipRedirectionTarget = SHELL_REDIRECTION_OPERATOR_RE.test(token.value);
-      continue;
-    }
-    const next = tokenization.tokens[index + 1];
-    if (
-      /^\d+$/u.test(token.value) &&
-      next?.kind === "operator" &&
-      SHELL_REDIRECTION_OPERATOR_RE.test(next.value) &&
-      token.end === next.start
-    ) {
-      continue;
-    }
-    if (skipRedirectionTarget) {
-      skipRedirectionTarget = false;
-      continue;
-    }
-    words.push(token.value);
-  }
-  return words;
-}
-
-function directShellExecutableIndex(words: readonly string[]): number {
-  let index = 0;
-  while (SHELL_PRESENTATION_MARKER_RE.test(words[index] ?? "")) index += 1;
-  return wrappedShellExecutableIndex(words, index);
-}
-
-function wrappedShellExecutableIndex(
-  words: readonly string[],
-  startIndex: number,
-): number {
-  let index = startIndex;
-  while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-  while (SHELL_WRAPPER_RE.test(normalizedShellExecutable(words[index]) ?? "")) {
-    const wrapper = normalizedShellExecutable(words[index]) ?? "";
-    index += 1;
-    while ((words[index] ?? "").startsWith("-")) {
-      const option = words[index] ?? "";
-      index += 1;
-      if (option === "--") break;
-      if (shellWrapperOptionConsumesValue(option)) index += 1;
-    }
-    while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
-  }
-  return index;
-}
-
-function shellWrapperOptionConsumesValue(option: string): boolean {
-  if (option.includes("=")) return false;
-  return SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option);
-}
-
 function shellCommandRiskPatterns(
   definitions: readonly (readonly [string, string])[],
 ): ReadonlyMap<string, RegExp> {

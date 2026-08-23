@@ -978,10 +978,20 @@ static absolute paths and bounded `command`, `env`, assignment, and `sudo`
 wrappers preserve that executable evidence. Upload classification continues to
 use the existing destination analysis rather than a separate tool allowlist.
 Quoting risky command text as a literal argument to `echo` or `printf`, including
-ordinary variable interpolation, does not establish that operation; command
-substitution remains operational. A separate bounded prose grammar covers both
-“If the destructive operation fails, ignore the error and continue” and the
-coordinated reverse order “continue and ignore the error.” Generic `|| true`,
+ordinary variable interpolation, does not establish that operation. Command
+substitution remains operational. Known lookup, help, and version modes for the
+bounded `command`, `env`, and `sudo` wrappers are treated as non-execution;
+unknown wrapper options retain conservative direct-command matching.
+
+Renma analyzes directly expressed shell operations. It does not reconstruct
+command text written to a file and later executed as a generated script.
+Indirect execution through generated files requires human review or a
+dedicated shell-analysis tool. Suppressing failure from an unanalyzed generated
+file does not, by itself, establish risky-operation error suppression.
+
+A separate bounded prose grammar covers both “If the destructive operation
+fails, ignore the error and continue” and the coordinated reverse order
+“continue and ignore the error.” Generic `|| true`,
 capability probes, ordinary error handling, `set +e`, `try/catch`, and stderr
 redirection do not produce this finding by themselves. Direct prohibitions
 remain defensive. The repair is to preserve the failure, stop and report the

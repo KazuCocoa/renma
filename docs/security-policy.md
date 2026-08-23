@@ -573,12 +573,22 @@ or unknown. Risky-looking text is suppressed only along proven literal-only
 command and data paths, such as direct output through `echo` or `printf`.
 Command substitution, shell `-c`/`eval` contexts, and standard input consumed as
 shell code remain operational; unrecognized wrappers, consumers, and shell
-options use conservative matching. Local quotation or bounded source
-attribution such as “the incident report says:” or “the audit states:” keeps a
-blockquote inert even
-beneath a generic instruction heading; attribution does not need to contain the
-word “quote.” An explicit local execution route takes precedence. A routed blockquote is
-analyzed as an instruction only within that local structural boundary. For a
+options use conservative matching. Wrapper execution is tracked separately as
+proven, known not executed, or unknown. Known lookup, help, and version modes do
+not produce direct command-risk findings, while unknown options retain
+conservative matching.
+
+Renma analyzes directly expressed shell operations. It does not reconstruct
+command text written to a file and later executed as a generated script.
+Indirect execution through generated files requires human review or a
+dedicated shell-analysis tool.
+
+Local quotation or bounded source attribution such as “the incident report
+says:” or “the audit
+states:” keeps a blockquote inert even beneath a generic instruction heading;
+attribution does not need to contain the word “quote.” An explicit local
+execution route takes precedence. A routed blockquote is analyzed as an
+instruction only within that local structural boundary. For a
 routed multiline shell instruction, quote markers are removed only from the
 logical-shell analysis projection, while findings retain the exact quoted
 source lines. Generic wording such as “handle this carefully” is not an
@@ -848,8 +858,11 @@ Destructive and privileged shell classification requires the risky executable
 in command position. Static absolute paths and bounded wrappers retain that
 evidence, while uploads continue to reuse the existing destination analysis
 without a second tool allowlist. Literal `echo` or `printf` command text remains
-outside this finding when it contains ordinary variable interpolation; command
-substitution remains operational. Neither generic error handling nor a generic
+outside this finding when it contains ordinary variable interpolation.
+Command substitution remains operational. Command text written to a file and
+later executed is outside core analysis, so suppressing failure from that
+unanalyzed generated file does not establish this finding by itself. Neither
+generic error handling nor a generic
 suppression is enough: capability probes, ordinary commands, `try/catch`,
 `set +e`, and stderr redirection remain outside the rule by themselves. Preserve
 the failure, stop and report the blocker, and add explicit verification or

@@ -14,14 +14,23 @@ concurrency:
 
 jobs:
   verify-release-ref:
-    name: Verify release tag and main identity
+    name: Verify release ref and metadata
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Verify annotated release tag at exact origin/main
         run: node scripts/verify-release-tag.mjs
+
+      - name: Verify release metadata contract
+        shell: bash
+        run: |
+          node tools/release-prep.mjs \
+            --check-only \
+            --version "${GITHUB_REF_NAME#v}"
 
   validate-supported-runtime:
     name: Supported runtime (${{ matrix.runtime }})
