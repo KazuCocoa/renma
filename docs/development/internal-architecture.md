@@ -448,6 +448,21 @@ logical shell command receives one result that reuses its existing
 `DestinationAnalysis`; physical continuation members do not independently
 reanalyze that command.
 
+`src/security-command/shell-command.ts` owns the shared shell-wrapper
+resolution state. Execution is a three-way disposition—`proven`,
+`not-executed`, or `unknown`—so an explicitly inert lookup/help mode is not
+conflated with an unrecognized option that may still execute. Only `proven`
+resolution can establish generated-script producer, `tee`, consumer, or
+mutation evidence; ordinary command risk uses conservative fallback for
+`unknown`. `src/security-command/generated-script.ts` returns bounded values
+with completeness and stable limitation reasons. Bytes, command count, tracked
+files, executions, alternatives, and unsupported generated shell syntax cannot
+silently become an empty complete result. Diagnostic projection classifies
+retained commands and falls back over the relevant original shell text when the
+bounded result is incomplete. `tee` operand identity additionally rejects
+relative paths across a possible cwd change and every operand across a possible
+root change, without applying the wrapper context to shell-owned redirections.
+
 `SEC-UNPINNED-DEPENDENCY-INSTALL` also retains its older bounded line-level
 fallback for Homebrew formula installs and Docker image pull/run commands.
 Structured npm/PyPI analysis suppresses that fallback only when the structured

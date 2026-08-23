@@ -16,6 +16,20 @@ export type BoundedGeneratedScriptExecution = {
   consumerSpan: Readonly<{ start: number; end: number }>;
 };
 
+export type GeneratedScriptAnalysisLimitation =
+  | "bytes"
+  | "commands"
+  | "tracked-files"
+  | "executions"
+  | "alternatives"
+  | "unsupported-shell-syntax";
+
+export type BoundedGeneratedScriptResult<T> = {
+  values: readonly T[];
+  complete: boolean;
+  limitations: readonly GeneratedScriptAnalysisLimitation[];
+};
+
 type Segment = {
   start: number;
   end: number;
@@ -41,6 +55,15 @@ export const MAX_GENERATED_SCRIPT_COMMANDS = 256;
 export const MAX_TRACKED_GENERATED_FILES = 64;
 export const MAX_GENERATED_SCRIPT_EXECUTIONS = 64;
 export const MAX_GENERATED_SCRIPT_ALTERNATIVES = 8;
+
+const GENERATED_SCRIPT_LIMITATION_ORDER = [
+  "bytes",
+  "commands",
+  "tracked-files",
+  "executions",
+  "alternatives",
+  "unsupported-shell-syntax",
+] as const satisfies readonly GeneratedScriptAnalysisLimitation[];
 
 type FileWrite = {
   mode: "append" | "overwrite";
@@ -92,8 +115,18 @@ const PROVEN_NON_MUTATING_EXECUTABLES = new Set([
 export function boundedGeneratedScriptExecutions(
   input: string,
 ): readonly BoundedGeneratedScriptExecution[] {
+  return analyzeBoundedGeneratedScriptExecutions(input).values;
+}
+
+export function analyzeBoundedGeneratedScriptExecutions(
+  input: string,
+): BoundedGeneratedScriptResult<BoundedGeneratedScriptExecution> {
+  const limitations = new Set<GeneratedScriptAnalysisLimitation>();
   const tokenization = tokenizeBoundedShell(input);
-  if (!tokenization.supported) return [];
+  if (!tokenization.supported) {
+    limitations.add("unsupported-shell-syntax");
+    return boundedResult([], limitations);
+  }
 
   const segments = commandSegments(input, tokenization.tokens);
   let files: GeneratedFiles = new Map();
@@ -113,6 +146,7 @@ export function boundedGeneratedScriptExecutions(
 
     const parsed = parseSegment(segment.text);
     if (parsed === undefined) {
+      limitations.add("unsupported-shell-syntax");
       const effects = unknownEffects();
       applyInvalidations(files, effects);
       mergeEffects(operandEffects, effects);
@@ -128,15 +162,15 @@ export function boundedGeneratedScriptExecutions(
         pendingOrSuccess =
           pendingOrSuccess === undefined
             ? successfulFiles
-            : mergeMayFiles(pendingOrSuccess, successfulFiles);
+            : mergeMayFiles(pendingOrSuccess, successfulFiles, limitations);
       } else if (pendingOrSuccess !== undefined) {
-        files = mergeMayFiles(pendingOrSuccess, files);
+        files = mergeMayFiles(pendingOrSuccess, files, limitations);
         pendingOrSuccess = undefined;
       }
       continue;
     }
 
-    const produced = staticLiteralOutput(parsed, segment);
+    const produced = staticLiteralOutput(parsed, segment, limitations);
     const successfulRedirectionEffects = effectsPreservingKnownAppends(
       parsed.redirectionEffects,
       parsed.stdoutWrite === undefined ? [] : [parsed.stdoutWrite],
@@ -160,7 +194,10 @@ export function boundedGeneratedScriptExecutions(
         consumerPath === undefined ? undefined : files.get(consumerPath.key);
       if (consumerPath !== undefined && outputs !== undefined) {
         for (const output of outputs) {
-          if (executions.length >= MAX_GENERATED_SCRIPT_EXECUTIONS) break;
+          if (executions.length >= MAX_GENERATED_SCRIPT_EXECUTIONS) {
+            limitations.add("executions");
+            break;
+          }
           executions.push({
             path: consumerPath.key,
             shellText: output.shellText,
@@ -185,17 +222,22 @@ export function boundedGeneratedScriptExecutions(
         pipelineOutput = produced;
       } else {
         if (parsed.stdoutWrite !== undefined) {
-          applyFileWrite(files, parsed.stdoutWrite, produced);
+          applyFileWrite(files, parsed.stdoutWrite, produced, limitations);
         }
         pipelineOutput = undefined;
       }
     } else if (receivesPipeline && tee !== undefined) {
       for (const write of tee.writes) {
-        applyFileWrite(files, write, pipelineOutput);
+        applyFileWrite(files, write, pipelineOutput, limitations);
       }
       if (parsed.stdoutRedirected) {
         if (parsed.stdoutWrite !== undefined) {
-          applyFileWrite(files, parsed.stdoutWrite, pipelineOutput);
+          applyFileWrite(
+            files,
+            parsed.stdoutWrite,
+            pipelineOutput,
+            limitations,
+          );
         }
         pipelineOutput = undefined;
       }
@@ -221,20 +263,28 @@ export function boundedGeneratedScriptExecutions(
       pendingOrSuccess =
         pendingOrSuccess === undefined
           ? successfulFiles
-          : mergeMayFiles(pendingOrSuccess, successfulFiles);
+          : mergeMayFiles(pendingOrSuccess, successfulFiles, limitations);
     } else if (pendingOrSuccess !== undefined) {
-      files = mergeMayFiles(pendingOrSuccess, files);
+      files = mergeMayFiles(pendingOrSuccess, files, limitations);
       pendingOrSuccess = undefined;
     }
   }
 
-  return Object.freeze(executions.map((execution) => Object.freeze(execution)));
+  return boundedResult(executions, limitations);
 }
 
 /** Project reconstructed bytes into independently classifiable shell commands. */
 export function generatedLogicalShellCommands(shellText: string): string[] {
+  return [...analyzeGeneratedLogicalShellCommands(shellText).values];
+}
+
+export function analyzeGeneratedLogicalShellCommands(
+  shellText: string,
+): BoundedGeneratedScriptResult<string> {
+  const limitations = new Set<GeneratedScriptAnalysisLimitation>();
   if (utf8ByteLength(shellText) > MAX_GENERATED_SCRIPT_BYTES) {
-    return [];
+    limitations.add("bytes");
+    return boundedResult([], limitations);
   }
   const physicalLines = shellText.split(/\r?\n/u);
   const commands: string[] = [];
@@ -273,15 +323,19 @@ export function generatedLogicalShellCommands(shellText: string): string[] {
             kind === "operator" && (value === "<<" || value === "<<-"),
         )
       ) {
-        return [];
+        limitations.add("unsupported-shell-syntax");
+        break;
       }
-      if (commands.length >= MAX_GENERATED_SCRIPT_COMMANDS) break;
+      if (commands.length >= MAX_GENERATED_SCRIPT_COMMANDS) {
+        limitations.add("commands");
+        break;
+      }
       commands.push(projection);
     }
     index = cursor + 1;
   }
 
-  return commands;
+  return boundedResult(commands, limitations);
 }
 
 function commandSegments(
@@ -374,20 +428,31 @@ function parseSegment(segment: string): ParsedSegment | undefined {
 function staticLiteralOutput(
   parsed: ParsedSegment,
   segment: Segment,
+  limitations: Set<GeneratedScriptAnalysisLimitation>,
 ): StaticOutput | undefined {
-  if (!parsed.resolution.executionProven) return undefined;
+  if (parsed.resolution.executionDisposition !== "proven") return undefined;
+  if (!parsed.stdoutRedirected && segment.boundaryAfter !== "|") {
+    return undefined;
+  }
   const { effectiveExecutable, effectiveIndex } = parsed.resolution;
   const args = parsed.wordTokens.slice(effectiveIndex + 1);
   let shellText: string | undefined;
 
   if (effectiveExecutable === "echo") shellText = staticEchoOutput(args);
-  else if (effectiveExecutable === "printf")
-    shellText = staticPrintfOutput(args);
+  else if (effectiveExecutable === "printf") {
+    shellText = staticPrintfOutput(args, limitations);
+  }
   if (shellText === undefined) return undefined;
+
+  const byteLength = utf8ByteLength(shellText);
+  if (byteLength > MAX_GENERATED_SCRIPT_BYTES) {
+    limitations.add("bytes");
+    return undefined;
+  }
 
   return {
     shellText,
-    byteLength: utf8ByteLength(shellText),
+    byteLength,
     producerSpan: { start: segment.start, end: segment.end },
   };
 }
@@ -401,7 +466,10 @@ function staticEchoOutput(args: readonly ShellToken[]): string | undefined {
   return `${values.join(" ")}${index === 0 ? "\n" : ""}`;
 }
 
-function staticPrintfOutput(args: readonly ShellToken[]): string | undefined {
+function staticPrintfOutput(
+  args: readonly ShellToken[],
+  limitations: Set<GeneratedScriptAnalysisLimitation>,
+): string | undefined {
   const index = args[0]?.value === "--" ? 1 : 0;
   if ((args[index]?.value ?? "").startsWith("-")) return undefined;
   const format = args[index];
@@ -414,12 +482,13 @@ function staticPrintfOutput(args: readonly ShellToken[]): string | undefined {
   ) {
     return undefined;
   }
-  return renderStaticPrintf(staticFormat, values as string[]);
+  return renderStaticPrintf(staticFormat, values as string[], limitations);
 }
 
 function renderStaticPrintf(
   format: string,
   values: readonly string[],
+  limitations: Set<GeneratedScriptAnalysisLimitation>,
 ): string | undefined {
   let output = "";
   let outputBytes = 0;
@@ -427,7 +496,10 @@ function renderStaticPrintf(
   let repeats = 0;
   const append = (addition: string): boolean => {
     outputBytes += utf8ByteLength(addition);
-    if (outputBytes > MAX_GENERATED_SCRIPT_BYTES) return false;
+    if (outputBytes > MAX_GENERATED_SCRIPT_BYTES) {
+      limitations.add("bytes");
+      return false;
+    }
     output += addition;
     return true;
   };
@@ -507,7 +579,7 @@ function staticPrintfEscape(
 
 function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
   if (
-    !parsed.resolution.executionProven ||
+    parsed.resolution.executionDisposition !== "proven" ||
     parsed.resolution.effectiveExecutable !== "tee"
   ) {
     return undefined;
@@ -554,6 +626,13 @@ function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
       effects.unknownFileMutation = true;
       continue;
     }
+    if (
+      parsed.resolution.executionRootMayChange ||
+      (!path.absolute && parsed.resolution.executionCwdMayChange)
+    ) {
+      effects.unknownFileMutation = true;
+      continue;
+    }
     effects.exactMutatedPaths.add(path.key);
     writes.push({ mode, path });
   }
@@ -568,9 +647,9 @@ function staticScriptConsumerPath(
     effectiveIndex,
     executionCwdMayChange,
     executionRootMayChange,
-    executionProven,
+    executionDisposition,
   } = parsed.resolution;
-  if (!executionProven) return undefined;
+  if (executionDisposition !== "proven") return undefined;
   if (
     effectiveExecutable === undefined ||
     (!SHELL_EXECUTABLES.has(effectiveExecutable) &&
@@ -605,8 +684,11 @@ function staticScriptConsumerPath(
 }
 
 function commandEffects(parsed: ParsedSegment): BoundedShellEffects {
+  if (parsed.resolution.executionDisposition === "not-executed") {
+    return emptyEffects();
+  }
   if (
-    !parsed.resolution.executionProven ||
+    parsed.resolution.executionDisposition !== "proven" ||
     parsed.resolution.executionCwdMayChange ||
     parsed.resolution.executionRootMayChange
   ) {
@@ -879,6 +961,7 @@ function applyFileWrite(
   files: GeneratedFiles,
   write: FileWrite,
   output: StaticOutput | undefined,
+  limitations: Set<GeneratedScriptAnalysisLimitation>,
 ): void {
   if (output === undefined) {
     files.delete(write.path.key);
@@ -889,6 +972,7 @@ function applyFileWrite(
       !files.has(write.path.key) &&
       files.size >= MAX_TRACKED_GENERATED_FILES
     ) {
+      limitations.add("tracked-files");
       return;
     }
     files.set(write.path.key, [output]);
@@ -898,7 +982,10 @@ function applyFileWrite(
   if (existing === undefined) return;
   const appended = existing.flatMap((candidate) => {
     const byteLength = candidate.byteLength + output.byteLength;
-    if (byteLength > MAX_GENERATED_SCRIPT_BYTES) return [];
+    if (byteLength > MAX_GENERATED_SCRIPT_BYTES) {
+      limitations.add("bytes");
+      return [];
+    }
     return [
       {
         shellText: candidate.shellText + output.shellText,
@@ -914,6 +1001,9 @@ function applyFileWrite(
     files.delete(write.path.key);
     return;
   }
+  if (appended.length > MAX_GENERATED_SCRIPT_ALTERNATIVES) {
+    limitations.add("alternatives");
+  }
   files.set(
     write.path.key,
     appended.slice(0, MAX_GENERATED_SCRIPT_ALTERNATIVES),
@@ -923,12 +1013,19 @@ function applyFileWrite(
 function mergeMayFiles(
   first: ReadonlyMap<string, readonly StaticOutput[]>,
   second: ReadonlyMap<string, readonly StaticOutput[]>,
+  limitations: Set<GeneratedScriptAnalysisLimitation>,
 ): GeneratedFiles {
   const merged = cloneFiles(first);
   for (const [path, outputs] of second) {
     const existing = merged.get(path);
     if (existing === undefined) {
-      if (merged.size >= MAX_TRACKED_GENERATED_FILES) continue;
+      if (merged.size >= MAX_TRACKED_GENERATED_FILES) {
+        limitations.add("tracked-files");
+        continue;
+      }
+      if (outputs.length > MAX_GENERATED_SCRIPT_ALTERNATIVES) {
+        limitations.add("alternatives");
+      }
       merged.set(path, outputs.slice(0, MAX_GENERATED_SCRIPT_ALTERNATIVES));
     } else {
       const alternatives = [...existing];
@@ -938,7 +1035,10 @@ function mergeMayFiles(
         ) {
           continue;
         }
-        if (alternatives.length >= MAX_GENERATED_SCRIPT_ALTERNATIVES) break;
+        if (alternatives.length >= MAX_GENERATED_SCRIPT_ALTERNATIVES) {
+          limitations.add("alternatives");
+          break;
+        }
         alternatives.push(output);
       }
       merged.set(path, alternatives);
@@ -995,4 +1095,27 @@ function cloneFiles(
   files: ReadonlyMap<string, readonly StaticOutput[]>,
 ): GeneratedFiles {
   return new Map([...files].map(([path, outputs]) => [path, [...outputs]]));
+}
+
+function boundedResult<T>(
+  values: readonly T[],
+  limitations: ReadonlySet<GeneratedScriptAnalysisLimitation>,
+): BoundedGeneratedScriptResult<T> {
+  const boundedValues = Object.freeze(
+    values.map((value) =>
+      typeof value === "object" && value !== null
+        ? Object.freeze(value)
+        : value,
+    ),
+  );
+  const boundedLimitations = Object.freeze(
+    GENERATED_SCRIPT_LIMITATION_ORDER.filter((limitation) =>
+      limitations.has(limitation),
+    ),
+  );
+  return Object.freeze({
+    values: boundedValues,
+    complete: boundedLimitations.length === 0,
+    limitations: boundedLimitations,
+  });
 }

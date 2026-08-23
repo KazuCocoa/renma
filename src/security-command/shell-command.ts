@@ -9,8 +9,10 @@ export type ShellExecutableResolution = {
   sudo: boolean;
   executionCwdMayChange: boolean;
   executionRootMayChange: boolean;
-  executionProven: boolean;
+  executionDisposition: ShellExecutionDisposition;
 };
+
+export type ShellExecutionDisposition = "proven" | "not-executed" | "unknown";
 
 const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
@@ -52,18 +54,21 @@ export function resolveShellExecutableWords(
       sudo: false,
       executionCwdMayChange: direct.cwdMayChange,
       executionRootMayChange: false,
-      executionProven: direct.executionProven,
+      executionDisposition: direct.executionDisposition,
     };
   }
 
   index = direct.index + 1;
   let sudoCwdMayChange = false;
   let sudoRootMayChange = false;
-  let sudoExecutionProven = true;
+  let sudoExecutionDisposition: ShellExecutionDisposition = "proven";
   while ((words[index] ?? "").startsWith("-")) {
     const option = words[index] ?? "";
     index += 1;
-    sudoExecutionProven &&= sudoOptionProvesExecution(option);
+    sudoExecutionDisposition = combineExecutionDispositions(
+      sudoExecutionDisposition,
+      sudoOptionExecutionDisposition(option),
+    );
     if (
       option === "-D" ||
       option === "--chdir" ||
@@ -84,7 +89,12 @@ export function resolveShellExecutableWords(
       sudoRootMayChange = true;
     }
     if (SUDO_OPTION_WITH_VALUE_RE.test(option)) {
-      if ((words[index] ?? "").length === 0) sudoExecutionProven = false;
+      if ((words[index] ?? "").length === 0) {
+        sudoExecutionDisposition = combineExecutionDispositions(
+          sudoExecutionDisposition,
+          "not-executed",
+        );
+      }
       index += 1;
     }
   }
@@ -100,10 +110,11 @@ export function resolveShellExecutableWords(
     executionCwdMayChange:
       direct.cwdMayChange || sudoCwdMayChange || effective.cwdMayChange,
     executionRootMayChange: sudoRootMayChange,
-    executionProven:
-      direct.executionProven &&
-      sudoExecutionProven &&
-      effective.executionProven,
+    executionDisposition: combineExecutionDispositions(
+      direct.executionDisposition,
+      sudoExecutionDisposition,
+      effective.executionDisposition,
+    ),
   };
 }
 
@@ -166,12 +177,12 @@ function wrappedShellExecutableResolution(
   index: number;
   wrappers: string[];
   cwdMayChange: boolean;
-  executionProven: boolean;
+  executionDisposition: ShellExecutionDisposition;
 } {
   let index = startIndex;
   const wrappers: string[] = [];
   let cwdMayChange = false;
-  let executionProven = true;
+  let executionDisposition: ShellExecutionDisposition = "proven";
   while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   while (SHELL_WRAPPER_RE.test(normalizeShellExecutable(words[index]) ?? "")) {
     const wrapper = normalizeShellExecutable(words[index]) ?? "";
@@ -181,7 +192,10 @@ function wrappedShellExecutableResolution(
       const option = words[index] ?? "";
       index += 1;
       if (option === "--") break;
-      executionProven &&= wrapperOptionProvesExecution(wrapper, option);
+      executionDisposition = combineExecutionDispositions(
+        executionDisposition,
+        wrapperOptionExecutionDisposition(wrapper, option),
+      );
       if (
         wrapper === "env" &&
         (option === "-C" ||
@@ -192,13 +206,18 @@ function wrappedShellExecutableResolution(
         cwdMayChange = true;
       }
       if (shellWrapperOptionConsumesValue(option)) {
-        if ((words[index] ?? "").length === 0) executionProven = false;
+        if ((words[index] ?? "").length === 0) {
+          executionDisposition = combineExecutionDispositions(
+            executionDisposition,
+            "not-executed",
+          );
+        }
         index += 1;
       }
     }
     while (SHELL_ASSIGNMENT_RE.test(words[index] ?? "")) index += 1;
   }
-  return { index, wrappers, cwdMayChange, executionProven };
+  return { index, wrappers, cwdMayChange, executionDisposition };
 }
 
 function shellWrapperOptionConsumesValue(option: string): boolean {
@@ -206,15 +225,23 @@ function shellWrapperOptionConsumesValue(option: string): boolean {
   return SHELL_WRAPPER_OPTION_WITH_VALUE_RE.test(option);
 }
 
-function wrapperOptionProvesExecution(
+function wrapperOptionExecutionDisposition(
   wrapper: string,
   option: string,
-): boolean {
+): ShellExecutionDisposition {
   if (wrapper === "command") {
-    return /^-p+$/u.test(option);
+    if (/^-p+$/u.test(option)) return "proven";
+    if (option === "--help" || /^-[p]*[vV][pvV]*$/u.test(option)) {
+      return "not-executed";
+    }
+    return "unknown";
   }
-  if (wrapper !== "env") return false;
-  return (
+  if (wrapper !== "env") return "unknown";
+  if (option === "--help" || option === "--version") {
+    return "not-executed";
+  }
+  return option === "-v" ||
+    option === "--debug" ||
     option === "-i" ||
     option === "--ignore-environment" ||
     option === "-u" ||
@@ -232,11 +259,14 @@ function wrapperOptionProvesExecution(
     option === "-a" ||
     option === "--argv0" ||
     (option.startsWith("--argv0=") && option.length > "--argv0=".length)
-  );
+    ? "proven"
+    : "unknown";
 }
 
-function sudoOptionProvesExecution(option: string): boolean {
-  if (option === "--") return true;
+function sudoOptionExecutionDisposition(
+  option: string,
+): ShellExecutionDisposition {
+  if (option === "--") return "proven";
   if (option.startsWith("--")) {
     const equals = option.indexOf("=");
     const name = option.slice(0, equals < 0 ? undefined : equals);
@@ -251,7 +281,7 @@ function sudoOptionProvesExecution(option: string): boolean {
         "--remove-timestamp",
       ]).has(name)
     ) {
-      return false;
+      return "not-executed";
     }
     const valueTaking = new Set([
       "--user",
@@ -263,10 +293,14 @@ function sudoOptionProvesExecution(option: string): boolean {
       "--chroot",
     ]);
     if (valueTaking.has(name)) {
-      return attachedValue === undefined || attachedValue.length > 0;
+      return attachedValue === undefined || attachedValue.length > 0
+        ? "proven"
+        : "not-executed";
     }
     if (name === "--preserve-env") {
-      return attachedValue === undefined || attachedValue.length > 0;
+      return attachedValue === undefined || attachedValue.length > 0
+        ? "proven"
+        : "not-executed";
     }
     const flagOnly = new Set([
       "--set-home",
@@ -275,13 +309,26 @@ function sudoOptionProvesExecution(option: string): boolean {
       "--stdin",
       "--shell",
     ]);
-    return flagOnly.has(name) && attachedValue === undefined;
+    if (flagOnly.has(name) && attachedValue === undefined) return "proven";
+    return "unknown";
   }
-  if (!option.startsWith("-") || option === "-") return false;
+  if (!option.startsWith("-") || option === "-") return "unknown";
   const flags = option.slice(1);
-  if (/[hVlvkK]/u.test(flags)) return false;
-  if (/^[nSEHs]+$/u.test(flags)) return true;
-  return (
-    /^-[ughpCTRD].+/u.test(option) || SUDO_OPTION_WITH_VALUE_RE.test(option)
-  );
+  if (/[hVlvkK]/u.test(flags)) return "not-executed";
+  if (/^[AbBEHinPSs]+$/u.test(flags)) return "proven";
+  if (
+    /^-[ughpCTRD].+/u.test(option) ||
+    SUDO_OPTION_WITH_VALUE_RE.test(option)
+  ) {
+    return "proven";
+  }
+  return "unknown";
+}
+
+function combineExecutionDispositions(
+  ...dispositions: readonly ShellExecutionDisposition[]
+): ShellExecutionDisposition {
+  if (dispositions.includes("not-executed")) return "not-executed";
+  if (dispositions.includes("unknown")) return "unknown";
+  return "proven";
 }

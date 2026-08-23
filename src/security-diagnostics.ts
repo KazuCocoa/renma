@@ -73,8 +73,9 @@ import {
   tokenizeBoundedShell,
 } from "./security-command/shell.js";
 import {
+  analyzeBoundedGeneratedScriptExecutions,
+  analyzeGeneratedLogicalShellCommands,
   boundedGeneratedScriptExecutions,
-  generatedLogicalShellCommands,
 } from "./security-command/generated-script.js";
 import {
   directShellExecutable,
@@ -4736,9 +4737,15 @@ function generatedScriptRiskKinds(
   command: string,
   consumerStart = 0,
 ): RiskyOperationKind[] {
-  return generatedScriptExecutionRiskKinds(
-    boundedGeneratedScriptExecutions(command),
-    consumerStart,
+  const analysis = analyzeBoundedGeneratedScriptExecutions(command);
+  const kinds = new Set(
+    generatedScriptExecutionRiskKinds(analysis.values, consumerStart),
+  );
+  if (!analysis.complete) {
+    for (const kind of fallbackShellCommandRiskKinds(command)) kinds.add(kind);
+  }
+  return (["destructive-command", "privileged-command"] as const).filter(
+    (kind) => kinds.has(kind),
   );
 }
 
@@ -4749,10 +4756,14 @@ function generatedScriptExecutionRiskKinds(
   const kinds = new Set<RiskyOperationKind>();
   for (const execution of executions) {
     if (execution.consumerSpan.start < consumerStart) continue;
-    for (const logicalCommand of generatedLogicalShellCommands(
-      execution.shellText,
-    )) {
+    const analysis = analyzeGeneratedLogicalShellCommands(execution.shellText);
+    for (const logicalCommand of analysis.values) {
       for (const kind of classifyShellCommandRiskKinds(logicalCommand, false)) {
+        kinds.add(kind);
+      }
+    }
+    if (!analysis.complete) {
+      for (const kind of fallbackShellCommandRiskKinds(execution.shellText)) {
         kinds.add(kind);
       }
     }
@@ -4770,15 +4781,18 @@ function addShellCommandSegmentRiskKinds(
   if (!segment) return;
 
   const words = shellCommandWords(segment);
-  if (
-    words !== undefined &&
-    !resolveShellExecutableWords(words).executionProven
-  ) {
+  const resolution =
+    words === undefined ? undefined : resolveShellExecutableWords(words);
+  if (resolution?.executionDisposition === "not-executed") return;
+  if (resolution?.executionDisposition === "unknown") {
+    for (const kind of fallbackShellCommandRiskKinds(segment)) kinds.add(kind);
     return;
   }
 
-  const executable = directShellExecutable(segment);
-  const effectiveExecutable = effectiveShellExecutable(segment);
+  const executable =
+    resolution?.directExecutable ?? directShellExecutable(segment);
+  const effectiveExecutable =
+    resolution?.effectiveExecutable ?? effectiveShellExecutable(segment);
   const destructivePattern =
     effectiveExecutable === undefined
       ? undefined
@@ -4878,8 +4892,13 @@ function shellPipelineConsumerDisposition(
 ): ShellTextDisposition {
   const words = shellCommandWords(segment);
   if (words === undefined) return "unknown";
-  const executableIndex = effectiveShellExecutableIndex(words);
-  const executable = normalizeShellExecutable(words[executableIndex]);
+  const resolution = resolveShellExecutableWords(words);
+  if (resolution.executionDisposition === "not-executed") {
+    return "literal-only";
+  }
+  if (resolution.executionDisposition === "unknown") return "unknown";
+  const executableIndex = resolution.effectiveIndex;
+  const executable = resolution.effectiveExecutable;
   if (executable === undefined) return "unknown";
   if (SHELL_LITERAL_PIPELINE_CONSUMERS.has(executable)) {
     return "literal-only";

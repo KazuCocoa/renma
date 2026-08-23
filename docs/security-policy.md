@@ -573,20 +573,30 @@ or unknown. Risky-looking text is suppressed only along proven literal-only
 command and data paths, such as direct output through `echo` or `printf`.
 Command substitution, shell `-c`/`eval` contexts, and standard input consumed as
 shell code remain operational; unrecognized wrappers, consumers, and shell
-options use conservative matching. Within one bounded logical shell command,
-Renma also correlates statically known `echo`/`printf` output written by an
-ordinary stdout redirection or captured by `tee` with a later `sh`, `bash`,
+options use conservative matching. Wrapper execution is tracked separately as
+proven, known not executed, or unknown: only the first state can establish a
+generated producer or consumer, while unknown options retain command-risk
+fallback instead of being assumed inert. Within one bounded logical shell
+command, Renma also correlates statically known `echo`/`printf` output written
+by an ordinary stdout redirection or captured by `tee` with a later `sh`, `bash`,
 `dash`, `ksh`, `zsh`, `fish`, `source`, or `.` consumer of the exact normalized
 static path. The generated text then reuses the same command-position-aware
 destructive and privileged classification. This is not filesystem or general
 shell data-flow analysis: Renma does not resolve variables or symlinks, inspect
 existing file content, correlate different bounded commands, or treat a write
-as executable without the matching later consumer. Local quotation or bounded
-source attribution such as “the incident report says:” or “the audit states:” keeps a
-blockquote inert even
-beneath a generic instruction heading; attribution does not need to contain the
-word “quote.” An explicit local execution route takes precedence. A routed blockquote is
-analyzed as an instruction only within that local structural boundary. For a
+as executable without the matching later consumer. Relative `tee` operands do
+not cross a wrapper working-directory change, and no `tee` operand crosses a
+possible chroot; absolute operands may cross only a working-directory change.
+Generated reconstruction stops at 64 KiB, 256 projected commands, 64 tracked
+files, 64 executions, or 8 alternatives per path. Hitting a bound or
+unsupported generated syntax records an incomplete internal result and invokes
+conservative command-risk fallback over the relevant original text, so later
+risky text is not silently discarded. Local quotation or bounded source
+attribution such as “the incident report says:” or “the audit states:” keeps a
+blockquote inert even beneath a generic instruction heading; attribution does
+not need to contain the word “quote.” An explicit local execution route takes
+precedence. A routed blockquote is analyzed as an instruction only within that
+local structural boundary. For a
 routed multiline shell instruction, quote markers are removed only from the
 logical-shell analysis projection, while findings retain the exact quoted
 source lines. Generic wording such as “handle this carefully” is not an

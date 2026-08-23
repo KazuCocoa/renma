@@ -997,8 +997,32 @@ relative facts while unaffected absolute facts survive. `;` and `&&` carry the
 successful post-state; `||` and `&` instead carry operand-entry facts after the
 operand's possible effects, so they cannot prove new background or failed
 writes. The ordinary diagnostics and generated-script consumer use the same
-assignment, `command`, `env`, and `sudo` executable resolver. `env source` and
-`sudo source` are not treated as current-shell builtin execution.
+assignment, `command`, `env`, and `sudo` executable resolver. That resolver
+distinguishes proven execution, known non-execution modes such as `command -v`,
+`env --help`, and `sudo -V`, and unknown options. Known non-execution produces
+no command-risk finding or generated correlation; unknown options cannot prove
+generated execution and retain conservative destructive or privileged fallback
+matching. Executing options such as GNU `env -v`/`--debug` and `sudo -A`/`-b`
+remain executable evidence. `env source` and `sudo source` are not treated as
+current-shell builtin execution.
+
+Wrapper execution context is part of generated path identity. If an `env -C`
+or equivalent wrapper may change the `tee` working directory, relative `tee`
+operands cannot correlate with later paths in the outer shell; absolute
+operands remain eligible. If `sudo -R`/`--chroot` may change the execution root,
+no `tee` operand path is correlated across that boundary. Shell-owned stdout
+redirections remain in the outer shell context and are evaluated separately.
+
+The reconstruction is explicitly bounded to 64 KiB per generated script, 256
+projected generated commands, 64 tracked generated files, 64 correlated
+executions, and 8 content alternatives per path. Limit hits and unsupported
+generated shell syntax are retained as an internal incomplete result rather
+than being indistinguishable from a complete result with no correlation.
+Already reconstructed commands are still classified; the original relevant
+shell text is also passed through the existing conservative destructive and
+privileged fallback so padding or an unsupported prefix cannot silently hide
+later risky text. Heredocs and ambiguous multiline quoting remain unsupported
+for generated-command projection.
 
 Paths may normalize `.` components, but any `..` component is rejected. Renma
 does not inspect files, resolve `~`, variables, substitutions, globs, symlinks,

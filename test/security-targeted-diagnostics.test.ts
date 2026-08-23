@@ -183,6 +183,44 @@ ${command}
   }
 });
 
+test("executing and unknown wrapper options cannot bypass command risk", () => {
+  for (const command of [
+    "env -v rm -rf /tmp/example",
+    "env --debug rm -rf /tmp/example",
+    "env --future-option rm -rf /tmp/example",
+  ]) {
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+  }
+
+  for (const command of [
+    "sudo -A rm -rf /tmp/example || true",
+    "sudo -b rm -rf /tmp/example || true",
+    "sudo --future-option rm -rf /tmp/example || true",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    findingFor(findings, "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD");
+    assert.deepEqual(
+      findingFor(findings, RISKY_SUPPRESSION_ID).details?.operationKinds,
+      ["destructive-command", "privileged-command"],
+      command,
+    );
+  }
+});
+
 test("generated script may-analysis retains risky branch alternatives", () => {
   const command =
     `echo 'rm -rf /tmp/example' > run.sh || ` +
@@ -213,6 +251,45 @@ ${command}
       findings.some(({ id }) => id === "SEC-DESTRUCTIVE-COMMAND"),
       true,
       command,
+    );
+  }
+});
+
+test("generated-script analysis limits fail closed for hidden later risk", () => {
+  const commandLimitedScript = [
+    ...Array.from({ length: 256 }, () => "echo safe"),
+    "rm -rf /tmp/after-command-limit",
+  ];
+  const commandLimited =
+    `printf '%s\\n' ${commandLimitedScript.map((line) => `'${line}'`).join(" ")} ` +
+    `> run.sh; sh run.sh`;
+
+  const alternatives = [
+    ...Array.from(
+      { length: 8 },
+      (_, index) => `echo 'echo safe ${index}' > run.sh`,
+    ),
+    `echo 'rm -rf /tmp/after-alternative-limit' > run.sh`,
+  ];
+  const alternativeLimited = `${alternatives.join(" || ")}; sh run.sh`;
+
+  const unsupportedPrefix =
+    `printf '%s\\n' 'cat <<EOF' 'safe' 'EOF' ` +
+    `'rm -rf /tmp/after-heredoc' > run.sh; sh run.sh`;
+
+  for (const command of [
+    commandLimited,
+    alternativeLimited,
+    unsupportedPrefix,
+  ]) {
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
     );
   }
 });
@@ -466,6 +543,48 @@ ${command}
       command,
     );
   }
+});
+
+test("tee wrapper cwd and root changes do not create false path correlations", () => {
+  const cwdCommand = `echo 'rm -rf /tmp/example' | env -C /tmp tee run.sh; sh run.sh`;
+  assert.deepEqual(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${cwdCommand}
+\`\`\`
+`).filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+    [],
+  );
+
+  const rootCommand = `echo 'rm -rf /tmp/example' | sudo -R /sandbox tee /tmp/run.sh; sh /tmp/run.sh`;
+  const rootFindings = findingsFor(`# Workflow
+
+\`\`\`bash
+${rootCommand}
+\`\`\`
+`);
+  assert.equal(
+    rootFindings.some(({ id }) => id === "SEC-DESTRUCTIVE-COMMAND"),
+    false,
+  );
+  assert.equal(
+    rootFindings.some(
+      ({ id }) => id === "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    ),
+    true,
+  );
+
+  const absoluteCommand = `echo 'rm -rf /tmp/example' | env -C /tmp tee /tmp/run.sh; sh /tmp/run.sh`;
+  findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${absoluteCommand}
+\`\`\`
+`),
+    "SEC-DESTRUCTIVE-COMMAND",
+  );
 });
 
 test("generated consumers reuse canonical env and sudo wrapper resolution", () => {

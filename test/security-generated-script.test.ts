@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  analyzeBoundedGeneratedScriptExecutions,
+  analyzeGeneratedLogicalShellCommands,
   boundedGeneratedScriptExecutions,
   generatedLogicalShellCommands,
   MAX_GENERATED_SCRIPT_BYTES,
@@ -216,6 +218,14 @@ test("generated-script reconstruction has deterministic resource bounds", () => 
     ),
     [],
   );
+  const oversizedProjection = analyzeGeneratedLogicalShellCommands(oversized);
+  assert.equal(oversizedProjection.complete, false);
+  assert.deepEqual(oversizedProjection.limitations, ["bytes"]);
+  const ordinaryLiteral = analyzeBoundedGeneratedScriptExecutions(
+    `printf '%s' '${oversized}'`,
+  );
+  assert.equal(ordinaryLiteral.complete, true);
+  assert.deepEqual(ordinaryLiteral.values, []);
   const boundedCommands = generatedLogicalShellCommands(
     [
       "rm -rf /tmp/early-evidence",
@@ -224,6 +234,18 @@ test("generated-script reconstruction has deterministic resource bounds", () => 
   );
   assert.equal(boundedCommands.length, MAX_GENERATED_SCRIPT_COMMANDS);
   assert.equal(boundedCommands[0], "rm -rf /tmp/early-evidence");
+  const commandLimitAnalysis = analyzeGeneratedLogicalShellCommands(
+    [
+      ...Array.from({ length: MAX_GENERATED_SCRIPT_COMMANDS }, () => "echo ok"),
+      "rm -rf /tmp/after-limit",
+    ].join("\n"),
+  );
+  assert.equal(commandLimitAnalysis.complete, false);
+  assert.deepEqual(commandLimitAnalysis.limitations, ["commands"]);
+  assert.equal(
+    commandLimitAnalysis.values.includes("rm -rf /tmp/after-limit"),
+    false,
+  );
   const files = Array.from(
     { length: MAX_TRACKED_GENERATED_FILES + 1 },
     (_, index) =>
@@ -237,6 +259,11 @@ test("generated-script reconstruction has deterministic resource bounds", () => 
     retainedFileExecution[0]?.shellText,
     "rm -rf /tmp/early-evidence\n",
   );
+  const trackedFileAnalysis = analyzeBoundedGeneratedScriptExecutions(
+    `${files.join(";")}; sh f0.sh`,
+  );
+  assert.equal(trackedFileAnalysis.complete, false);
+  assert.ok(trackedFileAnalysis.limitations.includes("tracked-files"));
   const executionPairs = Array.from(
     { length: MAX_GENERATED_SCRIPT_EXECUTIONS + 1 },
     (_, index) => `echo unsafe > e${index}.sh; sh e${index}.sh`,
@@ -246,6 +273,11 @@ test("generated-script reconstruction has deterministic resource bounds", () => 
   );
   assert.equal(boundedExecutions.length, MAX_GENERATED_SCRIPT_EXECUTIONS);
   assert.equal(boundedExecutions[0]?.shellText, "unsafe\n");
+  const executionLimitAnalysis = analyzeBoundedGeneratedScriptExecutions(
+    executionPairs.join(";"),
+  );
+  assert.equal(executionLimitAnalysis.complete, false);
+  assert.ok(executionLimitAnalysis.limitations.includes("executions"));
 });
 
 test("ambiguous multiline quotes and heredocs are not projected as generated commands", () => {
@@ -257,6 +289,12 @@ test("ambiguous multiline quotes and heredocs are not projected as generated com
     generatedLogicalShellCommands("cat <<EOF\nrm -rf /tmp/x\nEOF\n"),
     [],
   );
+  const unsupportedPrefix = analyzeGeneratedLogicalShellCommands(
+    "echo safe\ncat <<EOF\nsafe\nEOF\nrm -rf /tmp/x\n",
+  );
+  assert.equal(unsupportedPrefix.complete, false);
+  assert.deepEqual(unsupportedPrefix.values, ["echo safe"]);
+  assert.deepEqual(unsupportedPrefix.limitations, ["unsupported-shell-syntax"]);
 });
 
 test("a successful left side remains a possible state after || completes", () => {
@@ -335,6 +373,30 @@ test("non-executing resolver modes and unsupported tee options do not correlate"
   }
 });
 
+test("execution disposition separates executing, non-executing, and unknown wrapper modes", () => {
+  const cases = [
+    ["env -v rm -rf /tmp/x", "proven"],
+    ["env --debug rm -rf /tmp/x", "proven"],
+    ["sudo -A rm -rf /tmp/x", "proven"],
+    ["sudo -b rm -rf /tmp/x", "proven"],
+    ["command -v rm -rf /tmp/x", "not-executed"],
+    ["env --help rm -rf /tmp/x", "not-executed"],
+    ["sudo -V rm -rf /tmp/x", "not-executed"],
+    ["env --future-option rm -rf /tmp/x", "unknown"],
+    ["sudo --future-option rm -rf /tmp/x", "unknown"],
+  ] as const;
+
+  for (const [command, expected] of cases) {
+    const words = shellCommandWords(command);
+    assert.ok(words, command);
+    assert.equal(
+      resolveShellExecutableWords(words).executionDisposition,
+      expected,
+      command,
+    );
+  }
+});
+
 test("env value-taking execution options resolve the actual command", () => {
   for (const command of ["env -a sh true", "env -S 'sh run.sh'"]) {
     const words = shellCommandWords(command);
@@ -364,6 +426,35 @@ test("branch merges retain bounded alternative generated contents", () => {
     ["echo safe\n", "rm -rf /tmp/example\n"].sort(),
   );
   assert.ok(MAX_GENERATED_SCRIPT_ALTERNATIVES > 1);
+});
+
+test("branch alternative truncation is explicit", () => {
+  const producers = Array.from(
+    { length: MAX_GENERATED_SCRIPT_ALTERNATIVES + 1 },
+    (_, index) => `echo 'echo ${index}' > run.sh`,
+  );
+  const analysis = analyzeBoundedGeneratedScriptExecutions(
+    `${producers.join(" || ")}; sh run.sh`,
+  );
+  assert.equal(analysis.complete, false);
+  assert.ok(analysis.limitations.includes("alternatives"));
+  assert.equal(analysis.values.length, MAX_GENERATED_SCRIPT_ALTERNATIVES);
+});
+
+test("tee operands honor wrapper cwd and root path identity", () => {
+  for (const command of [
+    `echo unsafe | env -C /tmp tee run.sh; sh run.sh`,
+    `echo unsafe | sudo -R /sandbox tee /tmp/run.sh; sh /tmp/run.sh`,
+  ]) {
+    assert.deepEqual(boundedGeneratedScriptExecutions(command), [], command);
+  }
+
+  assert.equal(
+    boundedGeneratedScriptExecutions(
+      `echo unsafe | env -C /tmp tee /tmp/run.sh; sh /tmp/run.sh`,
+    ).length,
+    1,
+  );
 });
 
 test("path correlation rejects search, root, cwd, and directory ambiguities", () => {
