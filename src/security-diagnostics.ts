@@ -5417,6 +5417,11 @@ type UnsafeBoundedActionMatch = {
   end: number;
 };
 
+type UnsafeLocalActionMatch = UnsafeBoundedActionMatch & {
+  clauseStart: number;
+  clauseEnd: number;
+};
+
 function unsafeRiskyOperationFailureSuppression(
   text: string,
 ): UnsafeBoundedActionMatch | undefined {
@@ -5425,7 +5430,9 @@ function unsafeRiskyOperationFailureSuppression(
     RISKY_OPERATION_FAILURE_SUPPRESSION_PATTERNS,
   );
   return match === undefined ||
-    explicitMatchIsNonOperational(text, match.start, match.end)
+    isExplicitlyNonOperationalProse(
+      text.slice(match.clauseStart, match.clauseEnd),
+    )
     ? undefined
     : match;
 }
@@ -5480,35 +5487,10 @@ function isExplicitlyNonOperationalProse(text: string): boolean {
   );
 }
 
-function explicitMatchIsNonOperational(
-  text: string,
-  start: number,
-  end: number,
-): boolean {
-  return isExplicitlyNonOperationalProse(localClauseText(text, start, end));
-}
-
-function localClauseText(text: string, start: number, end: number): string {
-  const clauseStart = Math.max(
-    text.lastIndexOf(".", start - 1),
-    text.lastIndexOf("!", start - 1),
-    text.lastIndexOf("?", start - 1),
-    text.lastIndexOf(";", start - 1),
-    text.lastIndexOf("—", start - 1),
-    text.lastIndexOf("–", start - 1),
-    text.lastIndexOf("\n", start - 1),
-    text.lastIndexOf("\r", start - 1),
-  );
-  const followingBoundary = text.slice(end).search(/[.!?;—–\n\r]/u);
-  const clauseEnd =
-    followingBoundary === -1 ? text.length : end + followingBoundary + 1;
-  return text.slice(clauseStart + 1, clauseEnd);
-}
-
 function firstExplicitLocalMatch(
   text: string,
   patterns: readonly RegExp[],
-): UnsafeBoundedActionMatch | undefined {
+): UnsafeLocalActionMatch | undefined {
   const analysisText = safeguardMarkdownPresentationProjection(text);
   for (const clause of localClauseRanges(analysisText)) {
     const match = firstPatternMatch(clause.text, patterns);
@@ -5516,6 +5498,8 @@ function firstExplicitLocalMatch(
     return {
       start: clause.start + match.start,
       end: clause.start + match.end,
+      clauseStart: clause.start,
+      clauseEnd: clause.start + clause.text.length,
     };
   }
   return undefined;
@@ -5538,17 +5522,11 @@ function localClauseRanges(
 ): Array<{ start: number; text: string }> {
   const clauses: Array<{ start: number; text: string }> = [];
   for (const sentence of text.matchAll(/[^.!?;—–\n\r]+[.!?;—–]?/gu)) {
-    if (
-      ATTRIBUTED_DISCUSSION_RE.test(sentence[0]) ||
-      ILLUSTRATIVE_DISCUSSION_RE.test(sentence[0])
-    ) {
-      clauses.push({ start: sentence.index, text: sentence[0] });
-      continue;
-    }
     let localStart = 0;
     for (const continuation of sentence[0].matchAll(
       /,\s*(?=(?:(?:and\s+)?then|but|yet|however)\b)/giu,
     )) {
+      if (isInsideQuotedDiscussion(sentence[0], continuation.index)) continue;
       const localEnd = continuation.index + continuation[0].length;
       clauses.push({
         start: sentence.index + localStart,
@@ -5562,6 +5540,24 @@ function localClauseRanges(
     });
   }
   return clauses;
+}
+
+function isInsideQuotedDiscussion(text: string, offset: number): boolean {
+  for (const quoted of text.matchAll(
+    /"[^"\n\r]*"|'[^'\n\r]*'|`[^`\n\r]*`|“[^”\n\r]*”|‘[^’\n\r]*’/gu,
+  )) {
+    if (quoted.index < offset && offset < quoted.index + quoted[0].length) {
+      return true;
+    }
+  }
+  const prefix = text.slice(0, offset);
+  return (
+    /(?:^|[\s(:,])"[^"\n\r]*$/u.test(prefix) ||
+    /(?:^|[\s(:,])'[^'\n\r]*$/u.test(prefix) ||
+    /(?:^|[\s(:,])`[^`\n\r]*$/u.test(prefix) ||
+    prefix.lastIndexOf("“") > prefix.lastIndexOf("”") ||
+    prefix.lastIndexOf("‘") > prefix.lastIndexOf("’")
+  );
 }
 
 /** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
