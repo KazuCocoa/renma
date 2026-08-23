@@ -18,8 +18,14 @@ maintainable in Git without becoming an agent runtime.
 
 Agent-facing guidance is often copied across Skills, prompts, and repository
 instructions until its authority, owner, and lifecycle are unclear. A Context
-Repository gives reusable knowledge a Git-reviewed source of truth with stable
-identity and explicit relationships.
+Repository gives reusable knowledge stable identity and explicit,
+Git-reviewed governance. A Context Asset is the governance entry point for
+independently maintained knowledge and its authoritative sources. The content
+may live in the Context Repository or in an external governed system; Renma
+does not require copying the complete external source into `contexts/`.
+
+A reviewed reference does not prove that the source was consulted or its
+contents validated, and it does not grant permission to access the source.
 
 ## Product Boundary
 

@@ -52,13 +52,27 @@ if (options.releaseNotes) {
 const checks = [];
 
 const packageVersion = readPackageVersion();
+const lockVersions = readLockVersions();
 checks.push(
   check(
     `target version agrees with package.json (${version})`,
     packageVersion === version,
   ),
 );
-checks.push(check("package-lock.json version", readLockVersion() === version));
+checks.push(
+  versionCheck(
+    "package-lock.json version",
+    lockVersions.documentVersion,
+    version,
+  ),
+);
+checks.push(
+  versionCheck(
+    'package-lock.json root package version at packages[""].version',
+    lockVersions.rootPackageVersion,
+    version,
+  ),
+);
 checks.push(check("CHANGELOG section", changelogHasVersion(version)));
 checks.push(
   check("CHANGELOG compare link", changelogHasCompareLink(version, base)),
@@ -187,8 +201,12 @@ function readPackageVersion() {
   return JSON.parse(readFileSync("package.json", "utf8")).version;
 }
 
-function readLockVersion() {
-  return JSON.parse(readFileSync("package-lock.json", "utf8")).version;
+function readLockVersions() {
+  const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+  return {
+    documentVersion: lock.version,
+    rootPackageVersion: lock.packages?.[""]?.version,
+  };
 }
 
 function changelogHasVersion(releaseVersion) {
@@ -531,6 +549,14 @@ function gitOk(commandArgs) {
 
 function check(label, ok) {
   return { label, ok };
+}
+
+function versionCheck(label, actual, expected) {
+  const found = actual === undefined ? "missing" : JSON.stringify(actual);
+  return check(
+    `${label} matches target ${JSON.stringify(expected)} (found ${found})`,
+    actual === expected,
+  );
 }
 
 function buildReleaseNotes({ version: releaseVersion, base: baseTag, target }) {

@@ -25,6 +25,56 @@ renma uses two severity systems:
 
 In JSON output, diagnostics usually appear as structured objects with a `severity`, a `message`, and, when available, a `path`.
 
+## Diagnostic and Rule Evolution during 1.x
+
+Diagnostic behavior is a compatibility surface distinct from wire
+compatibility. A JSON document may remain schema-compatible while a new or
+more severe finding changes the result of a command such as
+`renma scan . --fail-on high`. Consumers that require exactly stable CI
+outcomes should pin an exact Renma version.
+
+Diagnostic IDs are machine-consumed identifiers. After 1.0, the same stable ID
+continues to represent the same conceptual problem class. Detection precision,
+evidence, and remediation may improve, but an ID must not silently acquire an
+unrelated meaning.
+
+Patch releases may:
+
+- reduce false positives;
+- improve evidence, source ranges, deduplication, or remediation wording;
+- fix deterministic classification to match the already documented rule
+  meaning; and
+- fix a false negative only when doing so restores behavior clearly promised
+  by the existing diagnostic contract without materially broadening the rule.
+
+Patch releases should not introduce a new default-blocking High or Critical
+diagnostic, increase an existing diagnostic's severity, materially broaden a
+rule into a new behavior category, or remove or rename a stable diagnostic ID.
+
+Minor releases may add diagnostic IDs, bounded detection coverage, new
+advisory, quality, or security findings, open-enum values where the contract
+already permits them, and backward-compatible scanner capabilities. A material
+addition that can newly fail common CI configurations must be called out in the
+Changelog with upgrade guidance as an intentional compatibility change, not a
+silent behavior change.
+
+For a new High or Critical rule, prefer where practical an advisory and
+documented introduction, followed by operational experience, before later
+default-blocking behavior. A severe vulnerability may require immediate
+blocking, in which case the release must document the behavioral CI impact
+explicitly.
+
+A major release is required to remove or rename a stable diagnostic ID, reuse
+an existing ID for materially different semantics, change a closed
+compatibility contract, or change an established diagnostic meaning in a way
+consumers cannot reasonably treat as an additive extension.
+
+Increasing severity can change CI outcomes and is not an ordinary patch-level
+wording change. Reducing severity to correct an established false positive may
+be a patch. This policy does not promise that every new finding is
+non-breaking: wire compatibility and behavioral CI compatibility are separate
+concerns.
+
 ## LLM-Actionable Diagnostics V2
 
 `renma scan --json` includes an additive `diagnosticsV2` array. Existing

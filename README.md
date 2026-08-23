@@ -1,6 +1,6 @@
 <p align="center">
   <img
-    src="docs/public/branding/renma-icon.png"
+    src="https://kazucocoa.github.io/renma/branding/renma-icon.png"
     alt="Renma"
     width="160"
     height="160"
@@ -27,10 +27,19 @@ evidence maintainable in Git without becoming an agent runtime.
 
 ## Why A Context Repository?
 
-A Context Repository is a Git-reviewed source of truth for reusable knowledge
-that LLMs and agents can consume. It gives independently maintained knowledge a
-stable identity, owner, lifecycle, and explicit relationships instead of
-leaving it copied across prompts or buried in one workflow.
+A Context Repository provides Git-reviewed governance for reusable knowledge
+that LLMs and agents can consume. A Context Asset is a Git-reviewed governance
+entry point for independently maintained knowledge and its authoritative
+sources. It gives that knowledge a stable identity, owner, lifecycle, and
+explicit relationships instead of leaving it copied across prompts or buried
+in one workflow.
+
+The authoritative content may live directly in the Context Repository or in an
+external governed system, including another Git repository, a documentation or
+specification system, or Confluence. Renma does not require duplicating
+external source material into `contexts/`. A reviewed source reference is not
+proof that the source was consulted, validation of its contents, permission to
+access it, or a runtime dependency for Renma.
 
 Cross-Skill reuse is one reason to create a Context Asset. Independent
 ownership, lifecycle, maintenance, or source-of-truth responsibility is also
