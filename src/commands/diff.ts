@@ -32,7 +32,7 @@ import {
   zeroExecutableSurfaceInventory,
   type ExecutableSurfaceInventory,
 } from "../executable-surface-inventory.js";
-import { DEFAULT_CONFIG, type ConfigOverrides } from "../config.js";
+import { DEFAULT_CONFIG, loadConfig, type ConfigOverrides } from "../config.js";
 import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
 import type { SecurityCiPolicyMode } from "../types/configuration.js";
 import type { ScanBoundaryCiPolicyMode } from "../types/configuration.js";
@@ -407,61 +407,86 @@ async function executeDiffWithProjection(
 
   try {
     const [fromResult, toResult] = await Promise.allSettled([
-      snapshot(
+      prepareComparisonRef(
         repoRoot,
         relativeTarget,
         options.fromRef,
         tempRoot,
         "from",
         options.overrides,
-        options.instrumentation?.from,
-        includeSkillDiscovery,
       ),
-      snapshot(
+      prepareComparisonRef(
         repoRoot,
         relativeTarget,
         options.toRef,
         tempRoot,
         "to",
         options.overrides,
-        options.instrumentation?.to,
-        includeSkillDiscovery,
       ),
     ]);
 
     if (fromResult.status === "rejected") throw fromResult.reason;
     if (toResult.status === "rejected") throw toResult.reason;
 
-    const fromCollected = fromResult.value;
-    const toCollected = toResult.value;
+    const fromPrepared = fromResult.value;
+    const toPrepared = toResult.value;
+    const effectiveBoundarySources =
+      options.includeCiEvidence === true
+        ? [fromPrepared.boundarySource, toPrepared.boundarySource]
+        : undefined;
+    const [fromSnapshotResult, toSnapshotResult] = await Promise.allSettled([
+      snapshot(
+        repoRoot,
+        fromPrepared,
+        options.overrides,
+        options.instrumentation?.from,
+        includeSkillDiscovery,
+      ),
+      snapshot(
+        repoRoot,
+        toPrepared,
+        options.overrides,
+        options.instrumentation?.to,
+        includeSkillDiscovery,
+        effectiveBoundarySources,
+      ),
+    ]);
+
+    if (fromSnapshotResult.status === "rejected") {
+      throw fromSnapshotResult.reason;
+    }
+    if (toSnapshotResult.status === "rejected") {
+      throw toSnapshotResult.reason;
+    }
+
+    const fromCollected = fromSnapshotResult.value;
+    const toCollected = toSnapshotResult.value;
     if (includeSkillDiscovery) {
+      const targetLocalInspectedPaths =
+        options.includeCiEvidence === true
+          ? toCollected.repositorySnapshot.evidenceBoundaryInspectedPaths[1]
+          : undefined;
+      const targetLocalSnapshot = targetLocalInspectedPaths
+        ? withSuppressedFindingsLimitedToPaths(
+            toCollected.snapshot,
+            targetLocalInspectedPaths,
+          )
+        : toCollected.snapshot;
       const localReport = buildDiffReport(
         repoRoot,
         fromCollected.snapshot,
-        toCollected.snapshot,
+        targetLocalSnapshot,
       );
       let report = localReport;
       let effectiveCiBoundary: EffectiveCiScanBoundaryEvidence | undefined;
       if (options.includeCiEvidence === true) {
         const trustedSuppressions = trustedCiSuppressions(
-          fromCollected.boundarySource.suppressions,
-          toCollected.boundarySource.suppressions,
-        );
-        const effectiveRepositorySnapshot = await collectRepositorySnapshot(
-          toCollected.target,
-          snapshotOverrides(
-            repoRoot,
-            toCollected.archiveRoot,
-            options.overrides ?? {},
-          ),
-          undefined,
-          {
-            sources: [fromCollected.boundarySource, toCollected.boundarySource],
-          },
+          fromPrepared.boundarySource.suppressions,
+          toPrepared.boundarySource.suppressions,
         );
         const effectiveProjected = projectDiffSnapshot(
           toCollected.snapshot.ref,
-          effectiveRepositorySnapshot,
+          toCollected.repositorySnapshot,
           includeSkillDiscovery,
           trustedSuppressions,
         );
@@ -1589,20 +1614,54 @@ function formatFindingDelta(finding: FindingDelta): string {
   return `${finding.severity.toUpperCase()} [${finding.riskClass}] ${finding.id}${location}${policyEvidence}`;
 }
 
-async function snapshot(
+interface PreparedComparisonRef {
+  ref: string;
+  target: string;
+  archiveRoot: string;
+  boundarySource: ScanBoundarySource;
+}
+
+async function prepareComparisonRef(
   repoRoot: string,
   relativeTarget: string,
   ref: string,
   tempRoot: string,
   label: string,
   overrides: ConfigOverrides = {},
+): Promise<PreparedComparisonRef> {
+  const archiveRoot = join(tempRoot, label);
+  const archivePath = join(tempRoot, `${label}.tar`);
+  await mkdir(archiveRoot, { recursive: true });
+  await gitInputOutput(
+    repoRoot,
+    ["archive", "--format=tar", "--output", archivePath, ref],
+    `Could not resolve Git comparison ref "${ref}"`,
+  );
+  await execFile("tar", ["-xf", archivePath, "-C", archiveRoot]);
+  const target =
+    relativeTarget === "." ? archiveRoot : join(archiveRoot, relativeTarget);
+  const loaded = await loadConfig(
+    target,
+    snapshotOverrides(repoRoot, archiveRoot, overrides),
+  );
+  return {
+    ref,
+    target,
+    archiveRoot,
+    boundarySource: scanBoundarySource(loaded.config, loaded.configPath),
+  };
+}
+
+async function snapshot(
+  repoRoot: string,
+  prepared: PreparedComparisonRef,
+  overrides: ConfigOverrides = {},
   instrumentation?: RepositoryCollectionInstrumentation,
   includeSkillDiscovery = true,
+  evidenceBoundarySources?: ScanBoundarySource[],
 ): Promise<{
   snapshot: DiffSnapshot;
-  target: string;
-  archiveRoot: string;
-  boundarySource: ScanBoundarySource;
+  repositorySnapshot: RepositorySnapshot;
   skillDiscoveryCiPolicy: SkillDiscoveryCiPolicyMode;
   securityPolicyCiPolicy: SecurityCiPolicyMode;
   scanBoundaryCiPolicy: ScanBoundaryCiPolicyMode;
@@ -1610,35 +1669,20 @@ async function snapshot(
   qualityCiPolicy: QualityCiPolicyMode;
   metadataCiPolicy: MetadataCiPolicyMode;
 }> {
-  const root = join(tempRoot, label);
-  const archivePath = join(tempRoot, `${label}.tar`);
-  await mkdir(root, { recursive: true });
-  await gitInputOutput(
-    repoRoot,
-    ["archive", "--format=tar", "--output", archivePath, ref],
-    `Could not resolve Git comparison ref "${ref}"`,
-  );
-  await execFile("tar", ["-xf", archivePath, "-C", root]);
-  const target = relativeTarget === "." ? root : join(root, relativeTarget);
   const repositorySnapshot = await collectRepositorySnapshot(
-    target,
-    snapshotOverrides(repoRoot, root, overrides),
+    prepared.target,
+    snapshotOverrides(repoRoot, prepared.archiveRoot, overrides),
     instrumentation,
+    evidenceBoundarySources ? { sources: evidenceBoundarySources } : undefined,
   );
   const projected = projectDiffSnapshot(
-    ref,
+    prepared.ref,
     repositorySnapshot,
     includeSkillDiscovery,
   );
-  const boundarySource = scanBoundarySource(
-    repositorySnapshot.config,
-    repositorySnapshot.configPath,
-  );
   return {
     snapshot: projected.snapshot,
-    target,
-    archiveRoot: root,
-    boundarySource,
+    repositorySnapshot,
     skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
     securityPolicyCiPolicy:
       repositorySnapshot.config.security.ciPolicy ?? "fail",
@@ -1711,6 +1755,18 @@ function projectDiffSnapshot(
     CI_EVIDENCE_BOUNDARY_SCHEMA_VERSION
       ? { effectiveBoundary: scanResult.scanBoundary }
       : {}),
+  };
+}
+
+function withSuppressedFindingsLimitedToPaths(
+  snapshot: DiffSnapshot,
+  inspectedPaths: ReadonlySet<string>,
+): DiffSnapshot {
+  return {
+    ...snapshot,
+    suppressedFindings: (snapshot.suppressedFindings ?? []).filter((item) =>
+      inspectedPaths.has(item.finding.evidence.path),
+    ),
   };
 }
 

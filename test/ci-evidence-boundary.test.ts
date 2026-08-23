@@ -280,6 +280,89 @@ test("a target-only suppression remains visible and cannot erase enforcement evi
   }
 });
 
+test("target-local suppression evidence excludes paths retained only by the base boundary", async () => {
+  const repo = await createRepo(
+    { globs: ["skills/**/SKILL.md"] },
+    secretBody(),
+  );
+  try {
+    await writeConfig(repo, {
+      globs: ["contexts/**/*.md"],
+      suppressions: [suppression(["skills/demo/**"], "never")],
+    });
+    await commit(repo, "narrow target boundary and add suppression");
+
+    const targetLocal = await scan(repo, { format: "json" });
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+    assert.equal(
+      targetLocal.suppressedFindings.some((item) =>
+        isLiteralSecret(item.finding),
+      ),
+      false,
+    );
+    assert.equal(
+      report.diff.findings.suppressed.to.some((item) =>
+        isLiteralSecret(item.finding),
+      ),
+      false,
+    );
+    assert.equal(
+      report.scanBoundaryPolicy.effectiveBoundary?.inspectedPaths.includes(
+        "skills/demo/SKILL.md",
+      ),
+      true,
+    );
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("target-local suppression evidence does not inherit base-only support references", async () => {
+  const repo = await createRepo(
+    { globs: ["skills/**/SKILL.md"] },
+    "\nRead `references/secret.md` before completing the review.\n",
+  );
+  try {
+    const supportPath = "skills/demo/references/secret.md";
+    await mkdir(join(repo, "skills/demo/references"), { recursive: true });
+    await writeFile(join(repo, supportPath), secretBody());
+    await commit(repo, "add referenced support");
+    await git(repo, ["tag", "-f", "base"]);
+    await writeConfig(repo, {
+      globs: ["contexts/**/*.md"],
+      suppressions: [suppression([supportPath], "never")],
+    });
+    await commit(repo, "hide the referring skill and suppress its support");
+
+    const targetLocal = await scan(repo, { format: "json" });
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+    assert.equal(
+      targetLocal.suppressedFindings.some((item) =>
+        isLiteralSecret(item.finding),
+      ),
+      false,
+    );
+    assert.equal(
+      report.diff.findings.suppressed.to.some((item) =>
+        isLiteralSecret(item.finding),
+      ),
+      false,
+    );
+    assert.equal(
+      report.scanBoundaryPolicy.effectiveBoundary?.inspectedPaths.includes(
+        supportPath,
+      ),
+      true,
+    );
+    assert.equal(report.status, "fail");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("finding reduction beside a new suppression is not praised as remediation", async () => {
   const repo = await createRepo(
     { globs: ["skills/**/SKILL.md"] },
