@@ -1505,8 +1505,12 @@ const DIRECT_DEFENSIVE_SEMANTIC_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,32}\b(ignore|bypass|circumvent|skip|omit|disable|deactivate|turn off|suppress|weaken|relax|continue|proceed|execute|run|apply|follow|obey|adopt|treat|use)\b/i;
 const EXPLICIT_LOCAL_PROHIBITION_RE =
   /(?:\b(?:do not|don't|never|cannot|can't|can not|will not|won't|may not|should not|must not|is not allowed to|is unable to)\b|\b(?:skill|rule|policy|instructions?|guidance)\b[^.;:!?—–\n\r]{0,40}\b(?:does not|doesn't)\b|\bno\b[^.;:!?—–\n\r]{0,80}\b(?:may|can|should|must|is allowed to)\b|\bunder no circumstances\b|\bit is forbidden\b[^.;:!?—–\n\r]{0,80}\bto\b)[^.;:!?—–\n\r]{0,120}\b(?:ignore|disregard|override|supersede|take\s+precedence|bypass|circumvent|skip|disable|deactivate|suppress|weaken|continue|proceed|execute|run|apply|follow|obey|adopt|treat|add|create|use)\b/iu;
+const ATTRIBUTED_DISCUSSION_RE =
+  /\b(?:(?:the|a)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b[^.!?;—–\n\r]{0,48}\b(?:says?|states?|reads?|notes?|noted|documents?|records?|reports?|explains?)\b|\baccording to\s+(?:(?:the|an?)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b/iu;
+const ILLUSTRATIVE_DISCUSSION_RE =
+  /\bfor example\b|\bthe (?:phrase|statement|prompt)\b/iu;
 const NON_OPERATIONAL_DISCUSSION_RE =
-  /\bfor example\b|\bthe (?:phrase|statement|prompt)\b|\b(?:(?:the|a)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b[^.!?;—–\n\r]{0,48}\b(?:says?|states?|reads?|notes?|noted|documents?|records?|reports?|explains?)\b|\baccording to\s+(?:(?:the|an?)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b|\b(?:approval|safeguard)-bypass\s+(?:requests?|instructions?|wording|examples?)\b|^\s*(?:explain|review|verify|determine|check|assess|document)\b|^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\b[^.!?;:—–\n\r]{0,180}\?\s*$/iu;
+  /\b(?:approval|safeguard)-bypass\s+(?:requests?|instructions?|wording|examples?)\b|^\s*(?:explain|review|verify|determine|check|assess|document)\b|^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\b[^.!?;:—–\n\r]{0,180}\?\s*$/iu;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 // Bounds associate the source and action within one local instruction while
@@ -5470,6 +5474,8 @@ function isExplicitlyNonOperationalProse(text: string): boolean {
   return (
     DIRECT_DEFENSIVE_SEMANTIC_RE.test(text) ||
     EXPLICIT_LOCAL_PROHIBITION_RE.test(text) ||
+    ATTRIBUTED_DISCUSSION_RE.test(text) ||
+    ILLUSTRATIVE_DISCUSSION_RE.test(text) ||
     NON_OPERATIONAL_DISCUSSION_RE.test(text)
   );
 }
@@ -5530,10 +5536,32 @@ function firstPatternMatch(
 function localClauseRanges(
   text: string,
 ): Array<{ start: number; text: string }> {
-  return [...text.matchAll(/[^.!?;—–\n\r]+[.!?;—–]?/gu)].map((clause) => ({
-    start: clause.index,
-    text: clause[0],
-  }));
+  const clauses: Array<{ start: number; text: string }> = [];
+  for (const sentence of text.matchAll(/[^.!?;—–\n\r]+[.!?;—–]?/gu)) {
+    if (
+      ATTRIBUTED_DISCUSSION_RE.test(sentence[0]) ||
+      ILLUSTRATIVE_DISCUSSION_RE.test(sentence[0])
+    ) {
+      clauses.push({ start: sentence.index, text: sentence[0] });
+      continue;
+    }
+    let localStart = 0;
+    for (const continuation of sentence[0].matchAll(
+      /,\s*(?=(?:(?:and\s+)?then|but|yet|however)\b)/giu,
+    )) {
+      const localEnd = continuation.index + continuation[0].length;
+      clauses.push({
+        start: sentence.index + localStart,
+        text: sentence[0].slice(localStart, localEnd),
+      });
+      localStart = localEnd;
+    }
+    clauses.push({
+      start: sentence.index + localStart,
+      text: sentence[0].slice(localStart),
+    });
+  }
+  return clauses;
 }
 
 /** Mask only parsed Markdown emphasis delimiters while retaining every offset. */
