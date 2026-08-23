@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Made `diff` and `ci-report` collect each archived repository revision once.
+  CI now applies its fail-closed endpoint boundary while building the shared
+  target snapshot, then derives both semantic diff and CI policy output from
+  that snapshot instead of rediscovering the target revision.
 - Reduced prose-only safeguard-bypass, risky-failure-suppression,
   instruction-hierarchy, and untrusted-content inference to explicit local
   line or clause evidence and advisory severity. Structural POSIX shell,

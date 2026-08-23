@@ -2490,7 +2490,7 @@ test("ci report retains evidence for a high finding suppressed on both refs", as
   }
 });
 
-test("ci report prepares Skill Discovery once for both refs", async () => {
+test("ci report collects and prepares each archived ref exactly once", async () => {
   const repo = await createSuppressedFindingRepo();
   const counts = {
     from: instrumentationCounts(),
