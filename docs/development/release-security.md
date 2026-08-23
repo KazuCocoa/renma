@@ -16,6 +16,16 @@ exact equality with `origin/main`, and then requires the tag version to equal
 `package.json`. Exact equality intentionally rejects tagged commits ahead of,
 behind, or beside main; ancestry is not enough.
 
+The same `verify-release-ref` job checks out full history and then runs
+`tools/release-prep.mjs --check-only --version "${GITHUB_REF_NAME#v}"`. This is
+the publication gate for the deterministic release metadata contract: the
+package-lock version, target changelog section and compare link, required base
+tag, exact documented consumer pins, and maintained installation and GitHub
+Actions example command forms must all agree with the triggering version tag.
+The workflow reuses the release-prep implementation rather than duplicating
+those rules. The publish job depends on this verification job, so neither stale
+metadata nor an identity mismatch can reach the only job with OIDC permission.
+
 The publish job also depends on successful tests, builds, and package checks at
 both the minimum supported Node version and the current LTS version. It also
 depends on strict Renma self-validation of the exact release commit, run from
@@ -132,10 +142,10 @@ the intended LTS matrix leg, and make the environment-protected job publish
 that exact artifact. Adding a parallel `npm pack`, mutable artifact selection,
 or an unverified handoff would weaken clarity rather than harden publication.
 The current repeated validation is therefore acceptable for 1.0 and is not a
-release blocker. Exact tag/main identity, minimum plus LTS validation, exact-ref
-macOS and Windows validation, strict Renma self-validation, package content
-verification, the `npm-publish` environment, and OIDC Trusted Publishing remain
-mandatory.
+release blocker. Exact annotated-tag/main/package identity, the deterministic
+release metadata contract, minimum plus LTS validation, exact-ref macOS and
+Windows validation, strict Renma self-validation, package content verification,
+the `npm-publish` environment, and OIDC Trusted Publishing remain mandatory.
 
 Repository code can verify Git objects, workflow structure, tests, and package
 metadata. It cannot verify that npm Trusted Publisher settings, GitHub

@@ -573,8 +573,16 @@ or unknown. Risky-looking text is suppressed only along proven literal-only
 command and data paths, such as direct output through `echo` or `printf`.
 Command substitution, shell `-c`/`eval` contexts, and standard input consumed as
 shell code remain operational; unrecognized wrappers, consumers, and shell
-options use conservative matching. Local quotation or bounded source
-attribution such as “the incident report says:” or “the audit states:” keeps a
+options use conservative matching. Within one bounded logical shell command,
+Renma also correlates statically known `echo`/`printf` output written by an
+ordinary stdout redirection or captured by `tee` with a later `sh`, `bash`,
+`dash`, `ksh`, `zsh`, `fish`, `source`, or `.` consumer of the exact normalized
+static path. The generated text then reuses the same command-position-aware
+destructive and privileged classification. This is not filesystem or general
+shell data-flow analysis: Renma does not resolve variables or symlinks, inspect
+existing file content, correlate different bounded commands, or treat a write
+as executable without the matching later consumer. Local quotation or bounded
+source attribution such as “the incident report says:” or “the audit states:” keeps a
 blockquote inert even
 beneath a generic instruction heading; attribution does not need to contain the
 word “quote.” An explicit local execution route takes precedence. A routed blockquote is
@@ -848,7 +856,10 @@ Destructive and privileged shell classification requires the risky executable
 in command position. Static absolute paths and bounded wrappers retain that
 evidence, while uploads continue to reuse the existing destination analysis
 without a second tool allowlist. Literal `echo` or `printf` command text remains
-outside this finding when it contains ordinary variable interpolation; command
+outside this finding when it contains ordinary variable interpolation and is
+not executed through the bounded static-file correlation described above. A
+matching generated-script consumer retains its destructive or privileged
+operation kind when `|| true` or `|| :` suppresses that consumer; command
 substitution remains operational. Neither generic error handling nor a generic
 suppression is enough: capability probes, ordinary commands, `try/catch`,
 `set +e`, and stderr redirection remain outside the rule by themselves. Preserve

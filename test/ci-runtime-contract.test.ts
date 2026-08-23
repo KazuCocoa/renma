@@ -11,6 +11,7 @@ type WorkflowStep = {
   if?: string;
   name?: string;
   run?: string;
+  shell?: string;
   uses?: string;
   with?: Record<string, unknown>;
 };
@@ -401,9 +402,29 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
 
   const refVerification = workflow.jobs?.["verify-release-ref"];
   assert.equal(refVerification?.permissions, undefined);
+  assert.equal(
+    actionStep(refVerification, "actions/checkout")?.with?.["fetch-depth"],
+    0,
+  );
+  const refVerificationSteps = steps(refVerification);
+  const exactTagVerifier = refVerificationSteps.find((step) =>
+    step.run?.includes("node scripts/verify-release-tag.mjs"),
+  );
+  const metadataVerifier = refVerificationSteps.find((step) =>
+    step.run?.includes("node tools/release-prep.mjs"),
+  );
+  assert.ok(exactTagVerifier, "expected the exact release-tag verifier");
+  assert.ok(metadataVerifier, "expected the release metadata verifier");
+  assert.equal(metadataVerifier.shell, "bash");
+  assert.match(metadataVerifier.run ?? "", /--check-only/);
   assert.match(
-    runCommands(refVerification).join("\n"),
-    /node scripts\/verify-release-tag\.mjs/,
+    metadataVerifier.run ?? "",
+    /--version "\$\{GITHUB_REF_NAME#v\}"/,
+  );
+  assert.ok(
+    refVerificationSteps.indexOf(exactTagVerifier) <
+      refVerificationSteps.indexOf(metadataVerifier),
+    "metadata verification must follow exact tag identity verification",
   );
 
   const validation = workflow.jobs?.["validate-supported-runtime"];
@@ -475,6 +496,12 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
       .filter(([, job]) => job.permissions?.["id-token"] === "write")
       .map(([jobName]) => jobName),
     ["publish"],
+  );
+  assert.ok(
+    (Array.isArray(publish?.needs) ? publish.needs : [publish?.needs]).includes(
+      "verify-release-ref",
+    ),
+    "OIDC publication must depend on tag and metadata verification",
   );
   const publishSteps = steps(publish);
   assert.equal(

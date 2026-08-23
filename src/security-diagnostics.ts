@@ -72,6 +72,7 @@ import {
   hasBoundedShellOperationalSubstitution,
   tokenizeBoundedShell,
 } from "./security-command/shell.js";
+import { boundedGeneratedScriptExecutions } from "./security-command/generated-script.js";
 import {
   disclosureClauseRangesIntersectingRange,
   disclosureRangeIsExplicitlyProhibited,
@@ -4623,6 +4624,13 @@ function riskyShellFailureSuppressions(
       operation,
       sensitiveDataOperation,
     );
+    const generatedScriptKinds = generatedScriptRiskKinds(
+      command.slice(0, token.start),
+      operationStart,
+    );
+    for (const kind of generatedScriptKinds) {
+      if (!operationKinds.includes(kind)) operationKinds.push(kind);
+    }
     if (operationKinds.length === 0) continue;
 
     suppressions.push({
@@ -4653,7 +4661,10 @@ function isShellPipelineBoundary(operator: string): boolean {
 // unknown and therefore fail closed.
 type ShellTextDisposition = "literal-only" | "operational" | "unknown";
 
-function classifyShellCommandRiskKinds(command: string): RiskyOperationKind[] {
+function classifyShellCommandRiskKinds(
+  command: string,
+  correlateGeneratedScripts = true,
+): RiskyOperationKind[] {
   const tokenization = tokenizeBoundedShell(command);
   if (!tokenization.supported) {
     return fallbackShellCommandRiskKinds(command);
@@ -4683,7 +4694,29 @@ function classifyShellCommandRiskKinds(command: string): RiskyOperationKind[] {
       shellPipelineInputDispositions.get(index),
     );
   }
+  if (correlateGeneratedScripts) {
+    for (const kind of generatedScriptRiskKinds(command)) kinds.add(kind);
+  }
 
+  return (["destructive-command", "privileged-command"] as const).filter(
+    (kind) => kinds.has(kind),
+  );
+}
+
+function generatedScriptRiskKinds(
+  command: string,
+  consumerStart = 0,
+): RiskyOperationKind[] {
+  const kinds = new Set<RiskyOperationKind>();
+  for (const execution of boundedGeneratedScriptExecutions(command)) {
+    if (execution.consumerSpan.start < consumerStart) continue;
+    for (const kind of classifyShellCommandRiskKinds(
+      execution.shellText,
+      false,
+    )) {
+      kinds.add(kind);
+    }
+  }
   return (["destructive-command", "privileged-command"] as const).filter(
     (kind) => kinds.has(kind),
   );

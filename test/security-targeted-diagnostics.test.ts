@@ -163,6 +163,124 @@ ${command}
   }
 });
 
+test("static generated scripts retain destructive and privileged command risk", () => {
+  const cases: Array<{ command: string; diagnosticId: string }> = [
+    {
+      command: `echo 'rm -rf "$target"' > /tmp/run.sh; sh /tmp/run.sh`,
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: `printf '%s\\n' 'sudo some-command' > /tmp/run.sh; bash /tmp/run.sh`,
+      diagnosticId: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    },
+    {
+      command: `echo 'git reset --hard' > ./run.sh && source ./run.sh`,
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+    {
+      command: `echo 'rm -rf "$target"' | tee /tmp/run.sh >/dev/null; sh /tmp/run.sh`,
+      diagnosticId: "SEC-DESTRUCTIVE-COMMAND",
+    },
+  ];
+
+  for (const { command, diagnosticId } of cases) {
+    const finding = findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      diagnosticId,
+    );
+    assert.deepEqual(finding.evidence, {
+      path: "contexts/security/targeted.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: command,
+    });
+  }
+
+  for (const shell of ["dash", "ksh", "zsh", "fish"]) {
+    const command = `echo 'rm -rf /tmp/example' > ./run.sh; ${shell} run.sh`;
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+  }
+
+  const dotSource = `printf '%s\\n' 'sudo some-command' > run.sh; . ./run.sh`;
+  findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${dotSource}
+\`\`\`
+`),
+    "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+  );
+});
+
+test("static generated-script correlation remains path-exact and execution-only", () => {
+  const commands = [
+    `echo 'rm -rf "$target"' > /tmp/example.txt; cat /tmp/example.txt`,
+    `echo 'rm -rf "$target"' > /tmp/a.sh; sh /tmp/b.sh`,
+    `printf '%s\\n' 'sudo some-command' | tee /tmp/example.txt; cat /tmp/example.txt`,
+    `echo 'rm -rf /tmp/example' > /tmp/run.sh > "$SCRIPT_PATH"; sh /tmp/run.sh`,
+    `echo 'rm -rf /tmp/example' > /tmp/run.sh || sh /tmp/run.sh`,
+    `echo 'rm -rf /tmp/example' > /tmp/run.sh & sh /tmp/run.sh`,
+    `echo 'rm -rf /tmp/example'`,
+    `printf '%s\\n' 'sudo some-command'`,
+    `echo 'rm -rf /tmp/example' | cat`,
+  ];
+
+  for (const command of commands) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("generated-script suppressions reuse the correlated operation kinds", () => {
+  const cases: Array<{ command: string; operationKinds: string[] }> = [
+    {
+      command: `echo 'rm -rf "$target"' > /tmp/run.sh; sh /tmp/run.sh || true`,
+      operationKinds: ["destructive-command"],
+    },
+    {
+      command: `printf '%s\\n' 'sudo some-command' > /tmp/run.sh; bash /tmp/run.sh || :`,
+      operationKinds: ["privileged-command"],
+    },
+  ];
+
+  for (const { command, operationKinds } of cases) {
+    const finding = findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+      RISKY_SUPPRESSION_ID,
+    );
+    assert.deepEqual(finding.details?.operationKinds, operationKinds, command);
+    assert.equal(finding.evidence.snippet, command);
+  }
+});
+
 test("pipeline inputs fail closed unless the consumer is proven literal-only", () => {
   const cases: Array<{
     disposition: "operational" | "unknown";

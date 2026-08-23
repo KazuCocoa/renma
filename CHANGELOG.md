@@ -29,6 +29,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   contexts and standard input consumed as shell code remain operational, while
   unrecognized wrappers, consumers, and shell options use conservative
   matching.
+- Bounded shell analysis now correlates proven static `echo`/`printf` output
+  written by redirection or `tee` with a later modeled shell consumer of the
+  exact same path, retaining existing destructive, privileged, and risky
+  error-suppression diagnostics without filesystem inspection or variable
+  inference.
+- The npm publication workflow now blocks its OIDC-enabled publish job on the
+  existing deterministic release metadata contract as well as exact annotated
+  tag, `origin/main`, and package-version identity.
 - Bounded negative-subject safeguard instructions such as “No Skill … may
   bypass” no longer overlap with `SEC-SAFEGUARD-BYPASS-INSTRUCTION`; a later
   independently expressed bypass remains reportable.
