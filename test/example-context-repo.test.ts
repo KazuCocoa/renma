@@ -12,7 +12,7 @@ const EXAMPLE_ROOT = path.join(process.cwd(), "examples/context-repo");
 test("example context repository scans and builds catalog/graph reports", async () => {
   const scanResult = await scan(EXAMPLE_ROOT);
 
-  assert.equal(scanResult.diagnostics.length, 0);
+  assert.equal(scanResult.rawDiagnostics.length, 0);
   assert.equal(scanResult.findings.length, 0);
   assert.ok(
     scanResult.scannedFileCount >= 5,

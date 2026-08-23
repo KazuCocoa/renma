@@ -12,7 +12,7 @@ import type {
 } from "./executable-surface-inventory.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { visibleMarkdownInlineValue } from "./renderers/markdown-inline-code.js";
-import { createSuppressedDiagnostics } from "./diagnostics-v2.js";
+import { createSuppressedDiagnostics } from "./scan-diagnostics.js";
 
 const EXECUTABLE_SURFACE_TEXT_LIMIT =
   DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
@@ -61,7 +61,7 @@ export function toScanJsonDocument(result: ScanResult): ScanJsonDocument {
       ? { securityPolicyInventory: result.securityPolicyInventory }
       : {}),
     ...(result.trustGraph ? { trustGraph: result.trustGraph } : {}),
-    diagnostics: result.diagnosticsV2,
+    diagnostics: result.diagnostics,
     suppressedDiagnostics: createSuppressedDiagnostics(
       result.suppressedFindings,
     ),
@@ -91,7 +91,7 @@ export function formatText(result: ScanResult): string {
           `Context lens diagnostics: error ${result.contextLens.diagnosticCounts.error}, warning ${result.contextLens.diagnosticCounts.warning}, info ${result.contextLens.diagnosticCounts.info}`,
         ]
       : []),
-    `Diagnostics: ${result.diagnostics.length}`,
+    `Diagnostics: ${result.rawDiagnostics.length}`,
     `Exit threshold: ${result.exitThreshold}`,
     `Findings: ${result.findings.length}`,
     `Suppressed findings retained: ${result.suppressedFindings.length}`,
@@ -137,7 +137,7 @@ export function formatText(result: ScanResult): string {
     );
   }
 
-  for (const diagnostic of result.diagnostics) {
+  for (const diagnostic of result.rawDiagnostics) {
     lines.push(
       `diagnostic ${diagnostic.severity}: ${diagnostic.path ? `${diagnostic.path}: ` : ""}${diagnostic.message}`,
     );

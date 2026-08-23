@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Made normalized scan diagnostics the canonical internal
+  `ScanResult.diagnostics` collection behind the v2 serializer. Renamed the
+  producer-level collection to internal `rawDiagnostics` and moved scan
+  normalization and review bundling from the version-named module to
+  `scan-diagnostics` without changing public output.
 - Replaced the three overlapping pre-1.0 scan JSON projections with the
   `renma.scan.v2` contract. Active results now use one normalized `diagnostics`
   array, suppressed results use `suppressedDiagnostics`, and the wire-level

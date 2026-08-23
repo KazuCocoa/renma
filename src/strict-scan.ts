@@ -32,7 +32,7 @@ export function evaluateStrictScan(result: ScanResult): StrictScanEvaluation {
   const thresholdFindingCount = result.findings.filter((finding) =>
     severityMeets(finding.severity, result.exitThreshold),
   ).length;
-  const errorDiagnosticCount = result.diagnostics.filter(
+  const errorDiagnosticCount = result.rawDiagnostics.filter(
     (diagnostic) => diagnostic.severity === "error",
   ).length;
   const incompleteSecurityAnalysisCount =

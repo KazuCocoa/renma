@@ -200,7 +200,7 @@ export function readinessFromRepositorySnapshot(
   });
   const diagnostics = readinessDiagnosticsFromRepositorySnapshot(
     snapshot,
-    scanResult.diagnostics,
+    scanResult.rawDiagnostics,
     projectionOptions,
   );
   return buildReadinessReport(

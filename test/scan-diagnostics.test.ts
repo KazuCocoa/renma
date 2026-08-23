@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
-  createDiagnosticsV2,
+  createScanDiagnostics,
   createReviewBundles,
-} from "../src/diagnostics-v2.js";
+} from "../src/scan-diagnostics.js";
 import {
   canonicalFindingRepairGuidance,
   projectFindingRepairGuidance,
@@ -61,7 +61,7 @@ test("typed Finding guidance projects legacy text without prose inference", () =
     finding.verificationStepsV2,
   );
 
-  const [diagnostic] = createDiagnosticsV2({
+  const [diagnostic] = createScanDiagnostics({
     findings: [finding],
     diagnostics: [],
   });
@@ -190,7 +190,7 @@ test("scan JSON includes canonical LLM-actionable diagnostic metadata", async ()
 });
 
 test("network allow-list diagnostics include preserve-semantics repair policy", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-diagnostics-v2-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-diagnostics-"));
   await mkdir(path.join(root, "skills", "network"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "network", "SKILL.md"),
@@ -209,7 +209,7 @@ Fetch https://api.example.com/status.
   );
 
   const result = await scan(root);
-  const diagnostic = result.diagnosticsV2.find(
+  const diagnostic = result.diagnostics.find(
     (item) => item.code === "SEC-UNAPPROVED-NETWORK-DESTINATION",
   );
 
@@ -282,7 +282,7 @@ test("review bundles use structured duplicate id facts before prose", async () =
   const root = await duplicateContextFixture();
   const result = await scan(root);
   const bundles = createReviewBundles(
-    scrubProse(result.diagnosticsV2, "META-DUPLICATE-ASSET-ID"),
+    scrubProse(result.diagnostics, "META-DUPLICATE-ASSET-ID"),
   );
 
   const duplicateBundle = bundleWithCode(bundles, "META-DUPLICATE-ASSET-ID");
@@ -299,7 +299,7 @@ test("unknown reference bundles use structured source and target facts", async (
   const root = await unknownReferenceFixture();
   const result = await scan(root);
   const bundles = createReviewBundles(
-    scrubProse(result.diagnosticsV2, "META-UNKNOWN-REFERENCE"),
+    scrubProse(result.diagnostics, "META-UNKNOWN-REFERENCE"),
   );
 
   const bundle = bundleWithCode(bundles, "META-UNKNOWN-REFERENCE");
@@ -314,7 +314,7 @@ test("Context Lens target bundles use structured source and target facts", async
   const root = await contextLensMissingTargetFixture();
   const result = await scan(root);
   const bundles = createReviewBundles(
-    scrubProse(result.diagnosticsV2, "CONTEXT-LENS-TARGET-NOT-FOUND"),
+    scrubProse(result.diagnostics, "CONTEXT-LENS-TARGET-NOT-FOUND"),
   );
 
   const bundle = bundleWithCode(bundles, "CONTEXT-LENS-TARGET-NOT-FOUND");
@@ -325,7 +325,7 @@ test("Context Lens target bundles use structured source and target facts", async
 });
 
 test("suppressed findings are omitted from diagnostics v2 and review bundles", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-diagnostics-v2-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-diagnostics-"));
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(
     path.join(root, "renma.config.json"),
@@ -348,7 +348,7 @@ test("suppressed findings are omitted from diagnostics v2 and review bundles", a
   const result = await scan(root);
 
   assert.equal(
-    result.diagnosticsV2.some(
+    result.diagnostics.some(
       (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
     ),
     false,
@@ -362,7 +362,7 @@ test("suppressed findings are omitted from diagnostics v2 and review bundles", a
 });
 
 async function duplicateContextFixture(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-diagnostics-v2-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-diagnostics-"));
   await mkdir(path.join(root, "contexts", "alpha"), { recursive: true });
   await mkdir(path.join(root, "contexts", "beta"), { recursive: true });
   const content = `---
@@ -385,7 +385,7 @@ Stable fixture body.
 }
 
 async function unknownReferenceFixture(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-diagnostics-v2-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-diagnostics-"));
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "demo", "SKILL.md"),
@@ -420,7 +420,7 @@ Run the demo check.
 }
 
 async function contextLensMissingTargetFixture(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-diagnostics-v2-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-diagnostics-"));
   await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
   await writeFile(
     path.join(root, "lenses", "testing", "spec-review.md"),

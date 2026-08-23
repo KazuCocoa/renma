@@ -600,7 +600,7 @@ test("scan pipeline preserves locations, ordering, Diagnostics v2, and suppressi
     false,
   );
 
-  const diagnostic = first.diagnosticsV2.find(
+  const diagnostic = first.diagnostics.find(
     ({ code, location }) =>
       code === INVISIBLE_ID &&
       location?.path === "skills/demo/scripts/check.sh",
@@ -636,7 +636,7 @@ test("scan pipeline preserves locations, ordering, Diagnostics v2, and suppressi
     false,
   );
   assert.equal(
-    suppressed.diagnosticsV2.some(
+    suppressed.diagnostics.some(
       ({ code, location }) =>
         code === INVISIBLE_ID &&
         location?.path === "skills/demo/scripts/check.sh",

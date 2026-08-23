@@ -35,7 +35,7 @@ test("Context Lens example is clean, ready, and reports explicit Discovery publi
     ),
   ]);
 
-  assert.equal(scanResult.diagnostics.length, 0);
+  assert.equal(scanResult.rawDiagnostics.length, 0);
   assert.deepEqual(scanResult.findings, []);
   assert.equal(scanResult.agentSkills.totalSkillCount, 1);
   assert.equal(scanResult.agentSkills.validSkillCount, 1);

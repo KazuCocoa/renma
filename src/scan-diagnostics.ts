@@ -29,15 +29,15 @@ const GUIDANCE_ONLY_DIAGNOSTIC_CODES = new Set<string>([
   DISCOVERY_LAYOUT_DIAGNOSTIC_IDS.SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR,
 ]);
 
-/** Convert legacy diagnostics and findings into the LLM-actionable v2 shape. */
-export function createDiagnosticsV2(input: {
+/** Normalize producer diagnostics and active findings for the scan wire model. */
+export function createScanDiagnostics(input: {
   findings: Finding[];
   diagnostics: Diagnostic[];
 }): DiagnosticV2[] {
   return [
-    ...input.findings.map(findingToDiagnosticV2),
-    ...input.diagnostics.map(rawDiagnosticToDiagnosticV2),
-  ].sort(compareDiagnosticsV2);
+    ...input.findings.map(findingToScanDiagnostic),
+    ...input.diagnostics.map(rawDiagnosticToScanDiagnostic),
+  ].sort(compareScanDiagnostics);
 }
 
 /** Convert retained finding suppressions into the canonical scan diagnostic shape. */
@@ -47,10 +47,10 @@ export function createSuppressedDiagnostics(
   return suppressed
     .map((item, index) => ({
       suppression: item.suppression,
-      diagnostic: findingToDiagnosticV2(item.finding, index),
+      diagnostic: findingToScanDiagnostic(item.finding, index),
     }))
     .sort((left, right) =>
-      compareDiagnosticsV2(left.diagnostic, right.diagnostic),
+      compareScanDiagnostics(left.diagnostic, right.diagnostic),
     );
 }
 
@@ -78,7 +78,10 @@ export function createReviewBundles(
     .sort((a, b) => compareUtf16CodeUnits(a.id, b.id));
 }
 
-function findingToDiagnosticV2(finding: Finding, index: number): DiagnosticV2 {
+function findingToScanDiagnostic(
+  finding: Finding,
+  index: number,
+): DiagnosticV2 {
   const code = finding.id;
   const diagnosticId = diagnosticIdFor(
     code,
@@ -107,7 +110,7 @@ function findingToDiagnosticV2(finding: Finding, index: number): DiagnosticV2 {
   });
 }
 
-function rawDiagnosticToDiagnosticV2(
+function rawDiagnosticToScanDiagnostic(
   diagnostic: Diagnostic,
   index: number,
 ): DiagnosticV2 {
@@ -509,7 +512,7 @@ function reviewBundle(
   seed: BundleSeed,
   diagnostics: DiagnosticV2[],
 ): ReviewBundle {
-  const sortedDiagnostics = [...diagnostics].sort(compareDiagnosticsV2);
+  const sortedDiagnostics = [...diagnostics].sort(compareScanDiagnostics);
   const affectedFiles = stableUnique(
     sortedDiagnostics.flatMap((diagnostic) => filesForDiagnostic(diagnostic)),
   );
@@ -889,7 +892,7 @@ function reviewOrder(
   ];
 }
 
-function compareDiagnosticsV2(a: DiagnosticV2, b: DiagnosticV2): number {
+function compareScanDiagnostics(a: DiagnosticV2, b: DiagnosticV2): number {
   const byCode = compareUtf16CodeUnits(a.code, b.code);
   if (byCode !== 0) return byCode;
   const byPath = compareUtf16CodeUnits(

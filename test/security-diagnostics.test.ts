@@ -2301,7 +2301,7 @@ test("historical Skill entrypoints do not enter operational security analysis", 
       entrypoint.path,
     );
     assert.ok(
-      result.diagnostics.some(
+      result.rawDiagnostics.some(
         (diagnostic) =>
           diagnostic.code === "LAYOUT-HISTORICAL-SKILL-ENTRYPOINT" &&
           diagnostic.path === entrypoint.path,

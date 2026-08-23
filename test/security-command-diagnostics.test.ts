@@ -971,7 +971,7 @@ security cms -D -i "$PROFILE_PATH" > "$LOCAL_PLIST"
     "verificationSteps",
     "whyItMatters",
   ]);
-  const diagnosticV2 = result.diagnosticsV2.find(
+  const diagnosticV2 = result.diagnostics.find(
     ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
   );
   assert.equal(diagnosticV2?.details?.ecosystem, "npm");
@@ -1009,7 +1009,7 @@ docker run ubuntu
     ["brew install jq", "docker pull ubuntu", "docker run ubuntu"],
   );
   assert.equal(
-    result.diagnosticsV2.filter(
+    result.diagnostics.filter(
       ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
     ).length,
     3,
@@ -1040,7 +1040,7 @@ docker run ubuntu
     false,
   );
   assert.equal(
-    suppressed.diagnosticsV2.some(
+    suppressed.diagnostics.some(
       ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
     ),
     false,
