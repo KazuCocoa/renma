@@ -979,7 +979,8 @@ example, or policy handling. It also does not broaden security analysis to
 canonical Skill `description`; deciding which of those raw-agent-visible scalar
 surfaces warrant high-signal analysis remains a follow-up.
 
-`SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
+`SEC-SAFEGUARD-BYPASS-INSTRUCTION` is a medium-severity advisory for explicit
+local guidance to disable or
 circumvent security checks, weaken policy to pass diagnostics, suppress
 warnings, replace approval with post-hoc review, choose a more dangerous
 permission fallback, or execute automatically after no user response. The safe
@@ -998,10 +999,11 @@ beneath a generic instruction heading without requiring the word “quote,” bu
 an explicit local execution route takes precedence. Routed
 multiline shell analysis removes quote markers only in its logical-command
 projection; diagnostic evidence retains the exact quoted source lines. Routing
-does not cross an unrelated structural boundary. Safeguard polarity attaches a
-prohibition to the directly governed action and bounded coordinated predicates;
-bounded “No Skill … may” actor clauses are also defensive. A later independently
-expressed unsafe action is evaluated separately.
+does not cross an unrelated structural boundary. The recognizer evaluates one
+physical line and one punctuation-bounded clause at a time. Direct local
+prohibitions are defensive; it does not infer polarity, actors, or authority
+across clauses or lines. A later independently expressed unsafe action is
+evaluated separately.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
@@ -1039,7 +1041,7 @@ Indirect execution through generated files requires human review or a
 dedicated shell-analysis tool. Suppressing failure from an unanalyzed generated
 file does not, by itself, establish risky-operation error suppression.
 
-A separate bounded prose grammar covers both “If the destructive operation
+A separate line-local prose grammar covers both “If the destructive operation
 fails, ignore the error and continue” and the coordinated reverse order
 “continue and ignore the error.” Generic `|| true`,
 capability probes, ordinary error handling, `set +e`, `try/catch`, and stderr
@@ -1048,7 +1050,8 @@ remain defensive. The repair is to preserve the failure, stop and report the
 blocker, and explicitly verify or roll back partial effects rather than
 substituting another suppression.
 
-`SEC-INSTRUCTION-HIERARCHY-OVERRIDE` reports an explicit attempt to ignore,
+`SEC-INSTRUCTION-HIERARCHY-OVERRIDE` is a medium-severity advisory for an
+explicit line-local attempt to ignore,
 disregard, override, supersede, or take precedence over a narrow set of
 higher-authority targets: previous, prior, earlier, or preceding instructions;
 system or developer instructions or prompts; higher-level instructions;
@@ -1060,16 +1063,16 @@ direct or indirect bounded hierarchy questions, and explicitly attributed or
 illustrative phrases are outside the rule. A bare mention of “the prompt,” “the
 statement,” or “the phrase” is not attribution by itself, and an attribution or
 illustrative cue does not govern a later independent clause. Direct prohibitions
-and bounded inability or negative-subject forms remain defensive, including
-locally qualified Skill subjects, but their polarity stops at the governed action
-and does not cross a later finite clause. Quoted or non-operational unsafe
+and explicit negative-subject forms remain defensive. Renma does not resolve an
+implied actor, pronoun, or earlier sentence. Quoted or non-operational unsafe
 examples follow the existing Markdown security-view boundaries. A recognized
 override inside an HTML or YAML frontmatter comment remains hidden operational
 evidence under the existing hidden-comment diagnostic rather than becoming a
 rendered-visible finding. Repair removes the priority claim, preserves system and
 developer authority, and states only the intended local behavior.
 
-`SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
+`SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` is a medium-severity advisory for one
+physical line that explicitly makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
 Markdown authoritative or executes its embedded commands without review. Safe
 reading, quoting, summarizing, provenance capture, and locally reviewed or
@@ -1078,20 +1081,12 @@ treating source content as untrusted data, preserving provenance, validating
 task-relevant facts, and keeping execution authority in reviewed repository
 guidance or explicit human approval.
 
-Semantic windows use CommonMark paragraph ranges. Source and action text in one
-paragraph, including valid indented or lazy list-item continuations, can form
-one bounded instruction; positioned paragraph and list-item boundaries prevent
-sibling or nested items from being combined. Ordinary adjacent prose lines in
-one paragraph remain eligible for multiline matching. A review
-guard applies only when it precedes and names the same execution action, so a
-later defensive sentence cannot retroactively suppress an unsafe action and a
-guard for `apply` does not cover a later `execute`. Multiline matches are
-deduplicated only after an emitted action span is selected; a guarded raw regex
-match does not suppress a later contradictory action. An action that proceeds
-regardless of review findings, despite failed validation or inspection, or
-without reviewing, validating, verifying, inspecting, or checking explicitly
-rejects the preceding guard and remains an untrusted-content finding. Guard and
-contradiction matching use the same review vocabulary and inflected forms.
+Source, execution action, and any review guard must occur on that same physical
+line. Renma does not combine soft-wrapped, lazy-continuation, adjacent, parent,
+or child lines for this prose rule, and it does not carry a guard from an
+earlier sentence or line. This deliberately leaves ambiguous and cross-line
+wording for human review instead of attempting general natural-language
+coreference.
 
 `SEC-EXECUTABLE-AS-POLICY-AUTHORITY` reports a narrower authority boundary in
 canonical Skill body instructions. It requires parser-owned evidence for an

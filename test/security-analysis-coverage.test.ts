@@ -90,7 +90,7 @@ test("scan JSON exposes deterministic security-analysis coverage for discovered 
   );
   assert.deepEqual(
     evaluateStrictScan(result).matches.map((match) => match.id),
-    ["strict_scan.finding_threshold"],
+    [],
   );
 });
 

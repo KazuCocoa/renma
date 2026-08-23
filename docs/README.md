@@ -99,6 +99,9 @@ source-repository-only and intentionally excluded from the npm package.
 - [Current Roadmap](development/plan.md) owns
   the current stabilization checkpoint, open candidates, deferred ecosystem
   concerns, and explicit non-commitments.
+- [Renma 1.0 Stabilization Boundary](development/stabilization-1.0.md) records
+  the pre-1.0 reduction order, the retained shell-family and `ci-report`
+  contracts, and the precision-first boundary for natural-language analysis.
 - [Skill Discovery Design](development/plan-discovery.md)
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in

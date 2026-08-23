@@ -242,6 +242,13 @@ instructions and effective policy metadata. They use Markdown structure, exact
 guard scope, bounded command and destination recognition, policy inheritance,
 and fail-closed fallback.
 
+Natural-language checks recognize only explicit local evidence. They do not
+resolve implicit actors, inherit guards across sentences, or claim complete
+semantic coverage. Prose-only findings are advisory by default; High or
+Critical findings require structural command, destination, or policy evidence.
+The bounded POSIX shell, PowerShell, and Windows batch analyzers remain core
+structural evidence and are not replaced by prose inference.
+
 Renma distinguishes repository policy evidence from runtime enforcement. An
 external URL in Markdown is body content, not a catalog node, approved
 destination, or network grant. Renma must not manufacture permissive allowed
