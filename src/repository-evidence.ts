@@ -221,38 +221,58 @@ export async function collectRepositorySnapshotCore(
     instrumentation?.onDocumentParse?.(artifact.path);
     return parseDocument(artifact);
   });
-  const attemptedExplicitPaths = new Set<string>();
+  const attemptedExplicitPathsBySource = evidenceBoundarySources.map(
+    () => new Set<string>(),
+  );
+  const skippedPathStatesBySource = discovery.skippedPathStatesBySource.map(
+    (states) => new Map(states),
+  );
   while (true) {
-    const expected = staticallyExpectedSupportInspection(
-      documents,
-      [
-        ...new Set([
-          ...discovery.discoveredPaths,
-          ...artifacts.map((artifact) => artifact.path),
-          ...skippedPathStates.keys(),
-        ]),
-      ],
-      buildSkillParentIndex(documents),
-      [...discovery.excludedSupportDirectoryPaths],
+    const candidatesBySource = evidenceBoundarySources.map(
+      (_source, sourceIndex) => {
+        const inspectedPaths = evidenceBoundaryInspectedPaths[sourceIndex]!;
+        const localDocuments = documents.filter((document) =>
+          inspectedPaths.has(document.artifact.path),
+        );
+        const localSkippedPathStates = skippedPathStatesBySource[sourceIndex]!;
+        const expected = staticallyExpectedSupportInspection(
+          localDocuments,
+          [
+            ...new Set([
+              ...discovery.discoveredPathsBySource[sourceIndex]!,
+              ...inspectedPaths,
+              ...localSkippedPathStates.keys(),
+            ]),
+          ],
+          buildSkillParentIndex(localDocuments),
+          [...discovery.excludedSupportDirectoryPathsBySource[sourceIndex]!],
+        );
+        const attemptedPaths = attemptedExplicitPathsBySource[sourceIndex]!;
+        return expected.paths
+          .map((expectation) => expectation.targetPath)
+          .filter(
+            (candidate) =>
+              !attemptedPaths.has(candidate) &&
+              !inspectedPaths.has(candidate) &&
+              !localSkippedPathStates.has(candidate),
+          );
+      },
     );
+    if (candidatesBySource.every((candidates) => candidates.length === 0)) {
+      break;
+    }
+    for (const [sourceIndex, candidates] of candidatesBySource.entries()) {
+      const attemptedPaths = attemptedExplicitPathsBySource[sourceIndex]!;
+      for (const candidate of candidates) attemptedPaths.add(candidate);
+    }
     const knownArtifactPaths = new Set(
       artifacts.map((artifact) => artifact.path),
     );
-    const candidates = expected.paths
-      .map((expectation) => expectation.targetPath)
-      .filter(
-        (candidate) =>
-          !attemptedExplicitPaths.has(candidate) &&
-          !knownArtifactPaths.has(candidate) &&
-          !skippedPathStates.has(candidate),
-      );
-    if (candidates.length === 0) break;
-    for (const candidate of candidates) attemptedExplicitPaths.add(candidate);
     const explicit = await inspectExplicitWithBoundarySources(
       root,
       config,
       evidenceBoundarySources,
-      candidates,
+      candidatesBySource,
     );
     for (const [
       sourceIndex,
@@ -261,6 +281,16 @@ export async function collectRepositorySnapshotCore(
       const inspectedPaths = evidenceBoundaryInspectedPaths[sourceIndex];
       if (!inspectedPaths) continue;
       for (const artifactPath of paths) inspectedPaths.add(artifactPath);
+    }
+    for (const [
+      sourceIndex,
+      states,
+    ] of explicit.skippedPathStatesBySource.entries()) {
+      const localStates = skippedPathStatesBySource[sourceIndex];
+      if (!localStates) continue;
+      for (const [candidate, state] of states) {
+        localStates.set(candidate, state);
+      }
     }
     discoveryDiagnostics.push(...explicit.diagnostics);
     for (const [candidate, state] of explicit.skippedPathStates) {
@@ -385,6 +415,11 @@ async function discoverWithBoundarySources(
 ): Promise<
   Awaited<ReturnType<typeof discoverArtifacts>> & {
     artifactPathsBySource: ReadonlyArray<ReadonlySet<string>>;
+    discoveredPathsBySource: ReadonlyArray<ReadonlySet<string>>;
+    skippedPathStatesBySource: ReadonlyArray<
+      ReadonlyMap<string, RepositoryPathState>
+    >;
+    excludedSupportDirectoryPathsBySource: ReadonlyArray<ReadonlySet<string>>;
   }
 > {
   const discoveries = await Promise.all(
@@ -442,6 +477,15 @@ async function discoverWithBoundarySources(
       (discovery) =>
         new Set(discovery.artifacts.map((artifact) => artifact.path)),
     ),
+    discoveredPathsBySource: discoveries.map(
+      (discovery) => discovery.discoveredPaths,
+    ),
+    skippedPathStatesBySource: discoveries.map(
+      (discovery) => discovery.skippedPathStates,
+    ),
+    excludedSupportDirectoryPathsBySource: discoveries.map(
+      (discovery) => discovery.excludedSupportDirectoryPaths,
+    ),
   };
 }
 
@@ -449,18 +493,21 @@ async function inspectExplicitWithBoundarySources(
   root: string,
   semanticConfig: ScanConfig,
   sources: readonly ScanBoundarySource[],
-  candidatePaths: readonly string[],
+  candidatePathsBySource: ReadonlyArray<readonly string[]>,
 ): Promise<
   ExplicitArtifactInspectionResult & {
     artifactPathsBySource: ReadonlyArray<ReadonlySet<string>>;
+    skippedPathStatesBySource: ReadonlyArray<
+      ReadonlyMap<string, RepositoryPathState>
+    >;
   }
 > {
   const inspections = await Promise.all(
-    sources.map((source) =>
+    sources.map((source, sourceIndex) =>
       inspectExplicitRepositoryArtifacts(
         root,
         boundaryConfig(semanticConfig, source),
-        candidatePaths,
+        candidatePathsBySource[sourceIndex] ?? [],
       ),
     ),
   );
@@ -497,6 +544,9 @@ async function inspectExplicitWithBoundarySources(
     artifactPathsBySource: inspections.map(
       (inspection) =>
         new Set(inspection.artifacts.map((artifact) => artifact.path)),
+    ),
+    skippedPathStatesBySource: inspections.map(
+      (inspection) => inspection.skippedPathStates,
     ),
   };
 }
