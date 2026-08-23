@@ -1506,7 +1506,7 @@ const DIRECT_DEFENSIVE_SEMANTIC_RE =
 const EXPLICIT_LOCAL_PROHIBITION_RE =
   /(?:\b(?:do not|don't|never|cannot|can't|can not|will not|won't|may not|should not|must not|is not allowed to|is unable to)\b|\b(?:skill|rule|policy|instructions?|guidance)\b[^.;:!?—–\n\r]{0,40}\b(?:does not|doesn't)\b|\bno\b[^.;:!?—–\n\r]{0,80}\b(?:may|can|should|must|is allowed to)\b|\bunder no circumstances\b|\bit is forbidden\b[^.;:!?—–\n\r]{0,80}\bto\b)[^.;:!?—–\n\r]{0,120}\b(?:ignore|disregard|override|supersede|take\s+precedence|bypass|circumvent|skip|disable|deactivate|suppress|weaken|continue|proceed|execute|run|apply|follow|obey|adopt|treat|add|create|use)\b/iu;
 const NON_OPERATIONAL_DISCUSSION_RE =
-  /\b(?:for example|the (?:phrase|statement|prompt)|documentation|docs?|incident report|audit report|reviewer|maintainer)\b|\b(?:approval|safeguard)-bypass\s+(?:requests?|instructions?|wording|examples?)\b|^\s*(?:explain|review|verify|determine|check|assess|document)\b|^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\b[^.!?;:—–\n\r]{0,180}\?\s*$/iu;
+  /\bfor example\b|\bthe (?:phrase|statement|prompt)\b|\b(?:(?:the|a)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b[^.!?;—–\n\r]{0,48}\b(?:says?|states?|reads?|notes?|noted|documents?|records?|reports?|explains?)\b|\baccording to\s+(?:(?:the|an?)\s+)?(?:documentation|docs?|incident report|audit report|reviewer|maintainer)\b|\b(?:approval|safeguard)-bypass\s+(?:requests?|instructions?|wording|examples?)\b|^\s*(?:explain|review|verify|determine|check|assess|document)\b|^\s*(?:do|does|did|can|could|should|would|will|may|must|is|are)\b[^.!?;:—–\n\r]{0,180}\?\s*$/iu;
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 // Bounds associate the source and action within one local instruction while
@@ -5429,31 +5429,40 @@ function unsafeRiskyOperationFailureSuppression(
 function unsafeInstructionHierarchyOverride(
   text: string,
 ): UnsafeBoundedActionMatch | undefined {
-  if (NON_OPERATIONAL_DISCUSSION_RE.test(text)) return undefined;
-  const match = firstExplicitLocalMatch(text, [
-    DIRECT_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
-    PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
-  ]);
-  if (match === undefined) return undefined;
-  if (explicitMatchIsNonOperational(text, match.start, match.end)) {
-    return undefined;
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  for (const clause of localClauseRanges(analysisText)) {
+    if (isExplicitlyNonOperationalProse(clause.text)) continue;
+    const localMatch = firstPatternMatch(clause.text, [
+      DIRECT_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
+      PRECEDENCE_INSTRUCTION_HIERARCHY_OVERRIDE_RE,
+    ]);
+    if (localMatch === undefined) continue;
+    const prefix = clause.text.slice(0, localMatch.start).trimEnd();
+    if (
+      prefix.length !== 0 &&
+      !/(?:\b(?:this|that|these|those|local)\s+(?:skill|rule|policy|instructions?|guidance)|\b(?:you|we|i)|\bthe\s+prompt)\s*$/iu.test(
+        prefix,
+      ) &&
+      !/\b(?:and|but|then|yet|to)\s*$/iu.test(prefix)
+    ) {
+      continue;
+    }
+    return {
+      start: clause.start + localMatch.start,
+      end: clause.start + localMatch.end,
+    };
   }
-  const prefix = text.slice(0, match.start).trimEnd();
-  return prefix.length === 0 ||
-    /(?:\b(?:this|that|these|those|local)\s+(?:skill|rule|policy|instructions?|guidance)|\b(?:you|we|i)|\bthe\s+prompt)\s*$/iu.test(
-      prefix,
-    ) ||
-    /\b(?:and|but|then|yet|to)\s*$/iu.test(prefix)
-    ? match
-    : undefined;
+  return undefined;
 }
 
 function explicitUntrustedContentInstruction(text: string): boolean {
-  return (
-    UNTRUSTED_CONTENT_SOURCE_RE.test(text) &&
-    UNTRUSTED_EXECUTION_ACTION_RE.test(text) &&
-    !isExplicitlyNonOperationalProse(text) &&
-    !UNTRUSTED_CONTENT_REVIEW_GUARD_RE.test(text)
+  const analysisText = safeguardMarkdownPresentationProjection(text);
+  return localClauseRanges(analysisText).some(
+    (clause) =>
+      UNTRUSTED_CONTENT_SOURCE_RE.test(clause.text) &&
+      UNTRUSTED_EXECUTION_ACTION_RE.test(clause.text) &&
+      !isExplicitlyNonOperationalProse(clause.text) &&
+      !UNTRUSTED_CONTENT_REVIEW_GUARD_RE.test(clause.text),
   );
 }
 
@@ -5479,13 +5488,12 @@ function localClauseText(text: string, start: number, end: number): string {
     text.lastIndexOf("!", start - 1),
     text.lastIndexOf("?", start - 1),
     text.lastIndexOf(";", start - 1),
-    text.lastIndexOf(":", start - 1),
     text.lastIndexOf("—", start - 1),
     text.lastIndexOf("–", start - 1),
     text.lastIndexOf("\n", start - 1),
     text.lastIndexOf("\r", start - 1),
   );
-  const followingBoundary = text.slice(end).search(/[.!?;:—–\n\r]/u);
+  const followingBoundary = text.slice(end).search(/[.!?;—–\n\r]/u);
   const clauseEnd =
     followingBoundary === -1 ? text.length : end + followingBoundary + 1;
   return text.slice(clauseStart + 1, clauseEnd);
@@ -5497,14 +5505,24 @@ function firstExplicitLocalMatch(
 ): UnsafeBoundedActionMatch | undefined {
   const analysisText = safeguardMarkdownPresentationProjection(text);
   for (const clause of localClauseRanges(analysisText)) {
-    for (const pattern of patterns) {
-      const match = pattern.exec(clause.text);
-      if (match?.index === undefined) continue;
-      return {
-        start: clause.start + match.index,
-        end: clause.start + match.index + match[0].length,
-      };
-    }
+    const match = firstPatternMatch(clause.text, patterns);
+    if (match === undefined) continue;
+    return {
+      start: clause.start + match.start,
+      end: clause.start + match.end,
+    };
+  }
+  return undefined;
+}
+
+function firstPatternMatch(
+  text: string,
+  patterns: readonly RegExp[],
+): UnsafeBoundedActionMatch | undefined {
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match?.index === undefined) continue;
+    return { start: match.index, end: match.index + match[0].length };
   }
   return undefined;
 }
@@ -5512,7 +5530,7 @@ function firstExplicitLocalMatch(
 function localClauseRanges(
   text: string,
 ): Array<{ start: number; text: string }> {
-  return [...text.matchAll(/[^.!?;:—–\n\r]+[.!?;:—–]?/gu)].map((clause) => ({
+  return [...text.matchAll(/[^.!?;—–\n\r]+[.!?;—–]?/gu)].map((clause) => ({
     start: clause.index,
     text: clause[0],
   }));
