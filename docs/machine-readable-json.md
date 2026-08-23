@@ -112,6 +112,21 @@ Consumers should ignore unknown optional fields, preserve unknown open-enum
 values when forwarding evidence, and fail clearly when they do not support the
 document's top-level `schemaVersion`.
 
+## Renma 1.0 release-candidate freeze
+
+The stable identifiers in the contract table are the Renma 1.0
+release-candidate top-level JSON identities. Their exact command-to-identifier
+mapping is pinned independently of the producer constants, while the existing
+whole-document goldens, published schemas, and semantic fixtures continue to
+freeze document shape and meaning. The checked-in public TypeScript API
+snapshot separately freezes the supported npm type entrypoints.
+
+This freeze does not include `renma.experimental-execution-contract.v1`,
+internal `ScanResult` fields, implementation module paths, diagnostic prose,
+or environment-derived values documented below. After the freeze, a breaking
+change to a stable JSON contract requires a new schema identity and migration
+guidance; updating producer code and documentation together is not sufficient.
+
 ## Determinism and environment-derived values
 
 Deterministic machine ordering uses ECMAScript UTF-16 code-unit comparison and

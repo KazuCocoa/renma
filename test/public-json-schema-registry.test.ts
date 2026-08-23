@@ -4,6 +4,36 @@ import test from "node:test";
 
 import { PUBLIC_JSON_SCHEMA_VERSIONS } from "../src/commands/public-json-schema-versions.js";
 
+const RELEASE_CANDIDATE_1_0_SCHEMA_IDENTITIES = {
+  scan: "renma.scan.v2",
+  catalog: "renma.catalog.v1",
+  graph: "renma.graph.v1",
+  readiness: "renma.readiness.v2",
+  ownership: "renma.ownership.v1",
+  diff: "renma.diff.v1",
+  "ci-report": "renma.ci-report.v1",
+  "inspect outline": "renma.inspect-outline.v1",
+  "inspect --lines": "renma.inspect-slice.v1",
+  "guide skill": "renma.skill-authoring-guide.v1",
+  scaffold: "renma.scaffold.v1",
+  "suggest-metadata": "renma.metadata-suggestion.v1",
+  "suggest-semantic-split": "renma.semantic-split-suggestion.v1",
+  "skill-index": "renma.skill-index.v1",
+  "trust-graph": "renma.trustGraph.v2",
+  bom: "renma.repository-context-bom.v3",
+} as const;
+
+test("1.0 release-candidate top-level schema identities are frozen", () => {
+  assert.deepEqual(
+    PUBLIC_JSON_SCHEMA_VERSIONS.stable,
+    RELEASE_CANDIDATE_1_0_SCHEMA_IDENTITIES,
+  );
+  assert.equal(
+    "execution-contract" in RELEASE_CANDIDATE_1_0_SCHEMA_IDENTITIES,
+    false,
+  );
+});
+
 test("public JSON schema registry matches the documented top-level inventory", async () => {
   const documentation = await readFile("docs/machine-readable-json.md", "utf8");
   const rows = documentation
