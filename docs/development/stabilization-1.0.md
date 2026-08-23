@@ -66,16 +66,13 @@ not sufficient.
 
 ## Diagnostic Migration Sequence
 
-Before changing the public 1.0 diagnostic document, producers should author
-one canonical typed diagnostic model. Pre-1.0 `findings`, `diagnostics`, and
-`diagnosticsV2` projections may temporarily remain as serializers over that
-model. Compatibility projection must not become producer authority.
-
-The public 1.0 diagnostic and JSON contracts are selected only after the
-natural-language and CLI boundaries above settle. At that point obsolete
-pre-1.0 adapters, disabled identifiers, exact property-order workarounds, and
-whole-document compatibility fixtures may be removed in one documented
-breaking transition.
+Producers author one canonical typed diagnostic model. The `renma.scan.v2`
+public document selects that model as its single active `diagnostics` array and
+uses the same shape for `suppressedDiagnostics`. The overlapping pre-1.0
+`findings`, legacy `diagnostics`, and transitional `diagnosticsV2` wire fields
+are no longer serialized. Internal scan working data may remain until the
+post-contract source reorganization; it is not a compatibility projection or
+public producer authority.
 
 ## Implementation Order
 
@@ -86,6 +83,7 @@ breaking transition.
 3. Preserve the `ci-report` integration and remove internal diff/report
    duplication.
 4. Select the 1.0 JSON contracts and remove obsolete pre-1.0 projections.
+   Completed for scan as `renma.scan.v2`.
 5. Reorganize source directories, serializers, documentation, and tests behind
    the settled public boundary.
 6. Freeze compatibility only for the release-candidate contracts.

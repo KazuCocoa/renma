@@ -9,7 +9,7 @@ path.
 
 | Command or output        | Top-level `schemaVersion`                  | Repository compatibility assurance                          |
 | ------------------------ | ------------------------------------------ | ----------------------------------------------------------- |
-| `scan`                   | `renma.scan.v1`                            | Representative whole-document golden                        |
+| `scan`                   | `renma.scan.v2`                            | Representative whole-document golden                        |
 | `catalog`                | `renma.catalog.v1`                         | Representative whole-document golden                        |
 | `graph`                  | `renma.graph.v1`                           | Representative whole-document golden                        |
 | `readiness`              | `renma.readiness.v2`                       | Representative whole-document golden                        |
@@ -69,12 +69,19 @@ serialized, and internal working values do not receive `schemaVersion`
 blindly.
 
 For scan consumers, the public TypeScript `ScanJsonDocument` models the wire
-shape with literal `schemaVersion: "renma.scan.v1"` and `format: "json"`.
+shape with literal `schemaVersion: "renma.scan.v2"` and `format: "json"`.
 Renma's pre-serialization core scan model has no supported public library
 producer and remains internal; `formatJson()` remains the authoritative
 serializer. Its dedicated `toScanJsonDocument()` projection explicitly selects
 every supported top-level field; it never spreads the internal `ScanResult`
 model into the wire document.
+
+Scan v2 replaces the three overlapping pre-1.0 projections (`findings`, legacy
+`diagnostics`, and `diagnosticsV2`) with one canonical normalized `diagnostics`
+array. Suppressed results use the same diagnostic shape under
+`suppressedDiagnostics`, paired with their suppression evidence. Consumers
+must branch on `schemaVersion` and migrate field access rather than treating v2
+as an additive v1 extension.
 
 Classification `matchedRule` and `reasonCode` values are open enums in JSON and
 in the public TypeScript wire types. Consumers must retain unfamiliar future

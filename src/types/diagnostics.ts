@@ -109,6 +109,12 @@ export interface SuppressedFindingEvidence {
   finding: Finding;
 }
 
+/** Suppressed diagnostic evidence serialized by the scan v2 wire contract. */
+export interface SuppressedDiagnosticEvidence {
+  suppression: SuppressedFindingEvidence["suppression"];
+  diagnostic: DiagnosticV2;
+}
+
 /** Supported suppression expiration values. */
 export type SuppressionExpiration = "never" | `${number}-${number}-${number}`;
 

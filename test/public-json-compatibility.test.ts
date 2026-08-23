@@ -154,10 +154,6 @@ test("representative public JSON matches fixed compatibility baselines", async (
   }
 
   for (const item of BASELINE_CASES) {
-    const expected = await readFile(
-      path.join(EXPECTED_ROOT, `${item.name}.golden`),
-      "utf8",
-    );
     const actual = await captureProcessOutput(() => main([...item.argv]));
     const versionNormalizedStdout: string =
       item.name === "bom"
@@ -170,7 +166,7 @@ test("representative public JSON matches fixed compatibility baselines", async (
 
     assert.equal(actual.code, item.code, `${item.name} exit code`);
     assert.equal(actual.stderr, "", `${item.name} stderr`);
-    assert.equal(normalizedStdout, expected, `${item.name} stdout`);
+    await assertOrUpdateGolden(item.name, normalizedStdout);
     outputs.set(item.name, normalizedStdout);
   }
 
@@ -182,7 +178,7 @@ test("representative public JSON matches fixed compatibility baselines", async (
       ]),
     ),
     {
-      scan: "renma.scan.v1",
+      scan: "renma.scan.v2",
       catalog: "renma.catalog.v1",
       graph: "renma.graph.v1",
       "skill-index": "renma.skill-index.v1",
@@ -207,27 +203,25 @@ test("representative public JSON matches fixed compatibility baselines", async (
     "renma.security-analysis-coverage.v1",
   );
   assert.equal(arrayOfRecords(securityAnalysisCoverage.artifacts).length, 7);
-  const findingIds = arrayOfRecords(scanOutput.findings).map(
-    (finding) => finding.id,
-  );
-  assert.ok(findingIds.includes("META-INVALID-STATUS"));
-  assert.ok(findingIds.includes("META-CONTEXT-MISSING-WHEN-TO-USE"));
-  assert.ok(findingIds.includes("META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY"));
-  assert.ok(findingIds.includes("META-UNKNOWN-DEPENDENCY"));
-  assert.ok(findingIds.includes("MAINT-REFERENCE-DEPRECATED-ASSET"));
-  assert.ok(
-    arrayOfRecords(scanOutput.findings).every(
-      (finding) =>
-        record(finding.evidence).path !== "contexts/missing-owner.md",
-    ),
-  );
-
-  const diagnosticV2Codes = arrayOfRecords(scanOutput.diagnosticsV2).map(
+  const diagnosticCodes = arrayOfRecords(scanOutput.diagnostics).map(
     (diagnostic) => diagnostic.code,
   );
-  for (const findingId of findingIds) {
-    assert.ok(diagnosticV2Codes.includes(findingId), String(findingId));
-  }
+  assert.ok(diagnosticCodes.includes("META-INVALID-STATUS"));
+  assert.ok(diagnosticCodes.includes("META-CONTEXT-MISSING-WHEN-TO-USE"));
+  assert.ok(
+    diagnosticCodes.includes("META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY"),
+  );
+  assert.ok(diagnosticCodes.includes("META-UNKNOWN-DEPENDENCY"));
+  assert.ok(diagnosticCodes.includes("MAINT-REFERENCE-DEPRECATED-ASSET"));
+  assert.ok(
+    arrayOfRecords(scanOutput.diagnostics).every(
+      (diagnostic) =>
+        record(diagnostic.location).path !== "contexts/missing-owner.md",
+    ),
+  );
+  assert.equal("findings" in scanOutput, false);
+  assert.equal("suppressedFindings" in scanOutput, false);
+  assert.equal("diagnosticsV2" in scanOutput, false);
 
   const bomOutput = parseOutput(outputs, "bom");
   const executableSurfaceInventory = record(

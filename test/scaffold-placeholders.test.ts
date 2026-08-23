@@ -149,15 +149,17 @@ test("strict High scan fails in JSON and text for an untouched scaffold", async 
   );
   assert.equal(json.code, 1);
   const parsed = JSON.parse(json.stdout) as {
-    findings: Array<{
-      id: string;
-      evidence: { path: string; startLine: number; snippet: string };
+    diagnostics: Array<{
+      code: string;
+      location?: { path: string; startLine?: number; snippet?: string };
     }>;
   };
-  const finding = parsed.findings.find(({ id }) => id === PLACEHOLDER_ID);
-  assert.equal(finding?.evidence.path, "skills/demo/SKILL.md");
-  assert.ok((finding?.evidence.startLine ?? 0) > 0);
-  assert.match(finding?.evidence.snippet ?? "", /^description:/);
+  const diagnostic = parsed.diagnostics.find(
+    ({ code }) => code === PLACEHOLDER_ID,
+  );
+  assert.equal(diagnostic?.location?.path, "skills/demo/SKILL.md");
+  assert.ok((diagnostic?.location?.startLine ?? 0) > 0);
+  assert.match(diagnostic?.location?.snippet ?? "", /^description:/);
 
   const text = await capture(() =>
     main(["scan", root, "--fail-on", "high", "--strict", "--format", "text"]),

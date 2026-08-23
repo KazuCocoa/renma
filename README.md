@@ -234,7 +234,7 @@ import {
 ```
 
 `ScanJsonDocument` is the public wire document emitted by `formatJson()` and
-`scan --format json`; it has the literal `schemaVersion: "renma.scan.v1"` and
+`scan --format json`; it has the literal `schemaVersion: "renma.scan.v2"` and
 `format: "json"`. Public discovery recognizes only exact
 canonical `SKILL.md` entrypoints. Historical lowercase and flat entrypoints
 remain available only to explicit CLI migration tooling.

@@ -168,15 +168,18 @@ test("strict high scan rejects a policy-violating canonical Skill description", 
     ]),
   );
   const json = JSON.parse(result.stdout) as {
-    findings: Array<{ id: string; evidence: { startLine: number } }>;
+    diagnostics: Array<{
+      code: string;
+      location?: { startLine?: number };
+    }>;
   };
 
   assert.equal(result.code, 1);
   assert.ok(
-    json.findings.some(
-      (finding) =>
-        finding.id === "SEC-SAFEGUARD-BYPASS-INSTRUCTION" &&
-        finding.evidence.startLine === 3,
+    json.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "SEC-SAFEGUARD-BYPASS-INSTRUCTION" &&
+        diagnostic.location?.startLine === 3,
     ),
   );
 });
@@ -202,20 +205,22 @@ test("strict high scan rejects a destructive canonical Skill description", async
     ]),
   );
   const json = JSON.parse(result.stdout) as {
-    findings: Array<{
-      id: string;
+    diagnostics: Array<{
+      code: string;
       severity: string;
-      evidence: { startLine: number; snippet: string };
+      location?: { startLine?: number; snippet?: string };
+      details?: { findingSeverity?: string };
     }>;
   };
-  const destructive = json.findings.find(
-    (finding) => finding.id === "SEC-DESTRUCTIVE-COMMAND",
+  const destructive = json.diagnostics.find(
+    (diagnostic) => diagnostic.code === "SEC-DESTRUCTIVE-COMMAND",
   );
 
   assert.equal(result.code, 1);
-  assert.equal(destructive?.severity, "high");
-  assert.equal(destructive?.evidence.startLine, 3);
-  assert.match(destructive?.evidence.snippet ?? "", /^description:/);
+  assert.equal(destructive?.severity, "error");
+  assert.equal(destructive?.details?.findingSeverity, "high");
+  assert.equal(destructive?.location?.startLine, 3);
+  assert.match(destructive?.location?.snippet ?? "", /^description:/);
 });
 
 test("strict scan rejects a real error diagnostic without redefining normal scan", async (t) => {

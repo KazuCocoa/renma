@@ -634,10 +634,10 @@ test("config suppressions remove findings without skipping scanned files", async
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
   const report = JSON.parse(exitCode.stdout) as {
     scannedFileCount: number;
-    findings: Array<{ id: string }>;
+    diagnostics: Array<{ code: string }>;
   };
-  const secretFinding = report.findings.find(
-    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  const secretFinding = report.diagnostics.find(
+    (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
   );
 
   assert.equal(exitCode.code, 0);
@@ -697,10 +697,10 @@ test("config suppressions require both matching id and path", async () => {
 
     const exitCode = await withCapturedConsole(() => main(["scan", root]));
     const report = JSON.parse(exitCode.stdout) as {
-      findings: Array<{ id: string }>;
+      diagnostics: Array<{ code: string }>;
     };
-    const secretFinding = report.findings.find(
-      (finding) => finding.id === "SEC-LITERAL-SECRET",
+    const secretFinding = report.diagnostics.find(
+      (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
     );
 
     assert.equal(exitCode.code, item.expectedCode, item.name);
@@ -733,11 +733,10 @@ test("expired config suppressions do not suppress findings", async () => {
 
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
   const report = JSON.parse(exitCode.stdout) as {
-    diagnostics: Array<{ severity: string; message: string }>;
-    findings: Array<{ id: string }>;
+    diagnostics: Array<{ code: string; severity: string; message: string }>;
   };
-  const secretFinding = report.findings.find(
-    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  const secretFinding = report.diagnostics.find(
+    (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
   );
 
   assert.equal(exitCode.code, 1);
@@ -778,11 +777,10 @@ test('config suppressions with expires "never" do not expire', async () => {
 
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
   const report = JSON.parse(exitCode.stdout) as {
-    diagnostics: Array<{ message: string }>;
-    findings: Array<{ id: string }>;
+    diagnostics: Array<{ code: string; message: string }>;
   };
-  const secretFinding = report.findings.find(
-    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  const secretFinding = report.diagnostics.find(
+    (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
   );
 
   assert.equal(exitCode.code, 0);
@@ -949,18 +947,18 @@ test("scan output keeps suppressed findings separate and visible as evidence", a
 
   const json = await withCapturedConsole(() => main(["scan", root, "--json"]));
   const report = JSON.parse(json.stdout) as {
-    findings: Array<{ id: string }>;
-    suppressedFindings: Array<{ finding: { id: string } }>;
+    diagnostics: Array<{ code: string }>;
+    suppressedDiagnostics: Array<{ diagnostic: { code: string } }>;
   };
-  const secretFinding = report.findings.find(
-    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  const secretFinding = report.diagnostics.find(
+    (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
   );
 
   assert.equal(json.code, 0);
   assert.equal(secretFinding, undefined);
   assert.ok(
-    report.suppressedFindings.some(
-      (item) => item.finding.id === "SEC-LITERAL-SECRET",
+    report.suppressedDiagnostics.some(
+      (item) => item.diagnostic.code === "SEC-LITERAL-SECRET",
     ),
   );
 
@@ -1010,12 +1008,14 @@ test("CLI reports JSON and fail-on exit code", async () => {
     main(["scan", root, "--json", "--fail-on", "high"]),
   );
   const report = JSON.parse(exitCode.stdout) as {
-    findings: Array<{ id: string }>;
+    diagnostics: Array<{ code: string }>;
   };
 
   assert.equal(exitCode.code, 1);
   assert.ok(
-    report.findings.some((finding) => finding.id === "SEC-LITERAL-SECRET"),
+    report.diagnostics.some(
+      (diagnostic) => diagnostic.code === "SEC-LITERAL-SECRET",
+    ),
   );
 });
 

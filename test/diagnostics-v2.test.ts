@@ -128,13 +128,13 @@ test("scan Finding legacy arrays cannot drift from canonical typed guidance", as
   assert.ok(guidedFindingCount > 0);
 });
 
-test("scan JSON includes LLM-actionable diagnostics v2 metadata", async () => {
+test("scan JSON includes canonical LLM-actionable diagnostic metadata", async () => {
   const root = await duplicateContextFixture();
 
   const report = JSON.parse(formatJson(await scan(root))) as {
-    diagnosticsV2: DiagnosticV2[];
+    diagnostics: DiagnosticV2[];
   };
-  const duplicate = report.diagnosticsV2.find(
+  const duplicate = report.diagnostics.find(
     (diagnostic) => diagnostic.code === "META-DUPLICATE-ASSET-ID",
   );
 

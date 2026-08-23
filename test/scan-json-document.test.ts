@@ -12,7 +12,7 @@ import {
   type ScanResult,
 } from "../src/types/scan-result.js";
 
-test("scan JSON serialization adds the typed renma.scan.v1 wire boundary", async () => {
+test("scan JSON serialization adds the typed renma.scan.v2 wire boundary", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-scan-json-type-"));
   const result: ScanResult = await scan(root, { format: "json" });
   const expectedDocument = toScanJsonDocument(result);
@@ -20,8 +20,13 @@ test("scan JSON serialization adds the typed renma.scan.v1 wire boundary", async
 
   assert.equal("schemaVersion" in result, false);
   assert.equal(result.format, "json");
-  assert.equal(document.schemaVersion, "renma.scan.v1");
+  assert.equal(document.schemaVersion, "renma.scan.v2");
   assert.equal(document.format, "json");
+  assert.ok(Array.isArray(document.diagnostics));
+  assert.ok(Array.isArray(document.suppressedDiagnostics));
+  assert.equal("findings" in document, false);
+  assert.equal("suppressedFindings" in document, false);
+  assert.equal("diagnosticsV2" in document, false);
   assert.deepEqual(document, expectedDocument);
 });
 

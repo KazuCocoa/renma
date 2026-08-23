@@ -12,6 +12,7 @@ import type {
 } from "./executable-surface-inventory.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { visibleMarkdownInlineValue } from "./renderers/markdown-inline-code.js";
+import { createSuppressedDiagnostics } from "./diagnostics-v2.js";
 
 const EXECUTABLE_SURFACE_TEXT_LIMIT =
   DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
@@ -38,7 +39,7 @@ export function formatVersionedJsonDocument(
   );
 }
 
-/** Project the internal scan model into the supported renma.scan.v1 wire shape. */
+/** Project the internal scan model into the supported renma.scan.v2 wire shape. */
 export function toScanJsonDocument(result: ScanResult): ScanJsonDocument {
   return {
     schemaVersion: SCAN_JSON_SCHEMA_VERSION,
@@ -60,10 +61,10 @@ export function toScanJsonDocument(result: ScanResult): ScanJsonDocument {
       ? { securityPolicyInventory: result.securityPolicyInventory }
       : {}),
     ...(result.trustGraph ? { trustGraph: result.trustGraph } : {}),
-    findings: result.findings,
-    suppressedFindings: result.suppressedFindings,
-    diagnostics: result.diagnostics,
-    diagnosticsV2: result.diagnosticsV2,
+    diagnostics: result.diagnosticsV2,
+    suppressedDiagnostics: createSuppressedDiagnostics(
+      result.suppressedFindings,
+    ),
     reviewBundles: result.reviewBundles,
     exitThreshold: result.exitThreshold,
   };

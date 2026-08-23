@@ -1238,7 +1238,7 @@ The configuration supports the same names used by the implementation, including:
 - `exclude`: paths or path prefixes to skip.
 - `suppressions`: rule suppressions that remove matching findings from the
   active report and failure threshold while retaining them in structured
-  `suppressedFindings` evidence.
+  `suppressedDiagnostics` evidence in scan JSON.
 - `max_file_size_bytes`: largest file renma will read for content analysis. A
   larger discovered file remains repository existence evidence, so a valid
   reference is not also reported as missing.
@@ -1351,10 +1351,10 @@ valid; `..` traversal outside the Skill root remains invalid.
 Use `exclude` for files Renma should not scan. Use `suppressions` for audited
 exceptions where Renma should scan the file, detect matching findings, omit
 them from the active finding set and failure decision, and retain them in the
-structured suppression ledger. A finding is never duplicated into both
-`findings` and `suppressedFindings`. Each retained row identifies the finding,
-severity/risk class, evidence location, matching rule and path pattern, reason,
-and expiration. A suppression applies only when both `id` and `paths` match.
+structured suppression ledger. A diagnostic is never duplicated into both
+`diagnostics` and `suppressedDiagnostics`. Each retained row identifies the
+diagnostic, evidence location, matching rule and path pattern, reason, and
+expiration. A suppression applies only when both `id` and `paths` match.
 Each suppression includes `id`, `paths`, required `reason`, and optional
 `expires`; the reason lives in config for auditability.
 
@@ -1489,7 +1489,7 @@ order. See [Machine-Readable JSON Compatibility](machine-readable-json.md) for
 the complete identifier inventory, 1.x additive/breaking rules, and the exact
 environment-derived values excluded from portable deterministic comparisons.
 In the npm type surface, `ScanJsonDocument` models the serialized scan wire
-shape with literal `schemaVersion: "renma.scan.v1"` and `format: "json"`, as
+shape with literal `schemaVersion: "renma.scan.v2"` and `format: "json"`, as
 emitted by `formatJson()` and `scan --format json`. The producerless
 pre-serialization core scan model remains internal. The serializer explicitly
 projects supported wire fields, so a new internal scan-result property is not
@@ -1637,7 +1637,7 @@ that evidence.
 
 Human-readable output states whether inspection was complete, so zero findings
 with blocking coverage issues is not described as a complete result. The JSON
-output includes findings, evidence, diagnostics, `diagnosticsV2`,
+output includes normalized `diagnostics`, `suppressedDiagnostics`,
 `reviewBundles`, `trustGraph`, `executableSurfaceInventory`, inspection
 coverage, security-analysis coverage, and summary data that other tools can
 consume.
@@ -1655,7 +1655,10 @@ mode additionally fails only when the applicable YAML frontmatter-comment
 layer reports `yamlFrontmatterComments: "not-analyzable"`, because that is a
 security surface Renma expected to inspect but could not safely parse.
 
-Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
+Output includes normalized scan and discovery diagnostics, the effective exit
+threshold, and evidence paths or snippets. Diagnostics may include typed repair
+constraints, structured verification steps, and concise LLM hints;
+`reviewBundles` groups related diagnostics for code review.
 
 `executableSurfaceInventory` uses schema
 `renma.executable-surface-inventory.v1`. An executable surface is an

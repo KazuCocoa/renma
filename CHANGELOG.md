@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Replaced the three overlapping pre-1.0 scan JSON projections with the
+  `renma.scan.v2` contract. Active results now use one normalized `diagnostics`
+  array, suppressed results use `suppressedDiagnostics`, and the wire-level
+  `findings`, `suppressedFindings`, and `diagnosticsV2` fields were removed.
 - Made `diff` and `ci-report` collect each archived repository revision once.
   CI now applies its fail-closed endpoint boundary while building the shared
   target snapshot, then derives both semantic diff and CI policy output from
