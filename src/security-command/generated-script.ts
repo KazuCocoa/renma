@@ -34,10 +34,13 @@ type StaticOutput = {
   producerSpan: { start: number; end: number };
 };
 
+type GeneratedFiles = Map<string, StaticOutput[]>;
+
 export const MAX_GENERATED_SCRIPT_BYTES = 64 * 1024;
 export const MAX_GENERATED_SCRIPT_COMMANDS = 256;
 export const MAX_TRACKED_GENERATED_FILES = 64;
 export const MAX_GENERATED_SCRIPT_EXECUTIONS = 64;
+export const MAX_GENERATED_SCRIPT_ALTERNATIVES = 8;
 
 type FileWrite = {
   mode: "append" | "overwrite";
@@ -93,12 +96,12 @@ export function boundedGeneratedScriptExecutions(
   if (!tokenization.supported) return [];
 
   const segments = commandSegments(input, tokenization.tokens);
-  let files = new Map<string, StaticOutput>();
+  let files: GeneratedFiles = new Map();
   const executions: BoundedGeneratedScriptExecution[] = [];
   let pipelineOutput: StaticOutput | undefined;
   let operandEntry = cloneFiles(files);
   let operandEffects = emptyEffects();
-  let pendingOrSuccess: Map<string, StaticOutput> | undefined;
+  let pendingOrSuccess: GeneratedFiles | undefined;
 
   for (const [index, segment] of segments.entries()) {
     const receivesPipeline = segments[index - 1]?.boundaryAfter === "|";
@@ -153,19 +156,21 @@ export function boundedGeneratedScriptExecutions(
 
     if (!receivesPipeline) {
       const consumerPath = staticScriptConsumerPath(parsed);
-      const output =
+      const outputs =
         consumerPath === undefined ? undefined : files.get(consumerPath.key);
-      if (consumerPath !== undefined && output !== undefined) {
-        if (executions.length >= MAX_GENERATED_SCRIPT_EXECUTIONS) break;
-        executions.push({
-          path: consumerPath.key,
-          shellText: output.shellText,
-          producerSpan: Object.freeze({ ...output.producerSpan }),
-          consumerSpan: Object.freeze({
-            start: segment.start,
-            end: segment.end,
-          }),
-        });
+      if (consumerPath !== undefined && outputs !== undefined) {
+        for (const output of outputs) {
+          if (executions.length >= MAX_GENERATED_SCRIPT_EXECUTIONS) break;
+          executions.push({
+            path: consumerPath.key,
+            shellText: output.shellText,
+            producerSpan: Object.freeze({ ...output.producerSpan }),
+            consumerSpan: Object.freeze({
+              start: segment.start,
+              end: segment.end,
+            }),
+          });
+        }
       }
     }
 
@@ -228,11 +233,7 @@ export function boundedGeneratedScriptExecutions(
 
 /** Project reconstructed bytes into independently classifiable shell commands. */
 export function generatedLogicalShellCommands(shellText: string): string[] {
-  if (
-    utf8ByteLength(shellText) > MAX_GENERATED_SCRIPT_BYTES ||
-    /(^|[;&|]\s*)[^\n]*<<-?\s*[^<&\s]/mu.test(shellText) ||
-    hasQuoteAcrossPhysicalLine(shellText)
-  ) {
+  if (utf8ByteLength(shellText) > MAX_GENERATED_SCRIPT_BYTES) {
     return [];
   }
   const physicalLines = shellText.split(/\r?\n/u);
@@ -264,7 +265,16 @@ export function generatedLogicalShellCommands(shellText: string): string[] {
       lines.join("\n"),
     ).projection.trim();
     if (projection.length > 0) {
-      if (!tokenizeBoundedShell(projection).supported) return [];
+      const tokenization = tokenizeBoundedShell(projection);
+      if (
+        !tokenization.supported ||
+        tokenization.tokens.some(
+          ({ kind, value }) =>
+            kind === "operator" && (value === "<<" || value === "<<-"),
+        )
+      ) {
+        return [];
+      }
       if (commands.length >= MAX_GENERATED_SCRIPT_COMMANDS) break;
       commands.push(projection);
     }
@@ -272,22 +282,6 @@ export function generatedLogicalShellCommands(shellText: string): string[] {
   }
 
   return commands;
-}
-
-function hasQuoteAcrossPhysicalLine(input: string): boolean {
-  let quote: "'" | '"' | undefined;
-  for (let index = 0; index < input.length; index += 1) {
-    const character = input[index];
-    if (character === "\n" && quote !== undefined) return true;
-    if (quote === "'") {
-      if (character === "'") quote = undefined;
-    } else if (quote === '"') {
-      if (character === '"') quote = undefined;
-      else if (character === "\\") index += 1;
-    } else if (character === "'" || character === '"') quote = character;
-    else if (character === "\\") index += 1;
-  }
-  return quote !== undefined;
 }
 
 function commandSegments(
@@ -381,6 +375,7 @@ function staticLiteralOutput(
   parsed: ParsedSegment,
   segment: Segment,
 ): StaticOutput | undefined {
+  if (!parsed.resolution.executionProven) return undefined;
   const { effectiveExecutable, effectiveIndex } = parsed.resolution;
   const args = parsed.wordTokens.slice(effectiveIndex + 1);
   let shellText: string | undefined;
@@ -511,7 +506,12 @@ function staticPrintfEscape(
 }
 
 function teeSummary(parsed: ParsedSegment): TeeSummary | undefined {
-  if (parsed.resolution.effectiveExecutable !== "tee") return undefined;
+  if (
+    !parsed.resolution.executionProven ||
+    parsed.resolution.effectiveExecutable !== "tee"
+  ) {
+    return undefined;
+  }
   const effects = emptyEffects();
   const writes: FileWrite[] = [];
   let mode: FileWrite["mode"] = "overwrite";
@@ -843,11 +843,11 @@ function staticWordValue(token: ShellToken): string | undefined {
 }
 
 function branchExitFiles(
-  successFiles: Map<string, StaticOutput>,
-  entryFiles: ReadonlyMap<string, StaticOutput>,
+  successFiles: GeneratedFiles,
+  entryFiles: ReadonlyMap<string, readonly StaticOutput[]>,
   effects: BoundedShellEffects,
   boundary: string | undefined,
-): Map<string, StaticOutput> {
+): GeneratedFiles {
   if (boundary !== "||" && boundary !== "&") return successFiles;
   const branchFiles = cloneFiles(entryFiles);
   applyInvalidations(branchFiles, effects);
@@ -855,7 +855,7 @@ function branchExitFiles(
 }
 
 function applyInvalidations(
-  files: Map<string, StaticOutput>,
+  files: GeneratedFiles,
   effects: BoundedShellEffects,
 ): void {
   if (effects.unknownFileMutation) files.clear();
@@ -876,7 +876,7 @@ function applyInvalidations(
 }
 
 function applyFileWrite(
-  files: Map<string, StaticOutput>,
+  files: GeneratedFiles,
   write: FileWrite,
   output: StaticOutput | undefined,
 ): void {
@@ -891,39 +891,57 @@ function applyFileWrite(
     ) {
       return;
     }
-    files.set(write.path.key, output);
+    files.set(write.path.key, [output]);
     return;
   }
   const existing = files.get(write.path.key);
   if (existing === undefined) return;
-  const byteLength = existing.byteLength + output.byteLength;
-  if (byteLength > MAX_GENERATED_SCRIPT_BYTES) {
+  const appended = existing.flatMap((candidate) => {
+    const byteLength = candidate.byteLength + output.byteLength;
+    if (byteLength > MAX_GENERATED_SCRIPT_BYTES) return [];
+    return [
+      {
+        shellText: candidate.shellText + output.shellText,
+        byteLength,
+        producerSpan: {
+          start: candidate.producerSpan.start,
+          end: output.producerSpan.end,
+        },
+      },
+    ];
+  });
+  if (appended.length === 0) {
     files.delete(write.path.key);
     return;
   }
-  files.set(write.path.key, {
-    shellText: existing.shellText + output.shellText,
-    byteLength,
-    producerSpan: {
-      start: existing.producerSpan.start,
-      end: output.producerSpan.end,
-    },
-  });
+  files.set(
+    write.path.key,
+    appended.slice(0, MAX_GENERATED_SCRIPT_ALTERNATIVES),
+  );
 }
 
 function mergeMayFiles(
-  first: ReadonlyMap<string, StaticOutput>,
-  second: ReadonlyMap<string, StaticOutput>,
-): Map<string, StaticOutput> {
+  first: ReadonlyMap<string, readonly StaticOutput[]>,
+  second: ReadonlyMap<string, readonly StaticOutput[]>,
+): GeneratedFiles {
   const merged = cloneFiles(first);
-  for (const [path, output] of second) {
+  for (const [path, outputs] of second) {
     const existing = merged.get(path);
     if (existing === undefined) {
       if (merged.size >= MAX_TRACKED_GENERATED_FILES) continue;
-      merged.set(path, output);
-    } else if (existing.shellText !== output.shellText) {
-      // Multiple possible byte sequences cannot be represented exactly.
-      merged.delete(path);
+      merged.set(path, outputs.slice(0, MAX_GENERATED_SCRIPT_ALTERNATIVES));
+    } else {
+      const alternatives = [...existing];
+      for (const output of outputs) {
+        if (
+          alternatives.some(({ shellText }) => shellText === output.shellText)
+        ) {
+          continue;
+        }
+        if (alternatives.length >= MAX_GENERATED_SCRIPT_ALTERNATIVES) break;
+        alternatives.push(output);
+      }
+      merged.set(path, alternatives);
     }
   }
   return merged;
@@ -974,7 +992,7 @@ function mergeEffects(
 }
 
 function cloneFiles(
-  files: ReadonlyMap<string, StaticOutput>,
-): Map<string, StaticOutput> {
-  return new Map(files);
+  files: ReadonlyMap<string, readonly StaticOutput[]>,
+): GeneratedFiles {
+  return new Map([...files].map(([path, outputs]) => [path, [...outputs]]));
 }

@@ -163,6 +163,60 @@ ${command}
   }
 });
 
+test("non-executing wrapper modes do not classify their lookup targets", () => {
+  for (const command of [
+    "command -v rm -rf",
+    "command -V sudo some-command",
+    "env --help rm -rf /tmp/example",
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      command,
+    );
+  }
+});
+
+test("generated script may-analysis retains risky branch alternatives", () => {
+  const command =
+    `echo 'rm -rf /tmp/example' > run.sh || ` +
+    `echo 'echo safe' > run.sh; sh run.sh`;
+  findingFor(
+    findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`),
+    "SEC-DESTRUCTIVE-COMMAND",
+  );
+});
+
+test("inert generated text cannot hide a later destructive command", () => {
+  for (const command of [
+    `printf '%s\\n' "# reviewer's note" 'rm -rf /tmp/example' > run.sh; sh run.sh`,
+    `printf '%s\\n' "echo 'cat <<EOF'" 'rm -rf /tmp/example' > run.sh; sh run.sh`,
+  ]) {
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${command}
+\`\`\`
+`);
+    assert.equal(
+      findings.some(({ id }) => id === "SEC-DESTRUCTIVE-COMMAND"),
+      true,
+      command,
+    );
+  }
+});
+
 test("static generated scripts retain destructive and privileged command risk", () => {
   const cases: Array<{ command: string; diagnosticId: string }> = [
     {

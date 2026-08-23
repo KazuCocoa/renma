@@ -81,6 +81,7 @@ import {
   effectiveShellExecutable,
   effectiveShellExecutableIndex,
   normalizeShellExecutable,
+  resolveShellExecutableWords,
   shellCommandWords,
 } from "./security-command/shell-command.js";
 import {
@@ -4767,6 +4768,14 @@ function addShellCommandSegmentRiskKinds(
   shellPipelineInputDisposition: ShellTextDisposition | undefined,
 ): void {
   if (!segment) return;
+
+  const words = shellCommandWords(segment);
+  if (
+    words !== undefined &&
+    !resolveShellExecutableWords(words).executionProven
+  ) {
+    return;
+  }
 
   const executable = directShellExecutable(segment);
   const effectiveExecutable = effectiveShellExecutable(segment);

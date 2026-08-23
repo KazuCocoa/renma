@@ -5,6 +5,7 @@ import {
   boundedGeneratedScriptExecutions,
   generatedLogicalShellCommands,
   MAX_GENERATED_SCRIPT_BYTES,
+  MAX_GENERATED_SCRIPT_ALTERNATIVES,
   MAX_GENERATED_SCRIPT_COMMANDS,
   MAX_GENERATED_SCRIPT_EXECUTIONS,
   MAX_TRACKED_GENERATED_FILES,
@@ -274,6 +275,13 @@ test("a successful left side remains a possible state after || completes", () =>
 });
 
 test("non-executing resolver modes and unsupported tee options do not correlate", () => {
+  for (const producer of [
+    `command -v echo 'rm -rf /tmp/x' > run.sh; sh run.sh`,
+    `command --help printf '%s' 'rm -rf /tmp/x' > run.sh; sh run.sh`,
+    `echo 'rm -rf /tmp/x' | env --help tee run.sh; sh run.sh`,
+  ]) {
+    assert.deepEqual(boundedGeneratedScriptExecutions(producer), [], producer);
+  }
   for (const consumer of [
     "command -v sh run.sh",
     "command -V sh run.sh",
@@ -325,6 +333,37 @@ test("non-executing resolver modes and unsupported tee options do not correlate"
       consumer,
     );
   }
+});
+
+test("env value-taking execution options resolve the actual command", () => {
+  for (const command of ["env -a sh true", "env -S 'sh run.sh'"]) {
+    const words = shellCommandWords(command);
+    assert.ok(words, command);
+    const resolution = resolveShellExecutableWords(words);
+    assert.notEqual(resolution.effectiveExecutable, "sh", command);
+  }
+});
+
+test("inert comment and quoted heredoc text do not hide later commands", () => {
+  assert.deepEqual(
+    generatedLogicalShellCommands("# reviewer's note\nrm -rf /tmp/example\n"),
+    ["rm -rf /tmp/example"],
+  );
+  assert.deepEqual(
+    generatedLogicalShellCommands("echo 'cat <<EOF'\nrm -rf /tmp/example\n"),
+    ["echo 'cat <<EOF'", "rm -rf /tmp/example"],
+  );
+});
+
+test("branch merges retain bounded alternative generated contents", () => {
+  const executions = boundedGeneratedScriptExecutions(
+    `echo 'rm -rf /tmp/example' > run.sh || echo 'echo safe' > run.sh; sh run.sh`,
+  );
+  assert.deepEqual(
+    executions.map(({ shellText }) => shellText).sort(),
+    ["echo safe\n", "rm -rf /tmp/example\n"].sort(),
+  );
+  assert.ok(MAX_GENERATED_SCRIPT_ALTERNATIVES > 1);
 });
 
 test("path correlation rejects search, root, cwd, and directory ambiguities", () => {

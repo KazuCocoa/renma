@@ -16,7 +16,8 @@ const SHELL_PRESENTATION_MARKER_RE = /^(?:[-*+$%]|\d+[.)])$/u;
 const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/u;
 const SHELL_REDIRECTION_OPERATOR_RE = /^(?:>|>>|<|<<|&>)$/u;
 const SHELL_WRAPPER_RE = /^(?:command|env)$/iu;
-const SHELL_WRAPPER_OPTION_WITH_VALUE_RE = /^(?:-u|--unset|-C|--chdir)$/u;
+const SHELL_WRAPPER_OPTION_WITH_VALUE_RE =
+  /^(?:-u|--unset|-C|--chdir|-a|--argv0|-S|--split-string)$/u;
 const SUDO_OPTION_WITH_VALUE_RE =
   /^(?:-[ughpCTRD]|--(?:user|group|host|prompt|chdir|command-timeout|chroot))$/u;
 
@@ -216,8 +217,6 @@ function wrapperOptionProvesExecution(
   return (
     option === "-i" ||
     option === "--ignore-environment" ||
-    option === "-0" ||
-    option === "--null" ||
     option === "-u" ||
     option === "--unset" ||
     (option.startsWith("--unset=") && option.length > "--unset=".length) ||
