@@ -4770,8 +4770,16 @@ function analyzeGeneratedScriptRisks(
   const generated = analyzeBoundedGeneratedScriptExecutions(command);
   const executions = generated.values.map((execution) => {
     const projected = analyzeGeneratedLogicalShellCommands(execution.shellText);
+    const projectedCommands =
+      execution.executionScope === "first-command-only"
+        ? projected.values.slice(0, 1)
+        : projected.values;
+    const projectionComplete =
+      execution.executionScope === "all-commands"
+        ? projected.complete
+        : projected.complete || projected.values.length > 0;
     const kinds = new Set<RiskyOperationKind>();
-    for (const logicalCommand of projected.values) {
+    for (const logicalCommand of projectedCommands) {
       for (const kind of classifyShellCommandRiskKinds(logicalCommand, false)) {
         kinds.add(kind);
       }
@@ -4783,7 +4791,7 @@ function analyzeGeneratedScriptRisks(
           (kind) => kinds.has(kind),
         ),
       ),
-      complete: projected.complete,
+      complete: projectionComplete,
     });
   });
   return Object.freeze({

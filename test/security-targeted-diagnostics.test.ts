@@ -382,6 +382,9 @@ test("generated scripts retain risk through common shell execution options", () 
     "bash -O extglob run.sh",
     "bash -o errexit run.sh",
     "bash -- run.sh",
+    "bash - run.sh",
+    "sh - run.sh",
+    "bash --noprofile -e run.sh",
   ]) {
     const command = `echo 'rm -rf /tmp/example' > run.sh; ${consumer}`;
     findingFor(
@@ -400,6 +403,7 @@ ${command}
     "sh -s run.sh",
     `bash -c 'echo safe' run.sh`,
     "bash --future-option run.sh",
+    "bash -e --noprofile run.sh",
   ]) {
     const command = `echo 'rm -rf /tmp/example' > run.sh; ${consumer}`;
     const findings = findingsFor(`# Workflow
@@ -412,6 +416,40 @@ ${command}
       findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
       [],
       command,
+    );
+  }
+});
+
+test("one-command shell options classify only the first generated command", () => {
+  for (const consumer of [
+    "bash -t run.sh",
+    "sh -t run.sh",
+    "bash -o onecmd run.sh",
+  ]) {
+    const firstRisky =
+      `printf '%s\\n' 'rm -rf /tmp/example' 'echo later' > run.sh; ` + consumer;
+    findingFor(
+      findingsFor(`# Workflow
+
+\`\`\`bash
+${firstRisky}
+\`\`\`
+`),
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+
+    const laterRisky =
+      `printf '%s\\n' 'echo safe' 'rm -rf /tmp/example' > run.sh; ` + consumer;
+    const findings = findingsFor(`# Workflow
+
+\`\`\`bash
+${laterRisky}
+\`\`\`
+`);
+    assert.deepEqual(
+      findings.filter(({ id }) => RISKY_COMMAND_DIAGNOSTIC_IDS.has(id)),
+      [],
+      consumer,
     );
   }
 });

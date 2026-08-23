@@ -9,9 +9,13 @@ import {
   projectShellContinuations,
 } from "../security-destination/logical-shell.js";
 
+export type GeneratedScriptExecutionScope =
+  "all-commands" | "first-command-only";
+
 export type BoundedGeneratedScriptExecution = {
   path: string;
   shellText: string;
+  executionScope: GeneratedScriptExecutionScope;
   producerSpan: Readonly<{ start: number; end: number }>;
   consumerSpan: Readonly<{ start: number; end: number }>;
 };
@@ -43,7 +47,11 @@ type StaticPath = {
 };
 
 type StaticScriptConsumerResolution =
-  | { disposition: "proven"; path: StaticPath }
+  | {
+      disposition: "proven";
+      path: StaticPath;
+      executionScope: GeneratedScriptExecutionScope;
+    }
   | { disposition: "not-executed" }
   | { disposition: "unknown" };
 
@@ -171,6 +179,13 @@ const SHELL_FILE_EXECUTION_SHORT_OPTIONS = new Map([
   ["zsh", new Set(["i", "l", "p", "r"])],
   ["fish", new Set(["i", "l", "p", "N"])],
 ]);
+const SHELL_SINGLE_DASH_FILE_TERMINATOR_EXECUTABLES = new Set([
+  "bash",
+  "dash",
+  "ksh",
+  "sh",
+  "zsh",
+]);
 
 /**
  * Correlate only statically reconstructed shell text written to an exact path
@@ -273,6 +288,7 @@ export function analyzeBoundedGeneratedScriptExecutions(
           executions.push({
             path: consumer.path.key,
             shellText: output.shellText,
+            executionScope: consumer.executionScope,
             producerSpan: Object.freeze({ ...output.producerSpan }),
             consumerSpan: Object.freeze({
               start: segment.start,
@@ -741,6 +757,7 @@ function resolveStaticScriptConsumer(
   }
 
   let index = effectiveIndex + 1;
+  let executionScope: GeneratedScriptExecutionScope = "all-commands";
   if (SHELL_EXECUTABLES.has(effectiveExecutable)) {
     const optionResolution = shellFileConsumerOperandIndex(
       parsed.words,
@@ -749,6 +766,7 @@ function resolveStaticScriptConsumer(
     );
     if (optionResolution.disposition !== "proven") return optionResolution;
     index = optionResolution.index;
+    executionScope = optionResolution.executionScope;
   } else if (parsed.words[index] === "--") index += 1;
   else if ((parsed.words[index] ?? "").startsWith("-")) {
     return { disposition: "unknown" };
@@ -765,7 +783,7 @@ function resolveStaticScriptConsumer(
   ) {
     return { disposition: "not-executed" };
   }
-  return { disposition: "proven", path };
+  return { disposition: "proven", path, executionScope };
 }
 
 function shellFileConsumerOperandIndex(
@@ -773,16 +791,44 @@ function shellFileConsumerOperandIndex(
   startIndex: number,
   executable: string,
 ):
-  | { disposition: "proven"; index: number }
+  | {
+      disposition: "proven";
+      index: number;
+      executionScope: GeneratedScriptExecutionScope;
+    }
   | { disposition: "not-executed" }
   | { disposition: "unknown" } {
   let index = startIndex;
+  let executionScope: GeneratedScriptExecutionScope = "all-commands";
+  let sawSingleCharacterOption = false;
   while (index < words.length) {
     const option = words[index] ?? "";
     if (option === "--") {
-      return { disposition: "proven", index: index + 1 };
+      return {
+        disposition: "proven",
+        index: index + 1,
+        executionScope,
+      };
+    }
+    if (
+      option === "-" &&
+      SHELL_SINGLE_DASH_FILE_TERMINATOR_EXECUTABLES.has(executable)
+    ) {
+      return {
+        disposition: "proven",
+        index: index + 1,
+        executionScope,
+      };
     }
     if (!option.startsWith("-") && !option.startsWith("+")) break;
+
+    if (
+      executable === "bash" &&
+      sawSingleCharacterOption &&
+      option.startsWith("--")
+    ) {
+      return { disposition: "not-executed" };
+    }
 
     if (
       SHELL_FILE_NON_EXECUTION_LONG_OPTIONS.has(option) ||
@@ -817,6 +863,20 @@ function shellFileConsumerOperandIndex(
 
     const short = shortShellFileOptionResolution(option, executable);
     if (short.disposition !== "proven") return short;
+    sawSingleCharacterOption = true;
+    if (short.executionScope !== undefined) {
+      executionScope = short.executionScope;
+    }
+    if (
+      executable === "bash" &&
+      short.consumesNext &&
+      option.endsWith("o") &&
+      words[index + 1] === "onecmd"
+    ) {
+      executionScope = option.startsWith("-")
+        ? "first-command-only"
+        : "all-commands";
+    }
     index += 1;
     if (short.consumesNext) {
       if ((words[index] ?? "").length === 0) {
@@ -825,19 +885,24 @@ function shellFileConsumerOperandIndex(
       index += 1;
     }
   }
-  return { disposition: "proven", index };
+  return { disposition: "proven", index, executionScope };
 }
 
 function shortShellFileOptionResolution(
   option: string,
   executable: string,
 ):
-  | { disposition: "proven"; consumesNext: boolean }
+  | {
+      disposition: "proven";
+      consumesNext: boolean;
+      executionScope?: GeneratedScriptExecutionScope;
+    }
   | { disposition: "not-executed" }
   | { disposition: "unknown" } {
   if (!/^[+-][A-Za-z]+$/u.test(option)) return { disposition: "unknown" };
   const flags = option.slice(1);
   let consumesNext = false;
+  let executionScope: GeneratedScriptExecutionScope | undefined;
 
   for (let index = 0; index < flags.length; index += 1) {
     const flag = flags[index] ?? "";
@@ -852,9 +917,22 @@ function shortShellFileOptionResolution(
         return { disposition: "unknown" };
       }
       consumesNext = index === flags.length - 1;
-      return { disposition: "proven", consumesNext };
+      return {
+        disposition: "proven",
+        consumesNext,
+        ...(executionScope === undefined ? {} : { executionScope }),
+      };
     }
     if (flag === "n" && option.startsWith("+")) continue;
+    if (
+      flag === "t" &&
+      SHELL_FILE_EXECUTION_SHORT_OPTIONS.get(executable)?.has(flag) === true
+    ) {
+      executionScope = option.startsWith("-")
+        ? "first-command-only"
+        : "all-commands";
+      continue;
+    }
     if (flag === "C" && executable === "fish") {
       consumesNext = index === flags.length - 1;
       return { disposition: "proven", consumesNext };
@@ -866,7 +944,11 @@ function shortShellFileOptionResolution(
       return { disposition: "unknown" };
     }
   }
-  return { disposition: "proven", consumesNext };
+  return {
+    disposition: "proven",
+    consumesNext,
+    ...(executionScope === undefined ? {} : { executionScope }),
+  };
 }
 
 function commandEffects(parsed: ParsedSegment): BoundedShellEffects {

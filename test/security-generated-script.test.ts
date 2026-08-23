@@ -26,6 +26,7 @@ test("generated scripts retain reconstructed text, normalized paths, and outer s
   assert.deepEqual(execution, {
     path: "run.sh",
     shellText: "echo ready\nrm -rf /tmp/example\n",
+    executionScope: "all-commands",
     producerSpan: {
       start: 0,
       end: command.indexOf("; sh run.sh"),
@@ -170,6 +171,9 @@ test("shell file consumers distinguish executing, inert, and unknown options", (
     "fish --no-config run.sh",
     `fish -C 'echo ready' run.sh`,
     "sh -- run.sh",
+    "bash - run.sh",
+    "sh - run.sh",
+    "bash --noprofile -e run.sh",
   ];
   for (const consumer of executing) {
     const analysis = analyzeBoundedGeneratedScriptExecutions(
@@ -186,6 +190,7 @@ test("shell file consumers distinguish executing, inert, and unknown options", (
     `bash -c 'source run.sh'`,
     "bash --command=source\\ run.sh",
     "bash --help run.sh",
+    "bash -e --noprofile run.sh",
   ]) {
     const analysis = analyzeBoundedGeneratedScriptExecutions(
       `echo unsafe > run.sh; ${consumer}`,
@@ -209,6 +214,24 @@ test("shell file consumers distinguish executing, inert, and unknown options", (
       consumer,
     );
   }
+});
+
+test("one-command shell options retain only the first generated command", () => {
+  for (const consumer of [
+    "bash -t run.sh",
+    "sh -t run.sh",
+    "bash -o onecmd run.sh",
+  ]) {
+    const [execution] = boundedGeneratedScriptExecutions(
+      `printf '%s\\n' 'echo first' 'rm -rf /tmp/later' > run.sh; ${consumer}`,
+    );
+    assert.equal(execution?.executionScope, "first-command-only", consumer);
+  }
+
+  const [reenabled] = boundedGeneratedScriptExecutions(
+    `echo unsafe > run.sh; bash -t +t run.sh`,
+  );
+  assert.equal(reenabled?.executionScope, "all-commands");
 });
 
 test("canonical resolver remains synchronized for wrappers, options, paths, and sudo", () => {

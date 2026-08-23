@@ -1024,9 +1024,11 @@ turning raw substrings inside unparsed literal arguments into destructive or
 privileged findings. Common file-execution options such as `--noprofile`,
 `--norc`, `-e`, `-f`, `-O <value>`, and `-o <value>` retain correlation;
 command-string, standard-input, no-execution, help, and version modes do not.
-Unknown shell options make the generated result incomplete. Heredocs and
-ambiguous multiline quoting remain unsupported
-for generated-command projection.
+Unknown shell options make the generated result incomplete. A standalone `-`
+terminates options for supported Bourne-family consumers. Bash long options
+must precede single-character options, and `-t` (`onecmd`) classifies only the
+first projected generated command. Heredocs and ambiguous multiline quoting
+remain unsupported for generated-command projection.
 
 Paths may normalize `.` components, but any `..` component is rejected. Renma
 does not inspect files, resolve `~`, variables, substitutions, globs, symlinks,

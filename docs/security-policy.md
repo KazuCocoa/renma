@@ -597,7 +597,11 @@ shared with risky-suppression association and logical evidence projection.
 Common shell file-execution options such as `--noprofile`, `--norc`, `-e`,
 `-f`, `-O <value>`, and `-o <value>` preserve exact-path correlation; `-c`,
 standard-input, no-execution, help, and version modes do not consume the file,
-while unknown options leave the generated analysis incomplete. Local quotation
+while unknown options leave the generated analysis incomplete. A standalone
+`-` terminates options for the supported Bourne-family consumers. Bash long
+options must precede its single-character options; an invalid reversed order
+does not establish file execution. Bash-compatible `-t` (`onecmd`) execution
+classifies only the first projected generated command. Local quotation
 or bounded source attribution such as “the incident report says:” or “the audit
 states:” keeps a blockquote inert even beneath a generic instruction heading;
 attribution does not need to contain the word “quote.” An explicit local
