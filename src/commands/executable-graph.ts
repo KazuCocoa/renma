@@ -11,7 +11,7 @@ import {
   type ExecutableSurfaceInventory,
   type ExecutableSurfaceInvocation,
 } from "../executable-surface-inventory.js";
-import type { AssetOwnership } from "../model.js";
+import type { AssetOwnership } from "../types/governance.js";
 import type {
   ExecutableGraphNodeRole,
   ExecutableGraphProjection,
