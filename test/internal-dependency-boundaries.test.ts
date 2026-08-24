@@ -132,7 +132,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "context-language.ts",
       "frontmatter-envelope.ts",
       "markdown-security-view.ts",
-      "markdown-source-projection.ts",
       "markdown-syntax.ts",
       "markdown.ts",
       "token-estimator.ts",
