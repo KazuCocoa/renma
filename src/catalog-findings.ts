@@ -438,8 +438,9 @@ function findingFromCatalogDiagnostic(
     },
     whyItMatters: definition.whyItMatters,
     remediation: definition.remediation,
-    repairConstraints:
-      diagnostic.repairConstraints ?? definitionRepairConstraints,
+    repairConstraints: diagnostic.repairConstraints
+      ? [...diagnostic.repairConstraints, ...definitionRepairConstraints]
+      : definitionRepairConstraints,
     verificationSteps:
       diagnostic.verificationSteps ?? definitionVerificationSteps,
     llmHint: diagnostic.llmHint ?? definition.llmHint,
