@@ -9,15 +9,15 @@ import { scan } from "../src/scanner.js";
 import { parseDocument } from "../src/markdown.js";
 import { applySuppressions } from "../src/suppressions.js";
 import { RENMA_SCAFFOLD_PLACEHOLDERS } from "../src/scaffold-placeholders.js";
-import {
-  associatedNetworkDestinations,
-  associatedUploadDestinations,
-  classifyDestinationCandidates,
-} from "../src/security-destination/index.js";
+import { classifyDestinationCandidates } from "../src/security-destination/index.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Artifact } from "../src/types/artifact.js";
 import type { Finding } from "../src/types/diagnostics.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
+import {
+  associatedNetworkDestinations,
+  associatedUploadDestinations,
+} from "./security-destination-test-helpers.js";
 
 const securityDiagnosticsV1Ids = new Set([
   "SEC-CREDENTIAL-IN-COMMAND-ARG",
