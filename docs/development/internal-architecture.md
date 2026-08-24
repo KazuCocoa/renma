@@ -63,12 +63,10 @@ new unclassified `src/**/*.ts` file fails CI. Runtime imports, type-only
 imports, and re-exports all count as dependencies; lateral imports within one
 layer are valid.
 
-Architecture exceptions name one exact source, target, and reason. The current
-list contains only snapshot construction's classification-index path.
-Internal type re-exports from `src/commands/inspect.ts` and
-`src/commands/suggest-metadata.ts` are also listed and checked exactly rather
-than allowing command modules to re-export arbitrary lower-layer contracts;
-those command modules are not package exports.
+The dependency direction has no exceptions. Internal type re-exports from
+`src/commands/inspect.ts` and `src/commands/suggest-metadata.ts` are listed and
+checked exactly rather than allowing command modules to re-export arbitrary
+lower-layer contracts; those command modules are not package exports.
 
 ## Repository-Required Metadata Policy
 
