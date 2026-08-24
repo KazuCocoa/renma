@@ -5,8 +5,8 @@ import {
   type FloatingDependencyAllowance,
 } from "../dependency-selectors.js";
 import type { SecurityGuardEvidence } from "../markdown-security-view.js";
-import type { ShellProjection } from "../security-destination/index.js";
 import { projectionSpanToSourceSpan } from "../security-destination/logical-shell.js";
+import type { ShellProjection } from "../security-destination/types.js";
 import { associatedFailClosedVariableGuardNames } from "./guards.js";
 import type { ShellToken } from "./shell.js";
 import type {

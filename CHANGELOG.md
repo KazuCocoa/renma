@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Narrowed internal security-command dependencies to import destination
+  analysis functions and types from their owning modules instead of routing
+  through the security-destination subsystem entrypoint. Public exports and
+  runtime behavior remain unchanged.
 - Simplified the security-destination subsystem entrypoint so bindings used
   only for forwarding are re-exported directly from their owners. The cohesive
   entrypoint and all destination-analysis consumers remain unchanged.

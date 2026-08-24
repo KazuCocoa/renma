@@ -1,4 +1,4 @@
-import { analyzeDestinationsFromProjection } from "../security-destination/index.js";
+import { analyzeDestinationsFromProjection } from "../security-destination/association.js";
 import { projectShellContinuations } from "../security-destination/logical-shell.js";
 import { classifyDependencyInstalls } from "./dependency-install.js";
 import { explicitNoDisclosureGuards } from "./guards.js";
