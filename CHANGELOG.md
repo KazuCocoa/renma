@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed internal result-type and renderer compatibility re-exports from the
+  inspect and suggest-metadata command modules. Internal consumers now import
+  the evidence, decision, and renderer owners directly.
 - Removed the final internal dependency-layer exception by keeping the
   single-use classification index projection inside repository snapshot
   construction instead of a higher-layer evidence module.

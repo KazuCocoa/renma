@@ -1,8 +1,9 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { compareUtf16CodeUnits } from "../canonical-json.js";
-import { buildInspectOutline, type InspectOutline } from "./inspect.js";
+import type { InspectOutline } from "../evidence/inspect.js";
 import { formatVersionedJsonDocument } from "../report.js";
+import { buildInspectOutline } from "./inspect.js";
 
 const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const CONTEXT_DIRS = new Set(["references", "profiles", "examples", "r"]);

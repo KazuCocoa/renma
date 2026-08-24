@@ -27,13 +27,6 @@ import type { KnownAssetClassificationEvidence } from "../types/known-classifica
 import type { MetadataValue } from "../types/metadata.js";
 import type { SuggestedNextAction } from "../types/decision.js";
 
-// Preserve established command-module result-type deep imports.
-export type {
-  BlockedMetadata,
-  MetadataSuggestion,
-} from "../decisions/metadata-suggestion.js";
-export { renderMetadataPrompt };
-
 export type SuggestMetadataFormat = "prompt" | "json";
 export const METADATA_SUGGESTION_JSON_SCHEMA_VERSION =
   "renma.metadata-suggestion.v1" as const;

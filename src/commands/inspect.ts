@@ -43,16 +43,6 @@ export interface InspectOptions {
   lines?: string;
 }
 
-// Keep the established deep-import type contract while the implementation DTO
-// lives below command orchestration and renderer dependencies.
-export type {
-  InspectAssetSummary,
-  InspectOutline,
-  InspectRelationship,
-  InspectRelationshipChain,
-  InspectSlice,
-} from "../evidence/inspect.js";
-
 export async function runInspectCommand(
   target: string,
   options: InspectOptions = {},
