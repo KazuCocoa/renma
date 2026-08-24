@@ -32,8 +32,6 @@ import {
   type SecurityIdentifierAuthority,
 } from "./security-identifier-integrity.js";
 
-export type { CanonicalSecurityOperationalField } from "./metadata-definitions.js";
-
 export interface SecurityPolicyFieldEvidence {
   startLine: number;
   endLine: number;

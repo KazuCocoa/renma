@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed the unused internal `CanonicalSecurityOperationalField` re-export
+  from `security-policy.ts`; its definition remains owned by
+  `metadata-definitions.ts`.
 - Removed the one-line internal `context-language-diagnostics.ts` facade;
   catalog analysis now imports its implementation owner directly.
 - Removed the internal `AssetOwnership` re-export from `model.ts`; command
