@@ -25,8 +25,8 @@ import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "../types/skill-descr
 import { RESERVED_SKILL_SUPPORT_DIRS } from "../skill-path-contract.js";
 import { RENMA_SCAFFOLD_PLACEHOLDERS } from "../scaffold-placeholders.js";
 
-export type ScaffoldKind = "skill" | "context" | "context_lens";
-export type ScaffoldFormat = "file" | "prompt" | "json";
+type ScaffoldKind = "skill" | "context" | "context_lens";
+type ScaffoldFormat = "file" | "prompt" | "json";
 export type ScaffoldResource = "references" | "scripts" | "assets";
 export const SCAFFOLD_JSON_SCHEMA_VERSION = "renma.scaffold.v1" as const;
 
@@ -42,7 +42,7 @@ export interface ScaffoldOptions {
   handoffPath?: string;
 }
 
-export interface ScaffoldBundle {
+interface ScaffoldBundle {
   kind: ScaffoldKind;
   path: string;
   id: string;

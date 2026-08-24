@@ -27,18 +27,18 @@ import type { KnownAssetClassificationEvidence } from "../types/known-classifica
 import type { MetadataValue } from "../types/metadata.js";
 import type { SuggestedNextAction } from "../types/decision.js";
 
-export type SuggestMetadataFormat = "prompt" | "json";
+type SuggestMetadataFormat = "prompt" | "json";
 export const METADATA_SUGGESTION_JSON_SCHEMA_VERSION =
   "renma.metadata-suggestion.v1" as const;
 
-export interface SuggestMetadataOptions {
+interface SuggestMetadataOptions {
   format?: SuggestMetadataFormat;
   owner?: string;
   /** Internal fixture seam; not exposed as a CLI option. */
   repositoryMarkerSearchBoundary?: string;
 }
 
-export class SuggestMetadataTargetError extends CliUserError {
+class SuggestMetadataTargetError extends CliUserError {
   constructor(target: string, cause: unknown) {
     super(
       `Could not read metadata target ${target}: ${readErrorReason(cause)}`,

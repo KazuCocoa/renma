@@ -10,7 +10,7 @@ import type {
   TrustGraphNodeType,
 } from "../trust-graph.js";
 
-export type TrustGraphFormat = "json" | "markdown";
+type TrustGraphFormat = "json" | "markdown";
 
 const NODE_TYPES: TrustGraphNodeType[] = [
   "asset",

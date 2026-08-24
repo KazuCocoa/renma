@@ -33,10 +33,10 @@ import type { AssetOwnership } from "../types/governance.js";
 export const REPOSITORY_CONTEXT_BOM_SCHEMA_VERSION =
   "renma.repository-context-bom.v3" as const;
 
-export type BomFormat = "json" | "markdown";
-export type BomOutputMode = "default" | "omit_generated_at";
+type BomFormat = "json" | "markdown";
+type BomOutputMode = "default" | "omit_generated_at";
 
-export interface BomOptions {
+interface BomOptions {
   omitGeneratedAt?: boolean;
 }
 
@@ -90,7 +90,7 @@ export interface BomReport {
   diagnostics: Diagnostic[];
 }
 
-export interface BomAsset {
+interface BomAsset {
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -110,7 +110,7 @@ export interface BomAsset {
   diagnostics: Diagnostic[];
 }
 
-export interface BomAssetLifecycle {
+interface BomAssetLifecycle {
   status?: AssetStatus;
   statusReason?: string;
   statusChangedAt?: string;
@@ -119,7 +119,7 @@ export interface BomAssetLifecycle {
   expiresAt?: string;
 }
 
-export interface BomAssetDependency {
+interface BomAssetDependency {
   kind: DependencyKind;
   to: string;
   resolved: boolean;
@@ -128,13 +128,13 @@ export interface BomAssetDependency {
   targetPath?: string;
 }
 
-export interface BomAssetDependent {
+interface BomAssetDependent {
   kind: DependencyKind;
   from: string;
   sourcePath: string;
 }
 
-export interface BomDependency {
+interface BomDependency {
   from: string;
   to: string;
   kind: DependencyKind;

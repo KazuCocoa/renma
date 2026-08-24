@@ -20,10 +20,10 @@ import type { Diagnostic, Evidence } from "../types/diagnostics.js";
 
 export const SKILL_INDEX_SCHEMA_VERSION = "renma.skill-index.v1" as const;
 
-export type SkillIndexFormat = "json" | "markdown";
+type SkillIndexFormat = "json" | "markdown";
 
 /** Canonical complete or exactly focused static Skill Index report. */
-export interface SkillIndexReportV1 {
+interface SkillIndexReportV1 {
   schemaVersion: typeof SKILL_INDEX_SCHEMA_VERSION;
   root: string;
   configPath?: string;

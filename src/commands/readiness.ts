@@ -44,7 +44,7 @@ import type {
   InspectionCoverageIssue,
 } from "../inspection-coverage.js";
 
-export type ReadinessFormat = "json" | "markdown";
+type ReadinessFormat = "json" | "markdown";
 export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v2" as const;
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
@@ -90,9 +90,9 @@ const SUSPENSION_READINESS_DIAGNOSTIC_IDS = new Set<string>([
 ]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
-export type ReadinessCheckSeverity = "info" | "warning" | "error";
+type ReadinessCheckSeverity = "info" | "warning" | "error";
 
-export interface WorkflowReadinessSummary {
+interface WorkflowReadinessSummary {
   skillEntrypoints: number;
   checks: number;
   pass: number;
@@ -102,7 +102,7 @@ export interface WorkflowReadinessSummary {
 }
 
 /** Compact repository-wide projection over one prepared Skill Discovery index. */
-export interface SkillDiscoveryReadinessSummary {
+interface SkillDiscoveryReadinessSummary {
   adoptionState: SkillDiscoveryAdoptionState;
   publishedEntrypointCount: number;
   routeEligibleSkillCount: number;

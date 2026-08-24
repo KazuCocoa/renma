@@ -11,14 +11,14 @@ export const INITIAL_CONFIG_CONTENT = `{
 }
 `;
 
-export type InitState =
+type InitState =
   | "created"
   | "primary-existing"
   | "json-existing"
   | "legacy-existing"
   | "conflicting";
 
-export interface InitResult {
+interface InitResult {
   state: InitState;
   primaryPath: string;
   existingPaths: string[];

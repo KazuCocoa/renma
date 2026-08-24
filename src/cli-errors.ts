@@ -16,7 +16,7 @@ export class CliUserError extends Error {
   }
 }
 
-export interface ClassifiedCliError {
+interface ClassifiedCliError {
   exitCode: typeof CLI_EXIT.userError | typeof CLI_EXIT.internalError;
   message: string;
 }

@@ -111,7 +111,7 @@ const REQUIRED_METADATA_FIELD_ORDER = new Map<string, number>(
   REQUIRED_METADATA_POLICY_FIELDS.map((field, index) => [field, index]),
 );
 
-export class DiffInputError extends CliUserError {
+class DiffInputError extends CliUserError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "DiffInputError";
@@ -185,10 +185,9 @@ export interface DiffReport {
 }
 
 export type DiffReportWithoutSkillDiscovery = Omit<DiffReport, "discovery">;
-export type DiffReportFormatInput =
-  DiffReport | DiffReportWithoutSkillDiscovery;
+type DiffReportFormatInput = DiffReport | DiffReportWithoutSkillDiscovery;
 
-export interface DiffOwnershipEndpoint {
+interface DiffOwnershipEndpoint {
   ownedAssets: number;
   eligibleAssets: number;
   coveragePercent: number;
@@ -227,7 +226,7 @@ const COMPARABLE_ASSET_FIELDS = [
   "statusChangedAt",
 ] as const;
 
-export type ComparableAssetField = (typeof COMPARABLE_ASSET_FIELDS)[number];
+type ComparableAssetField = (typeof COMPARABLE_ASSET_FIELDS)[number];
 
 export interface AssetChange {
   id: string;
@@ -273,7 +272,7 @@ interface EvidenceDelta {
   snippet?: string | undefined;
 }
 
-export interface DiffSnapshot {
+interface DiffSnapshot {
   ref: string;
   root: string;
   readiness: ReadinessReport;
@@ -295,7 +294,7 @@ export interface DiffCollectionInstrumentation {
   to?: RepositoryCollectionInstrumentation;
 }
 
-export interface DiffExecutionContext {
+interface DiffExecutionContext {
   report: DiffReport;
   skillDiscoveryCiPolicy: {
     from: SkillDiscoveryCiPolicyMode;

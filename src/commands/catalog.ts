@@ -12,7 +12,7 @@ import { formatVersionedJsonDocument } from "../report.js";
 import { collectRepositoryEvidence } from "../repository-evidence.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
-export type CatalogFormat = "json" | "markdown";
+type CatalogFormat = "json" | "markdown";
 export const CATALOG_JSON_SCHEMA_VERSION = "renma.catalog.v1" as const;
 
 /** Complete result emitted by the catalog command before formatting. */
@@ -25,12 +25,12 @@ export interface CatalogResult {
   diagnostics: Diagnostic[];
 }
 
-export interface CatalogDependencyIndexes {
+interface CatalogDependencyIndexes {
   outboundBySourceId: ReadonlyMap<string, readonly Dependency[]>;
   inboundByResolvedTargetId: ReadonlyMap<string, readonly Dependency[]>;
 }
 
-export interface CatalogMarkdownInstrumentation {
+interface CatalogMarkdownInstrumentation {
   onAssetIndexed?(entry: Asset): void;
   onDependencyIndexed?(dependency: Dependency): void;
   onDependencyTargetResolved?(

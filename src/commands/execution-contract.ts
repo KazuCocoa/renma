@@ -39,7 +39,7 @@ const EXECUTION_CONTRACT_EVIDENCE_DIGEST_DOMAIN =
   "renma.experimental-execution-contract.evidence-digest" as const;
 const EXECUTION_CONTRACT_EVIDENCE_DIGEST_PAYLOAD_VERSION = 1 as const;
 
-export interface ExecutionContractOptions {
+interface ExecutionContractOptions {
   entrypoint: string;
   sourceRevision?: string;
 }
@@ -97,7 +97,7 @@ export interface ExecutionContractReport {
   diagnostics: Diagnostic[];
 }
 
-export interface ExecutionContractSubject {
+interface ExecutionContractSubject {
   id: string;
   kind: "skill";
   sourcePath: string;
@@ -107,7 +107,7 @@ export interface ExecutionContractSubject {
   statusChangedAt?: string;
 }
 
-export interface ExecutionContractSurface {
+interface ExecutionContractSurface {
   kind: "repository-script";
   sourcePath: string;
   scope: ExecutableSurfaceEntry["scope"];
@@ -119,14 +119,14 @@ export interface ExecutionContractSurface {
   inventoryDependencyEvidence: ExecutableSurfaceEntry["dependencyEvidence"];
 }
 
-export interface ExecutionContractEndpoint {
+interface ExecutionContractEndpoint {
   kind: "skill" | "repository-script";
   sourcePath: string;
   id?: string;
   contentHash?: string;
 }
 
-export interface ExecutionContractRelationship {
+interface ExecutionContractRelationship {
   from: ExecutionContractEndpoint;
   to: ExecutionContractEndpoint & { kind: "repository-script" };
   relationship: "invokes";
@@ -136,17 +136,17 @@ export interface ExecutionContractRelationship {
   evidence: ExecutionContractEvidence[];
 }
 
-export interface ExecutionContractStructuralRelationship {
+interface ExecutionContractStructuralRelationship {
   from: ExecutionContractEndpoint & { kind: "skill"; id: string };
   to: ExecutionContractEndpoint & { kind: "repository-script" };
   relationship: "contains";
   meaning: "structural_placement_only";
 }
 
-export type ExecutionContractEvidence =
+type ExecutionContractEvidence =
   ExecutionContractInvocationEvidence | ExecutionContractDependencyEvidence;
 
-export interface ExecutionContractInvocationEvidence {
+interface ExecutionContractInvocationEvidence {
   type: "invocation";
   sourcePath: string;
   line: number;
@@ -159,7 +159,7 @@ export interface ExecutionContractInvocationEvidence {
   occurrenceOrdinal: number;
 }
 
-export interface ExecutionContractDependencyEvidence {
+interface ExecutionContractDependencyEvidence {
   type: "dependency";
   sourcePath: string;
   line: number;
