@@ -1647,12 +1647,6 @@
         "confidence": "high",
         "remediation": "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
         "whyItMatters": "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
-        "legacyConstraints": [
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Do not automatically rewrite references during scan.",
-          "Preserve compatibility shims when they are intentionally needed."
-        ],
         "diagnosticId": "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#5",
         "source": "finding",
         "facts": {
@@ -1745,13 +1739,6 @@
         "confidence": "high",
         "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
         "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
-        "legacyConstraints": [
-          "Do not infer missing boundaries from broad body prose.",
-          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Keep metadata compact and preserve detailed guidance outside frontmatter."
-        ],
         "diagnosticId": "META-CONTEXT-MISSING-WHEN-TO-USE@contexts/missing-boundary.md:L1#1",
         "source": "finding",
         "facts": {
@@ -1846,13 +1833,6 @@
         "confidence": "high",
         "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
         "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
-        "legacyConstraints": [
-          "Do not infer missing boundaries from broad body prose.",
-          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Keep metadata compact and preserve detailed guidance outside frontmatter."
-        ],
         "diagnosticId": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY@contexts/placeholder.md:L6#2",
         "source": "finding",
         "facts": {
@@ -1947,13 +1927,6 @@
         "confidence": "high",
         "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
         "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
-        "legacyConstraints": [
-          "Do not infer missing boundaries from broad body prose.",
-          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Keep metadata compact and preserve detailed guidance outside frontmatter."
-        ],
         "diagnosticId": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY@contexts/placeholder.md:L8#3",
         "source": "finding",
         "facts": {
@@ -2044,12 +2017,6 @@
         "confidence": "high",
         "remediation": "Use one of the supported lifecycle status values: experimental, stable, suspended, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
         "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, deprecated, or archived.",
-        "legacyConstraints": [
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Do not silently rewrite metadata during scan.",
-          "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
-        ],
         "diagnosticId": "META-INVALID-STATUS@contexts/invalid-status.md:L4#0",
         "source": "finding",
         "facts": {
@@ -2147,11 +2114,6 @@
         "confidence": "high",
         "remediation": "Update the asset metadata so catalog construction can identify the asset and validate declared relationships.",
         "whyItMatters": "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
-        "legacyConstraints": [
-          "Do not introduce runtime context resolution.",
-          "Do not create prompt packages.",
-          "Do not silently rewrite metadata during scan."
-        ],
         "diagnosticId": "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#6",
         "source": "finding",
         "facts": {
@@ -2257,12 +2219,6 @@
         "confidence": "high",
         "remediation": "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
         "whyItMatters": "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
-        "legacyConstraints": [
-          "Do not select runtime context.",
-          "Do not assemble prompt packages.",
-          "Do not infer missing dependencies with an LLM during scan.",
-          "Only validate declared repository relationships."
-        ],
         "diagnosticId": "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#4",
         "source": "finding",
         "facts": {

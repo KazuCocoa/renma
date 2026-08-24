@@ -53,16 +53,12 @@ test("every known metadata diagnostic has a registered code conversion", () => {
       CATALOG_FINDING_DEFINITIONS[code].severity,
     );
     assert.deepEqual(
-      finding[0]?.constraints,
-      CATALOG_FINDING_DEFINITIONS[code].repairConstraints.map(
-        (constraint) => constraint.text,
-      ),
+      finding[0]?.repairConstraints,
+      CATALOG_FINDING_DEFINITIONS[code].repairConstraints,
     );
     assert.deepEqual(
       finding[0]?.verificationSteps,
-      CATALOG_FINDING_DEFINITIONS[code].verificationStepsV2.map(
-        (step) => step.text,
-      ),
+      CATALOG_FINDING_DEFINITIONS[code].verificationSteps,
     );
     assert.deepEqual(
       createScanDiagnostics({ findings: finding, diagnostics: [] }).map(
@@ -71,6 +67,34 @@ test("every known metadata diagnostic has a registered code conversion", () => {
       [code],
     );
   }
+});
+
+test("catalog Finding retains diagnostic-specific and definition repair constraints", () => {
+  const diagnosticConstraint = {
+    kind: "requires_human_decision" as const,
+    text: "Confirm the reviewed lifecycle decision.",
+  };
+  const code = DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT;
+  const [finding] = catalogDiagnosticFindings([
+    {
+      ...codedDiagnostic(code, "invalid lifecycle date"),
+      repairConstraints: [diagnosticConstraint],
+    },
+  ]);
+
+  assert.deepEqual(finding?.repairConstraints, [
+    diagnosticConstraint,
+    ...CATALOG_FINDING_DEFINITIONS[code].repairConstraints,
+  ]);
+  assert.deepEqual(
+    createScanDiagnostics({
+      findings: finding ? [finding] : [],
+      diagnostics: [],
+    })
+      .flatMap((diagnostic) => diagnostic.repairConstraints ?? [])
+      .filter((constraint) => constraint.text === diagnosticConstraint.text),
+    [diagnosticConstraint],
+  );
 });
 
 test("metadata and catalog producers attach every known conversion code", () => {

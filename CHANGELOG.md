@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Made the typed Diagnostics v2 repair model the standard `Finding` contract.
+  The typed `verificationStepsV2` field is now `verificationSteps`, and the
+  legacy string-only `constraints` and `verificationSteps` projections were
+  removed together with their internal compatibility layer. Findings now expose
+  `repairConstraints` and `verificationSteps` directly as typed guidance.
+
 ## [0.36.1] - 2026-08-23
 
 ### Changed

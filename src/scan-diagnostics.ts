@@ -4,7 +4,6 @@ import {
   DIAGNOSTIC_IDS,
   DISCOVERY_LAYOUT_DIAGNOSTIC_IDS,
 } from "./diagnostic-ids.js";
-import { canonicalFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type {
   Diagnostic,
   DiagnosticLocation,
@@ -105,7 +104,6 @@ function findingToScanDiagnostic(
       riskClass: finding.riskClass,
       remediation: finding.remediation,
       whyItMatters: finding.whyItMatters,
-      legacyConstraints: finding.constraints,
     }),
   });
 }
@@ -141,12 +139,10 @@ function isGuidanceOnlyDiagnostic(code: string): boolean {
 }
 
 function repairConstraintsForFinding(finding: Finding): RepairConstraint[] {
-  const guidance = canonicalFindingRepairGuidance(finding);
   return uniqueConstraints([
     ...semanticRepairConstraints(),
     ...specificRepairConstraints(finding.id),
     ...(finding.repairConstraints ?? []),
-    ...(guidance?.repairConstraints ?? []),
   ]);
 }
 
@@ -175,27 +171,6 @@ function semanticRepairConstraints(): RepairConstraint[] {
 }
 
 function specificRepairConstraints(code: string): RepairConstraint[] {
-  if (code === DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION) {
-    return [
-      {
-        kind: "must_preserve",
-        text: "Enumerate the actual required domains in approved_network_destinations or the applicable profile/repository security config.",
-      },
-      {
-        kind: "must_not_change",
-        text: "Do not remove the network requirement, move the declaration elsewhere, or use broad wildcards only to silence this warning.",
-      },
-      {
-        kind: "must_not_change",
-        text: "Do not replace specific domains with broad wildcards unless the source documentation explicitly supports that exact scope.",
-      },
-      {
-        kind: "requires_human_decision",
-        text: "If the required domains are unknown, keep the issue visible and add a TODO with supporting references instead of guessing.",
-      },
-    ];
-  }
-
   if (
     code === DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID ||
     code === CONTEXT_LENS_DIAGNOSTIC_CODES.DUPLICATE_ID
@@ -391,12 +366,25 @@ function specificRepairConstraints(code: string): RepairConstraint[] {
 }
 
 function verificationStepsForFinding(finding: Finding): VerificationStep[] {
-  const guidance = canonicalFindingRepairGuidance(finding);
-  const steps =
-    finding.verificationStepsV2 ?? guidance?.verificationSteps ?? [];
+  const steps = finding.verificationSteps ?? [];
   return steps.length > 0
-    ? uniqueVerificationSteps(steps)
+    ? uniqueVerificationSteps(
+        steps.map((step) => completeFindingVerificationStep(step, finding.id)),
+      )
     : defaultVerificationSteps(finding.id);
+}
+
+function completeFindingVerificationStep(
+  step: VerificationStep,
+  code: string,
+): VerificationStep {
+  if (step.command !== "renma scan" || step.expected !== undefined) {
+    return step;
+  }
+  return {
+    ...step,
+    expected: `No diagnostics with code ${code} are reported.`,
+  };
 }
 
 function verificationStepsForDiagnostic(

@@ -1,6 +1,5 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { Artifact } from "./types/artifact.js";
-import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type {
   Finding,
   RepairConstraint,
@@ -302,7 +301,7 @@ export function hiddenUnicodeFindings(artifact: Artifact): Finding[] {
     }
   }
 
-  return findings.map((finding) => projectFindingRepairGuidance(finding));
+  return findings;
 }
 
 /** Shared eligibility predicate for raw hidden-Unicode analysis and coverage. */
@@ -608,7 +607,7 @@ function findingForLine(
     whyItMatters: metadata.whyItMatters,
     remediation: REMEDIATION,
     repairConstraints: REPAIR_CONSTRAINTS,
-    verificationStepsV2: VERIFICATION_STEPS,
+    verificationSteps: VERIFICATION_STEPS,
     llmHint: LLM_HINT,
     details: {
       unicodeCategory: category,

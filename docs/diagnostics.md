@@ -114,9 +114,9 @@ Typed repair guidance is authoritative before Diagnostics v2 is constructed.
 Finding and diagnostic producers author `RepairConstraint[]` and
 `VerificationStep[]` values directly, including constraint kinds, commands, and
 expected outcomes. Renma does not derive those semantics from phrases such as
-"Do not", "Preserve", or "Run renma". For the stable Finding compatibility
-shape, `constraints` and `verificationSteps` are generated only from the typed
-objects' `text` fields.
+"Do not", "Preserve", or "Run renma". Findings expose only the typed
+`repairConstraints` and `verificationSteps` fields; Diagnostics v2 consumes
+those values directly.
 
 ## Classification Evidence
 

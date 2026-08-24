@@ -768,7 +768,7 @@
     },
     "types/diagnostics.d.ts#Finding": {
       "declarations": [
-        "export interface Finding { id: string; title: string; category: \"quality\" | \"safety\" | \"structure\" | \"maintenance\"; severity: Severity; confidence: \"low\" | \"medium\" | \"high\"; riskClass?: RiskClass; evidence: Evidence; whyItMatters: string; remediation: string; constraints?: string[]; repairConstraints?: RepairConstraint[]; verificationSteps?: string[]; verificationStepsV2?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
+        "export interface Finding { id: string; title: string; category: \"quality\" | \"safety\" | \"structure\" | \"maintenance\"; severity: Severity; confidence: \"low\" | \"medium\" | \"high\"; riskClass?: RiskClass; evidence: Evidence; whyItMatters: string; remediation: string; repairConstraints?: RepairConstraint[]; verificationSteps?: VerificationStep[]; llmHint?: string; details?: Record<string, unknown>; }"
       ],
       "references": [
         "types/diagnostics.d.ts#Evidence",

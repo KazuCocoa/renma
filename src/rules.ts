@@ -44,14 +44,13 @@ import {
   type RenmaScaffoldPlaceholderName,
 } from "./scaffold-placeholders.js";
 import { ensureYamlFrontmatterForDocument } from "./yaml-frontmatter.js";
-import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 
 type FindingDetails = Partial<
   Pick<
     Finding,
     | "whyItMatters"
     | "repairConstraints"
-    | "verificationStepsV2"
+    | "verificationSteps"
     | "llmHint"
     | "riskClass"
     | "details"
@@ -217,13 +216,11 @@ export function runRules(
     options.repositoryPathStates,
     options.incompleteSupportDirectories,
   ).flatMap((rule) => rule(context));
-  return findings
-    .map((finding) => projectFindingRepairGuidance(finding))
-    .sort((a, b) => {
-      const byPath = compareUtf16CodeUnits(a.evidence.path, b.evidence.path);
-      if (byPath !== 0) return byPath;
-      return a.evidence.startLine - b.evidence.startLine;
-    });
+  return findings.sort((a, b) => {
+    const byPath = compareUtf16CodeUnits(a.evidence.path, b.evidence.path);
+    if (byPath !== 0) return byPath;
+    return a.evidence.startLine - b.evidence.startLine;
+  });
 }
 
 function rulesForEvaluationDate(
@@ -374,7 +371,7 @@ function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
         },
         { kind: "must_not_change", text: "Do not create prompt packages." },
       ],
-      verificationStepsV2: [
+      verificationSteps: [
         { text: "Run renma scan.", command: "renma scan" },
         {
           text: "Run renma catalog.",
@@ -426,7 +423,7 @@ function reviewOverdueAssetFindings(
         },
         { kind: "must_not_change", text: "Do not create prompt packages." },
       ],
-      verificationStepsV2: [
+      verificationSteps: [
         { text: "Run renma scan.", command: "renma scan" },
         {
           text: "Run renma catalog.",
@@ -484,7 +481,7 @@ function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
           text: "Update declared references through a reviewable patch after renaming an id.",
         },
       ],
-      verificationStepsV2: [
+      verificationSteps: [
         { text: "Run renma scan.", command: "renma scan" },
         {
           text: "Run renma catalog.",
@@ -550,7 +547,7 @@ function unknownReferenceFindings(
             text: "Only validate declared repository relationships.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run renma catalog.",
@@ -631,7 +628,7 @@ function referenceDeprecatedAssetFindings(
             text: "Preserve compatibility shims when they are intentionally needed.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run renma catalog.",
@@ -711,7 +708,7 @@ function orphanedContextLensFindings(
             text: "Treat this as repository governance only.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run renma catalog.",
@@ -790,7 +787,7 @@ function contextLensAppliesToInactiveContextFindings(
             text: "Keep the check deterministic and relationship-based.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run renma catalog.",
@@ -867,7 +864,7 @@ function orphanedContextAssetFindings(
             text: "Use this as a repository maintenance advisory.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run renma catalog.",
@@ -1132,7 +1129,7 @@ function shapeFindings(
               text: "Choose a destination by semantic ownership, not by size alone.",
             },
           ],
-          verificationStepsV2: [
+          verificationSteps: [
             { text: "Run renma scan.", command: "renma scan" },
             {
               text: "Run any project-specific validation checks that apply to this repository.",
@@ -1293,7 +1290,7 @@ function shapeFindings(
               text: "Keep the skill as a static workflow entrypoint.",
             },
           ],
-          verificationStepsV2: [
+          verificationSteps: [
             { text: "Run renma scan.", command: "renma scan" },
             {
               text: "Run renma readiness.",
@@ -1352,7 +1349,7 @@ function shapeFindings(
               text: "Keep the skill as a static workflow entrypoint.",
             },
           ],
-          verificationStepsV2: [
+          verificationSteps: [
             { text: "Run renma scan.", command: "renma scan" },
             {
               text: "Run renma readiness.",
@@ -1503,7 +1500,7 @@ function renmaScaffoldPlaceholderFindings(document: ParsedDocument): Finding[] {
               text: "Do not treat this exact-marker check as proof of general semantic completeness.",
             },
           ],
-          verificationStepsV2: [
+          verificationSteps: [
             {
               text: "Run renma scan . --fail-on high --strict.",
               command: "renma scan",
@@ -1696,7 +1693,7 @@ function reusableContextCandidateFinding(
         text: "Give extracted context assets stable metadata such as id, owner, and status.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets.",
@@ -1841,7 +1838,7 @@ function supportSharedContextCandidateFindings(
           text: "Give promoted context assets stable metadata such as id, owner, and status.",
         },
       ],
-      verificationStepsV2: [
+      verificationSteps: [
         { text: "Run renma scan.", command: "renma scan" },
         {
           text: "Run renma catalog.",
@@ -1928,7 +1925,7 @@ function contextPathNonSemanticFindings(document: ParsedDocument): Finding[] {
           text: "Temporary staging folders are acceptable outside final contexts/ paths, but final shared context assets should use semantic paths.",
         },
       ],
-      verificationStepsV2: [
+      verificationSteps: [
         { text: "Run renma scan.", command: "renma scan" },
         {
           text: "Run renma catalog.",
@@ -1996,7 +1993,7 @@ function skillContextReferenceNotDeclaredFindings(
           text: "Only declare repository relationships that the skill already references or intentionally depends on.",
         },
       ],
-      verificationStepsV2: [
+      verificationSteps: [
         { text: "Run renma scan.", command: "renma scan" },
         {
           text: "Run renma catalog.",
@@ -2093,7 +2090,7 @@ function skillReferencesSupersededAssetFindings(
             text: "Update declared context references when pointing the skill directly at shared contexts.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run renma catalog.",
@@ -2258,7 +2255,7 @@ function assetReferencesSupersededAssetFindings(
                 text: "Update references through a reviewable human or calling-agent patch.",
               },
             ],
-            verificationStepsV2: [
+            verificationSteps: [
               { text: "Run renma scan.", command: "renma scan" },
               {
                 text: "Run renma catalog.",
@@ -2406,9 +2403,7 @@ function contextBudgetFindings(
             text: "Ask whether a meaningful split preserves coherence and execution order before proposing an override.",
           },
         ],
-        verificationStepsV2: [
-          { text: "Run renma scan.", command: "renma scan" },
-        ],
+        verificationSteps: [{ text: "Run renma scan.", command: "renma scan" }],
         llmHint: `${invalidReasonSummary} Report these reasons to the user in their existing order without inferring a correction. First ask whether the asset can be split along meaningful boundaries without harming coherence or execution order. Only if the user confirms it should remain long should you repair explicit override metadata with their rationale.`,
         details: {
           estimatedTokens,
@@ -2511,7 +2506,7 @@ function contextBudgetFindings(
             text: "Keep static references from the parent file or SKILL.md to every split part.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           { text: "Run renma scan.", command: "renma scan" },
           {
             text: "Run the repository-specific validation or test command, if one exists.",
@@ -2680,7 +2675,7 @@ function skillLocalSupportReachabilityFindings(
                 text: "Preserve original concrete steps and support content.",
               },
             ],
-            verificationStepsV2: [
+            verificationSteps: [
               { text: "Run renma scan.", command: "renma scan" },
               {
                 text: "Run any project-specific validation checks that apply to this repository.",
@@ -2735,7 +2730,7 @@ function skillLocalSupportReachabilityFindings(
                   text: "Use SKILL.md or a referenced parent support file for static reachability.",
                 },
               ],
-              verificationStepsV2: [
+              verificationSteps: [
                 { text: "Run renma scan.", command: "renma scan" },
                 {
                   text: "Run any project-specific validation checks that apply to this repository.",
@@ -3108,7 +3103,7 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
         {
           whyItMatters:
             "README.md and AGENTS.md should describe the current repository model without treating valid Skill-local support as stale.",
-          verificationStepsV2: [
+          verificationSteps: [
             {
               text: "Confirm docs distinguish canonical Skill roots and valid local support from governed contexts/** assets and shared tools/** helpers.",
             },
@@ -3184,7 +3179,7 @@ function declaredDependencyLayoutFindings(
         "Declared context references should resolve through canonical contexts/**, skills/**, .agents/skills/**, or tools/** repository paths.",
       remediation:
         "Rewrite declared required or optional context dependency values to canonical repo-root paths without changing the Skill's operational metadata format.",
-      verificationStepsV2: [
+      verificationSteps: [
         {
           text: "Run renma graph and confirm all edges resolve.",
           command: "renma graph",
@@ -3224,7 +3219,7 @@ function unresolvedHelperCommandFinding(
     {
       whyItMatters:
         "Agents need shared tools/** helpers and Skill-local scripts to resolve deterministically before running them.",
-      verificationStepsV2: [
+      verificationSteps: [
         {
           text: "Confirm the command resolves to an existing tools/** helper or to scripts/** inside its owning Skill.",
         },
@@ -3290,8 +3285,8 @@ function finding(
     ...(details.repairConstraints
       ? { repairConstraints: details.repairConstraints }
       : {}),
-    ...(details.verificationStepsV2
-      ? { verificationStepsV2: details.verificationStepsV2 }
+    ...(details.verificationSteps
+      ? { verificationSteps: details.verificationSteps }
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),
@@ -3322,8 +3317,8 @@ function documentFinding(
     ...(details.repairConstraints
       ? { repairConstraints: details.repairConstraints }
       : {}),
-    ...(details.verificationStepsV2
-      ? { verificationStepsV2: details.verificationStepsV2 }
+    ...(details.verificationSteps
+      ? { verificationSteps: details.verificationSteps }
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),

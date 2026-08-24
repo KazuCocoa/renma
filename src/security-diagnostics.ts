@@ -23,7 +23,6 @@ import {
   type SecurityProfileChain,
 } from "./security-policy.js";
 import type { Artifact } from "./types/artifact.js";
-import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type {
   Finding,
   RepairConstraint,
@@ -125,7 +124,7 @@ type RuleMetadata = {
   whyItMatters: string;
   remediation: string;
   repairConstraints: RepairConstraint[];
-  verificationStepsV2: VerificationStep[];
+  verificationSteps: VerificationStep[];
   llmHint: string;
   confidence: Finding["confidence"];
   riskClass: RiskClass;
@@ -176,7 +175,7 @@ const RULES = {
         text: "Preserve existing repository governance metadata.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       { text: "Confirm the artifact declares the relevant policy fields." },
       {
@@ -206,7 +205,7 @@ const RULES = {
         text: "Keep network and upload allowances explicit.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm contradictory policy fields no longer appear together.",
@@ -239,7 +238,7 @@ const RULES = {
         text: "Preserve the local declaration as blocked until a human confirms the policy.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the canonical field uses the documented exact encoding.",
@@ -275,7 +274,7 @@ const RULES = {
         text: "Preserve the local declaration as blocked until a human confirms the policy.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the frontmatter is valid YAML with one declaration per recognized field.",
@@ -308,7 +307,7 @@ const RULES = {
         text: "does not perform general natural-language intent classification",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       {
         text: "Run renma scan and confirm policy fields match the body instructions.",
         command: "renma scan",
@@ -337,7 +336,7 @@ const RULES = {
         text: "Keep profile names deterministic and repo-local.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the referenced security profile exists in configuration.",
@@ -366,7 +365,7 @@ const RULES = {
         text: "Keep inherited policy chains short and explicit.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm profile inheritance resolves without revisiting the same profile.",
@@ -395,7 +394,7 @@ const RULES = {
         text: "Do not weaken local restrictions through profile inheritance.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm inherited policy does not contradict explicit artifact denials.",
@@ -424,7 +423,7 @@ const RULES = {
         text: "Keep profile data-class restrictions explicit.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the artifact no longer instructs agents to handle forbidden inputs.",
@@ -453,7 +452,7 @@ const RULES = {
         text: "Preserve the artifact's intended workflow where it can be made policy-compliant.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       { text: "Confirm no instruction conflicts with the declared policy." },
     ],
@@ -480,7 +479,7 @@ const RULES = {
         text: "Keep the guard close to the sensitive instruction.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the sensitive action is guarded by nearby approval language.",
@@ -509,7 +508,7 @@ const RULES = {
         text: "Keep allowlisted sample paths separate from real secret material.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm sensitive file references are removed, mocked, or protected by policy.",
@@ -538,7 +537,7 @@ const RULES = {
         text: "Prefer safe placeholders and redaction guidance.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm secret material is not requested for printing, copying, uploading, or context inclusion.",
@@ -571,7 +570,7 @@ const RULES = {
         text: "Do not weaken the underlying security policy to silence this finding.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the reported HTML comment no longer contains a recognized security-sensitive instruction.",
@@ -608,7 +607,7 @@ const RULES = {
         text: "Do not weaken the underlying security policy to silence this finding.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the reported YAML frontmatter comment no longer contains a recognized security-sensitive instruction.",
@@ -640,7 +639,7 @@ const RULES = {
         text: "Keep approved destinations explicit in policy metadata.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm uploads are either removed or guarded by explicit policy and approval.",
@@ -677,11 +676,11 @@ const RULES = {
         text: "Do not replace specific domains with broad wildcards unless the source documentation explicitly supports that exact scope.",
       },
       {
-        kind: "must_preserve",
+        kind: "requires_human_decision",
         text: "If the required domains are unknown, keep the issue visible and add a TODO with supporting references instead of guessing.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm every real external destination is represented by a specific approved network destination.",
@@ -710,7 +709,7 @@ const RULES = {
         text: "Keep upload destinations explicit and deterministic.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       { text: "Confirm every upload destination is approved or removed." },
     ],
@@ -737,7 +736,7 @@ const RULES = {
         text: "Prefer scoped evidence snippets over bulk data transfer.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm sharing instructions name a bounded, minimal data set.",
@@ -763,7 +762,7 @@ const RULES = {
       },
       { kind: "must_preserve", text: "Keep external upload policy explicit." },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       { text: "Confirm cloud uploads are removed, approved, or guarded." },
     ],
@@ -790,7 +789,7 @@ const RULES = {
         text: "Keep guidance deterministic and repository-local.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm context instructions are scoped and exclude sensitive material.",
@@ -819,7 +818,7 @@ const RULES = {
         text: "Keep examples synthetic where possible.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm instructions require redaction where sensitive data may appear.",
@@ -852,7 +851,7 @@ const RULES = {
         text: "Keep permission failures fail-closed and report unresolved authority instead of selecting a more dangerous fallback.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the bypass instruction is removed or rewritten as a fail-closed stop and report path.",
@@ -888,7 +887,7 @@ const RULES = {
         text: "Add explicit verification or rollback after preserving and reporting the original failure.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the risky operation no longer discards or ignores its failure.",
@@ -924,7 +923,7 @@ const RULES = {
         text: "State bounded local behavior and routing conditions without making an instruction-priority claim.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the agent-facing text no longer claims to ignore, override, or supersede higher-authority instructions.",
@@ -960,7 +959,7 @@ const RULES = {
         text: "Reading, quoting, summarizing, or validating a source is not permission to execute it.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm external or tool-produced content is handled as data rather than authority.",
@@ -996,7 +995,7 @@ const RULES = {
         text: "Preserve the helper when it remains useful as evidence rather than authority.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the helper no longer decides whether a security-sensitive operation is allowed, permitted, approved, authorized, or safe.",
@@ -1032,7 +1031,7 @@ const RULES = {
         text: "Keep traversal bounds local to the instruction they govern.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm recursive traversal is removed or has explicit local scope and termination boundaries.",
@@ -1061,7 +1060,7 @@ const RULES = {
       },
       { kind: "must_preserve", text: "Keep install guidance reproducible." },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm remote script execution is removed or pinned with verification.",
@@ -1098,7 +1097,7 @@ const RULES = {
         text: "Do not claim that uninspected manifests, lockfiles, requirements files, constraints files, or other dependency sources were verified.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm structured npm/PyPI installs use reviewed exact selectors, structurally accepted fail-closed variables, or exact asset-local npm:/pypi: floating-selector approvals.",
@@ -1130,7 +1129,7 @@ const RULES = {
       },
       { kind: "must_preserve", text: "Keep the guard close to the command." },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm privileged commands require approval or have been removed.",
@@ -1162,7 +1161,7 @@ const RULES = {
         text: "Keep real operational text visible to the existing security diagnostics.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the description contains capabilities and selection boundaries rather than a concrete high-risk payload.",
@@ -1198,7 +1197,7 @@ const RULES = {
         text: "Keep approval and recovery guidance close to the command.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       { text: "Confirm destructive commands are removed or guarded." },
       {
@@ -1228,7 +1227,7 @@ const RULES = {
         text: "Keep any replacement workflow deterministic and reviewable.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm disallowed command instructions have been removed or rewritten.",
@@ -1257,7 +1256,7 @@ const RULES = {
         text: "Use placeholders only when examples are necessary.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm command examples do not include token, password, key, or certificate values.",
@@ -1283,7 +1282,7 @@ const RULES = {
       },
       { kind: "must_preserve", text: "Keep cleanup instructions explicit." },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm sensitive temporary paths are randomized, scoped, and cleaned up.",
@@ -1732,7 +1731,7 @@ export function analyzeSecurityDiagnostics(
         ...(prepared === undefined
           ? []
           : securityFindingsForPreparedDocument(prepared)),
-      ].map((finding) => projectFindingRepairGuidance(finding)),
+      ],
       coverage: securityAnalysisCoverageArtifact(artifact, prepared),
     };
   });
@@ -5911,7 +5910,7 @@ function findingFromDetection(
     whyItMatters: detection.metadata.whyItMatters,
     remediation: detection.metadata.remediation,
     repairConstraints: detection.metadata.repairConstraints,
-    verificationStepsV2: detection.metadata.verificationStepsV2,
+    verificationSteps: detection.metadata.verificationSteps,
     llmHint: detection.metadata.llmHint,
     confidence: detection.metadata.confidence,
     riskClass: detection.riskClass ?? detection.metadata.riskClass,

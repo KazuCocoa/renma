@@ -6,7 +6,6 @@ import {
   createScanDiagnostics,
   createReviewBundles,
 } from "./scan-diagnostics.js";
-import { copyFindingWith } from "./finding-repair-guidance.js";
 import {
   collectRepositorySnapshot,
   prepareRepositorySnapshotProjections,
@@ -214,10 +213,11 @@ function attachFindingClassification(
     finding.id === DIAGNOSTIC_IDS.QUAL_SKILL_MIXED_RESPONSIBILITY
       ? finding.llmHint
       : classificationLlmHint(classification, finding.llmHint);
-  return copyFindingWith(finding, {
+  return {
+    ...finding,
     ...(llmHint ? { llmHint } : {}),
     details: { ...(finding.details ?? {}), classification },
-  });
+  };
 }
 
 function classificationRelevantFinding(id: string): boolean {

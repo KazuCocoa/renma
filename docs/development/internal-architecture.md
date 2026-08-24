@@ -176,11 +176,9 @@ supported package entrypoints expose only the open evidence contracts.
 ## Typed Finding Repair Authority
 
 Finding producers author `RepairConstraint[]` and `VerificationStep[]`
-semantics explicitly. `projectFindingRepairGuidance()` is the one compatibility
-boundary that generates legacy `constraints` and `verificationSteps` arrays
-from the typed objects' `text` fields. The canonical typed values remain
-available internally for Diagnostics v2 even though legacy-only Finding
-producers are rejected.
+semantics explicitly through the Finding `repairConstraints` and
+`verificationSteps` fields. Diagnostics v2 consumes those typed values directly;
+there is no parallel string-array projection or hidden canonical representation.
 
 `createScanDiagnostics()` never classifies a constraint from English verbs and
 never discovers commands from sentence prefixes. It consumes only the typed

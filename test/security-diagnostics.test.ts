@@ -177,18 +177,18 @@ docker run ubuntu:24.04
 
   const guidance = findings[0];
   assert.ok(guidance);
-  assert.ok(guidance.constraints);
+  assert.ok(guidance.repairConstraints);
   assert.ok(guidance.llmHint);
   assert.match(guidance.remediation, /Homebrew formula version/u);
   assert.match(guidance.remediation, /image tag or immutable digest/u);
   assert.ok(
-    guidance.constraints.some((constraint) =>
-      constraint.includes("never invent"),
+    guidance.repairConstraints.some((constraint) =>
+      constraint.text.includes("never invent"),
     ),
   );
   assert.ok(
-    guidance.constraints.some((constraint) =>
-      constraint.includes("npm/PyPI floating-selector allowances"),
+    guidance.repairConstraints.some((constraint) =>
+      constraint.text.includes("npm/PyPI floating-selector allowances"),
     ),
   );
   assert.match(guidance.llmHint, /asset-local floating allowances only for/u);
@@ -251,7 +251,7 @@ rm -rf /tmp/renma-output
   for (const finding of destructiveFindings) {
     assert.equal(finding.severity, "high");
     assert.ok(finding.whyItMatters);
-    assert.ok(finding.constraints?.length);
+    assert.ok(finding.repairConstraints?.length);
     assert.ok(finding.verificationSteps?.length);
     assert.ok(finding.llmHint);
   }
@@ -602,7 +602,7 @@ tool login --token abc123
     assert.ok(finding.evidence.endLine >= finding.evidence.startLine);
     assert.ok(finding.whyItMatters);
     assert.ok(finding.remediation);
-    assert.ok(finding.constraints?.length);
+    assert.ok(finding.repairConstraints?.length);
     assert.ok(finding.verificationSteps?.length);
     assert.ok(finding.llmHint);
   }
@@ -629,7 +629,7 @@ test("explicit local safeguard bypass instructions are advisory findings", () =>
     assert.equal(finding.severity, "medium", example);
     assert.equal(finding.confidence, "high", example);
     assert.equal(finding.riskClass, "advisory", example);
-    assert.ok(finding.constraints?.length, example);
+    assert.ok(finding.repairConstraints?.length, example);
     assert.ok(finding.verificationSteps?.length, example);
     assert.match(finding.llmHint ?? "", /stop|preserve/i, example);
   }
@@ -4173,8 +4173,10 @@ Fetch https://api.example.com/upload metadata.
   assert.match(finding.llmHint ?? "", /broad wildcards/);
   assert.match(finding.llmHint ?? "", /TODO with supporting references/);
   assert.ok(
-    finding.constraints?.some((constraint) =>
-      /Do not replace specific domains with broad wildcards/.test(constraint),
+    finding.repairConstraints?.some((constraint) =>
+      /Do not replace specific domains with broad wildcards/.test(
+        constraint.text,
+      ),
     ),
   );
   assert.doesNotMatch(finding.remediation, /remove the external network/i);

@@ -7,14 +7,8 @@ import type { Finding } from "../src/types/diagnostics.js";
 
 type CompatibilityFinding = Pick<
   Finding,
-  | "id"
-  | "severity"
-  | "category"
-  | "evidence"
-  | "remediation"
-  | "llmHint"
-  | "constraints"
->;
+  "id" | "severity" | "category" | "evidence" | "remediation" | "llmHint"
+> & { constraints: string[] };
 
 const FINDING_TEXT = {
   "SEC-UNAPPROVED-NETWORK-DESTINATION": {
@@ -319,7 +313,7 @@ const EXPECTED_COMPATIBILITY_FINDINGS: readonly CompatibilityFinding[] = [
   ),
 ];
 
-test("v0.22.4 destination compatibility corpus preserves exact public findings", () => {
+test("destination regression corpus preserves exact finding guidance text", () => {
   const actual = securityDiagnosticFindings([...COMPATIBILITY_ARTIFACTS]).map(
     ({
       id,
@@ -328,7 +322,7 @@ test("v0.22.4 destination compatibility corpus preserves exact public findings",
       evidence,
       remediation,
       llmHint,
-      constraints,
+      repairConstraints,
     }) => ({
       id,
       severity,
@@ -336,7 +330,7 @@ test("v0.22.4 destination compatibility corpus preserves exact public findings",
       evidence,
       remediation,
       llmHint,
-      constraints,
+      constraints: repairConstraints?.map((item) => item.text),
     }),
   );
 

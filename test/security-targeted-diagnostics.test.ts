@@ -43,7 +43,7 @@ rm -rf "$other" 2>/dev/null
   for (const finding of suppressions) {
     assert.ok(finding.whyItMatters);
     assert.ok(finding.remediation);
-    assert.ok(finding.constraints?.length);
+    assert.ok(finding.repairConstraints?.length);
     assert.ok(finding.verificationSteps?.length);
     assert.match(finding.llmHint ?? "", /stop|report|rollback/iu);
   }
@@ -1132,7 +1132,7 @@ test("explicit local instruction hierarchy overrides are advisory", () => {
     assert.equal(finding.riskClass, "advisory", example);
     assert.equal(finding.evidence.startLine, 7, example);
     assert.equal(finding.evidence.snippet, example, example);
-    assert.ok(finding.constraints?.length, example);
+    assert.ok(finding.repairConstraints?.length, example);
     assert.ok(finding.verificationSteps?.length, example);
     assert.match(
       finding.llmHint ?? "",

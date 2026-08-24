@@ -132,7 +132,7 @@ test("scan emits actionable declared-composition diagnostics and Lens freshness 
   assert.equal(mismatch?.details?.expectedTargetKind, "context");
   assert.equal(mismatch?.details?.actualTargetKind, "context_lens");
   assert.ok(mismatch?.llmHint);
-  assert.ok(mismatch?.constraints?.length);
+  assert.ok(mismatch?.repairConstraints?.length);
   assert.ok(mismatch?.verificationSteps?.length);
 
   const duplicate = findingsById.get(
@@ -204,7 +204,7 @@ test("scan reports invalid applies_to sources even when targets are unresolved",
   assert.match(unresolvedSource?.title ?? "", /originates from the wrong/);
   assert.equal(unresolvedSource?.evidence.path, "contexts/wrong-missing.md");
   assert.ok(unresolvedSource?.llmHint);
-  assert.ok(unresolvedSource?.constraints?.length);
+  assert.ok(unresolvedSource?.repairConstraints?.length);
   assert.ok(unresolvedSource?.verificationSteps?.length);
 
   const validTarget = sourceMismatchesBySource.get("context.wrong-valid");
@@ -230,7 +230,7 @@ test("scan reports invalid applies_to sources even when targets are unresolved",
   assert.match(wrongTarget?.title ?? "", /targets the wrong/);
   assert.equal(wrongTarget?.evidence.path, "contexts/wrong-target.md");
   assert.ok(wrongTarget?.llmHint);
-  assert.ok(wrongTarget?.constraints?.length);
+  assert.ok(wrongTarget?.repairConstraints?.length);
   assert.ok(wrongTarget?.verificationSteps?.length);
 
   const unknownSources = result.findings

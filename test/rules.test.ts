@@ -10,6 +10,12 @@ import { scan } from "../src/scanner.js";
 import type { ScanResult } from "../src/types/scan-result.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
+function guidanceTexts(
+  items: ReadonlyArray<{ text: string }> | undefined,
+): string[] {
+  return items?.map((item) => item.text) ?? [];
+}
+
 test("Skill quality rules consume resolved Agent Skills YAML descriptions", async () => {
   const fixtures = [
     {
@@ -813,19 +819,25 @@ Do not use for production credential changes.
     /statically discoverable/,
   );
   assert.ok(
-    reachabilityFinding?.constraints?.includes(
+    guidanceTexts(reachabilityFinding?.repairConstraints).includes(
       "Do not introduce runtime context resolution.",
     ),
   );
   assert.ok(
-    reachabilityFinding?.verificationSteps?.includes("Run renma scan."),
+    guidanceTexts(reachabilityFinding?.verificationSteps).includes(
+      "Run renma scan.",
+    ),
   );
   assert.ok(
-    reachabilityFinding?.verificationSteps?.includes(
+    guidanceTexts(reachabilityFinding?.verificationSteps).includes(
       "Run any project-specific validation checks that apply to this repository.",
     ),
   );
-  assert.ok(!reachabilityFinding?.verificationSteps?.includes("Run npm test."));
+  assert.ok(
+    !guidanceTexts(reachabilityFinding?.verificationSteps).includes(
+      "Run npm test.",
+    ),
+  );
   assert.match(reachabilityFinding?.llmHint ?? "", /reachability guidance/);
 
   const textReport = formatText(result);
@@ -847,7 +859,7 @@ Do not use for production credential changes.
     /static repository evidence/,
   );
   assert.ok(
-    unreachableFinding?.constraints?.includes(
+    guidanceTexts(unreachableFinding?.repairConstraints).includes(
       "Do not delete or summarize support content just to satisfy the check.",
     ),
   );
@@ -916,7 +928,9 @@ Run the workflow test command and confirm result.
   assert.match(finding?.evidence.snippet ?? "", /Domain Rules/);
   assert.match(finding?.evidence.snippet ?? "", /known issue/);
   assert.ok(
-    finding?.constraints?.includes("Do not make Renma select runtime context."),
+    guidanceTexts(finding?.repairConstraints).includes(
+      "Do not make Renma select runtime context.",
+    ),
   );
   assert.match(finding?.llmHint ?? "", /used across Skills/);
 
@@ -929,7 +943,7 @@ Run the workflow test command and confirm result.
     "evidence",
     "whyItMatters",
     "remediation",
-    "constraints",
+    "repairConstraints",
     "verificationSteps",
     "llmHint",
   ]) {
@@ -1325,7 +1339,7 @@ status: stable
     /contexts\/tools\/demo\/setup\.md/,
   );
   assert.match(
-    JSON.stringify(finding?.constraints),
+    JSON.stringify(finding?.repairConstraints),
     /Do not make Renma call an LLM/,
   );
   assert.match(JSON.stringify(finding?.verificationSteps), /Run renma catalog/);
@@ -1557,7 +1571,7 @@ status: stable
     /contexts\/tools\/demo\/setup\.md/,
   );
   assert.match(
-    JSON.stringify(finding?.constraints),
+    JSON.stringify(finding?.repairConstraints),
     /Do not automatically move or rewrite files during scan/,
   );
   assert.match(JSON.stringify(finding?.verificationSteps), /Run renma catalog/);
@@ -1779,20 +1793,24 @@ ${repeatWords("example", 1000)}
     /coherence and maintainability review/,
   );
   assert.ok(
-    contextBudgetFinding?.constraints?.includes(
+    guidanceTexts(contextBudgetFinding?.repairConstraints).includes(
       "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
     ),
   );
   assert.ok(
-    contextBudgetFinding?.verificationSteps?.includes("Run renma scan."),
+    guidanceTexts(contextBudgetFinding?.verificationSteps).includes(
+      "Run renma scan.",
+    ),
   );
   assert.ok(
-    contextBudgetFinding?.verificationSteps?.includes(
+    guidanceTexts(contextBudgetFinding?.verificationSteps).includes(
       "Run the repository-specific validation or test command, if one exists.",
     ),
   );
   assert.ok(
-    !contextBudgetFinding?.verificationSteps?.includes("Run npm test."),
+    !guidanceTexts(contextBudgetFinding?.verificationSteps).includes(
+      "Run npm test.",
+    ),
   );
   assert.match(contextBudgetFinding?.remediation ?? "", /Ask the user/);
   assert.match(
@@ -2521,17 +2539,25 @@ Run npm test.
   assert.equal(skillBudgetFinding?.details?.unit, "estimated_tokens");
   assert.match(skillBudgetFinding?.whyItMatters ?? "", /Long Skill bodies/);
   assert.ok(
-    skillBudgetFinding?.constraints?.includes(
+    guidanceTexts(skillBudgetFinding?.repairConstraints).includes(
       "Do not make Renma responsible for selecting context.",
     ),
   );
-  assert.ok(skillBudgetFinding?.verificationSteps?.includes("Run renma scan."));
   assert.ok(
-    skillBudgetFinding?.verificationSteps?.includes(
+    guidanceTexts(skillBudgetFinding?.verificationSteps).includes(
+      "Run renma scan.",
+    ),
+  );
+  assert.ok(
+    guidanceTexts(skillBudgetFinding?.verificationSteps).includes(
       "Run any project-specific validation checks that apply to this repository.",
     ),
   );
-  assert.ok(!skillBudgetFinding?.verificationSteps?.includes("Run npm test."));
+  assert.ok(
+    !guidanceTexts(skillBudgetFinding?.verificationSteps).includes(
+      "Run npm test.",
+    ),
+  );
   assert.match(skillBudgetFinding?.llmHint ?? "", /progressive disclosure/);
   const sectionCandidates = skillBudgetFinding?.details?.sectionCandidates as
     | Array<{
@@ -2825,7 +2851,7 @@ Verify the workflow after each fix and record the checked command.
   );
   assert.match(finding?.evidence.snippet ?? "", /Source of Truth/);
   assert.match(finding?.evidence.snippet ?? "", /Compatibility/);
-  assert.ok(finding?.constraints?.length);
+  assert.ok(finding?.repairConstraints?.length);
   assert.ok(finding?.verificationSteps?.length);
   assert.match(finding?.llmHint ?? "", /Search the repository/);
   assert.match(finding?.llmHint ?? "", /overlapping guidance/);
@@ -2861,7 +2887,7 @@ Use this context when reviewing workflow setup ownership.
   assert.equal(finding?.evidence.path, "contexts/promoted/workflow-setup.md");
   assert.match(finding?.evidence.snippet ?? "", /promoted/);
   assert.match(finding?.remediation ?? "", /contexts\/tools\/<tool>/);
-  assert.ok(finding?.constraints?.length);
+  assert.ok(finding?.repairConstraints?.length);
   assert.ok(finding?.verificationSteps?.length);
   assert.match(finding?.llmHint ?? "", /Infer semantic scope/);
   assert.doesNotMatch(JSON.stringify(finding), /runtime[- ]resolver/i);
@@ -3384,9 +3410,19 @@ test("missing required inputs finding includes rich static guidance", async () =
   assert.equal(finding?.category, "quality");
   assert.equal(finding?.severity, "medium");
   assert.match(finding?.whyItMatters ?? "", /Agents need explicit input/);
-  assert.ok(finding?.constraints?.includes("Do not infer runtime context."));
-  assert.ok(finding?.constraints?.includes("Do not assemble prompt packages."));
-  assert.ok(finding?.verificationSteps?.includes("Run renma readiness."));
+  assert.ok(
+    guidanceTexts(finding?.repairConstraints).includes(
+      "Do not infer runtime context.",
+    ),
+  );
+  assert.ok(
+    guidanceTexts(finding?.repairConstraints).includes(
+      "Do not assemble prompt packages.",
+    ),
+  );
+  assert.ok(
+    guidanceTexts(finding?.verificationSteps).includes("Run renma readiness."),
+  );
   assert.match(finding?.llmHint ?? "", /Required inputs or Prerequisites/);
 });
 
@@ -3441,9 +3477,19 @@ test("missing completion criteria finding includes rich static guidance", async 
   assert.equal(finding?.category, "quality");
   assert.equal(finding?.severity, "medium");
   assert.match(finding?.whyItMatters ?? "", /completion criteria/);
-  assert.ok(finding?.constraints?.includes("Do not infer runtime context."));
-  assert.ok(finding?.constraints?.includes("Do not assemble prompt packages."));
-  assert.ok(finding?.verificationSteps?.includes("Run renma readiness."));
+  assert.ok(
+    guidanceTexts(finding?.repairConstraints).includes(
+      "Do not infer runtime context.",
+    ),
+  );
+  assert.ok(
+    guidanceTexts(finding?.repairConstraints).includes(
+      "Do not assemble prompt packages.",
+    ),
+  );
+  assert.ok(
+    guidanceTexts(finding?.verificationSteps).includes("Run renma readiness."),
+  );
   assert.match(finding?.llmHint ?? "", /Completion criteria/);
 });
 

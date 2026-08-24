@@ -12,7 +12,6 @@ import type {
 } from "./model.js";
 import type { Evidence, Finding } from "./types/diagnostics.js";
 import { isLifecycleUsable } from "./lifecycle.js";
-import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 
 export type CompositionMembership = "required" | "optional";
 export type CompositionRelationship =
@@ -431,14 +430,12 @@ export function analyzeDeclaredCompositionFindings(
     ...duplicateDeclarationFindings(index.sortedDependencies),
     ...cycleFindings(cycleGroups),
     ...conflicts,
-  ]
-    .map((finding) => projectFindingRepairGuidance(finding))
-    .sort(
-      (left, right) =>
-        compareUtf16CodeUnits(left.evidence.path, right.evidence.path) ||
-        left.evidence.startLine - right.evidence.startLine ||
-        compareUtf16CodeUnits(left.id, right.id),
-    );
+  ].sort(
+    (left, right) =>
+      compareUtf16CodeUnits(left.evidence.path, right.evidence.path) ||
+      left.evidence.startLine - right.evidence.startLine ||
+      compareUtf16CodeUnits(left.id, right.id),
+  );
   return {
     findings,
     stats: { rootsAnalyzed, peakRetainedRootReports },
@@ -545,7 +542,7 @@ function sourceKindMismatchFinding(
         text: "Do not introduce runtime Context selection or loading.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Inspect the kind of the asset that declares applies_to." },
       { text: "Confirm applies_to originates from a Context Lens." },
       {
@@ -603,7 +600,7 @@ function targetKindMismatchFinding(
         text: "Do not introduce runtime Context selection or loading.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Inspect the resolved target and its cataloged asset kind." },
       { text: "Confirm the declaration points to the intended target kind." },
       {
@@ -669,7 +666,7 @@ function duplicateDeclarationFindings(dependencies: Dependency[]): Finding[] {
             text: "Do not change declaration order into semantic precedence.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           {
             text: "Inspect every duplicate line listed in the finding details.",
           },
@@ -765,7 +762,7 @@ function cycleFindings(grouped: Map<string, CompositionCycleGroup>): Finding[] {
             text: "Do not introduce runtime Context loading.",
           },
         ],
-        verificationStepsV2: [
+        verificationSteps: [
           {
             text: "Inspect each cycle-forming declaration and its line evidence.",
           },
@@ -878,7 +875,7 @@ function conflictFinding(
         text: "Do not select optional Context at runtime.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       {
         text: `Run renma graph . --view composition --focus ${root.id} --format json.`,
         command: "renma graph",
