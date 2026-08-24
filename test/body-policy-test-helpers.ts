@@ -183,27 +183,3 @@ export function assertFactRangesWithinSource(
     assert.ok(fact.evidenceEnd <= source.length);
   }
 }
-
-export function semanticFactProjection(
-  source: string,
-  facts: readonly BodyPolicyClauseFacts[],
-): readonly object[] {
-  return facts.map(
-    ({
-      domain,
-      modality,
-      scope,
-      completeness,
-      evidenceStart,
-      evidenceEnd,
-    }) => ({
-      domain,
-      modality,
-      scope,
-      completeness,
-      evidence: source
-        .slice(evidenceStart, evidenceEnd)
-        .replace(/[ \t]*\n[ \t]*/gu, " "),
-    }),
-  );
-}

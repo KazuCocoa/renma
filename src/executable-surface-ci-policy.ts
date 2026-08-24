@@ -31,9 +31,6 @@ export const EXECUTABLE_SURFACE_CI_MATCH_IDS = {
     "executable_surface_ci.transitive_reachability_added",
 } as const;
 
-export type ExecutableSurfaceCiMatchId =
-  (typeof EXECUTABLE_SURFACE_CI_MATCH_IDS)[keyof typeof EXECUTABLE_SURFACE_CI_MATCH_IDS];
-
 export interface ExecutableSurfaceCiConfiguration {
   from: ExecutableSurfaceCiPolicyMode;
   to: ExecutableSurfaceCiPolicyMode;

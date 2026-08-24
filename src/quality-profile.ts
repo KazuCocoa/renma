@@ -116,5 +116,3 @@ export const DEFAULT_QUALITY_PROFILE = {
     precedingLineFastPath: 2,
   },
 } as const;
-
-export type QualityProfile = typeof DEFAULT_QUALITY_PROFILE;

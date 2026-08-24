@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed five zero-consumer internal declarations: the historical Agent Skill
+  name-validation wrapper, three unused derived types, and one unused body-policy
+  test projection helper.
 - Consolidated internal module ownership by removing cross-owner re-exports
   from metadata parsing, discovery, repository paths, and security diagnostics.
   Internal consumers now import metadata definitions, Skill path contracts,
