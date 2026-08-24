@@ -39,13 +39,18 @@ choose stricter local metadata requirements than Renma's defaults, for example
 This is optional repository policy, not a Renma default or portable Agent
 Skills requirement, and it does not imply multi-repository federation.
 
-## Stabilization Priorities
+## 1.0 Stabilization Baseline
 
-The current stabilization phase prioritizes:
+The implementation phase of the explicit
+[Renma 1.0 stabilization boundary](stabilization-1.0.md) is complete. The 1.0
+baseline now includes:
 
-- applying the explicit [Renma 1.0 stabilization boundary](stabilization-1.0.md),
-  including precision-first local prose analysis, retained shell-family
-  structure, and the stable purpose of the `ci-report` integration;
+- precision-first local prose analysis with retained POSIX shell, PowerShell,
+  and Windows batch structure;
+- the stable, separate purpose of `diff` and the `ci-report` integration, backed
+  by shared repository evidence and diff construction;
+- one active `renma.scan.v2` diagnostics projection and a frozen set of stable
+  release-candidate JSON identities;
 - keeping documentation aligned with executable command, schema, diagnostic,
   path, metadata, ordering, and compatibility contracts;
 - preserving one immutable repository-evidence snapshot per analyzed repository
@@ -65,6 +70,12 @@ The current stabilization phase prioritizes:
   a core contract prematurely;
 - improving maintainability without adding dependencies or broadening runtime
   responsibility.
+
+Remaining 1.0 work is release assurance: exact-commit validation, dependency
+audit refresh, external publication-control review, and version-specific
+release preparation. It is not a new refactoring phase. The candidates below
+remain unassigned and do not enter 1.0 merely because stabilization is
+complete.
 
 ## Open Core Candidates
 

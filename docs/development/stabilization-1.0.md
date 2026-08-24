@@ -1,8 +1,27 @@
 # Renma 1.0 Stabilization Boundary
 
-This document records the decisions that govern the reduction work before
-Renma 1.0. It is a development plan, not a promise that every current
-pre-1.0 output will remain compatible.
+This document records the completed reduction boundary for Renma 1.0. It is a
+stabilization baseline, not a promise that every historical pre-1.0 output is
+compatible.
+
+## Stabilization Status
+
+The planned reduction and internal cleanup are complete as of 2026-08-23. The
+final audit found no remaining test-only production module, pass-through
+facade, unsupported compatibility projection, or duplicated repository
+collection path that must be removed before 1.0.
+
+The reduction did not treat diagnostic count as a simplification target.
+Stable diagnostic identities and their verification remain in place, while
+several prose-only diagnostic paths now use smaller, explicit local-evidence
+rules. Structural POSIX shell, PowerShell, and Windows batch analysis remains
+part of the product boundary. The separate `diff` and `ci-report` workflows
+also remain, with one shared internal repository-diff path.
+
+The remaining 1.0 work is release assurance rather than another product or
+source-architecture phase. New diagnostics, commands, schemas, inference
+coverage, and adjacent ecosystem work require independent scope review and are
+not implied by this baseline.
 
 ## Core Product Responsibility
 
@@ -70,31 +89,54 @@ Producers author one canonical typed diagnostic model. The `renma.scan.v2`
 public document selects that model as its single active `diagnostics` array and
 uses the same shape for `suppressedDiagnostics`. The overlapping pre-1.0
 `findings`, legacy `diagnostics`, and transitional `diagnosticsV2` wire fields
-are no longer serialized. Internal scan working data may remain until the
-post-contract source reorganization; it is not a compatibility projection or
-public producer authority.
+are no longer serialized. Producer-level scan evidence remains explicitly
+internal as `rawDiagnostics`; it is not a compatibility projection or public
+producer authority.
 
-## Implementation Order
+## Completion Record
 
-1. Preserve current public output while separating canonical diagnostics from
-   compatibility serialization.
-2. Reduce prose-only diagnostics to explicit local evidence and advisory
-   severity while retaining command analyzers.
-3. Preserve the `ci-report` integration and remove internal diff/report
-   duplication.
-4. Select the 1.0 JSON contracts and remove obsolete pre-1.0 projections.
-   Completed for scan as `renma.scan.v2`.
-5. Reorganize source directories, serializers, documentation, and tests behind
-   the settled public boundary. Completed for scan: canonical diagnostics now
-   use `ScanResult.diagnostics`, producer-level evidence is explicitly internal
-   as `rawDiagnostics`, and scan normalization is owned by
-   `src/scan-diagnostics.ts`.
-6. Freeze compatibility only for the release-candidate contracts. Completed:
-   stable top-level JSON identities are pinned independently of their producer
-   constants, existing document/schema fixtures remain authoritative, and the
-   experimental execution contract and internal working models stay outside
-   the freeze.
+1. **Canonical diagnostic ownership — complete.** Scan normalization is owned
+   by `src/scan-diagnostics.ts`; `ScanResult.diagnostics` contains normalized
+   diagnostics and producer-level evidence is explicitly internal as
+   `rawDiagnostics`.
+2. **Natural-language analysis boundary — complete.** Prose-only diagnostics
+   use explicit local line or clause evidence and advisory severity, while the
+   structural shell-family analyzers remain intact.
+3. **Shared diff and CI evidence — complete.** `diff` and `ci-report` collect
+   each archived repository state once and derive their distinct user-facing
+   results from the shared snapshot and diff projection.
+4. **1.0 JSON contract selection — complete.** Scan uses `renma.scan.v2`; the
+   obsolete overlapping pre-1.0 scan projections are no longer serialized.
+5. **Post-contract source cleanup — complete.** Single-consumer abstractions,
+   test-only production wrappers, unused declarations, cross-owner re-exports,
+   and unsupported internal compatibility facades were removed. Remaining
+   subsystem entrypoints and small modules have distinct consumers or
+   responsibilities.
+6. **Release-candidate contract freeze — complete.** Stable top-level JSON
+   identities are pinned independently of producer constants, existing
+   document and schema fixtures remain authoritative, and the experimental
+   execution contract and internal working models remain outside the freeze.
 
-Refactoring must follow deletion and contract selection. Renma should not
-first create a cleaner abstraction around behavior that 1.0 does not intend to
-keep.
+Refactoring followed deletion and contract selection; it did not create a new
+abstraction around behavior excluded from the 1.0 boundary.
+
+## Remaining 1.0 Release Gates
+
+Before creating the 1.0 release tag, maintainers must:
+
+- run the full tests, both TypeScript checks, package and public API
+  verification, documentation build, strict self-scan, supported-platform
+  validation, and the maintained release-preparation workflow on the exact
+  release commit;
+- refresh the full and production-only dependency audits and review whether a
+  supported stable VitePress upgrade resolves the documented development-only
+  advisories;
+- verify the external npm Trusted Publisher, GitHub Environment, reviewer,
+  deployment-ref, and release-tag protection described in
+  [Release Publication Security](release-security.md); and
+- prepare the version-specific release metadata through the existing release
+  process without broadening the stabilized product boundary.
+
+The documented VitePress `ES2024` target warning and the observed bundle-size
+warning are non-fatal tooling concerns, not reasons to weaken the supported
+TypeScript target or introduce an incompatible dependency override.
