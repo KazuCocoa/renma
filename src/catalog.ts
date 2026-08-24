@@ -2,7 +2,7 @@ import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import { conflictDiagnostics } from "./catalog-conflicts.js";
 import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
-import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
+import { contextBodyLanguageDiagnostics } from "./context-language.js";
 import {
   DIAGNOSTIC_IDS,
   omitFromCatalogFindings,
