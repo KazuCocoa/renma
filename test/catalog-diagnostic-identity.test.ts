@@ -53,16 +53,12 @@ test("every known metadata diagnostic has a registered code conversion", () => {
       CATALOG_FINDING_DEFINITIONS[code].severity,
     );
     assert.deepEqual(
-      finding[0]?.constraints,
-      CATALOG_FINDING_DEFINITIONS[code].repairConstraints.map(
-        (constraint) => constraint.text,
-      ),
+      finding[0]?.repairConstraints,
+      CATALOG_FINDING_DEFINITIONS[code].repairConstraints,
     );
     assert.deepEqual(
       finding[0]?.verificationSteps,
-      CATALOG_FINDING_DEFINITIONS[code].verificationStepsV2.map(
-        (step) => step.text,
-      ),
+      CATALOG_FINDING_DEFINITIONS[code].verificationSteps,
     );
     assert.deepEqual(
       createScanDiagnostics({ findings: finding, diagnostics: [] }).map(

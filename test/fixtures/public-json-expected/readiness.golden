@@ -370,16 +370,37 @@
       },
       "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, deprecated, or archived.",
       "remediation": "Use one of the supported lifecycle status values: experimental, stable, suspended, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
-      "constraints": [
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Do not silently rewrite metadata during scan.",
-        "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not silently rewrite metadata during scan."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Run any project-specific validation checks that apply to this repository."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Run any project-specific validation checks that apply to this repository."
+        }
       ],
       "llmHint": "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider a deprecated lifecycle status plus a separate supersession reference. Skills use metadata.renma.status and metadata.renma.superseded-by; non-Skills keep status and superseded_by. Pre-0.16 Skill fields are migration input only. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
       "details": {
@@ -407,17 +428,41 @@
       },
       "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
       "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
-      "constraints": [
-        "Do not infer missing boundaries from broad body prose.",
-        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing boundaries from broad body prose."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm shared context assets declare compact positive and negative usage boundaries."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm shared context assets declare compact positive and negative usage boundaries."
+        }
       ],
       "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
       "details": {
@@ -445,17 +490,41 @@
       },
       "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
       "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
-      "constraints": [
-        "Do not infer missing boundaries from broad body prose.",
-        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing boundaries from broad body prose."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm shared context assets declare compact positive and negative usage boundaries."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm shared context assets declare compact positive and negative usage boundaries."
+        }
       ],
       "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
       "details": {
@@ -483,17 +552,41 @@
       },
       "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
       "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
-      "constraints": [
-        "Do not infer missing boundaries from broad body prose.",
-        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing boundaries from broad body prose."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm shared context assets declare compact positive and negative usage boundaries."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm shared context assets declare compact positive and negative usage boundaries."
+        }
       ],
       "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
       "details": {
@@ -521,16 +614,37 @@
       },
       "whyItMatters": "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
       "remediation": "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
-      "constraints": [
-        "Do not select runtime context.",
-        "Do not assemble prompt packages.",
-        "Do not infer missing dependencies with an LLM during scan.",
-        "Only validate declared repository relationships."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not select runtime context."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not assemble prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing dependencies with an LLM during scan."
+        },
+        {
+          "kind": "allowed_change",
+          "text": "Only validate declared repository relationships."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm declared references resolve to known assets."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm declared references resolve to known assets."
+        }
       ],
       "llmHint": "Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved requires reference \"context.unknown\" declared by \"skill.review\". Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
       "details": {
@@ -562,16 +676,37 @@
       },
       "whyItMatters": "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
       "remediation": "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
-      "constraints": [
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Do not automatically rewrite references during scan.",
-        "Preserve compatibility shims when they are intentionally needed."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not automatically rewrite references during scan."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve compatibility shims when they are intentionally needed."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
+        }
       ],
       "llmHint": "Inspect \"contexts/inactive.md\" for a reviewed superseded_by relationship or replacement guidance. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
       "details": {
@@ -597,15 +732,33 @@
       },
       "whyItMatters": "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
       "remediation": "Update the asset metadata so catalog construction can identify the asset and validate declared relationships.",
-      "constraints": [
-        "Do not introduce runtime context resolution.",
-        "Do not create prompt packages.",
-        "Do not silently rewrite metadata during scan."
+      "repairConstraints": [
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not silently rewrite metadata during scan."
+        }
       ],
       "verificationSteps": [
-        "Run renma scan.",
-        "Run renma catalog.",
-        "Run any project-specific validation checks that apply to this repository."
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan"
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Run any project-specific validation checks that apply to this repository."
+        }
       ],
       "llmHint": "Add or correct asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog. Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
       "details": {

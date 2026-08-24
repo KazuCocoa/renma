@@ -4,7 +4,6 @@ import { createHash } from "node:crypto";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, estimatedTokenUnits } from "./token-estimator.js";
-import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type { Finding } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
@@ -131,9 +130,7 @@ export function detectRepeatedContextPatterns(
     ),
   ];
 
-  return findings
-    .map((finding) => projectFindingRepairGuidance(finding))
-    .sort(compareFindings);
+  return findings.sort(compareFindings);
 }
 
 function collectRepeatedSections(documents: ParsedDocument[]): RepeatGroup[] {
@@ -335,7 +332,7 @@ function groupsToFindings(
               text: "Treat this as deterministic evidence, not a semantic source-of-truth decision.",
             },
           ],
-          verificationStepsV2: [
+          verificationSteps: [
             {
               text: "Review all reported occurrences and choose an owned source of truth.",
             },

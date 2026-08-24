@@ -65,7 +65,7 @@ test("scan reports deterministic repeated context patterns", async () => {
   for (const finding of findings) {
     assert.ok(finding.whyItMatters);
     assert.ok(finding.remediation);
-    assert.ok(finding.constraints?.length);
+    assert.ok(finding.repairConstraints?.length);
     assert.ok(finding.verificationSteps?.length);
     assert.ok(finding.llmHint);
     assert.equal("message" in finding, false);

@@ -154,10 +154,14 @@ export function formatText(result: ScanResult): string {
       lines.push(`  evidence: ${finding.evidence.snippet}`);
     lines.push(`  why: ${finding.whyItMatters}`);
     lines.push(`  fix: ${finding.remediation}`);
-    if (finding.constraints && finding.constraints.length > 0)
-      lines.push(`  constraints: ${finding.constraints.join("; ")}`);
+    if (finding.repairConstraints && finding.repairConstraints.length > 0)
+      lines.push(
+        `  constraints: ${finding.repairConstraints.map((item) => item.text).join("; ")}`,
+      );
     if (finding.verificationSteps && finding.verificationSteps.length > 0)
-      lines.push(`  verify: ${finding.verificationSteps.join("; ")}`);
+      lines.push(
+        `  verify: ${finding.verificationSteps.map((item) => item.text).join("; ")}`,
+      );
     if (finding.llmHint) lines.push(`  llm: ${finding.llmHint}`);
   }
 

@@ -7,10 +7,6 @@ import {
   createScanDiagnostics,
   createReviewBundles,
 } from "../src/scan-diagnostics.js";
-import {
-  canonicalFindingRepairGuidance,
-  projectFindingRepairGuidance,
-} from "../src/finding-repair-guidance.js";
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -20,8 +16,8 @@ import type {
   ReviewBundle,
 } from "../src/types/diagnostics.js";
 
-test("typed Finding guidance projects legacy text without prose inference", () => {
-  const finding = projectFindingRepairGuidance({
+test("typed Finding guidance flows directly into scan diagnostics", () => {
+  const finding: Finding = {
     id: "TEST-TYPED-GUIDANCE",
     title: "Typed guidance test",
     category: "maintenance",
@@ -41,29 +37,14 @@ test("typed Finding guidance projects legacy text without prose inference", () =
         text: "Preserve this wording while testing an explicitly different kind.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       {
         text: "Run renma catalog, despite the explicitly authored command.",
         command: "npm test",
         expected: "The authored expectation remains authoritative.",
       },
     ],
-  });
-
-  assert.deepEqual(finding.constraints, [
-    "Preserve this wording while testing an explicitly different kind.",
-  ]);
-  assert.deepEqual(finding.verificationSteps, [
-    "Run renma catalog, despite the explicitly authored command.",
-  ]);
-  assert.deepEqual(
-    canonicalFindingRepairGuidance(finding)?.repairConstraints,
-    finding.repairConstraints,
-  );
-  assert.deepEqual(
-    canonicalFindingRepairGuidance(finding)?.verificationSteps,
-    finding.verificationStepsV2,
-  );
+  };
 
   const [diagnostic] = createScanDiagnostics({
     findings: [finding],
@@ -85,48 +66,16 @@ test("typed Finding guidance projects legacy text without prose inference", () =
   );
 });
 
-test("legacy-only Finding guidance is rejected at the producer boundary", () => {
-  const legacyFinding = {
-    id: "TEST-LEGACY-GUIDANCE",
-    title: "Legacy guidance test",
-    category: "maintenance",
-    severity: "low",
-    confidence: "high",
-    evidence: {
-      path: "contexts/test.md",
-      startLine: 1,
-      endLine: 1,
-      snippet: "test",
-    },
-    whyItMatters: "Legacy prose cannot be the semantic authority.",
-    remediation: "Author typed guidance.",
-    constraints: ["Do not infer a repair kind from this sentence."],
-  } satisfies Finding;
-
-  assert.throws(
-    () => projectFindingRepairGuidance(legacyFinding),
-    /authored legacy repair guidance instead of typed guidance/,
-  );
-});
-
-test("scan Finding legacy arrays cannot drift from canonical typed guidance", async () => {
+test("scan findings expose typed guidance without legacy arrays", async () => {
   const result = await scan(await duplicateContextFixture());
   let guidedFindingCount = 0;
 
   for (const finding of result.findings) {
-    const guidance = canonicalFindingRepairGuidance(finding);
-    if (!guidance) continue;
+    if (!finding.repairConstraints && !finding.verificationSteps) continue;
     guidedFindingCount += 1;
-    assert.deepEqual(
-      finding.constraints,
-      guidance.repairConstraints?.map((constraint) => constraint.text),
-      finding.id,
-    );
-    assert.deepEqual(
-      finding.verificationSteps,
-      guidance.verificationSteps?.map((step) => step.text),
-      finding.id,
-    );
+    assert.equal("constraints" in finding, false, finding.id);
+    assert.ok(finding.repairConstraints?.every((item) => item.text));
+    assert.ok(finding.verificationSteps?.every((item) => item.text));
   }
 
   assert.ok(guidedFindingCount > 0);

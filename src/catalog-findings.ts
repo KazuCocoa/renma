@@ -3,7 +3,6 @@ import {
   isOmittedFromCatalogFindings,
   type DiagnosticId,
 } from "./diagnostic-ids.js";
-import { projectFindingRepairGuidance } from "./finding-repair-guidance.js";
 import type {
   Diagnostic,
   Finding,
@@ -20,7 +19,7 @@ interface CatalogFindingDefinition {
   whyItMatters: string;
   remediation: string;
   repairConstraints: readonly RepairConstraint[];
-  verificationStepsV2: readonly VerificationStep[];
+  verificationSteps: readonly VerificationStep[];
   llmHint: string;
 }
 
@@ -47,7 +46,7 @@ const STATUS_FINDING = {
       text: "Keep lifecycle status separate from provenance, delegation, or replacement relationships.",
     },
   ],
-  verificationStepsV2: [
+  verificationSteps: [
     { text: "Run renma scan.", command: "renma scan" },
     {
       text: "Run renma catalog.",
@@ -85,7 +84,7 @@ const FRESHNESS_FINDING = {
       text: "Do not silently rewrite metadata during scan.",
     },
   ],
-  verificationStepsV2: [
+  verificationSteps: [
     { text: "Run renma scan.", command: "renma scan" },
     {
       text: "Run renma catalog.",
@@ -124,7 +123,7 @@ const METADATA_BUDGET_FINDING = {
       text: "Keep metadata useful for deterministic cataloging, graph checks, readiness checks, and security diagnostics.",
     },
   ],
-  verificationStepsV2: [
+  verificationSteps: [
     { text: "Run renma scan.", command: "renma scan" },
     {
       text: "Run renma catalog.",
@@ -166,7 +165,7 @@ const USAGE_BOUNDARY_FINDING = {
       text: "Keep metadata compact and preserve detailed guidance outside frontmatter.",
     },
   ],
-  verificationStepsV2: [
+  verificationSteps: [
     { text: "Run renma scan.", command: "renma scan" },
     {
       text: "Run renma catalog.",
@@ -202,7 +201,7 @@ const GENERIC_CATALOG_FINDING = {
       text: "Do not silently rewrite metadata during scan.",
     },
   ],
-  verificationStepsV2: [
+  verificationSteps: [
     { text: "Run renma scan.", command: "renma scan" },
     {
       text: "Run renma catalog.",
@@ -261,7 +260,7 @@ const CATALOG_FINDING_DEFINITION_LIST = [
         text: "Do not guess which duplicate declaration was intended.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan.", command: "renma scan" },
       {
         text: "Confirm the frontmatter parses as one YAML mapping without duplicate operational keys.",
@@ -347,7 +346,7 @@ const CATALOG_FINDING_DEFINITION_LIST = [
         text: "Preserve portable Agent Skills validity and use only canonical metadata.renma.* Skill declarations.",
       },
     ],
-    verificationStepsV2: [
+    verificationSteps: [
       { text: "Run renma scan . --format json.", command: "renma scan" },
       {
         text: "Confirm the required field is valid, non-empty, and explicitly declared on the asset.",
@@ -424,38 +423,28 @@ function findingFromCatalogDiagnostic(
   definition: CatalogFindingDefinition,
 ): Finding {
   const definitionRepairConstraints = [...definition.repairConstraints];
-  const definitionVerificationSteps = [...definition.verificationStepsV2];
-  return projectFindingRepairGuidance(
-    {
-      id: definition.code,
-      title: definition.title,
-      category: definition.category,
-      severity: diagnostic.severity === "error" ? "high" : definition.severity,
-      confidence: definition.confidence,
-      evidence: diagnostic.evidence ?? {
-        path: diagnostic.path ?? "(catalog)",
-        startLine: 1,
-        endLine: 1,
-        snippet: diagnostic.message,
-      },
-      whyItMatters: definition.whyItMatters,
-      remediation: definition.remediation,
-      repairConstraints: definitionRepairConstraints,
-      verificationStepsV2: definitionVerificationSteps,
-      llmHint: diagnostic.llmHint ?? definition.llmHint,
-      ...(diagnostic.details ? { details: diagnostic.details } : {}),
+  const definitionVerificationSteps = [...definition.verificationSteps];
+  return {
+    id: definition.code,
+    title: definition.title,
+    category: definition.category,
+    severity: diagnostic.severity === "error" ? "high" : definition.severity,
+    confidence: definition.confidence,
+    evidence: diagnostic.evidence ?? {
+      path: diagnostic.path ?? "(catalog)",
+      startLine: 1,
+      endLine: 1,
+      snippet: diagnostic.message,
     },
-    {
-      legacyRepairConstraints: definitionRepairConstraints,
-      legacyVerificationSteps: definitionVerificationSteps,
-      ...(diagnostic.repairConstraints
-        ? { repairConstraints: diagnostic.repairConstraints }
-        : {}),
-      ...(diagnostic.verificationSteps
-        ? { verificationStepsV2: diagnostic.verificationSteps }
-        : {}),
-    },
-  );
+    whyItMatters: definition.whyItMatters,
+    remediation: definition.remediation,
+    repairConstraints:
+      diagnostic.repairConstraints ?? definitionRepairConstraints,
+    verificationSteps:
+      diagnostic.verificationSteps ?? definitionVerificationSteps,
+    llmHint: diagnostic.llmHint ?? definition.llmHint,
+    ...(diagnostic.details ? { details: diagnostic.details } : {}),
+  };
 }
 
 function definitionRegistry<
