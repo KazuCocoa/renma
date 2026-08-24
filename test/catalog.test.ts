@@ -4,7 +4,7 @@ import test from "node:test";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("parseAssetMetadata normalizes supported frontmatter", () => {

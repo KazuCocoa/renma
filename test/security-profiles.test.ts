@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Artifact, SecurityConfig } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
+import type { SecurityConfig } from "../src/types/configuration.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const baseSecurityConfig: SecurityConfig = {

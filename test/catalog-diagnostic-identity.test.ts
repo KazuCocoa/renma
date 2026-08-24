@@ -22,7 +22,8 @@ import {
   CATALOG_FINDING_DIAGNOSTIC_CODES as SCANNER_CATALOG_FINDING_DIAGNOSTIC_CODES,
   catalogDiagnosticFindings as scannerCatalogDiagnosticFindings,
 } from "../src/scanner.js";
-import type { Artifact, ArtifactKind, Diagnostic } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
+import type { Diagnostic } from "../src/types/diagnostics.js";
 
 test("catalog Finding classification is invariant under diagnostic wording", () => {
   for (const code of CATALOG_FINDING_DIAGNOSTIC_CODES) {

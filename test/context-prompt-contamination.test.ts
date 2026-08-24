@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 
 test("buildCatalog warns when canonical context contains role-prompt wording", () => {
   const result = buildCatalog([

@@ -10,7 +10,7 @@ import {
   helperScriptPath,
   resolveHelperScriptPath,
 } from "../src/repository-paths.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 
 test("collectRepositoryPaths normalizes repo paths without resolving traversal outside the snapshot root", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-paths-"));

@@ -17,7 +17,7 @@ import {
   SECURITY_METADATA_FIELD_DEFINITIONS,
 } from "../src/metadata-definitions.js";
 import { resolveOperationalSecurityPolicy } from "../src/security-policy.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 
 const PORTABLE_START_MARKER = "<!-- agent-skills-portable-fields:start -->";
 const PORTABLE_END_MARKER = "<!-- agent-skills-portable-fields:end -->";

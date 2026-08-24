@@ -8,11 +8,11 @@ import { main } from "../src/cli.js";
 import { loadConfig } from "../src/config.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import { securityProfileChain } from "../src/security-policy.js";
+import type { Artifact } from "../src/types/artifact.js";
 import type {
-  Artifact,
   SecurityConfig,
   SecurityProfileConfig,
-} from "../src/types.js";
+} from "../src/types/configuration.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const PROTOTYPE_PROPERTY_NAMES = [

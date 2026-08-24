@@ -11,7 +11,8 @@ import {
   markdownBodyStartLine,
   markdownSyntaxForDocument,
 } from "../src/markdown-syntax.js";
-import type { Artifact, ParsedDocument } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
+import type { ParsedDocument } from "../src/types/metadata.js";
 import { parseAgentSkillFrontmatter } from "../src/yaml-frontmatter.js";
 
 test("parseDocument preserves the complete established Markdown projection", () => {

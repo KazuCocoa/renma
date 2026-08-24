@@ -9,11 +9,11 @@ import { promisify } from "node:util";
 import { main } from "../src/cli.js";
 import { buildSecurityPolicyChanges } from "../src/security-policy-diff.js";
 import { collectSecurityPolicyAssetEvidence } from "../src/security-policy-inventory.js";
+import type { Artifact } from "../src/types/artifact.js";
 import type {
-  Artifact,
   SecurityConfig,
   SecurityProfileConfig,
-} from "../src/types.js";
+} from "../src/types/configuration.js";
 
 const execFile = promisify(execFileCallback);
 

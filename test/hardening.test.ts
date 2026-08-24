@@ -14,7 +14,7 @@ import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import { zeroSecurityPolicyInventorySummary } from "../src/security-policy-inventory.js";
 import { zeroSecurityPostureSummary } from "../src/security-posture.js";
-import type { Finding } from "../src/types.js";
+import type { Finding } from "../src/types/diagnostics.js";
 
 test("removed layout config exits with caller-correctable guidance", async () => {
   const cases = [

@@ -20,7 +20,7 @@ import {
   projectShellContinuations,
   projectionSpanToSourceSpan,
 } from "../src/security-destination/logical-shell.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 import { SECURITY_DESTINATION_CASES } from "./fixtures/security-destination-cases.js";
 
 const destinationProjection = (

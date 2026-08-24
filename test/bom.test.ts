@@ -23,7 +23,7 @@ import {
   collectRepositorySnapshot,
 } from "../src/repository-evidence.js";
 import { scanFromRepositorySnapshot } from "../src/scanner.js";
-import type { ScanResult } from "../src/types.js";
+import type { ScanResult } from "../src/types/scan-result.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 

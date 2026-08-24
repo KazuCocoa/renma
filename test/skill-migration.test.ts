@@ -8,7 +8,7 @@ import { validateAgentSkill } from "../src/agent-skills.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
 import { parseDocument } from "../src/markdown.js";
 import { buildAgentSkillMigrationSuggestion } from "../src/skill-migration.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 
 test("suggest-metadata proposes a one-way legacy-to-Agent-Skills conversion", async () => {
   const { target, original } = await skillFixture(

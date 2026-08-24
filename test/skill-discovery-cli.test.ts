@@ -22,7 +22,7 @@ import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { scan } from "../src/scanner.js";
 import { SKILL_DISCOVERY_CI_POLICY_MATCH_IDS } from "../src/skill-discovery-ci-policy.js";
-import type { DiagnosticV2 } from "../src/types.js";
+import type { DiagnosticV2 } from "../src/types/diagnostics.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
 test("graph --view discovery JSON exposes the dedicated route contract", async (t) => {

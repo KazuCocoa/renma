@@ -14,7 +14,11 @@ import {
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
-import type { DiagnosticV2, Finding, ReviewBundle } from "../src/types.js";
+import type {
+  DiagnosticV2,
+  Finding,
+  ReviewBundle,
+} from "../src/types/diagnostics.js";
 
 test("typed Finding guidance projects legacy text without prose inference", () => {
   const finding = projectFindingRepairGuidance({

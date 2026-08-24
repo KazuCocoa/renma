@@ -16,7 +16,8 @@ import {
   resolveSkillDiscoveryRouteCycles,
   type DeclaredSkillRoute,
 } from "../src/skill-discovery.js";
-import type { Artifact, ArtifactKind, ParsedDocument } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
+import type { ParsedDocument } from "../src/types/metadata.js";
 
 test("Skill Discovery resolves exact IDs and repository-relative paths", () => {
   const documents = [

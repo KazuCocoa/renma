@@ -19,7 +19,8 @@ import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import { scan } from "../src/scanner.js";
 import { prepareSkillDiscoveryIndex } from "../src/skill-discovery.js";
-import type { Artifact, ArtifactKind, ParsedDocument } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
+import type { ParsedDocument } from "../src/types/metadata.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
 const SUSPENSION_REASON =

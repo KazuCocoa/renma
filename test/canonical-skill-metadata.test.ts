@@ -13,7 +13,7 @@ import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import { scanFromRepositorySnapshot } from "../src/scanner.js";
 import { parseOperationalSecurityPolicy } from "../src/security-policy.js";
 import { buildTrustGraph } from "../src/trust-graph.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 
 test("canonical Skill metadata normalizes every governance field", () => {
   const document = skillDocument(`---

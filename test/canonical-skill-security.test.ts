@@ -9,7 +9,8 @@ import {
   parseOperationalSecurityPolicy,
   resolveOperationalSecurityPolicy,
 } from "../src/security-policy.js";
-import type { Artifact, SecurityConfig } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
+import type { SecurityConfig } from "../src/types/configuration.js";
 
 test("canonical Skill security metadata normalizes every policy field with exact evidence", () => {
   const document = skillDocument(`---
