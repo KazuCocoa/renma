@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Simplified the security-destination subsystem entrypoint so bindings used
+  only for forwarding are re-exported directly from their owners. The cohesive
+  entrypoint and all destination-analysis consumers remain unchanged.
 - Moved the public JSON schema inventory from production commands to test
   support, its only consumer. Compatibility tests still derive every identifier
   from its runtime owner, while the unused production module is no longer built
