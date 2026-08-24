@@ -16,6 +16,7 @@ import {
   type ContextLensSummary,
 } from "./context-lens.js";
 import {
+  classifyAssetPath,
   discoverArtifacts,
   inspectExplicitRepositoryArtifacts,
   type ExplicitArtifactInspectionResult,
@@ -28,8 +29,8 @@ import {
   collectExecutableDependencyCandidates,
   type ExecutableDependencyCandidate,
 } from "./executable-dependency-analyzer.js";
-import { buildClassificationEvidenceIndex } from "./evidence/classification.js";
 import { parseDocument } from "./markdown.js";
+import { parseAssetMetadata } from "./metadata.js";
 import type { Catalog } from "./model.js";
 import {
   collectRepositoryPaths,
@@ -689,6 +690,22 @@ function createRepositoryProjections(
     securityPolicies,
     contextLens,
   };
+}
+
+function buildClassificationEvidenceIndex(
+  documents: ParsedDocument[],
+): ReadonlyMap<string, KnownAssetClassificationEvidence> {
+  return new Map(
+    documents.map((document) => {
+      const metadata = parseAssetMetadata(document).metadata;
+      return [
+        document.artifact.path,
+        classifyAssetPath(document.artifact.path, {
+          ...(metadata.type ? { metadataType: metadata.type } : {}),
+        }),
+      ];
+    }),
+  );
 }
 
 function createRepositorySnapshot(

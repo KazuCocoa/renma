@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed the final internal dependency-layer exception by keeping the
+  single-use classification index projection inside repository snapshot
+  construction instead of a higher-layer evidence module.
 - Removed the unused internal `src/types.ts` compatibility facade and updated
   tests to import cohesive type owners directly. The supported `renma/types`
   package export remains owned by `src/public-types.ts` and is unchanged.

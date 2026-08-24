@@ -44,12 +44,6 @@ interface ArchitectureResult {
   violations: DependencyViolation[];
 }
 
-interface DependencyException {
-  importingFile: string;
-  targetPath: string;
-  reason: string;
-}
-
 // Directory-owned layers classify new files automatically. Top-level modules
 // remain explicit because their historical flat layout does not encode a layer.
 const DIRECTORY_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
@@ -130,7 +124,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "scaffold-placeholders.ts",
         "security-identifier-integrity.ts",
         "skill-path-contract.ts",
-        "types.ts",
         "unicode-primitives.ts",
       ],
     ),
@@ -222,17 +215,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "index.ts",
     ]),
   ]);
-
-// These edges are compatibility seams, not new direction. Each exception names
-// one exact source and target and must be deleted when the seam is removed.
-const DEPENDENCY_EXCEPTIONS: readonly DependencyException[] = [
-  {
-    importingFile: "src/repository-evidence.ts",
-    targetPath: "src/evidence/classification.ts",
-    reason:
-      "snapshot construction owns the reusable classification index at its established deep-import path",
-  },
-];
 
 const COMMAND_COMPATIBILITY_REEXPORTS = [
   {
@@ -494,11 +476,7 @@ function inspectArchitecture(
       const targetClassification = classifySourceFile(dependency.targetPath);
       if (!targetClassification) continue;
       if (
-        canDependOn(
-          importingClassification.layer,
-          targetClassification.layer,
-        ) ||
-        isDependencyException(importingFile, dependency.targetPath)
+        canDependOn(importingClassification.layer, targetClassification.layer)
       ) {
         continue;
       }
@@ -532,18 +510,6 @@ function classifySourceFile(filePath: string): LayerClassification | undefined {
 
 function canDependOn(importingLayer: Layer, targetLayer: Layer): boolean {
   return LAYERS.indexOf(targetLayer) <= LAYERS.indexOf(importingLayer);
-}
-
-function isDependencyException(
-  importingFile: string,
-  targetPath: string,
-): boolean {
-  return DEPENDENCY_EXCEPTIONS.some(
-    (exception) =>
-      exception.importingFile === importingFile &&
-      exception.targetPath === targetPath &&
-      exception.reason.length > 0,
-  );
 }
 
 function readRelativeDependencies(
