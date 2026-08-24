@@ -10,7 +10,6 @@ import type {
   DestinationAnalysis,
   LogicalShellCommand,
   NetworkDestination,
-  ResolvedDestinationEvidence,
   ShellProjection,
 } from "./types.js";
 

@@ -53,7 +53,7 @@ test("canonical Skill-local support remains valid", async () => {
   const root = await fixture("renma-layout-generic-");
   await writeSkillSupport(root, "setup", "Demo");
 
-  const report = await scan(root);
+  await scan(root);
 });
 
 test("readiness markdown limits findings while JSON stays complete", () => {

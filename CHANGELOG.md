@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Enabled TypeScript's unused-local and unused-parameter checks across source
+  and tests, and removed the nine unused imports, locals, parameters, and test
+  helpers they exposed. Runtime behavior and test coverage remain unchanged.
 - Removed the remaining cross-owner internal type re-exports from executable
   inventory, body-policy clause analysis, and security-command working types.
   Consumers now import those contracts from their defining modules; intentional

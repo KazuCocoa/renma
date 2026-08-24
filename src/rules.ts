@@ -1010,7 +1010,6 @@ function secretFindings(document: ParsedDocument): Finding[] {
         "Private key material appears in repository text",
         "safety",
         "critical",
-        document,
         "Remove the key, rotate it if real, and keep only setup instructions or placeholders.",
         { riskClass: "violation" },
       );
@@ -1021,7 +1020,6 @@ function secretFindings(document: ParsedDocument): Finding[] {
         "Literal credential-like value appears in repository text",
         "safety",
         "high",
-        document,
         "Move secrets to user-approved inputs or a secret manager, and keep only placeholders in repository files.",
         { riskClass: "violation" },
       );
@@ -1039,7 +1037,6 @@ function commandFindings(document: ParsedDocument): Finding[] {
         "Remote command example uses unsafe default",
         "safety",
         "medium",
-        document,
         "Avoid production placeholders, insecure transport flags, and pipe-to-shell patterns unless paired with verification and confirmation.",
         { riskClass: "suspicious" },
       );
@@ -1050,7 +1047,6 @@ function commandFindings(document: ParsedDocument): Finding[] {
         "Command may pass broad environment into subprocess execution",
         "safety",
         "medium",
-        document,
         "Pass only required environment variables to subprocesses and avoid forwarding secrets by default.",
         { riskClass: "suspicious" },
       );
@@ -3284,7 +3280,7 @@ function findingAt(
   details: FindingDetails = {},
 ): Finding {
   return {
-    ...finding(id, title, category, severity, document, remediation, details),
+    ...finding(id, title, category, severity, remediation, details),
     evidence: evidence(document, line, snippet),
     remediation,
   };
@@ -3307,7 +3303,6 @@ function finding(
   title: string,
   category: Finding["category"],
   severity: Severity,
-  document: ParsedDocument,
   remediation: string,
   details: FindingDetails = {},
 ): Omit<Finding, "evidence" | "remediation"> & { remediation: string } {

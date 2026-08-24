@@ -573,16 +573,6 @@ function mappingIdentity(mapping: ExpectedMetadataMapping): string {
   return `${mapping.skillKey ?? "—"} -> ${mapping.nonSkillKey ?? "—"}`;
 }
 
-function rowFor(
-  rows: DocumentedMetadataRow[],
-  field: "skillKey" | "nonSkillKey",
-  key: string,
-): DocumentedMetadataRow {
-  const row = rows.find((candidate) => candidate[field] === key);
-  assert.ok(row, `missing documented row for ${key}`);
-  return row;
-}
-
 function occurrences(value: string, needle: string): number {
   return value.split(needle).length - 1;
 }

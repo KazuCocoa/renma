@@ -143,7 +143,6 @@ test("primary CI preserves LTS quality and adds exact-floor compatibility", () =
 
   const quality = workflow.jobs?.["lint-format-and-test"];
   assert.equal(quality?.name, "ESLint, Prettier, and Tests");
-  const qualitySteps = steps(quality);
   assert.equal(
     actionStep(quality, "actions/setup-node")?.with?.["node-version"],
     "lts/*",
@@ -503,7 +502,6 @@ test("npm publishing verifies the exact release ref before OIDC publication", ()
     ),
     "OIDC publication must depend on tag and metadata verification",
   );
-  const publishSteps = steps(publish);
   assert.equal(
     actionStep(publish, "actions/setup-node")?.with?.["node-version"],
     "lts/*",

@@ -7,7 +7,6 @@ import test from "node:test";
 import { formatJson, toScanJsonDocument } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import {
-  SCAN_JSON_SCHEMA_VERSION,
   type ScanJsonDocument,
   type ScanResult,
 } from "../src/types/scan-result.js";
