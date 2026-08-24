@@ -7,11 +7,9 @@ import { test } from "node:test";
 import { main } from "../src/cli.js";
 import { renmaCommand } from "../src/command-invocation.js";
 import { buildInspectOutline } from "../src/commands/inspect.js";
-import {
-  buildMetadataSuggestion,
-  renderMetadataPrompt,
-} from "../src/commands/suggest-metadata.js";
+import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
+import type { MetadataSuggestion } from "../src/decisions/metadata-suggestion.js";
 import {
   classifyAssetPath,
   discoverArtifacts,
@@ -19,7 +17,7 @@ import {
   repositoryClassificationPath,
 } from "../src/discovery.js";
 import { scan } from "../src/scanner.js";
-import type { MetadataSuggestion } from "../src/commands/suggest-metadata.js";
+import { renderMetadataPrompt } from "../src/renderers/metadata-suggestion.js";
 
 test("shared asset classifier locks documented precedence and boundaries", () => {
   const cases = [

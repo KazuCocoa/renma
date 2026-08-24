@@ -216,27 +216,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
     ]),
   ]);
 
-const COMMAND_COMPATIBILITY_REEXPORTS = [
-  {
-    commandFile: "src/commands/inspect.ts",
-    targetPath: "src/evidence/inspect.ts",
-    names: [
-      "InspectAssetSummary",
-      "InspectOutline",
-      "InspectRelationship",
-      "InspectRelationshipChain",
-      "InspectSlice",
-    ],
-    reason: "preserve the established command-module deep-import type contract",
-  },
-  {
-    commandFile: "src/commands/suggest-metadata.ts",
-    targetPath: "src/decisions/metadata-suggestion.ts",
-    names: ["BlockedMetadata", "MetadataSuggestion"],
-    reason: "preserve established suggestion result deep imports",
-  },
-] as const;
-
 test("every production TypeScript module belongs to exactly one layer", async () => {
   const fixtures = await readProductionFixtures();
   const result = inspectArchitecture(fixtures);
@@ -262,34 +241,6 @@ test("internal source dependencies point toward the same or lower layers", async
         ),
       ].join("\n"),
     );
-  }
-});
-
-test("command compatibility re-exports are exact and documented", async () => {
-  const fixtures = await readProductionFixtures();
-  const byPath = new Map(
-    fixtures.map((fixture) => [fixture.filePath, fixture]),
-  );
-  for (const compatibility of COMMAND_COMPATIBILITY_REEXPORTS) {
-    assert.ok(compatibility.reason.length > 0);
-    const fixture = byPath.get(compatibility.commandFile);
-    assert.ok(fixture, compatibility.commandFile);
-    const dependency = readRelativeDependencies(
-      compatibility.commandFile,
-      fixture.sourceText,
-      new Set(byPath.keys()),
-    ).find(
-      (candidate) =>
-        candidate.targetPath === compatibility.targetPath &&
-        candidate.kind === "type-re-export",
-    );
-    assert.ok(
-      dependency,
-      `${compatibility.commandFile} must retain its documented type re-export from ${compatibility.targetPath}`,
-    );
-    for (const name of compatibility.names) {
-      assert.match(fixture.sourceText, new RegExp(`\\b${name}\\b`));
-    }
   }
 });
 

@@ -63,10 +63,9 @@ new unclassified `src/**/*.ts` file fails CI. Runtime imports, type-only
 imports, and re-exports all count as dependencies; lateral imports within one
 layer are valid.
 
-The dependency direction has no exceptions. Internal type re-exports from
-`src/commands/inspect.ts` and `src/commands/suggest-metadata.ts` are listed and
-checked exactly rather than allowing command modules to re-export arbitrary
-lower-layer contracts; those command modules are not package exports.
+The dependency direction has no exceptions. Commands consume result types and
+renderers from their lower-layer owners without re-exporting those internal
+contracts from command modules.
 
 ## Repository-Required Metadata Policy
 

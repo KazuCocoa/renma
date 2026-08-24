@@ -11,7 +11,7 @@ import type {
   InspectRelationship,
   InspectRelationshipChain,
   InspectSlice,
-} from "../src/commands/inspect.js";
+} from "../src/evidence/inspect.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
 import {
   collectTargetDocumentEvidence,
