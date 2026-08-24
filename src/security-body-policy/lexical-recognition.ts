@@ -15,18 +15,18 @@ import type {
 
 /** Bounded lexical forms only; semantic eligibility remains in clause-facts. */
 export const NETWORK_SUBJECT = String.raw`(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?`;
-export const UPLOAD_SUBJECT = String.raw`(?:external\s+)?uploads?`;
-export const SECRET_ACCESS_SUBJECT = String.raw`(?:(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)|${BODY_SECRET_TARGET_TERMS})`;
+const UPLOAD_SUBJECT = String.raw`(?:external\s+)?uploads?`;
+const SECRET_ACCESS_SUBJECT = String.raw`(?:(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)|${BODY_SECRET_TARGET_TERMS})`;
 export const SECRET_EVIDENCE = String.raw`(?<![A-Za-z0-9_])(?:${BODY_SECRET_TARGET_TERMS})\b`;
-export const MODAL_WORD = String.raw`(?:must|shall|will|should|would|may|might|can|could)`;
-export const MODAL_NEVER = String.raw`${MODAL_WORD}[ \t]+never`;
-export const MODAL_NOT = String.raw`${MODAL_WORD}[ \t]+not`;
-export const MODAL_NEGATION_RE = new RegExp(
+const MODAL_WORD = String.raw`(?:must|shall|will|should|would|may|might|can|could)`;
+const MODAL_NEVER = String.raw`${MODAL_WORD}[ \t]+never`;
+const MODAL_NOT = String.raw`${MODAL_WORD}[ \t]+not`;
+const MODAL_NEGATION_RE = new RegExp(
   String.raw`\b(?<modal>must|shall|will|should|would|may|might|can|could)[ \t]+(?:(?<never>never)\b|not\b(?<after>[^.!?\n]{0,48}))`,
   "i",
 );
-export const FINITE_EXTERNAL_UPLOAD_ACTION = String.raw`(?:uploads|sends|posts|shares|attaches|submits|syncs|pushes|publishes)`;
-export const FINITE_SECRET_ACTION = String.raw`(?:accesses|reads|loads|uses|accepts|handles)`;
+const FINITE_EXTERNAL_UPLOAD_ACTION = String.raw`(?:uploads|sends|posts|shares|attaches|submits|syncs|pushes|publishes)`;
+const FINITE_SECRET_ACTION = String.raw`(?:accesses|reads|loads|uses|accepts|handles)`;
 
 export const DOMAIN_EVIDENCE_PATTERNS = {
   network:
@@ -174,12 +174,12 @@ export const GENERIC_PROHIBITION_PATTERNS = {
 
 export const NO_ALLOWANCE_SUFFIX_RE =
   /^[ \t]+(?:is|are|was|were)[ \t]+(?:allowed|permitted|available)\b/i;
-export const SCOPE_QUALIFIER_PREFIX = String.raw`[ \t]+(?:for|throughout|during|within|in)[ \t]+`;
+const SCOPE_QUALIFIER_PREFIX = String.raw`[ \t]+(?:for|throughout|during|within|in)[ \t]+`;
 export const WORKFLOW_SCOPE_QUALIFIER_RE = new RegExp(
   String.raw`^${SCOPE_QUALIFIER_PREFIX}${WORKFLOW_SCOPE_TERMS}\b`,
   "i",
 );
-export const LOCAL_SCOPE_TERMS = String.raw`(?:local[ \t]+(?:setup|installation|validation|run|mode|step|phase|command)|(?:(?:this|the|a|an)[ \t]+)?(?:setup|installation|validation|command|step|phase)(?:[ \t]+(?:step|phase))?)`;
+const LOCAL_SCOPE_TERMS = String.raw`(?:local[ \t]+(?:setup|installation|validation|run|mode|step|phase|command)|(?:(?:this|the|a|an)[ \t]+)?(?:setup|installation|validation|command|step|phase)(?:[ \t]+(?:step|phase))?)`;
 export const LOCAL_SCOPE_QUALIFIER_RE = new RegExp(
   String.raw`^${SCOPE_QUALIFIER_PREFIX}${LOCAL_SCOPE_TERMS}\b`,
   "i",
@@ -210,12 +210,12 @@ export const PROHIBITION_PREDICATE_RE = new RegExp(
   String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|${MODAL_NOT}|never|does[ \t]+not|cannot|can't|not[ \t]+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has[ \t]+to|needs[ \t]+to)[ \t]+(?:run|operate|work)(?:[ \t]+without)?|keep|run|operate)\b`,
   "gi",
 );
-export const STATEMENT_SHORT_MODIFIER = String.raw`(?:also|still|therefore|always|explicitly|directly|strictly|categorically)`;
-export const SUBJECTLESS_AUXILIARY_HEAD = String.raw`(?:is|are|was|were|has|have|had|does|do|did|will|would|shall|should|can|could|may|might|must|cannot|can't|needs|requires)`;
-export const SUBJECTLESS_ORDINARY_VERB_HEAD = String.raw`(?:accepts?|adapts?|analyzes?|applies|audits?|builds?|checks?|classifies|collects?|compares?|compiles?|completes?|configures?|creates?|detects?|documents?|emits?|evaluates?|executes?|generates?|handles?|inspects?|loads?|logs?|maps?|normalizes?|parses?|prepares?|processes|produces?|reads?|records?|reports?|resolves?|reviews?|runs?|scans?|selects?|stores?|summarizes?|tracks?|transforms?|updates?|uses?|validates?|verifies|writes?)`;
-export const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|no|without|don't|keep|operates?|works?|access(?:es)?|attach(?:es)?|handles?|loads?|posts?|publish(?:es)?|push(?:es)?|reads?|sends?|shares?|submits?|syncs?|uploads?|uses?)`;
-export const SUBJECTLESS_PREDICATE_HEAD = String.raw`(?:${SUBJECTLESS_AUXILIARY_HEAD}|${SUBJECTLESS_ORDINARY_VERB_HEAD}|${SUBJECTLESS_POLICY_VERB_HEAD})`;
-export const SUBJECTLESS_PREDICATE_PREFIX = String.raw`(?:[ \t]*(?:,[ \t]*)?)(?:(?:it|${STATEMENT_SHORT_MODIFIER})[ \t]+){0,4}`;
+const STATEMENT_SHORT_MODIFIER = String.raw`(?:also|still|therefore|always|explicitly|directly|strictly|categorically)`;
+const SUBJECTLESS_AUXILIARY_HEAD = String.raw`(?:is|are|was|were|has|have|had|does|do|did|will|would|shall|should|can|could|may|might|must|cannot|can't|needs|requires)`;
+const SUBJECTLESS_ORDINARY_VERB_HEAD = String.raw`(?:accepts?|adapts?|analyzes?|applies|audits?|builds?|checks?|classifies|collects?|compares?|compiles?|completes?|configures?|creates?|detects?|documents?|emits?|evaluates?|executes?|generates?|handles?|inspects?|loads?|logs?|maps?|normalizes?|parses?|prepares?|processes|produces?|reads?|records?|reports?|resolves?|reviews?|runs?|scans?|selects?|stores?|summarizes?|tracks?|transforms?|updates?|uses?|validates?|verifies|writes?)`;
+const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|no|without|don't|keep|operates?|works?|access(?:es)?|attach(?:es)?|handles?|loads?|posts?|publish(?:es)?|push(?:es)?|reads?|sends?|shares?|submits?|syncs?|uploads?|uses?)`;
+const SUBJECTLESS_PREDICATE_HEAD = String.raw`(?:${SUBJECTLESS_AUXILIARY_HEAD}|${SUBJECTLESS_ORDINARY_VERB_HEAD}|${SUBJECTLESS_POLICY_VERB_HEAD})`;
+const SUBJECTLESS_PREDICATE_PREFIX = String.raw`(?:[ \t]*(?:,[ \t]*)?)(?:(?:it|${STATEMENT_SHORT_MODIFIER})[ \t]+){0,4}`;
 export const ORDINARY_STATEMENT_SEPARATOR_RE =
   /(?:,[ \t]*and\b|[ \t]+and\b|,)(?=[ \t]+)/gi;
 export const INHERITED_STATEMENT_SEPARATOR_RE = new RegExp(

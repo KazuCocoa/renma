@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Narrowed body-policy lexical exports to the completed patterns and
+  recognizers used by neighboring analyzers. Regex vocabulary fragments used
+  only to assemble those patterns now remain private to their owner module;
+  diagnostic behavior is unchanged.
 - Narrowed internal security-command dependencies to import destination
   analysis functions and types from their owning modules instead of routing
   through the security-destination subsystem entrypoint. Public exports and
