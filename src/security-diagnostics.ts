@@ -5338,8 +5338,6 @@ function semanticInstructionDetections(
     }
   }
 
-  const instructionText = instructionLines.join(" ");
-
   for (const [lineIndex, line] of instructionLines.entries()) {
     if (
       !RECURSIVE_EXTERNAL_TRAVERSAL_RE.test(line) ||

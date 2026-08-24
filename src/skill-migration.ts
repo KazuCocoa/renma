@@ -124,7 +124,7 @@ export function buildAgentSkillMigrationSuggestion(
   const candidateAgentSkillsFields: Record<string, string> = {};
   const candidateRenmaMetadata: Record<string, string> = {};
   const preservedMetadata: Record<string, string> = {};
-  collectStructuralBlocks(document, frontmatter, blocked);
+  collectStructuralBlocks(frontmatter, blocked);
   const duplicateTopLevelMetadata = frontmatter.duplicateFields.some(
     (field) => field.key === AGENT_SKILL_TOP_LEVEL_KEYS.metadata,
   );
@@ -456,7 +456,6 @@ function validateMigrationCandidate(
 }
 
 function collectStructuralBlocks(
-  document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
   blocked: SkillMigrationBlock[],
 ): void {
