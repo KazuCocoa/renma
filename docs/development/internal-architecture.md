@@ -65,7 +65,9 @@ layer are valid.
 
 The dependency direction has no exceptions. Commands consume result types and
 renderers from their lower-layer owners without re-exporting those internal
-contracts from command modules.
+contracts from command modules. Command- and CLI-local option types, formatter
+inputs, intermediate DTOs, and internal error classes remain module-private
+unless another source module has a concrete consumer.
 
 ## Repository-Required Metadata Policy
 

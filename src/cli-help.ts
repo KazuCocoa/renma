@@ -12,7 +12,7 @@ export interface CommandHelp {
   options: readonly CommandOptionHelp[];
 }
 
-export type CommandOptionHelp =
+type CommandOptionHelp =
   | CliOptionName
   | {
       name: CliOptionName;

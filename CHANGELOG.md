@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Made 63 command- and CLI-local types module-private after verifying that they
+  have no cross-file consumers. Cross-module command contracts and every public
+  package entrypoint remain unchanged.
 - Narrowed the internal runtime surface by making 33 helpers module-private
   after verifying that they have no cross-file consumers. Public package
   entrypoints, schema identities, and type contracts remain unchanged.

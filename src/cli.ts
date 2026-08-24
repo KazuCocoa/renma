@@ -95,7 +95,7 @@ const COMMAND_DEFAULT_FORMATS = {
   "suggest-semantic-split": "prompt",
 } as const satisfies Partial<Record<CommandName, string>>;
 
-export interface CommandContract {
+interface CommandContract {
   minPositionals: number;
   maxPositionals: number;
   missingPositionalsMessage?: string;

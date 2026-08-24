@@ -32,13 +32,13 @@ import { frontmatterRangeForArtifact } from "../frontmatter-envelope.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
-export type InspectFormat = "json" | "text";
+type InspectFormat = "json" | "text";
 export const INSPECT_OUTLINE_JSON_SCHEMA_VERSION =
   "renma.inspect-outline.v1" as const;
 export const INSPECT_SLICE_JSON_SCHEMA_VERSION =
   "renma.inspect-slice.v1" as const;
 
-export interface InspectOptions {
+interface InspectOptions {
   format?: InspectFormat;
   lines?: string;
 }

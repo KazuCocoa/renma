@@ -4,10 +4,10 @@ import {
   renderSkillGuidePrompt,
 } from "../renderers/guide.js";
 
-export type GuideTopic = "skill";
-export type GuideFormat = "prompt" | "json";
+type GuideTopic = "skill";
+type GuideFormat = "prompt" | "json";
 
-export interface GuideOptions {
+interface GuideOptions {
   topic: GuideTopic;
   format: GuideFormat;
   renmaVersion: string;

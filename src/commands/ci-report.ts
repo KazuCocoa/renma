@@ -83,10 +83,10 @@ import {
 } from "../metadata-policy-ci-policy.js";
 import { REQUIRED_METADATA_CONFIGURATION_KEY } from "../metadata-definitions.js";
 
-export type CiReportFormat = DiffFormat;
+type CiReportFormat = DiffFormat;
 export const CI_REPORT_JSON_SCHEMA_VERSION = "renma.ci-report.v1" as const;
-export type CiReportStatus = "pass" | "warn" | "fail";
-export type CiReportFailureThreshold = "fail" | "warn";
+type CiReportStatus = "pass" | "warn" | "fail";
+type CiReportFailureThreshold = "fail" | "warn";
 type CiCompatibleExecutableSurfaceDiff = Omit<
   ExecutableSurfaceDiff,
   | "newInvocationsWithMultipleEffectivePolicyFingerprints"
@@ -117,7 +117,7 @@ type CiFormatCompatibleDiffReport = Omit<
 > & {
   executableSurface: CiCompatibleExecutableSurfaceDiff;
 };
-export type CiCompatibleDiffReport = DiffReportWithoutSkillDiscovery;
+type CiCompatibleDiffReport = DiffReportWithoutSkillDiscovery;
 
 export interface CiReport {
   root: string;

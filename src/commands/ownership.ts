@@ -11,10 +11,10 @@ import { formatVersionedJsonDocument } from "../report.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 import type { AssetOwnership } from "../types/governance.js";
 
-export type OwnershipFormat = "json" | "markdown";
+type OwnershipFormat = "json" | "markdown";
 export const OWNERSHIP_JSON_SCHEMA_VERSION = "renma.ownership.v1" as const;
 
-export interface OwnershipKindSummary {
+interface OwnershipKindSummary {
   kind: AssetKind;
   totalAssets: number;
   ownedAssets: number;
@@ -22,7 +22,7 @@ export interface OwnershipKindSummary {
   coveragePercent: number;
 }
 
-export interface UnownedAsset {
+interface UnownedAsset {
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -33,7 +33,7 @@ export interface UnownedAsset {
   tags: string[];
 }
 
-export interface OwnedAsset {
+interface OwnedAsset {
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -44,19 +44,19 @@ export interface OwnedAsset {
   tags: string[];
 }
 
-export interface OwnershipOwnerKindSummary {
+interface OwnershipOwnerKindSummary {
   kind: AssetKind;
   totalAssets: number;
 }
 
-export interface OwnershipOwnerSummary {
+interface OwnershipOwnerSummary {
   owner: string;
   totalAssets: number;
   byKind: OwnershipOwnerKindSummary[];
   assets: OwnedAsset[];
 }
 
-export interface OwnershipReport {
+interface OwnershipReport {
   root: string;
   configPath?: string;
   scannedFileCount: number;

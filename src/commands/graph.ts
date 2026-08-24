@@ -59,8 +59,7 @@ import {
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
 export const GRAPH_JSON_SCHEMA_VERSION = "renma.graph.v1" as const;
-export type GraphEdgeKind =
-  DependencyKind | "continues_with" | "invokes" | "contains";
+type GraphEdgeKind = DependencyKind | "continues_with" | "invokes" | "contains";
 export type GraphView =
   | "summary"
   | "workflow"

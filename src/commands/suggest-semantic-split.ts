@@ -8,11 +8,11 @@ import { buildInspectOutline } from "./inspect.js";
 const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const CONTEXT_DIRS = new Set(["references", "profiles", "examples", "r"]);
 
-export type SuggestSemanticSplitFormat = "prompt" | "json";
+type SuggestSemanticSplitFormat = "prompt" | "json";
 export const SEMANTIC_SPLIT_SUGGESTION_JSON_SCHEMA_VERSION =
   "renma.semantic-split-suggestion.v1" as const;
 
-export interface SuggestSemanticSplitOptions {
+interface SuggestSemanticSplitOptions {
   format?: SuggestSemanticSplitFormat;
   maxContextBytes?: number;
   maxSourceBytes?: number;
