@@ -12,13 +12,13 @@ import {
   classifyRepositorySkillPath,
   discoverArtifacts,
   normalizeRepositorySkillRelativePath,
-  RESERVED_SKILL_SUPPORT_DIRS,
-  SKILL_ROOTS,
-  SKILL_SUPPORT_DISCOVERY_MODE,
 } from "../src/discovery.js";
 import {
   classifyAbsoluteSkillMigrationEntrypointPath,
   classifyRepositorySkillMigrationEntrypointPath,
+  RESERVED_SKILL_SUPPORT_DIRS,
+  SKILL_ROOTS,
+  SKILL_SUPPORT_DISCOVERY_MODE,
 } from "../src/skill-path-contract.js";
 
 test("repository-relative Skill paths normalize dots without escaping roots", () => {

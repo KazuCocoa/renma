@@ -5,9 +5,6 @@ import {
   associatedNetworkDestinations,
   associatedUploadDestinations,
   classifyDestinationCandidates,
-  securityDiagnosticFindings,
-} from "../src/security-diagnostics.js";
-import {
   analyzeDestinations,
   analyzeDestinationsFromProjection,
   analyzeLogicalShellCommands,
@@ -16,6 +13,7 @@ import {
   unapprovedDestinations,
   uploadDestinations,
 } from "../src/security-destination/index.js";
+import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import {
   projectShellContinuations,
   projectionSpanToSourceSpan,

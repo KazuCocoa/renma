@@ -41,11 +41,6 @@ const STATUSES: AssetStatus[] = [
   "archived",
 ];
 
-export {
-  CANONICAL_SKILL_METADATA_KEYS,
-  CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
-} from "./metadata-definitions.js";
-
 type CanonicalSkillOperationalKey = keyof typeof CANONICAL_SKILL_METADATA_KEYS;
 
 const CANONICAL_SKILL_KEY_TO_OPERATIONAL = new Map<string, string>(

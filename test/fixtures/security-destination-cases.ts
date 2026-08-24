@@ -1,7 +1,7 @@
 import type {
   DestinationCandidateKind,
   NetworkDestination,
-} from "../../src/security-diagnostics.js";
+} from "../../src/security-destination/index.js";
 
 export type CandidateExpectation = {
   kind: DestinationCandidateKind;

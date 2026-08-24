@@ -14,12 +14,6 @@ import type { ScanConfig } from "./types/configuration.js";
 import { safeRepositoryPath } from "./repository-boundary.js";
 import type { ExecutableDependencyCandidate } from "./executable-dependency-analyzer.js";
 
-export {
-  helperScriptPath,
-  resolveHelperScriptPath,
-  type HelperScriptPathResolution,
-} from "./helper-command-evidence.js";
-
 export type RepositoryPathState =
   | "parsed"
   | "excluded"

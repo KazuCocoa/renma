@@ -28,15 +28,6 @@ import {
   type SkillRoot,
 } from "./skill-path-contract.js";
 
-export {
-  RESERVED_SKILL_SUPPORT_DIRS,
-  SKILL_SUPPORT_DISCOVERY_MODE,
-  SKILL_ROOTS,
-  type ReservedSkillSupportDirectory,
-  type CanonicalSkillEntrypointPath,
-  type SkillRoot,
-} from "./skill-path-contract.js";
-
 const SKILL_LIKE_FILE_GLOBS = [
   "SKILL.md",
   "skill.md",

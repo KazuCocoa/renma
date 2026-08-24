@@ -3,13 +3,13 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { parseDocument } from "../src/markdown.js";
-import type { Catalog } from "../src/model.js";
 import {
-  collectRepositoryPaths,
   helperScriptPath,
   resolveHelperScriptPath,
-} from "../src/repository-paths.js";
+} from "../src/helper-command-evidence.js";
+import { parseDocument } from "../src/markdown.js";
+import type { Catalog } from "../src/model.js";
+import { collectRepositoryPaths } from "../src/repository-paths.js";
 import type { Artifact } from "../src/types/artifact.js";
 
 test("collectRepositoryPaths normalizes repo paths without resolving traversal outside the snapshot root", async () => {

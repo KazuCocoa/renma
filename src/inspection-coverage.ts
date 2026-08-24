@@ -7,10 +7,10 @@ import {
   isExcluded,
   isOpaqueArtifactPath,
   repositoryPathDepth,
-  RESERVED_SKILL_SUPPORT_DIRS,
 } from "./discovery.js";
 import { hasSupportedHelperExtension } from "./helper-command-evidence.js";
 import type { RepositoryPathState } from "./repository-paths.js";
+import { RESERVED_SKILL_SUPPORT_DIRS } from "./skill-path-contract.js";
 import type {
   StaticSkillPackageContentKind,
   StaticSupportBoundaryReachabilityEvidence,
