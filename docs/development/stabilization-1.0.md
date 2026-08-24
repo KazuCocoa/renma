@@ -89,7 +89,11 @@ public producer authority.
    use `ScanResult.diagnostics`, producer-level evidence is explicitly internal
    as `rawDiagnostics`, and scan normalization is owned by
    `src/scan-diagnostics.ts`.
-6. Freeze compatibility only for the release-candidate contracts.
+6. Freeze compatibility only for the release-candidate contracts. Completed:
+   stable top-level JSON identities are pinned independently of their producer
+   constants, existing document/schema fixtures remain authoritative, and the
+   experimental execution contract and internal working models stay outside
+   the freeze.
 
 Refactoring must follow deletion and contract selection. Renma should not
 first create a cleaner abstraction around behavior that 1.0 does not intend to

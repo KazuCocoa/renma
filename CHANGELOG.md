@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Froze the Renma 1.0 release-candidate top-level JSON schema identities while
+  retaining the existing whole-document, published-schema, semantic-contract,
+  and public TypeScript API compatibility checks. The experimental execution
+  contract and internal working models remain outside the freeze.
 - Made normalized scan diagnostics the canonical internal
   `ScanResult.diagnostics` collection behind the v2 serializer. Renamed the
   producer-level collection to internal `rawDiagnostics` and moved scan
