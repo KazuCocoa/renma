@@ -9,7 +9,6 @@ import { classifyDestinationCandidates } from "./candidates.js";
 import type {
   DestinationAnalysis,
   LogicalShellCommand,
-  NetworkDestination,
   ShellProjection,
 } from "./types.js";
 
@@ -63,16 +62,4 @@ export function networkDestinations(analysis: DestinationAnalysis) {
 
 export function uploadDestinations(analysis: DestinationAnalysis) {
   return destinationsForIntent(analysis, "upload");
-}
-
-export function associatedNetworkDestinations(
-  input: string,
-): NetworkDestination[] {
-  return networkDestinations(analyzeDestinations(input));
-}
-
-export function associatedUploadDestinations(
-  input: string,
-): NetworkDestination[] {
-  return uploadDestinations(analyzeDestinations(input));
 }

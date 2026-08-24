@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed two destination-analysis composition wrappers that were used only by
+  tests. Production consumers continue to use the underlying typed analysis and
+  intent projections directly; test-only convenience stays in test code.
 - Enabled TypeScript's unused-local and unused-parameter checks across source
   and tests, and removed the nine unused imports, locals, parameters, and test
   helpers they exposed. Runtime behavior and test coverage remain unchanged.

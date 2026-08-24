@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  associatedNetworkDestinations,
-  associatedUploadDestinations,
   classifyDestinationCandidates,
   analyzeDestinations,
   analyzeDestinationsFromProjection,
@@ -20,6 +18,10 @@ import {
 } from "../src/security-destination/logical-shell.js";
 import type { Artifact } from "../src/types/artifact.js";
 import { SECURITY_DESTINATION_CASES } from "./fixtures/security-destination-cases.js";
+import {
+  associatedNetworkDestinations,
+  associatedUploadDestinations,
+} from "./security-destination-test-helpers.js";
 
 const destinationProjection = (
   destinations: Array<{ host: string; path: string }>,
