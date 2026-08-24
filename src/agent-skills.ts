@@ -388,13 +388,6 @@ export function normalizeAgentSkillDirectoryName(
   return normalizeAndValidateAgentSkillName(value, false);
 }
 
-/** Backward-compatible name for validating an Agent Skills YAML name field. */
-export function validateAgentSkillName(
-  value: unknown,
-): AgentSkillNameValidation {
-  return normalizeAgentSkillNameField(value);
-}
-
 function normalizeAndValidateAgentSkillName(
   value: unknown,
   trim: boolean,

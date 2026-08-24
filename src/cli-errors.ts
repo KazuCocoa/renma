@@ -8,8 +8,6 @@ export const CLI_EXIT = {
   internalError: 3,
 } as const;
 
-export type CliExitCode = (typeof CLI_EXIT)[keyof typeof CLI_EXIT];
-
 /** A caller-correctable invocation, configuration, target, or input error. */
 export class CliUserError extends Error {
   constructor(message: string, options?: ErrorOptions) {
