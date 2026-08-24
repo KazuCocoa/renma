@@ -7,11 +7,13 @@ import {
 } from "../canonical-json.js";
 import { CliUserError } from "../cli-errors.js";
 import type { ConfigOverrides } from "../config.js";
-import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
+import {
+  canonicalExecutableDependencyGraphEdges,
+  type ExecutableSurfaceDependency,
+} from "../executable-dependency-resolution.js";
 import {
   canonicalExecutableInvocationGraphEdges,
   EXECUTABLE_SURFACE_INVENTORY_SCHEMA,
-  type ExecutableSurfaceDependency,
   type ExecutableSurfaceEntry,
   type ExecutableSurfaceInvocation,
 } from "../executable-surface-inventory.js";

@@ -9,8 +9,6 @@ import type {
   SourceSpan,
 } from "../security-destination/index.js";
 
-export type { DependencyEcosystem, DependencySelectorKind };
-
 export type SecuritySourceEvidence = {
   text: string;
   startLine: number;

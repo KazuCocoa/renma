@@ -4,9 +4,9 @@ import {
   type ScanJsonDocument,
   type ScanResult,
 } from "./types/scan-result.js";
+import type { ExecutableSurfaceDependency } from "./executable-dependency-resolution.js";
 import type {
   ExecutableSurfaceEntry,
-  ExecutableSurfaceDependency,
   ExecutableSurfaceInventory,
   ExecutableSurfaceInvocation,
 } from "./executable-surface-inventory.js";

@@ -22,8 +22,8 @@ import {
   normalizeDependencyReference,
   resolveDependencyTarget,
 } from "../dependency-resolution.js";
+import type { ExecutableSurfaceDependency } from "../executable-dependency-resolution.js";
 import type {
-  ExecutableSurfaceDependency,
   ExecutableSurfaceInvocation,
   ExecutableSurfaceScope,
 } from "../executable-surface-inventory.js";

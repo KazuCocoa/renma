@@ -31,11 +31,11 @@ import {
 import { RepositoryFixture } from "./repository-fixture.js";
 import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
+import type { ExecutableSurfaceDependency } from "../src/executable-dependency-resolution.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import { evaluateExecutableSurfaceCiPolicy } from "../src/executable-surface-ci-policy.js";
 import {
   summarizeExecutableSurfaceInventory,
-  type ExecutableSurfaceDependency,
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";

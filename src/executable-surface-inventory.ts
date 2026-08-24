@@ -39,15 +39,6 @@ import {
 import type { Artifact, ArtifactKind } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
-export type {
-  BuiltInExecutableDependencyAnalyzerId,
-  ExecutableDependencyRelation,
-} from "./executable-dependency-analyzer.js";
-export type {
-  ExecutableSurfaceDependency,
-  ExecutableSurfaceDependencyResolution,
-} from "./executable-dependency-resolution.js";
-
 export const EXECUTABLE_SURFACE_INVENTORY_SCHEMA =
   "renma.executable-surface-inventory.v1" as const;
 

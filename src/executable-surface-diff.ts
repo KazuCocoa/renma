@@ -1,13 +1,15 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
+  ExecutableSurfaceDependency,
+  ExecutableSurfaceDependencyResolution,
+} from "./executable-dependency-resolution.js";
+import type {
   ExecutableInvocationGovernance,
   ExecutableInvocationOwningSkillResolution,
   ExecutableSurfaceEntry,
   ExecutableSurfaceInventory,
   ExecutableSurfaceInventorySummary,
   ExecutableSurfaceInvocation,
-  ExecutableSurfaceDependency,
-  ExecutableSurfaceDependencyResolution,
   StaticInvocationReachability,
 } from "./executable-surface-inventory.js";
 import { canonicalExecutableDependencyGraphEdges } from "./executable-dependency-resolution.js";

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  type BodyPolicyClauseFacts,
-  type BodyPolicyModality,
-  type BodyPolicyScope,
-} from "../src/security-body-policy/clause-facts.js";
+import type {
+  BodyPolicyClauseFacts,
+  BodyPolicyModality,
+  BodyPolicyScope,
+} from "../src/security-body-policy/model.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 import {
