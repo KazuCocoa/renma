@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import {
-  AGENT_SKILLS_TOP_LEVEL_FIELDS,
-  validateAgentSkill,
-} from "../src/agent-skills.js";
+import { validateAgentSkill } from "../src/agent-skills.js";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import {
+  AGENT_SKILLS_TOP_LEVEL_FIELDS,
   CANONICAL_SKILL_METADATA_KEYS,
   CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
   NON_SKILL_AUXILIARY_METADATA_DEFINITIONS,
