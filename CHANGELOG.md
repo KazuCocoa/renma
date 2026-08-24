@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed Catalog Finding compatibility re-exports from `scanner.ts`; the
+  ordered definition registry and diagnostic conversion remain owned only by
+  `catalog-findings.ts`.
 - Removed internal result-type and renderer compatibility re-exports from the
   inspect and suggest-metadata command modules. Internal consumers now import
   the evidence, decision, and renderer owners directly.
