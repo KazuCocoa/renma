@@ -27,11 +27,11 @@ path.
 | `bom`                    | `renma.repository-context-bom.v3`          | Published JSON Schema plus whole-document golden            |
 | `execution-contract`     | `renma.experimental-execution-contract.v1` | Explicitly experimental tests; no stable 1.x assurance      |
 
-The internal `PUBLIC_JSON_SCHEMA_VERSIONS` registry mirrors this table and
+The test-owned `PUBLIC_JSON_SCHEMA_VERSIONS` registry mirrors this table and
 separates stable identifiers from the explicitly experimental execution
-contract. A repository test compares the registry and this documentation so a
+contract. Repository tests compare the registry and this documentation so a
 public top-level document cannot be added, removed, or renamed on only one
-side.
+side without adding runtime inventory code.
 
 The compatibility-assurance column is also intentional release evidence. The
 golden suite normalizes checkout-local paths and package-derived versions, then

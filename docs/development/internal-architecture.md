@@ -188,11 +188,11 @@ guidance, adds the established code-specific typed guardrails, and applies
 typed defaults only when a producer supplied no verification steps. Prose may
 therefore improve without changing machine semantics.
 
-`src/commands/public-json-schema-versions.ts` inventories stable and
-experimental public top-level JSON identifiers by referencing their existing
-owners. Its documentation synchronization test keeps the inventory aligned
-with `docs/machine-readable-json.md` without changing command dependency
-direction or promoting nested and experimental contracts.
+`test/public-json-schema-versions.ts` inventories stable and experimental
+public top-level JSON identifiers by referencing their existing owners. Its
+documentation synchronization test keeps the inventory aligned with
+`docs/machine-readable-json.md` without adding a runtime command dependency or
+promoting nested and experimental contracts.
 
 ## Security Command and Destination Analysis
 

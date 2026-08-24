@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Moved the public JSON schema inventory from production commands to test
+  support, its only consumer. Compatibility tests still derive every identifier
+  from its runtime owner, while the unused production module is no longer built
+  or packaged.
 - Folded the single-consumer Markdown source-to-visible offset projection into
   `MarkdownSecurityView`. The standalone implementation module and its exported
   working types were removed without changing Markdown parsing or diagnostic
