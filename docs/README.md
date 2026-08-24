@@ -97,11 +97,12 @@ source-repository-only and intentionally excluded from the npm package.
   candidate design direction and SkillSpector experiment plan, not a current
   CLI, metadata, schema, or configuration contract.
 - [Current Roadmap](development/plan.md) owns
-  the current stabilization checkpoint, open candidates, deferred ecosystem
+  the completed 1.0 stabilization baseline, open candidates, deferred ecosystem
   concerns, and explicit non-commitments.
 - [Renma 1.0 Stabilization Boundary](development/stabilization-1.0.md) records
-  the pre-1.0 reduction order, the retained shell-family and `ci-report`
-  contracts, and the precision-first boundary for natural-language analysis.
+  the completed pre-1.0 reduction, retained shell-family and `ci-report`
+  contracts, precision-first natural-language boundary, and remaining release
+  assurance gates.
 - [Skill Discovery Design](development/plan-discovery.md)
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
