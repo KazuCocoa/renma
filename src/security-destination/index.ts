@@ -1,11 +1,7 @@
 import {
-  analyzeDestinations,
   analyzeDestinationsFromProjection,
   destinationsForIntent,
-  isNetworkInstruction,
-  isUploadInstruction,
 } from "./association.js";
-import { classifyDestinationCandidates } from "./candidates.js";
 import type {
   DestinationAnalysis,
   LogicalShellCommand,
@@ -14,11 +10,11 @@ import type {
 
 export {
   analyzeDestinations,
-  analyzeDestinationsFromProjection,
   isNetworkInstruction,
   isUploadInstruction,
-};
-export { classifyDestinationCandidates };
+} from "./association.js";
+export { analyzeDestinationsFromProjection };
+export { classifyDestinationCandidates } from "./candidates.js";
 export {
   logicalShellCommandEvidence,
   logicalShellCommands,
