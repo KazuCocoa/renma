@@ -149,7 +149,7 @@ export function trustedCiSuppressions(
     .sort(compareSuppressionConfigs);
 }
 
-export function suppressionIsActive(
+function suppressionIsActive(
   suppression: SuppressionConfig,
   today: Date | string,
 ): boolean {
@@ -169,7 +169,7 @@ function suppressionSortKey(suppression: SuppressionConfig): string {
   ].join("\0\0");
 }
 
-export function evaluationDateKey(value: Date | string): string {
+function evaluationDateKey(value: Date | string): string {
   return (value instanceof Date ? value : new Date(value))
     .toISOString()
     .slice(0, 10);

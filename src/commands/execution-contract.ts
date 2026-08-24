@@ -180,7 +180,7 @@ interface CanonicalExecutableEvidenceKeys {
 }
 
 /** Collect once, then build every contract field from the same snapshot. */
-export async function executionContract(
+async function executionContract(
   targetPath: string,
   options: ExecutionContractOptions,
   overrides: ConfigOverrides = {},

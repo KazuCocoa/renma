@@ -1274,7 +1274,7 @@ function formatSecurityPolicyInventoryMarkdown(
   return lines;
 }
 
-export function formatReadiness(
+function formatReadiness(
   report: ReadinessReport,
   format: ReadinessFormat,
 ): string {

@@ -100,11 +100,11 @@ export function buildSecurityDiffSummary(
   };
 }
 
-export function deltaNumber(to: number, from: number): number {
+function deltaNumber(to: number, from: number): number {
   return to - from;
 }
 
-export function deltaPolicyBoolean(
+function deltaPolicyBoolean(
   to: PolicyBooleanCounts,
   from: PolicyBooleanCounts,
 ): PolicyBooleanDelta {
@@ -115,7 +115,7 @@ export function deltaPolicyBoolean(
   };
 }
 
-export function deltaProfileCounts(
+function deltaProfileCounts(
   to: SecurityPolicyInventorySummary["securityProfiles"],
   from: SecurityPolicyInventorySummary["securityProfiles"],
 ): SecurityPolicyInventoryDelta["securityProfiles"] {

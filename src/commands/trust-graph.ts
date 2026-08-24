@@ -68,7 +68,7 @@ export async function trustGraph(
   return result.trustGraph;
 }
 
-export function formatTrustGraphJson(graph: TrustGraph): string {
+function formatTrustGraphJson(graph: TrustGraph): string {
   return formatJsonDocument(graph);
 }
 

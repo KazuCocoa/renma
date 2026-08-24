@@ -13,7 +13,7 @@ import {
 import type { RepositoryPathState } from "./repository-paths.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
-export const HELPER_COMMAND_LAUNCHERS = [
+const HELPER_COMMAND_LAUNCHERS = [
   "node",
   "bash",
   "sh",
@@ -250,7 +250,7 @@ export function resolveHelperCommandEvidence(
   };
 }
 
-export function isCanonicalHelperTarget(candidate: string): boolean {
+function isCanonicalHelperTarget(candidate: string): boolean {
   if (candidate.startsWith("tools/")) return true;
   const classified = classifyRepositorySkillPath(candidate);
   return (

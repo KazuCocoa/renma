@@ -50,7 +50,7 @@ const MODE_RANK: Record<ScanBoundaryCiPolicyMode, number> = {
   fail: 2,
 };
 
-export function effectiveScanBoundaryCiPolicy(
+function effectiveScanBoundaryCiPolicy(
   configured: ScanBoundaryCiConfiguration,
 ): ScanBoundaryCiPolicyMode {
   return MODE_RANK[configured.from] >= MODE_RANK[configured.to]

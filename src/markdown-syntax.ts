@@ -370,7 +370,7 @@ export function markdownSourceColumnRange(
 }
 
 /** Return the exact original source occupied by one positioned mdast node. */
-export function markdownNodeSource(
+function markdownNodeSource(
   node: { position?: Position | undefined },
   sourceLines: readonly string[],
   bodyStartLine: number,
@@ -416,7 +416,7 @@ function isMarkdownLinkSyntaxNode(
 }
 
 /** Traverse the shared tree once and retain parent/ancestor context. */
-export function collectMarkdownNodeRecords(root: Root): MarkdownNodeRecord[] {
+function collectMarkdownNodeRecords(root: Root): MarkdownNodeRecord[] {
   const records: MarkdownNodeRecord[] = [];
   const visit = (parent: Parents, ancestors: Parents[]): void => {
     parent.children.forEach((node, index) => {

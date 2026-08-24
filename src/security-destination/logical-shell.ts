@@ -7,7 +7,7 @@ import type {
 type Quote = "'" | '"' | undefined;
 type OffsetSpan = { start: number; end: number };
 
-export function activeShellContinuation(
+function activeShellContinuation(
   line: string,
   initialQuote: Quote,
 ): { active: boolean; quote: Quote } {
