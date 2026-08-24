@@ -21,7 +21,7 @@ export type BodyPolicyModality =
 export type BodyPolicyScope =
   "workflow" | "local-step" | "specific-target" | "specific-source" | "unknown";
 
-export type BodyPolicyCompleteness = "complete" | "unsupported-remainder";
+type BodyPolicyCompleteness = "complete" | "unsupported-remainder";
 
 export interface BodyPolicyClauseFacts {
   readonly domain: BodyPolicyDomain | undefined;
@@ -54,7 +54,7 @@ export interface EnclosureRange extends SourceRange {
   readonly provenance: Exclude<EnclosureProvenance, "unenclosed">;
 }
 
-export type StatementBoundary = "start" | "inherited" | "opaque" | "hard";
+type StatementBoundary = "start" | "inherited" | "opaque" | "hard";
 
 export type PredicateStartClassification =
   | "explicit-workflow-subject"

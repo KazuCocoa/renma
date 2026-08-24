@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Narrowed 27 security-analysis helper types to their owning modules. Their
+  definitions and the function signatures that use them are unchanged, while
+  unsupported internal deep-import surfaces no longer expose local-only names.
 - Narrowed body-policy lexical exports to the completed patterns and
   recognizers used by neighboring analyzers. Regex vocabulary fragments used
   only to assemble those patterns now remain private to their owner module;

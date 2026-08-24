@@ -27,7 +27,7 @@ export const REVIEWABLE_SECURITY_POLICY_FIELDS = [
   "disallowedCommands",
 ] as const;
 
-export type ReviewableSecurityPolicyField =
+type ReviewableSecurityPolicyField =
   (typeof REVIEWABLE_SECURITY_POLICY_FIELDS)[number];
 
 export type ScalarSecurityPolicyField =
@@ -60,7 +60,7 @@ export interface SecurityPolicyChangeProvenance {
   sources: SecurityPolicyChangeSource[];
 }
 
-export interface SecurityPolicyScalarChange {
+interface SecurityPolicyScalarChange {
   kind: "scalar";
   field: ScalarSecurityPolicyField;
   before: boolean | null;
@@ -68,7 +68,7 @@ export interface SecurityPolicyScalarChange {
   provenance: SecurityPolicyChangeProvenance;
 }
 
-export interface SecurityPolicyListChange {
+interface SecurityPolicyListChange {
   kind: "list";
   field: ListSecurityPolicyField;
   added: string[];

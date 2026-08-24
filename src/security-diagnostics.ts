@@ -1697,12 +1697,12 @@ export function securityDiagnosticFindings(
 }
 
 /** Findings and target-state coverage derived from one shared analysis pass. */
-export interface SecurityDiagnosticsAnalysis {
+interface SecurityDiagnosticsAnalysis {
   findings: Finding[];
   coverage: SecurityAnalysisCoverage;
 }
 
-export interface SecurityDiagnosticsAnalysisOptions {
+interface SecurityDiagnosticsAnalysisOptions {
   plainTextSupportReachability?: ReadonlyMap<
     string,
     PlainTextSupportSecurityReachability

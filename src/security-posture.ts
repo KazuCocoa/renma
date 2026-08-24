@@ -38,7 +38,7 @@ export interface SecurityPostureSummary {
   }>;
 }
 
-export interface SecurityPostureFindingLike {
+interface SecurityPostureFindingLike {
   id: string;
   severity: string;
   riskClass?: string | undefined;

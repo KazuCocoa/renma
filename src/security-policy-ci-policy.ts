@@ -27,7 +27,7 @@ export const SECURITY_POLICY_CI_MATCH_IDS = {
   DISALLOWED_COMMAND_REMOVED: "security_policy_ci.disallowed_command_removed",
 } as const;
 
-export type SecurityPolicyCiMatchId =
+type SecurityPolicyCiMatchId =
   (typeof SECURITY_POLICY_CI_MATCH_IDS)[keyof typeof SECURITY_POLICY_CI_MATCH_IDS];
 
 type AllowedValueListProperty =
@@ -43,7 +43,7 @@ interface SecurityPolicyRelaxationBase {
   provenance: SecurityPolicyChangeProvenance;
 }
 
-export interface SecurityPolicyScalarRelaxation extends SecurityPolicyRelaxationBase {
+interface SecurityPolicyScalarRelaxation extends SecurityPolicyRelaxationBase {
   kind: "scalar";
   property: ScalarSecurityPolicyField;
   direction: "restrictive_state_removed";
@@ -51,21 +51,21 @@ export interface SecurityPolicyScalarRelaxation extends SecurityPolicyRelaxation
   toState: SecurityPolicyBooleanState;
 }
 
-export interface SecurityPolicyAllowedValueRelaxation extends SecurityPolicyRelaxationBase {
+interface SecurityPolicyAllowedValueRelaxation extends SecurityPolicyRelaxationBase {
   kind: "list";
   property: AllowedValueListProperty;
   direction: "allowed_value_added";
   addedValues: string[];
 }
 
-export interface SecurityPolicyRestrictedValueRelaxation extends SecurityPolicyRelaxationBase {
+interface SecurityPolicyRestrictedValueRelaxation extends SecurityPolicyRelaxationBase {
   kind: "list";
   property: RestrictedValueListProperty;
   direction: "restricted_value_removed";
   removedValues: string[];
 }
 
-export type SecurityPolicyRelaxation =
+type SecurityPolicyRelaxation =
   | SecurityPolicyScalarRelaxation
   | SecurityPolicyAllowedValueRelaxation
   | SecurityPolicyRestrictedValueRelaxation;

@@ -9,7 +9,7 @@ export type ShellToken = {
   processSubstitution: boolean;
 };
 
-export type ShellTokenization = {
+type ShellTokenization = {
   tokens: readonly ShellToken[];
   supported: boolean;
 };

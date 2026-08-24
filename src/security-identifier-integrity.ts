@@ -13,7 +13,7 @@ import {
 
 export type SecurityIdentifierAuthority = "canonical" | "non-skill";
 
-export interface CorruptedSecurityIdentifier {
+interface CorruptedSecurityIdentifier {
   key: string;
   sanitizedKey: string;
   removedCodePoints: string[];
@@ -21,7 +21,7 @@ export interface CorruptedSecurityIdentifier {
   authority: SecurityIdentifierAuthority;
 }
 
-export interface ReviewedDefaultIgnorableProjection {
+interface ReviewedDefaultIgnorableProjection {
   sanitized: string;
   removedCodePoints: string[];
 }
