@@ -18,7 +18,6 @@ import {
 } from "./discovery.js";
 import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import { parseAssetMetadata } from "./metadata.js";
-import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
   formatTokenBudgetSectionReview,
@@ -193,6 +192,14 @@ const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
   "candidates",
 ]);
 
+interface RuleContext {
+  documents: ParsedDocument[];
+  catalog?: Catalog;
+  config: ScanConfig;
+}
+
+type Rule = (context: RuleContext) => Finding[];
+
 /** Run all deterministic rules and return findings in stable source order. */
 export function runRules(
   documents: ParsedDocument[],
@@ -200,17 +207,16 @@ export function runRules(
   catalog?: Catalog,
   options: RuleOptions = {},
 ): Finding[] {
-  const findings = runRuleRegistry(
-    documents,
-    rulesForEvaluationDate(
-      evaluationDay(options.evaluationDate),
-      options.repositoryPaths,
-      options.repositoryPathStates,
-      options.incompleteSupportDirectories,
-    ),
-    catalog,
-    config,
-  );
+  const context: RuleContext =
+    catalog === undefined
+      ? { documents, config }
+      : { documents, catalog, config };
+  const findings = rulesForEvaluationDate(
+    evaluationDay(options.evaluationDate),
+    options.repositoryPaths,
+    options.repositoryPathStates,
+    options.incompleteSupportDirectories,
+  ).flatMap((rule) => rule(context));
   return findings
     .map((finding) => projectFindingRepairGuidance(finding))
     .sort((a, b) => {
@@ -227,89 +233,54 @@ function rulesForEvaluationDate(
   incompleteSupportDirectories?: ReadonlySet<string>,
 ): Rule[] {
   return [
-    {
-      id: "strict-layout-policy",
-      run: (context) =>
-        strictLayoutPolicyFindings(
-          context.documents,
-          context.catalog,
-          repositoryPaths,
-        ),
-    },
-    {
-      id: "security",
-      run: ({ documents }) =>
-        documents
-          .filter(
-            (document) =>
-              document.artifact.kind !== "script" &&
-              document.artifact.markdownParserEligible,
-          )
-          .flatMap((document) => [
-            ...secretFindings(document),
-            ...commandFindings(document),
-          ]),
-    },
-    {
-      id: "shape",
-      run: ({ documents, config }) =>
-        documents.flatMap((document) => [
-          ...shapeFindings(document, config),
-          ...contextBudgetFindings(document, config),
-          ...profileFindings(document),
+    (context) =>
+      strictLayoutPolicyFindings(
+        context.documents,
+        context.catalog,
+        repositoryPaths,
+      ),
+    ({ documents }) =>
+      documents
+        .filter(
+          (document) =>
+            document.artifact.kind !== "script" &&
+            document.artifact.markdownParserEligible,
+        )
+        .flatMap((document) => [
+          ...secretFindings(document),
+          ...commandFindings(document),
         ]),
-    },
-    {
-      id: "renma-scaffold-placeholder",
-      run: ({ documents }) =>
-        documents.flatMap((document) =>
-          renmaScaffoldPlaceholderFindings(document),
-        ),
-    },
-    {
-      id: "skill-local-support-reachability",
-      run: ({ documents }) =>
-        skillLocalSupportReachabilityFindings(
-          documents,
-          repositoryPaths,
-          repositoryPathStates,
-          incompleteSupportDirectories,
-        ),
-    },
-    {
-      id: "support-asset-shared-context-candidate",
-      run: ({ documents }) =>
-        documents.flatMap((document) =>
-          supportSharedContextCandidateFindings(document),
-        ),
-    },
-    {
-      id: "context-path-non-semantic",
-      run: ({ documents }) =>
-        documents.flatMap((document) =>
-          contextPathNonSemanticFindings(document),
-        ),
-    },
-    {
-      id: "skill-context-reference-not-declared",
-      run: ({ documents }) =>
-        documents.flatMap((document) =>
-          skillContextReferenceNotDeclaredFindings(document),
-        ),
-    },
-    {
-      id: "skill-references-superseded-asset",
-      run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
-    },
-    {
-      id: "asset-references-superseded-asset",
-      run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
-    },
-    {
-      id: "catalog-declared-reference-governance",
-      run: ({ catalog }) =>
-        catalogDeclaredReferenceGovernanceFindings(catalog, evaluationDate),
-    },
+    ({ documents, config }) =>
+      documents.flatMap((document) => [
+        ...shapeFindings(document, config),
+        ...contextBudgetFindings(document, config),
+        ...profileFindings(document),
+      ]),
+    ({ documents }) =>
+      documents.flatMap((document) =>
+        renmaScaffoldPlaceholderFindings(document),
+      ),
+    ({ documents }) =>
+      skillLocalSupportReachabilityFindings(
+        documents,
+        repositoryPaths,
+        repositoryPathStates,
+        incompleteSupportDirectories,
+      ),
+    ({ documents }) =>
+      documents.flatMap((document) =>
+        supportSharedContextCandidateFindings(document),
+      ),
+    ({ documents }) =>
+      documents.flatMap((document) => contextPathNonSemanticFindings(document)),
+    ({ documents }) =>
+      documents.flatMap((document) =>
+        skillContextReferenceNotDeclaredFindings(document),
+      ),
+    ({ documents }) => skillReferencesSupersededAssetFindings(documents),
+    ({ documents }) => assetReferencesSupersededAssetFindings(documents),
+    ({ catalog }) =>
+      catalogDeclaredReferenceGovernanceFindings(catalog, evaluationDate),
   ];
 }
 

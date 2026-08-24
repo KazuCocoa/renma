@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Replaced the single-consumer rule-engine abstraction with a local function
+  registry in `rules.ts`. Eleven decorative registry IDs, object wrappers, and
+  the unreachable optional-config guard were removed without changing finding
+  IDs, evaluation order, or diagnostics.
 - Removed two destination-analysis composition wrappers that were used only by
   tests. Production consumers continue to use the underlying typed analysis and
   intent projections directly; test-only convenience stays in test code.
