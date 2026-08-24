@@ -5,14 +5,16 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
-  AGENT_SKILLS_TOP_LEVEL_FIELDS,
   AGENT_SKILLS_SPECIFICATION,
   validateAgentSkill,
   validateAgentSkills,
 } from "../src/agent-skills.js";
 import { main } from "../src/cli.js";
 import { parseDocument } from "../src/markdown.js";
-import { AGENT_SKILL_TOP_LEVEL_KEYS } from "../src/metadata-definitions.js";
+import {
+  AGENT_SKILLS_TOP_LEVEL_FIELDS,
+  AGENT_SKILL_TOP_LEVEL_KEYS,
+} from "../src/metadata-definitions.js";
 import { formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { Artifact } from "../src/types/artifact.js";

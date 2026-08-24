@@ -32,8 +32,6 @@ export const AGENT_SKILLS_SPECIFICATION =
 export const AGENT_SKILLS_VALIDATION_PROFILE =
   "agentskills.io/specification@2026-07-12";
 
-export { AGENT_SKILLS_TOP_LEVEL_FIELDS } from "./metadata-definitions.js";
-
 export const LEGACY_RENMA_SKILL_FIELDS = [
   "id",
   "title",

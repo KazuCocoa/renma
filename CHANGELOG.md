@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed the internal `AGENT_SKILLS_TOP_LEVEL_FIELDS` re-export from
+  `agent-skills.ts`; internal contract tests now import the metadata definition
+  owner directly.
 - Removed the unused internal `CanonicalSecurityOperationalField` re-export
   from `security-policy.ts`; its definition remains owned by
   `metadata-definitions.ts`.
