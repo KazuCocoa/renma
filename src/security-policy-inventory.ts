@@ -24,7 +24,7 @@ export interface PolicyBooleanCounts {
   unspecified: number;
 }
 
-export type ExternalUploadGovernanceState =
+type ExternalUploadGovernanceState =
   | "denied"
   | "allowed_approval_required"
   | "allowed_no_approval_required"
@@ -101,8 +101,7 @@ export interface DeclaredSecurityPolicyEvidence {
   disallowedCommands: string[];
 }
 
-export type SecurityProfileResolution =
-  "none" | "resolved" | "missing" | "cyclic";
+type SecurityProfileResolution = "none" | "resolved" | "missing" | "cyclic";
 
 export interface SecurityPolicyAssetEvidence {
   path: string;

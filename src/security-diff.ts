@@ -16,20 +16,20 @@ import {
   type SharedSecurityPolicyChange,
 } from "./security-policy-diff.js";
 
-export interface SecurityPostureDelta {
+interface SecurityPostureDelta {
   added: SecurityPostureSummary;
   resolved: SecurityPostureSummary;
 }
 
-export interface PolicyBooleanDelta {
+interface PolicyBooleanDelta {
   true: number;
   false: number;
   unspecified: number;
 }
 
-export type ExternalUploadGovernanceDelta = ExternalUploadGovernanceCounts;
+type ExternalUploadGovernanceDelta = ExternalUploadGovernanceCounts;
 
-export interface SecurityPolicyInventoryDelta {
+interface SecurityPolicyInventoryDelta {
   totalPolicyAssets: number;
   assetsWithLocalPolicyMetadata: number;
   assetsWithInheritedPolicy: number;

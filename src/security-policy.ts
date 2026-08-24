@@ -32,7 +32,7 @@ import {
   type SecurityIdentifierAuthority,
 } from "./security-identifier-integrity.js";
 
-export interface SecurityPolicyFieldEvidence {
+interface SecurityPolicyFieldEvidence {
   startLine: number;
   endLine: number;
   snippet: string;
@@ -57,10 +57,9 @@ export interface SecurityPolicy {
   evidenceByField: Map<string, SecurityPolicyFieldEvidence>;
 }
 
-export type EffectivePolicySource =
-  "local" | "security_profile" | "repository_config";
+type EffectivePolicySource = "local" | "security_profile" | "repository_config";
 
-export interface ResolvedSecurityPolicy {
+interface ResolvedSecurityPolicy {
   policy: SecurityPolicy;
   policySources: EffectivePolicySource[];
 }
@@ -76,12 +75,12 @@ export interface CanonicalSecurityMetadataIssue {
   identifierAuthority?: SecurityIdentifierAuthority;
 }
 
-export interface CanonicalSecurityMetadataResult {
+interface CanonicalSecurityMetadataResult {
   policy: SecurityPolicy;
   issues: CanonicalSecurityMetadataIssue[];
 }
 
-export interface SecurityProfileChainItem {
+interface SecurityProfileChainItem {
   name: string;
   profile: NonNullable<SecurityConfig["profiles"]>[string];
 }
