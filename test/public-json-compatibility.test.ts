@@ -14,7 +14,7 @@ import test, { type TestContext } from "node:test";
 
 import { main } from "../src/cli.js";
 import { catalog, formatCatalogJson } from "../src/commands/catalog.js";
-import { PUBLIC_JSON_SCHEMA_VERSIONS } from "../src/commands/public-json-schema-versions.js";
+import { PUBLIC_JSON_SCHEMA_VERSIONS } from "./public-json-schema-versions.js";
 
 const FIXTURE_ROOT = path.resolve("test/fixtures/public-json-baseline");
 const EXPECTED_ROOT = path.resolve("test/fixtures/public-json-expected");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { PUBLIC_JSON_SCHEMA_VERSIONS } from "../src/commands/public-json-schema-versions.js";
+import { PUBLIC_JSON_SCHEMA_VERSIONS } from "./public-json-schema-versions.js";
 
 const RELEASE_CANDIDATE_1_0_SCHEMA_IDENTITIES = {
   scan: "renma.scan.v2",
