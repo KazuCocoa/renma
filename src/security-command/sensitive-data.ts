@@ -1,7 +1,7 @@
 import {
   type DestinationAnalysis,
   type ShellProjection,
-} from "../security-destination/index.js";
+} from "../security-destination/types.js";
 import { projectionSpanToSourceSpan } from "../security-destination/logical-shell.js";
 import { positiveDisclosureActions } from "./guards.js";
 import type { ShellToken } from "./shell.js";

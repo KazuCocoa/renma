@@ -7,7 +7,7 @@ import type {
 import type {
   DestinationAnalysis,
   SourceSpan,
-} from "../security-destination/index.js";
+} from "../security-destination/types.js";
 
 export type SecuritySourceEvidence = {
   text: string;
