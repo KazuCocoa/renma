@@ -9,7 +9,6 @@ import {
   classifyRepositorySkillEntrypointPath,
   normalizeAssetRepositoryRelativePath,
   repositoryClassificationPath,
-  RESERVED_SKILL_SUPPORT_DIRS,
 } from "../discovery.js";
 import {
   RENMA_FIRST_AUTHORING_BOUNDARY,
@@ -23,6 +22,7 @@ import {
   type SkillAuthoringHandoff,
 } from "../skill-authoring-handoff.js";
 import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "../types/skill-description.js";
+import { RESERVED_SKILL_SUPPORT_DIRS } from "../skill-path-contract.js";
 import { RENMA_SCAFFOLD_PLACEHOLDERS } from "../scaffold-placeholders.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";

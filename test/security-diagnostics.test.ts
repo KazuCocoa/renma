@@ -13,8 +13,8 @@ import {
   associatedNetworkDestinations,
   associatedUploadDestinations,
   classifyDestinationCandidates,
-  securityDiagnosticFindings,
-} from "../src/security-diagnostics.js";
+} from "../src/security-destination/index.js";
+import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Artifact } from "../src/types/artifact.js";
 import type { Finding } from "../src/types/diagnostics.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";

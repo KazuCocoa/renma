@@ -1,4 +1,4 @@
-import { CANONICAL_SKILL_METADATA_KEYS } from "../metadata.js";
+import { CANONICAL_SKILL_METADATA_KEYS } from "../metadata-definitions.js";
 import {
   SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
   type SkillAuthoringHandoff,

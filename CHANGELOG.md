@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Consolidated internal module ownership by removing cross-owner re-exports
+  from metadata parsing, discovery, repository paths, and security diagnostics.
+  Internal consumers now import metadata definitions, Skill path contracts,
+  helper-command evidence, and destination analysis from their cohesive owners;
+  the supported `renma/discovery` public surface remains unchanged.
 - Removed the internal `AGENT_SKILLS_TOP_LEVEL_FIELDS` re-export from
   `agent-skills.ts`; internal contract tests now import the metadata definition
   owner directly.

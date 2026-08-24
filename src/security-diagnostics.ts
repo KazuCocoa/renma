@@ -116,19 +116,6 @@ import {
   type HelperCommandEvidence,
 } from "./helper-command-evidence.js";
 
-// Preserve the established destination-analysis deep imports while the
-// implementation remains owned by security-destination.
-export {
-  associatedNetworkDestinations,
-  associatedUploadDestinations,
-  classifyDestinationCandidates,
-} from "./security-destination/index.js";
-export type {
-  DestinationCandidate,
-  DestinationCandidateKind,
-  NetworkDestination,
-} from "./security-destination/index.js";
-
 type SecurityCategory = "quality" | "safety";
 
 type RuleMetadata = {

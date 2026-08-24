@@ -1326,8 +1326,9 @@ depend on command modules. `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` re-export their result types for colocated
 command consumers. `src/public-types.ts` is the intentional public semantic
 type facade. `src/context-language.ts` owns parsing-stage context language
-diagnostics, while the destination-analysis exports from
-`src/security-diagnostics.ts` form a narrow internal entrypoint.
+diagnostics. `src/security-command/index.ts` and
+`src/security-destination/index.ts` are cohesive internal subsystem entrypoints;
+`src/security-diagnostics.ts` consumes them without re-exporting their members.
 
 The package publishes the compiled `dist` tree for the executable, but its
 explicit `exports` allowlist exposes only `renma/types`, the focused
