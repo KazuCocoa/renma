@@ -16,7 +16,6 @@ import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
   AssetKind,
-  AssetOwnership,
   AssetStatus,
   DependencyKind,
 } from "../model.js";
@@ -29,6 +28,7 @@ import { formatJsonDocument } from "../report.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types/diagnostics.js";
+import type { AssetOwnership } from "../types/governance.js";
 
 export const REPOSITORY_CONTEXT_BOM_SCHEMA_VERSION =
   "renma.repository-context-bom.v3" as const;

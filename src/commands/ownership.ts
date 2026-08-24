@@ -5,11 +5,11 @@ import {
   effectiveAssetOwner,
   type Asset,
   type AssetKind,
-  type AssetOwnership,
   type AssetStatus,
 } from "../model.js";
 import { formatVersionedJsonDocument } from "../report.js";
 import type { Diagnostic } from "../types/diagnostics.js";
+import type { AssetOwnership } from "../types/governance.js";
 
 export type OwnershipFormat = "json" | "markdown";
 export const OWNERSHIP_JSON_SCHEMA_VERSION = "renma.ownership.v1" as const;

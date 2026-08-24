@@ -30,7 +30,6 @@ import type {
 import type {
   Asset,
   AssetKind,
-  AssetOwnership,
   AssetStatus,
   Dependency,
   DependencyKind,
@@ -45,6 +44,7 @@ import {
   type RepositoryEvidence,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
+import type { AssetOwnership } from "../types/governance.js";
 import {
   focusSkillDiscoveryIndex,
   type DeclaredSkillRoute,

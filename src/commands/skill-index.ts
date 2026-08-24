@@ -1,5 +1,4 @@
 import type { ConfigOverrides } from "../config.js";
-import type { AssetOwnership } from "../model.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatJsonDocument } from "../report.js";
 import {
@@ -7,6 +6,7 @@ import {
   repositoryDiagnosticsWithoutSkillDiscovery,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
+import type { AssetOwnership } from "../types/governance.js";
 import {
   focusSkillDiscoveryIndex,
   type DeclaredSkillRoute,

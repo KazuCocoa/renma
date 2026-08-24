@@ -8,6 +8,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed the internal `AssetOwnership` re-export from `model.ts`; command
+  consumers now import the cohesive governance type owner directly.
 - Removed Catalog Finding compatibility re-exports from `scanner.ts`; the
   ordered definition registry and diagnostic conversion remain owned only by
   `catalog-findings.ts`.
