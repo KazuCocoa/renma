@@ -220,7 +220,7 @@ export function parseFloatingDependencyAllowance(
   };
 }
 
-export function normalizePythonProjectName(name: string): string {
+function normalizePythonProjectName(name: string): string {
   return name.toLowerCase().replace(/[-_.]+/gu, "-");
 }
 

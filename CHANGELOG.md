@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Narrowed the internal runtime surface by making 33 helpers module-private
+  after verifying that they have no cross-file consumers. Public package
+  entrypoints, schema identities, and type contracts remain unchanged.
 - Removed five zero-consumer internal declarations: the historical Agent Skill
   name-validation wrapper, three unused derived types, and one unused body-policy
   test projection helper.

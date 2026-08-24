@@ -407,7 +407,7 @@ function policyDocuments(
   );
 }
 
-export function isPolicyInventoryArtifact(
+function isPolicyInventoryArtifact(
   artifact: Artifact,
   hasLocalMetadata = hasLocalSecurityPolicyMetadata(
     parseOperationalSecurityPolicy(artifact),
@@ -436,7 +436,7 @@ function isRawSupportArtifact(artifact: Artifact): boolean {
   return artifact.kind === "script" || artifact.kind === "asset";
 }
 
-export function skillArtifactsByDirectory(
+function skillArtifactsByDirectory(
   artifacts: Artifact[],
 ): ReadonlyMap<string, Artifact | null> {
   const skills = new Map<string, Artifact | null>();
@@ -455,7 +455,7 @@ export function skillArtifactsByDirectory(
   return skills;
 }
 
-export function policyArtifactFor(
+function policyArtifactFor(
   artifact: Artifact,
   skills: ReadonlyMap<string, Artifact | null>,
 ): Artifact | undefined {
@@ -485,9 +485,7 @@ function assertEffectivePolicySources(
   }
 }
 
-export function hasLocalSecurityPolicyMetadata(
-  policy: SecurityPolicy,
-): boolean {
+function hasLocalSecurityPolicyMetadata(policy: SecurityPolicy): boolean {
   return [...LOCAL_POLICY_METADATA_FIELDS].some((field) =>
     policy.declared.has(field),
   );
@@ -518,7 +516,7 @@ function zeroExternalUploadGovernanceCounts(): ExternalUploadGovernanceCounts {
   };
 }
 
-export function externalUploadGovernanceState(
+function externalUploadGovernanceState(
   externalUploadAllowed: boolean | null | undefined,
   humanApprovalRequired: boolean | null | undefined,
 ): ExternalUploadGovernanceState {

@@ -40,7 +40,7 @@ export function normalizeNetworkDestination(
   }
 }
 
-export function networkDestinationMatches(
+function networkDestinationMatches(
   candidate: NetworkDestination,
   approved: NetworkDestination,
 ): boolean {

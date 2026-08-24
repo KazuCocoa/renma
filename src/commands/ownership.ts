@@ -141,7 +141,7 @@ export async function ownership(
   };
 }
 
-export function formatOwnershipJson(report: OwnershipReport): string {
+function formatOwnershipJson(report: OwnershipReport): string {
   return formatVersionedJsonDocument(OWNERSHIP_JSON_SCHEMA_VERSION, report);
 }
 

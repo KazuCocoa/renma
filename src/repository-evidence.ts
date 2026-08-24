@@ -194,7 +194,7 @@ export function repositoryDiagnosticsWithoutSkillDiscovery(
 }
 
 /** Collect immutable repository facts exactly once before deriving projections. */
-export async function collectRepositorySnapshotCore(
+async function collectRepositorySnapshotCore(
   targetPath: string,
   overrides: ConfigOverrides = {},
   instrumentation?: RepositoryCollectionInstrumentation,

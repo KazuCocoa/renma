@@ -136,9 +136,7 @@ export function classifySkillAuthoringHandoffReadError(
 }
 
 /** Validate the v1 contract and cross-field consistency of caller-supplied state. */
-export function validateSkillAuthoringHandoff(
-  input: unknown,
-): SkillAuthoringHandoff {
+function validateSkillAuthoringHandoff(input: unknown): SkillAuthoringHandoff {
   const root = objectValue(input, "handoff");
   exactKeys(root, "handoff", [
     "schemaVersion",

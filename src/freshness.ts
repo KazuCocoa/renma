@@ -36,7 +36,7 @@ export function parseDayDuration(value: string): number | undefined {
 }
 
 /** Add whole UTC days to a strict ISO date and return an ISO date string. */
-export function addDaysIsoDate(value: string, days: number): string {
+function addDaysIsoDate(value: string, days: number): string {
   const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);

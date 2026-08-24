@@ -242,7 +242,7 @@ export function graphFromRepositorySnapshot(
   });
 }
 
-export function formatGraphJson(report: GraphReport): string {
+function formatGraphJson(report: GraphReport): string {
   return formatVersionedJsonDocument(GRAPH_JSON_SCHEMA_VERSION, report);
 }
 

@@ -119,27 +119,21 @@ export function summarizeSecurityPosture(
   return summary;
 }
 
-export function isSecurityFinding(
-  finding: SecurityPostureFindingLike,
-): boolean {
+function isSecurityFinding(finding: SecurityPostureFindingLike): boolean {
   return (
     finding.id.startsWith("SEC-") ||
     normalizeRiskClass(finding.riskClass) !== undefined
   );
 }
 
-export function normalizeRiskClass(
-  value: string | undefined,
-): RiskClass | undefined {
+function normalizeRiskClass(value: string | undefined): RiskClass | undefined {
   if (value === "violation" || value === "suspicious" || value === "advisory") {
     return value;
   }
   return undefined;
 }
 
-export function normalizeSeverity(
-  value: string | undefined,
-): Severity | undefined {
+function normalizeSeverity(value: string | undefined): Severity | undefined {
   if (
     value === "critical" ||
     value === "high" ||
@@ -151,7 +145,7 @@ export function normalizeSeverity(
   return undefined;
 }
 
-export function compareSeverity(left: Severity, right: Severity): number {
+function compareSeverity(left: Severity, right: Severity): number {
   return SEVERITY_ORDER[left] - SEVERITY_ORDER[right];
 }
 

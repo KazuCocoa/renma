@@ -123,7 +123,7 @@ export function attachYamlFrontmatter(
 }
 
 /** Return the primary artifact-aware YAML parse retained for this document. */
-export function yamlFrontmatterForDocument(
+function yamlFrontmatterForDocument(
   document: ParsedDocument,
 ): ParsedYamlFrontmatter | undefined {
   return frontmatterByDocument.get(document);

@@ -610,7 +610,7 @@ export function focusSkillDiscoveryIndex(
  * Resolve deterministic, cycle-safe Skill reachability from prepared Discovery
  * evidence. This function is pure and never re-evaluates route validity.
  */
-export function resolveSkillDiscoveryReachability(
+function resolveSkillDiscoveryReachability(
   skills: readonly VisibleSkillIdentity[],
   routes: readonly DeclaredSkillRoute[],
   publishedEntrypointIds: readonly string[],
