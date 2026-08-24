@@ -187,7 +187,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "quality-policy-diff.ts",
       "public-types.ts",
       "repeated-context.ts",
-      "rule-engine.ts",
       "rules.ts",
       "scan-boundary-ci-policy.ts",
       "scan-boundary-diff.ts",
