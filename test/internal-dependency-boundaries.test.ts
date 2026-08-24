@@ -129,7 +129,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
     ),
     ...topLevelModules("parsing", "source parsing and lexical projection", [
       "bounded-clause-ranges.ts",
-      "context-language-diagnostics.ts",
       "context-language.ts",
       "frontmatter-envelope.ts",
       "markdown-security-view.ts",

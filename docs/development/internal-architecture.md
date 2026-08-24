@@ -1325,8 +1325,9 @@ Inspect renderer DTOs live in `src/evidence/inspect.ts`, so renderers do not
 depend on command modules. `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` re-export their result types for colocated
 command consumers. `src/public-types.ts` is the intentional public semantic
-type facade. `src/context-language-diagnostics.ts` and the destination-analysis
-exports from `src/security-diagnostics.ts` are narrow internal entrypoints.
+type facade. `src/context-language.ts` owns parsing-stage context language
+diagnostics, while the destination-analysis exports from
+`src/security-diagnostics.ts` form a narrow internal entrypoint.
 
 The package publishes the compiled `dist` tree for the executable, but its
 explicit `exports` allowlist exposes only `renma/types`, the focused
