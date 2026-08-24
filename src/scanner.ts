@@ -32,12 +32,6 @@ import type { Diagnostic, Finding } from "./types/diagnostics.js";
 import type { SuppressionConfig } from "./types/diagnostics.js";
 import type { ScanResult } from "./types/scan-result.js";
 
-export {
-  CATALOG_FINDING_DEFINITIONS,
-  CATALOG_FINDING_DIAGNOSTIC_CODES,
-  catalogDiagnosticFindings,
-} from "./catalog-findings.js";
-
 interface ScanBuilderOptions {
   evaluationDate?: Date | string;
   /** Optional projections may reuse scan evidence without preparing Discovery. */

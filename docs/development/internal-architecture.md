@@ -106,8 +106,8 @@ asset, serialization key, and source configuration.
 
 Metadata and catalog producers assign stable `DIAGNOSTIC_IDS` identities when
 they create diagnostics. `src/catalog-findings.ts` owns the ordered definition
-registry and diagnostic-to-Finding conversion; `scanner.ts` re-exports the
-established conversion symbols while retaining scan orchestration.
+registry and diagnostic-to-Finding conversion; `scanner.ts` consumes that
+conversion only for scan orchestration.
 `catalogDiagnosticFindings` selects its Finding definition only from typed
 identity; human-readable messages remain evidence and presentation text and
 must never control classification. The diagnostic-code list is derived from the

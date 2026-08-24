@@ -17,11 +17,6 @@ import {
   omitFromCatalogFindings,
 } from "../src/diagnostic-ids.js";
 import { parseDocument } from "../src/markdown.js";
-import {
-  CATALOG_FINDING_DEFINITIONS as SCANNER_CATALOG_FINDING_DEFINITIONS,
-  CATALOG_FINDING_DIAGNOSTIC_CODES as SCANNER_CATALOG_FINDING_DIAGNOSTIC_CODES,
-  catalogDiagnosticFindings as scannerCatalogDiagnosticFindings,
-} from "../src/scanner.js";
 import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 import type { Diagnostic } from "../src/types/diagnostics.js";
 
@@ -38,18 +33,6 @@ test("catalog Finding classification is invariant under diagnostic wording", () 
       { seed: 0x22_05, numRuns: 50 },
     );
   }
-});
-
-test("scanner preserves exact Catalog Finding compatibility re-exports", () => {
-  assert.equal(
-    SCANNER_CATALOG_FINDING_DEFINITIONS,
-    CATALOG_FINDING_DEFINITIONS,
-  );
-  assert.equal(
-    SCANNER_CATALOG_FINDING_DIAGNOSTIC_CODES,
-    CATALOG_FINDING_DIAGNOSTIC_CODES,
-  );
-  assert.equal(scannerCatalogDiagnosticFindings, catalogDiagnosticFindings);
 });
 
 test("every known metadata diagnostic has a registered code conversion", () => {
