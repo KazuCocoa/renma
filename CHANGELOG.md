@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Folded the single-consumer Markdown source-to-visible offset projection into
+  `MarkdownSecurityView`. The standalone implementation module and its exported
+  working types were removed without changing Markdown parsing or diagnostic
+  source mapping.
 - Replaced the single-consumer rule-engine abstraction with a local function
   registry in `rules.ts`. Eleven decorative registry IDs, object wrappers, and
   the unreachable optional-config guard were removed without changing finding
