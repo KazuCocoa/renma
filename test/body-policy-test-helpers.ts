@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 
 import { disclosureClauseRangesIntersectingRange } from "../src/security-command/guards.js";
 import { WORKFLOW_SCOPE_TERMS } from "../src/security-prose-vocabulary.js";
-import {
-  bodyPolicyStatementGroupFacts,
-  type BodyPolicyClauseFacts,
-  type BodyPolicyModality,
-  type BodyPolicyScope,
-} from "../src/security-body-policy/clause-facts.js";
+import { bodyPolicyStatementGroupFacts } from "../src/security-body-policy/clause-facts.js";
+import type {
+  BodyPolicyClauseFacts,
+  BodyPolicyModality,
+  BodyPolicyScope,
+} from "../src/security-body-policy/model.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Finding } from "../src/types/diagnostics.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";

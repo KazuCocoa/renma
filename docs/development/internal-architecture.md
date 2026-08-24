@@ -1324,11 +1324,10 @@ They may be narrowed or reorganized when behavior-focused tests prove that the
 serialized contract is unchanged.
 
 Inspect renderer DTOs live in `src/evidence/inspect.ts`, so renderers do not
-depend on command modules. `src/commands/inspect.ts` and
-`src/commands/suggest-metadata.ts` re-export their result types for colocated
-command consumers. `src/public-types.ts` is the intentional public semantic
-type facade. `src/context-language.ts` owns parsing-stage context language
-diagnostics. `src/security-command/index.ts` and
+depend on command modules. Command modules consume result types from their
+evidence and decision owners without re-exporting them. `src/public-types.ts`
+is the intentional public semantic type facade. `src/context-language.ts` owns
+parsing-stage context language diagnostics. `src/security-command/index.ts` and
 `src/security-destination/index.ts` are cohesive internal subsystem entrypoints;
 `src/security-diagnostics.ts` consumes them without re-exporting their members.
 

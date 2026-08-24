@@ -104,11 +104,11 @@ import {
   EXTERNAL_UPLOAD_ACTION_TERMS,
   EXTERNAL_UPLOAD_DESTINATION_TERMS,
 } from "./security-prose-vocabulary.js";
-import {
-  bodyPolicyStatementGroupFacts,
-  type BodyPolicyClauseFacts,
-  type BodyPolicyDomain,
-} from "./security-body-policy/clause-facts.js";
+import { bodyPolicyStatementGroupFacts } from "./security-body-policy/clause-facts.js";
+import type {
+  BodyPolicyClauseFacts,
+  BodyPolicyDomain,
+} from "./security-body-policy/model.js";
 import { CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE } from "./types/skill-description.js";
 import type { PlainTextSupportSecurityReachability } from "./static-support.js";
 import {

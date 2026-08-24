@@ -70,13 +70,6 @@ import {
   supportedWorkflowSubjectInRange,
 } from "./statement-components.js";
 
-export type {
-  BodyPolicyClauseFacts,
-  BodyPolicyDomain,
-  BodyPolicyModality,
-  BodyPolicyScope,
-} from "./model.js";
-
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
 function bodyPolicyClauseFacts(
   clause: string,

@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed the remaining cross-owner internal type re-exports from executable
+  inventory, body-policy clause analysis, and security-command working types.
+  Consumers now import those contracts from their defining modules; intentional
+  public facades and cohesive subsystem entrypoints remain unchanged.
 - Made 63 command- and CLI-local types module-private after verifying that they
   have no cross-file consumers. Cross-module command contracts and every public
   package entrypoint remain unchanged.
