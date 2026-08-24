@@ -64,8 +64,7 @@ imports, and re-exports all count as dependencies; lateral imports within one
 layer are valid.
 
 Architecture exceptions name one exact source, target, and reason. The current
-list contains the internal `src/types.ts` facade re-export of the
-composed scan result and snapshot construction's classification-index path.
+list contains only snapshot construction's classification-index path.
 Internal type re-exports from `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` are also listed and checked exactly rather
 than allowing command modules to re-export arbitrary lower-layer contracts;
@@ -127,8 +126,8 @@ use the generic fail-closed catalog Finding definition.
 ## Cohesive Type Ownership
 
 `src/public-types.ts` is the intentionally narrow facade behind the semantic
-`renma/types` export. `src/types.ts` remains an internal compatibility facade;
-production modules import the cohesive owner under `src/types/` directly:
+`renma/types` export. Internal code and tests import the cohesive owner under
+`src/types/` directly; there is no parallel internal type barrel:
 
 - artifact, parsed metadata, normalized configuration, decision, governance,
   and the producerless core scan model remain low-level internal contracts;
@@ -1328,8 +1327,8 @@ serialized contract is unchanged.
 Inspect renderer DTOs live in `src/evidence/inspect.ts`, so renderers do not
 depend on command modules. `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` re-export their result types for colocated
-command consumers. `src/types.ts` is the intentional public semantic type
-barrel. `src/context-language-diagnostics.ts` and the destination-analysis
+command consumers. `src/public-types.ts` is the intentional public semantic
+type facade. `src/context-language-diagnostics.ts` and the destination-analysis
 exports from `src/security-diagnostics.ts` are narrow internal entrypoints.
 
 The package publishes the compiled `dist` tree for the executable, but its

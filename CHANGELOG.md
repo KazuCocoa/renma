@@ -8,6 +8,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Removed the unused internal `src/types.ts` compatibility facade and updated
+  tests to import cohesive type owners directly. The supported `renma/types`
+  package export remains owned by `src/public-types.ts` and is unchanged.
 - Froze the Renma 1.0 release-candidate top-level JSON schema identities while
   retaining the existing whole-document, published-schema, semantic-contract,
   and public TypeScript API compatibility checks. The experimental execution

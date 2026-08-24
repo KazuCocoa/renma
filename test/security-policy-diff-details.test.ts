@@ -3,12 +3,11 @@ import test from "node:test";
 
 import { buildSecurityPolicyChanges } from "../src/security-policy-diff.js";
 import { collectSecurityPolicyAssetEvidence } from "../src/security-policy-inventory.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 import type {
-  Artifact,
-  ArtifactKind,
   SecurityConfig,
   SecurityProfileConfig,
-} from "../src/types.js";
+} from "../src/types/configuration.js";
 
 test("direct effective policy changes retain normalized scalar and list details", () => {
   const path = "contexts/review.md";

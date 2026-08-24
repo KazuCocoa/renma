@@ -14,7 +14,7 @@ import {
   type FrontmatterContract,
 } from "../src/frontmatter-envelope.js";
 import { resolveOperationalSecurityPolicy } from "../src/security-policy.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 import {
   parseAgentSkillFrontmatter,
   parseRenmaFrontmatter,

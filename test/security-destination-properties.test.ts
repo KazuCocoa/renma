@@ -14,7 +14,7 @@ import {
   type SourceSpan,
 } from "../src/security-destination/index.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 
 const PROPERTY_SEED = 0x224119;
 const PROPERTY_RUNS = 80;

@@ -10,7 +10,8 @@ import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { hiddenUnicodeFindings } from "../src/hidden-unicode.js";
 import { scan } from "../src/scanner.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Artifact, Finding } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
+import type { Finding } from "../src/types/diagnostics.js";
 
 const BIDI_ID = DIAGNOSTIC_IDS.SEC_SUSPICIOUS_BIDI_CONTROL;
 const INVISIBLE_ID = DIAGNOSTIC_IDS.SEC_SUSPICIOUS_INVISIBLE_CHARACTER;

@@ -15,7 +15,7 @@ import {
   estimatedTokenUnits,
   markdownBody,
 } from "../src/token-estimator.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 import type { ScanConfig } from "../src/types/configuration.js";
 
 test("quality profile pins every package-version default", () => {

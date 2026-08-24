@@ -15,7 +15,7 @@ import { parseDocument } from "../src/markdown.js";
 import { AGENT_SKILL_TOP_LEVEL_KEYS } from "../src/metadata-definitions.js";
 import { formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 
 test("canonical Agent Skills top-level vocabulary is exact, derived, and unique", () => {
   const publicKeys = [

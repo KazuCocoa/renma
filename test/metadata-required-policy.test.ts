@@ -12,7 +12,7 @@ import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { parseDocument } from "../src/markdown.js";
 import { scan } from "../src/scanner.js";
 import type { MetadataConfig } from "../src/types/configuration.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 
 const REQUIRED_ID = "META-POLICY-REQUIRED-FIELD-MISSING";
 

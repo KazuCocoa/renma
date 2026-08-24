@@ -6,7 +6,7 @@ import test from "node:test";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import { scan } from "../src/scanner.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
 
 test("buildCatalog warns when active shared context lacks usage-boundary metadata", () => {
   const result = buildCatalog([

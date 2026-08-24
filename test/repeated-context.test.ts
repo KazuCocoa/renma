@@ -10,7 +10,8 @@ import {
 } from "../src/commands/readiness.js";
 import { repeatedContextFindingCap } from "../src/repeated-context.js";
 import { scan } from "../src/scanner.js";
-import type { Finding, ScanResult } from "../src/types.js";
+import type { Finding } from "../src/types/diagnostics.js";
+import type { ScanResult } from "../src/types/scan-result.js";
 
 test("scan reports deterministic repeated context patterns", async () => {
   const result = await scanFixture({

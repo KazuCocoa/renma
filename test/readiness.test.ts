@@ -16,7 +16,7 @@ import {
 } from "../src/commands/readiness.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
-import type { Finding } from "../src/types.js";
+import type { Finding } from "../src/types/diagnostics.js";
 
 test("readiness collects one repository snapshot for graph and scan evidence", async () => {
   const root = await fixture();

@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Artifact, Finding } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
+import type { Finding } from "../src/types/diagnostics.js";
 
 const RISKY_SUPPRESSION_ID = "SEC-RISKY-OPERATION-ERROR-SUPPRESSION";
 const RISKY_COMMAND_DIAGNOSTIC_IDS = new Set([

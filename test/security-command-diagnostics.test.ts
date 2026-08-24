@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { scan } from "../src/scanner.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 
 test("dependency findings project the shared pinning classification", () => {
   const guardedVariable = dependencyFindings(`

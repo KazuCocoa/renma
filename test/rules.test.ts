@@ -7,7 +7,7 @@ import { catalog } from "../src/commands/catalog.js";
 import { todayIsoDate } from "../src/freshness.js";
 import { formatJson, formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
-import type { ScanResult } from "../src/types.js";
+import type { ScanResult } from "../src/types/scan-result.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("Skill quality rules consume resolved Agent Skills YAML descriptions", async () => {

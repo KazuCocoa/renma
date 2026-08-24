@@ -12,7 +12,7 @@ import {
   parseSecurityPolicy,
   resolveOperationalSecurityPolicy,
 } from "../src/security-policy.js";
-import type { Artifact } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
 
 test("non-Skill body booleans cannot create local network policy", () => {
   const artifact = contextArtifact(`# Demo

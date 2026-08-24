@@ -227,12 +227,6 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
 // one exact source and target and must be deleted when the seam is removed.
 const DEPENDENCY_EXCEPTIONS: readonly DependencyException[] = [
   {
-    importingFile: "src/types.ts",
-    targetPath: "src/types/scan-result.ts",
-    reason:
-      "established dist/types.js facade re-exports the composed ScanResult contract",
-  },
-  {
     importingFile: "src/repository-evidence.ts",
     targetPath: "src/evidence/classification.ts",
     reason:

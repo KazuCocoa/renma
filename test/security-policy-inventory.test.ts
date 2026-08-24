@@ -8,7 +8,8 @@ import {
   zeroSecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
 import { parseSecurityPolicy } from "../src/security-policy.js";
-import type { Artifact, ArtifactKind, SecurityConfig } from "../src/types.js";
+import type { Artifact, ArtifactKind } from "../src/types/artifact.js";
+import type { SecurityConfig } from "../src/types/configuration.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("empty policy inventory returns a zero summary", () => {

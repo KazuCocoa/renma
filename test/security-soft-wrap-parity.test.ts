@@ -3,7 +3,8 @@ import test from "node:test";
 
 import { analyzeSecurityCommand } from "../src/security-command/analyze.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Artifact, Finding } from "../src/types.js";
+import type { Artifact } from "../src/types/artifact.js";
+import type { Finding } from "../src/types/diagnostics.js";
 
 const NETWORK_IDS = new Set([
   "SEC-INSTRUCTION-VIOLATES-POLICY",
