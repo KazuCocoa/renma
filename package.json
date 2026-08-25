@@ -69,7 +69,7 @@
   "scripts": {
     "clean": "node -e \"const fs=require('node:fs'); for (const dir of ['dist','dist-test']) fs.rmSync(dir,{recursive:true,force:true});\"",
     "clean:test": "node -e \"require('node:fs').rmSync('dist-test',{recursive:true,force:true});\"",
-    "build": "npm run clean && tsc -p tsconfig.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",

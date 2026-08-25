@@ -10,6 +10,12 @@ const base = "/renma/";
 const cloudflareWebAnalyticsToken = "f11a01438b294ad2a0b56b3e8f607312";
 
 export default defineConfig({
+  vite: {
+    build: {
+      // Mermaid and the local search index are lazy-loaded auxiliary chunks.
+      chunkSizeWarningLimit: 750,
+    },
+  },
   title: "Renma",
   description:
     "A Git-native Context Repository and deterministic governance CLI for agent-facing knowledge.",
