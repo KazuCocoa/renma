@@ -6,6 +6,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Made `npm test` emit a single summary on success and failure-only diagnostics
+  on error to reduce LLM context usage. Full per-test output remains available
+  through `npm run test:verbose`.
+
 ## [0.37.0] - 2026-08-24
 
 ### Changed
