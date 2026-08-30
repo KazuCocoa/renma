@@ -9,9 +9,13 @@ import {
 test("generated artifacts remain qualified evidence", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
   const truth = guidance.interaction.truthSources.join("\n");
+  const generated = guidance.interaction.truthSources.find((source) =>
+    source.startsWith("Generated and derived artifacts:"),
+  );
   const prompt = renderSkillGuidePrompt(guidance);
   const json = renderSkillGuideJson(guidance);
 
+  assert.ok(generated);
   assert.match(truth, /Generated and derived artifacts/);
   assert.match(
     truth,
@@ -29,6 +33,22 @@ test("generated artifacts remain qualified evidence", () => {
   assert.match(truth, /favorable result alone/);
   assert.match(truth, /artifact's supported evidence boundary/);
   assert.match(truth, /applicable truth source/);
+  assert.match(
+    generated,
+    /provenance remains applicable regardless of whether/,
+  );
+  assert.match(
+    generated,
+    /user-provided, repository-stored, or retrieved externally/,
+  );
+  assert.match(
+    generated,
+    /together with each applicable delivery- or location-based truth-source rule/,
+  );
+  assert.match(
+    generated,
+    /classifications do not broaden the artifact's supported evidence boundary/,
+  );
   assert.match(truth, /Preserve conflicts/);
   assert.match(truth, /recency, detail, or model confidence/);
   assert.match(truth, /authorized human's explicit decision/);
@@ -39,6 +59,14 @@ test("generated artifacts remain qualified evidence", () => {
       /bounded observations made by an identified producer/,
     );
     assert.match(projection, /artifact's supported evidence boundary/);
+    assert.match(
+      projection,
+      /user-provided, repository-stored, or retrieved externally/,
+    );
+    assert.match(
+      projection,
+      /classifications do not broaden the artifact's supported evidence boundary/,
+    );
     assert.match(projection, /authorized human's explicit decision/);
   }
 });
