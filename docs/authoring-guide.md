@@ -247,9 +247,18 @@ to this protocol.
 | --- | --- | --- |
 | Explicit user statements | Intent, governance decisions, source designation, fallback, and other decisions the user has authority to make | Designating a specification does not prove its contents |
 | User-provided artifacts | Facts in supplied documents, specifications, examples, logs, or schemas | Provenance and applicability must be clear; identify the artifact |
+| Generated and derived artifacts | Bounded observations made by an identified producer in Renma reports, test results, logs, diagnostics, machine-generated review summaries or comments, external-review artifacts, and other derived output | Provenance, subject, scope, applicability, and currentness must be clear; apply this qualification together with any user-provided, repository, or external-source classification because delivery or location does not broaden the supported evidence boundary; evidentiary value does not make the artifact governing authority for domain behavior, policy, completeness, or safety |
 | Repository evidence | Applicable and effective repository facts | Evidence must be unambiguous; deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed merely because it exists; identify the file, metadata, lifecycle evidence, or command result |
 | Reviewed authoritative external source content | Domain facts governed by a user-designated source | The authoring environment must be permitted and able to consult it successfully; identify the source and relevant section or evidence |
 | Renma structural rules | Structural constraints and proposed defaults | They do not establish product or domain truth |
+
+Generation, detail, prior use, or a favorable result alone does not make derived
+claims authoritative. Confirm claims beyond the artifact's supported evidence
+boundary through the applicable truth source. When generated or derived
+material conflicts with applicable evidence, preserve the conflict and
+determine the governing authority. Do not choose a winner by recency, detail,
+or model confidence alone. An authorized human's explicit decision retains the
+semantics of an explicit user statement regardless of medium.
 
 A user can confirm that a URL is intended to be authoritative. Its schema,
 fields, constraints, and behavior become Confirmed only after the source content
@@ -354,6 +363,16 @@ the conversation transcript, private reasoning, temporary Confirmed / Proposed
 / Unresolved headings, rejected proposals, unanswered questions, speculative
 work, or invented decision-state metadata. Report non-blocking uncertainty to
 the user instead of hiding it in authoritative prose.
+
+Before human approval, present a compact review summary. For each material
+non-obvious decision, state its governing evidence or authority and any
+evidence-backed consequence of changing it. When the consequence is not
+established, explicitly label the potential impact Proposed or Unresolved and
+state remaining non-blocking uncertainty. This summary is a review surface, not
+proof that the reviewer understood, approved, or independently verified the
+proposal. Persist only the durable reviewed rationale that belongs in the asset
+owning the decision; do not store the temporary summary as conversation-state
+metadata.
 
 ## Focused Workflow Model
 
@@ -522,6 +541,13 @@ source is authoritative or was consulted, or the domain facts are true. The
 source states `provided`, `consulted`, and `designated_unconsulted` preserve the
 difference between supplied or reviewed content and authority designation.
 
+A structurally valid handoff does not prove that its supporting evidence remains
+applicable. When current applicability cannot be established, recheck only the
+evidence supporting material handoff decisions that scaffolding or semantic
+authoring will rely on. Re-enter the creation gate when the result changes the
+Skill contract, source authority, security decisions, runtime-unknown handling,
+or asset boundaries.
+
 ### 3. Generate one repository-compatible starting point
 
 Run the Renma generator once:
@@ -661,8 +687,11 @@ renma readiness . --format markdown
 Inspect every created or reused asset and relationship. When optional Context,
 Lens, source, script, or security structures exist, perform the additional
 verification appropriate to them. The final step is human review of semantic
-correctness, meaningful decisions, applicable authority, and remaining
-uncertainty. Clean deterministic output does not prove semantic correctness.
+correctness and material non-obvious decisions, including their governing
+evidence or authority and any evidence-backed consequence of changing them.
+When a consequence is not established, explicitly label the potential impact
+Proposed or Unresolved and state remaining uncertainty. Clean deterministic
+output does not prove semantic correctness, reviewer understanding, or approval.
 
 ### Conditional external reference traversal rules
 
@@ -1271,7 +1300,13 @@ Before human approval, confirm that:
 - owners, policies, dependencies, and domain claims are evidence-backed;
 - reusable or independently maintained source-of-truth knowledge has an
   appropriate Context boundary;
+- material non-obvious decisions identify their governing evidence or authority
+  and any evidence-backed consequence of changing them, or explicitly label an
+  unestablished potential impact Proposed or Unresolved;
 - generated or suggested changes were reviewed rather than applied blindly;
+- generated or derived artifacts establish only bounded producer-scoped
+  observations unless an applicable truth source establishes broader claims or
+  governing authority;
 - blocked migration evidence was resolved instead of bypassed;
 - `renma scan . --fail-on high` was rerun after fixes; and
 - no policy weakening or new suppression was used merely to pass validation.
