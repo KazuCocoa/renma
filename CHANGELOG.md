@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Clarified the default Skill guide prompt and stable JSON guide so generated
+  artifacts retain bounded producer-scoped evidentiary value without becoming
+  governing authority, review consequences are evidence-backed or potential
+  impacts are labeled Proposed or Unresolved, and material handoff evidence is
+  rechecked when current applicability cannot be established.
 - Made `npm test` emit a single summary on success and failure-only diagnostics
   on error to reduce LLM context usage. Full per-test output remains available
   through `npm run test:verbose`.
