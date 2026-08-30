@@ -1416,6 +1416,13 @@ storage, and Skill execution outside this architecture.
 
 ## Contributor Checklist
 
+`npm test` uses the LLM-oriented reporter: a successful run emits one summary,
+while a failed run emits only failure details and a compact summary. Use
+`npm run test:verbose` when complete per-test output or uncapped failure output
+is needed. The compact reporter bounds output to 20 failures and 12,000
+characters per failure by default; `RENMA_TEST_MAX_FAILURES` and
+`RENMA_TEST_MAX_FAILURE_CHARS` can override those positive-integer limits.
+
 For an internal change:
 
 1. Add or confirm a behavior-focused test for the established
