@@ -1,8 +1,9 @@
 # Renma Architecture
 
-Renma is a Git-native Context Repository and deterministic governance layer for
-LLM-facing knowledge. It discovers repository assets, normalizes their metadata
-and relationships, evaluates static rules, and emits reviewable evidence.
+Renma is a Git-native Context Repository and deterministic governance CLI for
+LLM-facing knowledge and its static repository declarations. It discovers
+repository assets, normalizes their metadata and relationships, evaluates
+static rules, and emits reviewable evidence.
 
 Renma sits at the repository layer, not the runtime layer.
 
@@ -19,10 +20,11 @@ flowchart TD
   Repository -->|consumed according to runtime behavior| Runtime
 ```
 
-Renma does not interpret a live task, select a Skill or Context for that task,
-assemble or inject prompts, execute workflows, invoke providers, or collect
-runtime telemetry. Static relationships and policies are repository evidence;
-they are not proof of what a runtime selected, loaded, or did.
+Renma does not interpret a live task; select, retrieve, or load a Skill,
+Context Asset, or Context Lens for that task; assemble or inject prompts;
+execute workflows; invoke providers; or collect runtime telemetry. Static
+relationships and policies are repository evidence; they are not runtime
+instructions or proof of what a runtime selected, loaded, or did.
 
 ## Stable Layers
 

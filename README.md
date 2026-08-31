@@ -13,9 +13,11 @@
 [![Downloads](http://img.shields.io/npm/dm/renma.svg)](https://npmjs.org/package/renma)
 
 Renma is a Git-native Context Repository and deterministic governance CLI for
-agent-facing knowledge. It keeps Skills, Context Assets, Context Lenses,
-ownership, lifecycle, declared relationships, security policy, and review
-evidence maintainable in Git without becoming an agent runtime.
+agent-facing knowledge and its static repository declarations. It keeps Skills,
+Context Assets, Context Lenses, ownership, lifecycle, provenance, security
+policy, declared relationships, and review evidence maintainable in Git. Renma
+analyzes and reports repository state; it is not the runtime that consumes
+these assets.
 
 ### You May Need Renma When
 
@@ -84,7 +86,8 @@ repository assets. It does not:
 
 - call an LLM for core analysis;
 - select a live Skill, Context Asset, or Context Lens;
-- assemble prompts or inject Context;
+- retrieve or load assets for a live task;
+- assemble prompts, bundle assets, or inject Context;
 - execute Skills, agents, workflows, or operational commands found in repository
   instructions;
 - collect runtime telemetry;
@@ -399,8 +402,8 @@ Skill-local support.
 
 Declared composition, declared impact, Skill Discovery, the Repository Context
 BOM, and the Trust Graph are static repository relationships and evidence.
-They do not describe runtime selection, actual consumption, prompt assembly, or
-a trust score.
+They do not describe runtime selection, retrieval, loading, actual consumption,
+prompt assembly, injection, execution, telemetry, or a trust score.
 
 ## Documentation
 
