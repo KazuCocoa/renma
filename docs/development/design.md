@@ -1,7 +1,7 @@
 # Renma Product Design
 
 Renma is a Git-native Context Repository and deterministic governance CLI for
-repositories that hold LLM-facing knowledge.
+LLM-facing knowledge and its static declarations in a Git repository.
 
 Its product value is a reviewable repository model, not a runtime:
 
@@ -76,7 +76,8 @@ asset should win.
 Renma owns:
 
 - bounded repository discovery and classification;
-- metadata, lifecycle, ownership, relationship, and layout validation;
+- metadata, lifecycle, ownership, provenance, policy, relationship, and layout
+  validation;
 - deterministic diagnostics and security review evidence;
 - catalog, ownership, graph, composition, impact, Readiness, diff, CI,
   Skill Discovery, Trust Graph, and BOM projections;
@@ -86,6 +87,7 @@ Renma does not own:
 
 - interpretation of free-form live tasks;
 - Skill, Context, or Lens selection and ranking;
+- live retrieval or loading of repository or external-source content;
 - prompt construction, Context bundling, or injection;
 - workflow or tool execution;
 - provider gateways or agent orchestration;

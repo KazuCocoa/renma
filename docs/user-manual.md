@@ -1,10 +1,18 @@
 # renma User Manual
 
-renma scans agent-facing repository assets and turns them into deterministic, agent-consumable reports. Use it to keep skills, shared context, prompts, docs, and ownership metadata reviewable in CI instead of relying on an LLM to infer repository intent.
+renma scans agent-facing repository assets and their static declarations, then
+turns them into deterministic, agent-consumable reports. Use it to keep Skills,
+Context Assets, Context Lenses, ownership, lifecycle, provenance, security
+policy, and declared relationships reviewable in Git and CI instead of relying
+on an LLM to infer repository intent.
 
 ## What Renma Does And Does Not Do
 
-Renma is deterministic repository governance for context assets, skills, and agent-facing documentation. It reads local repository files, builds reviewable evidence, and reports what humans or coding agents should inspect.
+Renma is deterministic repository governance for Skills, Context Assets,
+Context Lenses, and related agent-facing documentation. It reads local
+repository files, builds reviewable evidence, and reports what humans or coding
+agents should inspect. Its declarations describe repository state; they do not
+direct a live runtime.
 
 English is the primary language for canonical governance and security wording,
 and receives Renma's strongest bounded natural-language recognition.
@@ -16,8 +24,8 @@ paths, executable references, Markdown structure, and hidden Unicode. Renma
 does not translate security terms or claim general multilingual NLP.
 
 Renma does not call an LLM, conduct an authoring conversation, ask the user
-questions, retain session state, choose runtime context, assemble prompts,
-inject context, execute agents, or collect telemetry.
+questions, retain session state, select, retrieve, or load runtime context,
+assemble prompts, inject context, execute agents, or collect runtime telemetry.
 
 Run `renma guide skill` before generation. It prints a deterministic protocol
 that tells the consuming LLM to clarify the request, inspect applicable
