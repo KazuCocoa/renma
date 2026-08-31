@@ -23,8 +23,9 @@ flowchart TD
 Renma does not interpret a live task; select, retrieve, or load a Skill,
 Context Asset, or Context Lens for that task; assemble or inject prompts;
 execute workflows; invoke providers; or collect runtime telemetry. Static
-relationships and policies are repository evidence; they are not runtime
-instructions or proof of what a runtime selected, loaded, or did.
+relationships and policies describe reviewed repository intent and
+constraints; they do not prove how a runtime interpreted, enforced, or consumed
+them.
 
 ## Stable Layers
 
