@@ -6,6 +6,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the stable `renma.skill-authoring-guide.v1` JSON contract with
+  `renma.skill-authoring-guide.v2`. V2 preserves Renma's creation-gate, evidence,
+  asset-boundary, handoff, and human-review guarantees while changing interaction
+  semantics from a prescribed clarification protocol to adaptive authoring
+  activities. Clarification is conditional, question batching and blocker
+  presentation are adaptive, prerequisite-aware questioning is required,
+  human-review rules have an explicit field, and recursive external traversal has
+  a compact applicability pointer. Consumers must branch on `schemaVersion` and
+  must not apply v1 phase-order, mandatory-clarification, fixed-batch, or
+  last-phase assumptions to v2.
+
 ## [0.37.1] - 2026-08-30
 
 ### Changed

@@ -2964,6 +2964,14 @@ to stdout, needs no repository, and performs no filesystem or network
 operations. Missing or unknown topics and unsupported arguments exit `2`; use
 `renma guide --help` for the supported contract.
 
+The JSON projection uses
+`schemaVersion: "renma.skill-authoring-guide.v2"`. Consumers must branch on
+`schemaVersion` and must not apply v1 assumptions about ordered phases,
+mandatory clarification, fixed question batches, or the last phase containing
+human-review guidance. V2 owns human review explicitly in
+`interaction.humanReviewRules`; it does not reinterpret or emit v1 as the new
+contract.
+
 The default prompt includes the smallest sufficient authoring contract. It tells
 the consuming LLM—not Renma—to inspect applicable truth sources, distinguish
 Confirmed, Proposed, and Unresolved decisions, classify Blocking, Reversible
@@ -3000,6 +3008,12 @@ The default prompt omits illustrations to reduce anchoring. JSON retains their
 useful optional structures and source-specific review details. Both projections
 derive from the same structured guidance source; they are intentionally not
 required to render every field identically.
+
+The prompt does include the compact conditional rule that, when the finished
+Skill may recursively follow references discovered inside an external source,
+the consumer must consult and apply `externalTraversalRules` from the complete
+JSON reference before passing the creation gate. Detailed traversal mechanics
+remain in JSON.
 
 Use it before generation, or when intentionally redesigning asset boundaries,
 to identify the smallest non-redundant asset graph, source-of-truth Context,

@@ -461,6 +461,15 @@ Before generating files, run:
 renma guide skill
 ```
 
+The complete JSON reference uses
+`schemaVersion: "renma.skill-authoring-guide.v2"`. Consumers must branch on
+`schemaVersion`; v2 does not preserve v1 assumptions that phases are ordered,
+clarification is mandatory, question batches are fixed, or the last phase owns
+human-review semantics. Human review is explicit in
+`interaction.humanReviewRules`. The compact prompt includes a conditional
+pointer to the complete JSON `externalTraversalRules` when the finished Skill
+may recursively follow references discovered inside an external source.
+
 Use its deterministic prompt to define:
 
 - the recurring task or decision;

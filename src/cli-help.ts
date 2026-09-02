@@ -796,6 +796,7 @@ export const COMMAND_HELP = [
     ],
     interpretation: [
       "Prompt is the compact default execution contract; JSON is the complete deterministic structured reference, and both derive from the same guidance data.",
+      "Guide JSON uses renma.skill-authoring-guide.v2. Consumers must branch on schemaVersion and must not apply v1 phase-order, mandatory-clarification, fixed-batch, or last-phase human-review assumptions to v2.",
       "The default prompt tells the consuming LLM to inspect applicable user-provided artifacts, repository evidence, and permitted authoritative source content; separate Confirmed, Proposed, and Unresolved support from Blocking, Reversible default, and Deferred progression; evaluate the creation gate; and ask only about unresolved Blocking authoring decisions that still require human truth.",
       "Clarification is not required when the request and applicable evidence establish every gate requirement. Small focused question batches are an adaptive default rather than a fixed correctness rule; retain blockers without requiring their complete presentation in every response.",
       "Do not ask a downstream authoring decision when its meaningful answer depends on an unresolved upstream decision; investigate or resolve the prerequisite first without persisting a decision graph, frontier, rounds, or conversation state.",
@@ -805,6 +806,7 @@ export const COMMAND_HELP = [
       "The command works without an existing repository and performs no filesystem or network operations.",
       "The guide establishes Renma boundaries; platform-native Skill authoring guidance may refine semantics only after the creation gate passes and within the agreed structure.",
       "A user-designated URL confirms intended authority, not source-content facts; authoring-time consultation depends on the current request, tools, and environment, while finished-Skill runtime access requires an evidence-backed effective security-policy decision.",
+      "If the finished Skill may recursively follow references discovered inside an external source, the prompt directs the consumer to consult and apply externalTraversalRules from the complete JSON reference before passing the creation gate.",
       "A deterministic finding is not automatically a deterministic repair; follow Diagnostics v2 constraints, investigate repeated context, and re-enter the creation gate before any newly justified asset-boundary change.",
     ],
     nextSteps: [

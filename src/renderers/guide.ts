@@ -28,6 +28,9 @@ export function renderSkillGuidePrompt(
     "Metadata rules",
     ...renderBullets(guidance.metadataRules),
     "",
+    "Conditional reference guidance",
+    guidance.externalTraversalApplicabilityRule,
+    "",
     "Durable handoff boundary",
     ...renderCompactHandoffGuidance(guidance.handoff),
     "",
@@ -89,7 +92,7 @@ function renderCoreInteraction(
     ...renderBullets(interaction.handoffRules),
     "",
     "Human review:",
-    ...renderBullets(interaction.phases.slice(-1)),
+    ...renderBullets(interaction.humanReviewRules),
   ];
 }
 

@@ -128,12 +128,14 @@ test("guide skill JSON and --json are equivalent complete deterministic projecti
     "artifactRules",
     "concisenessRules",
     "metadataRules",
+    "externalTraversalApplicabilityRule",
     "externalTraversalRules",
     "illustrationRules",
     "illustrations",
     "verification",
   ]);
-  assert.equal(output.schemaVersion, "renma.skill-authoring-guide.v1");
+  assert.equal(output.schemaVersion, "renma.skill-authoring-guide.v2");
+  assert.notEqual(output.schemaVersion, "renma.skill-authoring-guide.v1");
   assert.equal(output.topic, "skill");
   assert.equal(typeof output.renmaVersion, "string");
   assert.ok((output.renmaVersion as string).length > 0);
@@ -150,6 +152,7 @@ test("guide skill JSON and --json are equivalent complete deterministic projecti
     "postValidationActions",
     "persistenceRules",
     "handoffRules",
+    "humanReviewRules",
   ]);
   assert.ok(
     !Object.keys(output.interaction as Record<string, unknown>).some((key) =>
@@ -264,6 +267,7 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
     "Artifact rules",
     "Conciseness rules",
     "Metadata rules",
+    "Conditional reference guidance",
     "Durable handoff boundary",
     "Verification",
     "Complete reference",
@@ -282,10 +286,13 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
     postValidationActions: guidance.interaction.postValidationActions,
     persistenceRules: guidance.interaction.persistenceRules,
     handoffRules: guidance.interaction.handoffRules,
+    humanReviewRules: guidance.interaction.humanReviewRules,
     placementRules: guidance.placementRules,
     artifactRules: guidance.artifactRules,
     concisenessRules: guidance.concisenessRules,
     metadataRules: guidance.metadataRules,
+    externalTraversalApplicabilityRule:
+      guidance.externalTraversalApplicabilityRule,
     verification: guidance.verification,
   })) {
     assert.ok(prompt.includes(value), value);
@@ -360,6 +367,16 @@ test("conditional external traversal guidance defines finite authored behavior w
   const guidance = buildSkillAuthoringGuidance("test-version");
   const prompt = renderSkillGuidePrompt(guidance);
   const rules = guidance.externalTraversalRules.join("\n");
+  const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
+
+  assert.match(
+    guidance.externalTraversalApplicabilityRule,
+    /If the finished Skill may recursively follow references discovered inside an external source/,
+  );
+  assert.match(
+    guidance.externalTraversalApplicabilityRule,
+    /consult and apply `externalTraversalRules` from the complete JSON reference before passing the creation gate/,
+  );
 
   assert.match(rules, /Apply this section only when[\s\S]*recursively follow/);
   assert.match(
@@ -419,8 +436,19 @@ test("conditional external traversal guidance defines finite authored behavior w
       "source-backed-boundary",
     ],
   );
-  assert.doesNotMatch(prompt, /visited-source registry/);
-  assert.match(prompt, /conditional external-traversal guidance/);
+  for (const detailedRule of guidance.externalTraversalRules) {
+    assert.ok(!prompt.includes(detailedRule));
+  }
+  assert.doesNotMatch(
+    prompt,
+    /visited-source registry|provider-specific immutable resource ID|normalized URL without fragments|page-count and depth safety caps/,
+  );
+  assert.match(prompt, /Conditional reference guidance/);
+  assert.ok(prompt.includes(guidance.externalTraversalApplicabilityRule));
+  assert.deepEqual(
+    json.externalTraversalRules,
+    guidance.externalTraversalRules,
+  );
   assert.doesNotMatch(
     prompt,
     /Confluence|source graph|URL normalization example/i,
@@ -1133,6 +1161,28 @@ test("complete JSON retains illustration progression while prompt omits it", () 
   assert.equal(sourceBacked.clarification.questions.length, 3);
   assert.doesNotMatch(prompt, /Blocking decisions: 5/);
   assert.doesNotMatch(prompt, /Example Product API/);
+});
+
+test("human-review rendering is independent of adaptive activity order", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const reversedActivities = [...guidance.interaction.phases].reverse();
+  guidance.interaction.phases = [
+    ...reversedActivities,
+    "Last adaptive activity must not become human-review guidance.",
+  ];
+  guidance.interaction.humanReviewRules = [
+    "Explicit human-review ownership sentinel.",
+  ];
+
+  const prompt = renderSkillGuidePrompt(guidance);
+  assert.match(
+    prompt,
+    /Human review:\n- Explicit human-review ownership sentinel/,
+  );
+  assert.doesNotMatch(
+    prompt,
+    /Last adaptive activity must not become human-review guidance/,
+  );
 });
 
 test("workflow summary cross-references interaction rules without duplicating them", () => {

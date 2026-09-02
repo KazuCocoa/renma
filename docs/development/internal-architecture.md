@@ -1201,12 +1201,14 @@ source, or claim that caller-declared authoring facts are true.
 
 The `interaction` object owns the authoring contract and reference guidance for
 opening, adaptive activities, truth sources, epistemic state, unknown scope,
-progression, disposition, questions, the gate, validation, persistence, and
-handoff. The legacy `phases` field contains useful authoring activities but its
-array order is not a required reasoning sequence. `illustrationRules` and the
+progression, disposition, questions, the gate, validation, persistence,
+handoff, and human review. The legacy `phases` field contains useful authoring
+activities but its array order is not a required reasoning sequence.
+`humanReviewRules` owns human-review semantics explicitly; renderers must not
+infer those semantics from a phase position. `illustrationRules` and the
 ordered top-level `illustrations` array remain structurally separate. They have
-no compatibility aliases because authoring guidance is an unversioned internal
-projection rather than an independently versioned schema.
+no compatibility aliases in the internal builder shape; public wire
+compatibility is owned by the guide's top-level `schemaVersion`.
 
 Illustrations share one `SkillAuthoringIllustration` type and demonstrate
 authoring tensions rather than Skill categories. They may be ignored or used
@@ -1216,13 +1218,15 @@ the non-normative collection. The compact prompt omits illustrations and points
 to JSON when conditional or reference detail is needed. Illustration membership
 does not modify the core authoring contract.
 
-`externalTraversalRules` is a top-level normative collection in the complete
-JSON reference. It applies only to recursive discovery inside external sources.
-It defines what an authored Skill and its consuming runtime must specify; it
-neither authorizes nor causes Renma to
-fetch, normalize, identify, or crawl external sources. It adds no illustration
-selector, traversal state metadata, hidden prompt package, or live visited
-registry.
+`externalTraversalApplicabilityRule` is the compact prompt's conditional
+dispatch to the top-level `externalTraversalRules` normative collection in the
+complete JSON reference. The detailed rules apply only to recursive discovery
+inside external sources and remain absent from the prompt. They define what an
+authored Skill and its consuming runtime must specify; they neither authorize
+nor cause Renma to
+fetch, normalize, identify, or crawl external sources. The contract adds no
+illustration selector, traversal state metadata, hidden prompt package, or live
+visited registry.
 
 Prompt and JSON are intentionally different projections of that source. JSON is
 the complete structured reference and retains every interaction activity,
@@ -1234,6 +1238,13 @@ asset responsibilities, handoff boundary, and verification. Renderer tests
 verify presence of the sufficient contract and deliberate omission of detailed
 reference material; they do not require every JSON string to appear in the
 prompt.
+
+The public JSON projection is `renma.skill-authoring-guide.v2`. Consumers must
+branch on `schemaVersion`; v2 must not be parsed with v1 assumptions about phase
+ordering, mandatory clarification, fixed question batches, or last-phase
+human-review ownership. The v1 identity is not reinterpreted or emitted for the
+new interaction semantics. The independently versioned Skill Authoring Handoff
+remains `renma.skill-authoring-handoff.v1`.
 
 `interaction` is normative for truth qualification, the outcomes questioning
 must preserve, gate entry and re-entry, finding classification, persistence,

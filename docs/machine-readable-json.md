@@ -18,7 +18,7 @@ path.
 | `ci-report`              | `renma.ci-report.v1`                       | Representative revision-report whole-document golden        |
 | `inspect` outline        | `renma.inspect-outline.v1`                 | Representative whole-document golden                        |
 | `inspect --lines`        | `renma.inspect-slice.v1`                   | Representative whole-document golden                        |
-| `guide skill`            | `renma.skill-authoring-guide.v1`           | Representative whole-document golden                        |
+| `guide skill`            | `renma.skill-authoring-guide.v2`           | Representative whole-document golden                        |
 | `scaffold`               | `renma.scaffold.v1`                        | Representative whole-document golden                        |
 | `suggest-metadata`       | `renma.metadata-suggestion.v1`             | Representative whole-document golden                        |
 | `suggest-semantic-split` | `renma.semantic-split-suggestion.v1`       | Representative whole-document golden                        |
@@ -82,6 +82,23 @@ array. Suppressed results use the same diagnostic shape under
 `suppressedDiagnostics`, paired with their suppression evidence. Consumers
 must branch on `schemaVersion` and migrate field access rather than treating v2
 as an additive v1 extension.
+
+Skill Authoring Guide v2 replaces v1 because established interaction semantics
+changed. The overall Renma boundary is unchanged: the consuming LLM investigates,
+reasons, clarifies when needed, and edits; Renma supplies deterministic guidance
+and validates supplied structure; a human reviews meaningful decisions. In v2,
+`interaction.phases` contains adaptive authoring activities rather than a required
+ordered clarification algorithm, clarification is conditional on unresolved
+Blocking authoring decisions, question batching and blocker presentation are
+adaptive, and prerequisite-aware questioning is an invariant. Human review is
+owned explicitly by `interaction.humanReviewRules`, and
+`externalTraversalApplicabilityRule` dispatches consumers to the detailed
+`externalTraversalRules` when recursive external traversal may apply.
+
+Consumers must branch on `schemaVersion`: do not parse v2 using v1 assumptions
+about phase ordering, mandatory clarification, fixed question batches, or the
+last phase carrying human-review semantics. `renma.skill-authoring-guide.v1` is
+not reinterpreted or emitted as the new contract.
 
 Classification `matchedRule` and `reasonCode` values are open enums in JSON and
 in the public TypeScript wire types. Consumers must retain unfamiliar future

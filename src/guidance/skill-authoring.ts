@@ -11,7 +11,7 @@ export const SKILL_AUTHORING_PRINCIPLE =
 export const RENMA_FIRST_AUTHORING_BOUNDARY =
   "Use Renma to establish repository asset and metadata boundaries first. Use platform-native Skill authoring guidance to refine semantics within those boundaries.";
 export const SKILL_AUTHORING_GUIDE_SCHEMA_VERSION =
-  "renma.skill-authoring-guide.v1" as const;
+  "renma.skill-authoring-guide.v2" as const;
 
 export interface SkillAuthoringProgressionClasses {
   blocking: string;
@@ -66,6 +66,7 @@ export interface SkillAuthoringInteraction {
   postValidationActions: string[];
   persistenceRules: string[];
   handoffRules: string[];
+  humanReviewRules: string[];
 }
 
 export interface SkillAuthoringIllustration {
@@ -98,6 +99,7 @@ export interface SkillAuthoringGuidance {
   artifactRules: string[];
   concisenessRules: string[];
   metadataRules: string[];
+  externalTraversalApplicabilityRule: string;
   externalTraversalRules: string[];
   illustrationRules: string[];
   illustrations: SkillAuthoringIllustration[];
@@ -198,7 +200,6 @@ export function buildSkillAuthoringGuidance(
         "Establish the smallest justified Skill, Context, and support-file structure, then scaffold and author only within it.",
         "Validate with relevant Renma commands, classify findings, apply only uniquely supported repairs, and rerun relevant validation after changes.",
         "If refinement, source review, usage, or validation reveals a possible boundary change, stop structural edits, record the need as Proposed or Unresolved, investigate applicable evidence, ask only if human truth remains necessary, and re-enter the creation gate before updating the agreed structure.",
-        "Finish with human review supported by a compact summary of each material non-obvious decision, its governing evidence or authority, any evidence-backed consequence of changing it or, when the consequence is not established, a potential impact explicitly labeled Proposed or Unresolved, and remaining non-blocking uncertainty. Do not claim that the reviewer understood, approved, or independently verified the proposal.",
       ],
       truthSources: [
         "Explicit user statements: confirm user intent, governance decisions, source designation, fallback choices, and other decisions the user has authority to make; they do not by themselves prove the contents of a separately designated authoritative specification.",
@@ -307,6 +308,10 @@ export function buildSkillAuthoringGuidance(
         `When no Blocking authoring decision remains, construct a caller-declared ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff and invoke \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`. Keep Proposed, Unresolved, Reversible default, and Deferred state distinct; the supplied handoff declares readiness but does not prove the creation gate independently passed.`,
         "Renma remains non-interactive: the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic authoring rules and repository evidence; a human approves meaningful decisions.",
       ],
+      humanReviewRules: [
+        "Finish with human review supported by a compact summary of each material non-obvious decision, its governing evidence or authority, any evidence-backed consequence of changing it or, when the consequence is not established, a potential impact explicitly labeled Proposed or Unresolved, and remaining non-blocking uncertainty.",
+        "Do not claim that the reviewer understood, approved, or independently verified the proposal.",
+      ],
     },
     workflow: [
       "Satisfy the authoring contract without treating the interaction phases as a mandatory reasoning algorithm. Use clarification only when unresolved Blocking authoring decisions still require human truth, and re-enter the creation gate whenever asset boundaries may change.",
@@ -361,6 +366,8 @@ export function buildSkillAuthoringGuidance(
       "Preserve unknown existing vendor metadata when reviewing an existing Skill, but do not manufacture new provider-specific metadata without a requirement.",
       "Platform-native Skill authoring guidance is not the authority for Renma metadata, Context placement, repository asset boundaries, file count, source-of-truth representation, or whether scripts and support files should exist.",
     ],
+    externalTraversalApplicabilityRule:
+      "If the finished Skill may recursively follow references discovered inside an external source, consult and apply `externalTraversalRules` from the complete JSON reference before passing the creation gate.",
     externalTraversalRules: [
       "Apply this section only when the finished Skill may recursively follow references discovered inside an external source. Reading one or more explicitly named external sources is named source reading and does not by itself require a recursive traversal contract.",
       "When recursive external traversal is possible, define an explicit contract in the Skill body or justified Skill-local support owned by that Skill. Cover the approved source boundary, logical-source identity, visited-source registry, repeated-source behavior, relevance criteria, termination condition, page-count and depth safety caps, cycle behavior, ambiguous identity behavior, inaccessible-source behavior, and unresolved-reference reporting.",
