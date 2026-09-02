@@ -1199,9 +1199,11 @@ may reuse its low-level version and types; scaffold orchestrates it before any
 write. The module does not inspect repository contents, call a model, fetch a
 source, or claim that caller-declared authoring facts are true.
 
-The `interaction` object owns normative opening, phase, truth-source,
-epistemic, unknown-scope, progression, disposition, question, gate,
-validation, persistence, and handoff rules. `illustrationRules` and the
+The `interaction` object owns the authoring contract and reference guidance for
+opening, adaptive activities, truth sources, epistemic state, unknown scope,
+progression, disposition, questions, the gate, validation, persistence, and
+handoff. The legacy `phases` field contains useful authoring activities but its
+array order is not a required reasoning sequence. `illustrationRules` and the
 ordered top-level `illustrations` array remain structurally separate. They have
 no compatibility aliases because authoring guidance is an unversioned internal
 projection rather than an independently versioned schema.
@@ -1209,28 +1211,33 @@ projection rather than an independently versioned schema.
 Illustrations share one `SkillAuthoringIllustration` type and demonstrate
 authoring tensions rather than Skill categories. They may be ignored or used
 partially; no selector, similarity matcher, request classifier, or closest-example
-instruction exists. The prompt renders all protocol and illustration-usage
-rules before the non-normative collection. JSON serializes the same source
-directly. Illustration membership does not modify the normative interaction
-contract.
+instruction exists. JSON serializes the complete reference directly, including
+the non-normative collection. The compact prompt omits illustrations and points
+to JSON when conditional or reference detail is needed. Illustration membership
+does not modify the core authoring contract.
 
-`externalTraversalRules` is a top-level normative collection rendered after
-metadata rules and before illustration usage. It applies only to recursive
-discovery inside external sources. It defines what an authored Skill and its
-consuming runtime must specify; it neither authorizes nor causes Renma to
+`externalTraversalRules` is a top-level normative collection in the complete
+JSON reference. It applies only to recursive discovery inside external sources.
+It defines what an authored Skill and its consuming runtime must specify; it
+neither authorizes nor causes Renma to
 fetch, normalize, identify, or crawl external sources. It adds no illustration
 selector, traversal state metadata, hidden prompt package, or live visited
 registry.
 
-Prompt and JSON are intentionally different projections of that source. The
-prompt renders each illustration's title, demonstrated tensions, notice,
-request, and compact clarification. JSON also retains optional structure,
+Prompt and JSON are intentionally different projections of that source. JSON is
+the complete structured reference and retains every interaction activity,
+conditional traversal rule, handoff template, illustration, optional structure,
 responsibility, source-reference, additional-review, verification, and
-not-created-by-default fields. Renderer tests verify this focused projection;
-they do not require every JSON string to appear in the prompt.
+not-created-by-default field. The default prompt is the compact execution
+projection: core gate and evidence invariants, adaptive clarification guidance,
+asset responsibilities, handoff boundary, and verification. Renderer tests
+verify presence of the sufficient contract and deliberate omission of detailed
+reference material; they do not require every JSON string to appear in the
+prompt.
 
-`interaction` is normative for truth qualification, question behavior, gate
-entry and re-entry, finding classification, persistence, and semantic handoff.
+`interaction` is normative for truth qualification, the outcomes questioning
+must preserve, gate entry and re-entry, finding classification, persistence,
+and semantic handoff. Its strategies do not prescribe internal reasoning.
 The legacy `workflow` projection is only a short top-level summary, while
 placement, artifact, metadata, and conciseness sections retain rules they
 uniquely own. Renderers add headings and list formatting; they do not recreate
@@ -1239,10 +1246,19 @@ protocol decisions.
 Epistemic and progression classifications are independent. Confirmed, Proposed,
 and Unresolved describe support for a decision; Blocking, Reversible default,
 and Deferred describe whether the consuming LLM may proceed. The interaction
-contract requires the LLM to retain the complete blocker set while asking at
-most three closely related questions per turn, then pass the gate only when no
-Blocking decision remains. These are prompt instructions and JSON guidance, not
-stored Renma workflow state.
+contract requires the LLM to retain unresolved Blocking decisions until they
+are resolved and to pass the gate only when none remains. Clarification is not
+required when the request and applicable evidence already establish the gate.
+Small focused batches are adaptive guidance rather than fixed correctness
+requirements, and the complete blocker set need not be reproduced in every
+response.
+
+Question dependency is an invariant: do not ask a downstream authoring decision
+whose meaningful answer depends on an unresolved upstream decision. Investigate
+or resolve the prerequisite first. Renma does not require an explicit decision
+tree, graph, frontier, round-based algorithm, persisted conversation state, or
+new metadata. Dependency management remains in the consuming LLM's temporary
+reasoning state.
 
 Unknown scope and disposition remain separate from both axes. An authoring
 decision defines repository structure or Skill behavior and may block the gate;

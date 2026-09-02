@@ -331,7 +331,7 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     authoring,
-    /After the clarification gate[\s\S]*platform-native Skill authoring guidance may refine[\s\S]*not the authority for Renma metadata/,
+    /After the creation gate passes[\s\S]*platform-native Skill authoring guidance may refine[\s\S]*not the authority for Renma metadata/,
   );
   assert.match(
     authoring,
@@ -339,7 +339,11 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     authoring,
-    /`renma guide skill` remains deterministic and non-interactive[\s\S]*the consuming LLM conducts the conversation/,
+    /`renma guide skill` remains deterministic and non-interactive[\s\S]*the consuming LLM conducts any needed conversation/,
+  );
+  assert.match(
+    authoring,
+    /authoritative for Renma's authoring boundaries[\s\S]*not an authoritative description[\s\S]*internal reasoning algorithm/,
   );
   assert.match(
     authoring,

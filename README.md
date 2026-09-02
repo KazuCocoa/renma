@@ -139,7 +139,7 @@ fields. See
 for the exact current and compatibility forms.
 
 Run `renma guide skill` before generating a new Skill. It prints a deterministic
-clarification and creation-gate protocol for the consuming LLM. Renma remains
+creation-gate contract with adaptive clarification guidance for the consuming LLM. Renma remains
 non-interactive: the LLM investigates and proposes, Renma validates supplied
 structure and the resulting repository evidence it can determine, and a human
 reviews meaningful decisions. Renma does not certify caller-declared human or

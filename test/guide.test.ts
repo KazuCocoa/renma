@@ -40,9 +40,13 @@ test("guide skill defaults to deterministic prompt output for the installed vers
   );
   assert.match(
     defaultResult.stdout,
-    /begin with interactive clarification\. Do not create files immediately/,
+    /Before creating files, evaluate the creation gate/,
   );
-  assert.match(defaultResult.stdout, /one to three focused questions/);
+  assert.match(defaultResult.stdout, /clarification is not required/i);
+  assert.match(
+    defaultResult.stdout,
+    /question count, batching, and turn structure are adaptive strategies/,
+  );
   assert.match(
     defaultResult.stdout,
     /Confirmed:[\s\S]*Proposed:[\s\S]*Unresolved:/,
@@ -102,7 +106,7 @@ test("guide skill defaults to deterministic prompt output for the installed vers
   assert.match(defaultResult.stdout, /human review/i);
 });
 
-test("guide skill JSON and --json are equivalent small structured projections", async () => {
+test("guide skill JSON and --json are equivalent complete deterministic projections", async () => {
   const formatResult = await capture(() =>
     main(["guide", "skill", "--format", "json"]),
   );
@@ -244,53 +248,47 @@ test("guide skill JSON and --json are equivalent small structured projections", 
   );
 });
 
-test("guide renderers derive focused prompt and complete JSON from one source", () => {
+test("guide renderers derive a compact execution prompt and complete JSON reference", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
   const prompt = renderSkillGuidePrompt(guidance);
   const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
 
   assert.deepEqual(json, guidance);
+  assert.ok(prompt.length < renderSkillGuideJson(guidance).length);
   for (const heading of [
-    "Interactive authoring protocol",
-    "Authoring workflow",
-    "Placement rules",
+    "Core authoring contract",
+    "Evidence and epistemic state",
+    "Adaptive clarification guidance",
+    "Creation gate",
+    "Asset boundary rules",
     "Artifact rules",
     "Conciseness rules",
     "Metadata rules",
-    "External reference traversal rules",
-    "How to use illustrations",
-    "Non-normative authoring illustrations",
+    "Durable handoff boundary",
     "Verification",
+    "Complete reference",
   ]) {
     assert.match(prompt, new RegExp(escapeRegExp(heading)));
   }
   for (const value of collectStrings({
     principle: guidance.principle,
-    interaction: guidance.interaction,
-    workflow: guidance.workflow,
+    truthSources: guidance.interaction.truthSources,
+    decisionClasses: guidance.interaction.decisionClasses,
+    unknownScopes: guidance.interaction.unknownScopes,
+    progressionClasses: guidance.interaction.progressionClasses,
+    unresolvedItemDispositions: guidance.interaction.unresolvedItemDispositions,
+    questionRules: guidance.interaction.questionRules,
+    creationGate: guidance.interaction.creationGate,
+    postValidationActions: guidance.interaction.postValidationActions,
+    persistenceRules: guidance.interaction.persistenceRules,
+    handoffRules: guidance.interaction.handoffRules,
     placementRules: guidance.placementRules,
     artifactRules: guidance.artifactRules,
     concisenessRules: guidance.concisenessRules,
     metadataRules: guidance.metadataRules,
-    externalTraversalRules: guidance.externalTraversalRules,
-    illustrationRules: guidance.illustrationRules,
     verification: guidance.verification,
   })) {
     assert.ok(prompt.includes(value), value);
-  }
-  for (const illustration of guidance.illustrations) {
-    assert.match(
-      prompt,
-      new RegExp(`Illustration: ${escapeRegExp(illustration.title)}`),
-    );
-    for (const value of collectStrings({
-      demonstrates: illustration.demonstrates,
-      notice: illustration.notice,
-      request: illustration.request,
-      clarification: illustration.clarification,
-    })) {
-      assert.ok(prompt.includes(value), value);
-    }
   }
   const sourceBacked = getIllustration(guidance, "source-backed-boundary");
   assert.ok(sourceBacked.initialStructure);
@@ -299,8 +297,16 @@ test("guide renderers derive focused prompt and complete JSON from one source", 
   assert.ok(sourceBacked.additionalReview);
   assert.ok(sourceBacked.verification);
   assert.ok(sourceBacked.notCreatedByDefault);
+  assert.deepEqual(json.illustrations, guidance.illustrations);
+  assert.deepEqual(
+    json.externalTraversalRules,
+    guidance.externalTraversalRules,
+  );
+  assert.doesNotMatch(prompt, /Non-normative authoring illustrations/);
+  assert.doesNotMatch(prompt, /Illustration:/);
+  assert.doesNotMatch(prompt, /Template \(replace placeholder values/);
+  assert.doesNotMatch(prompt, /visited-source registry/);
   assert.doesNotMatch(prompt, /skills\/build-example-product-json\/SKILL\.md/);
-  assert.doesNotMatch(prompt, /Optional illustration-specific structure/);
   assert.doesNotMatch(prompt, /Inspect the Context body/);
 });
 
@@ -311,8 +317,8 @@ test("illustration rules prohibit template selection and preserve normative cont
   const gate = guidance.interaction.creationGate.join("\n");
   const rules = guidance.illustrationRules.join("\n");
 
-  assert.match(prompt, /How to use illustrations/);
-  assert.match(prompt, /Illustrations are non-normative[\s\S]*may be ignored/);
+  assert.doesNotMatch(prompt, /How to use illustrations/);
+  assert.doesNotMatch(prompt, /Illustration:/);
   assert.match(rules, /may be ignored/);
   assert.match(
     rules,
@@ -413,54 +419,39 @@ test("conditional external traversal guidance defines finite authored behavior w
       "source-backed-boundary",
     ],
   );
-  assert.ok(
-    prompt.indexOf("External reference traversal rules") <
-      prompt.indexOf("How to use illustrations"),
-  );
+  assert.doesNotMatch(prompt, /visited-source registry/);
+  assert.match(prompt, /conditional external-traversal guidance/);
   assert.doesNotMatch(
     prompt,
     /Confluence|source graph|URL normalization example/i,
   );
 });
 
-test("interactive protocol is the prompt entrypoint before placement and artifact rules", () => {
+test("core contract is the prompt entrypoint before asset and artifact rules", () => {
   const prompt = renderSkillGuidePrompt(
     buildSkillAuthoringGuidance("test-version"),
   );
-  const principleIndex = prompt.indexOf("Principle");
-  const interactionIndex = prompt.indexOf("Interactive authoring protocol");
+  const interactionIndex = prompt.indexOf("Core authoring contract");
   const openingIndex = prompt.indexOf(
-    "begin with interactive clarification. Do not create files immediately.",
+    "Before creating files, evaluate the creation gate",
   );
-  const placementIndex = prompt.indexOf("Placement rules");
+  const placementIndex = prompt.indexOf("Asset boundary rules");
   const artifactIndex = prompt.indexOf("Artifact rules");
   const metadataIndex = prompt.indexOf("Metadata rules");
-  const externalTraversalIndex = prompt.indexOf(
-    "External reference traversal rules",
-  );
-  const usageIndex = prompt.indexOf("How to use illustrations");
-  const illustrationsIndex = prompt.indexOf(
-    "Non-normative authoring illustrations",
-  );
-  const verificationIndex = prompt.indexOf("Verification", illustrationsIndex);
+  const handoffIndex = prompt.indexOf("Durable handoff boundary");
+  const verificationIndex = prompt.indexOf("Verification", handoffIndex);
 
-  assert.ok(principleIndex >= 0);
-  assert.ok(interactionIndex > principleIndex);
+  assert.ok(interactionIndex >= 0);
   assert.ok(openingIndex > interactionIndex);
   assert.ok(placementIndex > openingIndex);
   assert.ok(artifactIndex > placementIndex);
   assert.ok(metadataIndex > artifactIndex);
-  assert.ok(externalTraversalIndex > metadataIndex);
-  assert.ok(usageIndex > externalTraversalIndex);
-  assert.ok(illustrationsIndex > usageIndex);
-  assert.ok(verificationIndex > illustrationsIndex);
-  assert.doesNotMatch(
-    prompt.slice(interactionIndex, prompt.indexOf("Authoring workflow")),
-    /Illustration:/,
-  );
+  assert.ok(handoffIndex > metadataIndex);
+  assert.ok(verificationIndex > handoffIndex);
+  assert.doesNotMatch(prompt, /Illustration:/);
 });
 
-test("interactive protocol separates truth, proposals, and focused questions", () => {
+test("authoring contract separates truth, proposals, and adaptive questions", () => {
   const interaction = buildSkillAuthoringGuidance("test-version").interaction;
   const truth = interaction.truthSources.join("\n");
   const questions = interaction.questionRules.join("\n");
@@ -479,7 +470,11 @@ test("interactive protocol separates truth, proposals, and focused questions", (
   assert.match(questions, /security profiles/);
   assert.match(questions, /nearby validated examples/);
   assert.match(questions, /conflicting or unhealthy conventions/);
-  assert.match(questions, /one to three closely related questions/);
+  assert.match(questions, /often one to three closely related questions/);
+  assert.match(
+    questions,
+    /adaptive strategies rather than correctness requirements/,
+  );
   assert.match(questions, /do not send a comprehensive questionnaire/i);
   assert.match(questions, /Do not require a plan-mode-quality specification/);
   assert.match(questions, /use your judgment/);
@@ -544,8 +539,15 @@ test("authoring decisions and runtime task unknowns have separate scope and disp
     "defer",
     "reportAsFinding",
   ]);
-  assert.match(dispositions.askNow, /current-stage Blocking decision theme/);
-  assert.match(dispositions.queueAsBlocker, /complete blocker set/);
+  assert.match(
+    dispositions.askNow,
+    /Blocking authoring decision that still requires human truth/,
+  );
+  assert.match(
+    dispositions.askNow,
+    /prerequisites make the question answerable/,
+  );
+  assert.match(dispositions.queueAsBlocker, /temporary authoring state/);
   assert.match(
     dispositions.proceedWithReversibleDefault,
     /safe Proposed choice/,
@@ -626,12 +628,6 @@ test("review workflow is a first-class non-API clarification example", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
   const illustration = getIllustration(guidance, "report-first-progression");
   const example = illustration.clarification;
-  const prompt = renderSkillGuidePrompt(guidance);
-  const reviewStart = prompt.indexOf(
-    "Illustration: Report-first progression with runtime findings",
-  );
-  const reviewEnd = prompt.indexOf("Illustration:", reviewStart + 1);
-  const renderedReview = prompt.slice(reviewStart, reviewEnd);
   const serialized = JSON.stringify(example);
 
   assert.match(
@@ -682,13 +678,10 @@ test("review workflow is a first-class non-API clarification example", () => {
     example.progression.deferred.join("\n"),
     /stronger authority or completion policy[\s\S]*adjudicate mismatches rather than report them/,
   );
-  assert.match(renderedReview, /Blocking decisions: 0/);
-  assert.match(renderedReview, /Proceeding with reversible defaults/);
-  assert.doesNotMatch(renderedReview, /\nQuestions?\n/);
   assert.doesNotMatch(serialized, /API|schema|timeout|retry/);
 });
 
-test("question batches retain the complete blocker set and define proceeding", () => {
+test("adaptive questions retain blockers and define safe proceeding", () => {
   const interaction = buildSkillAuthoringGuidance("test-version").interaction;
   const questions = interaction.questionRules.join("\n");
   const gate = interaction.creationGate.join("\n");
@@ -699,27 +692,23 @@ test("question batches retain the complete blocker set and define proceeding", (
   );
   assert.match(
     questions,
-    /one to three closely related questions applies to the current turn, not to the total number/,
+    /small focused batch, often one to three closely related questions, is a useful default/,
   );
   assert.match(
     questions,
-    /never impose an arbitrary maximum on that total set/,
+    /question count, batching, and turn structure are adaptive strategies rather than correctness requirements/,
   );
   assert.match(
     questions,
-    /keep additional Blocking decisions visible as queued blockers/,
+    /Do not hide a Blocking decision or relabel it Deferred/,
   );
   assert.match(
     questions,
-    /continue with the next batch after the user answers/,
+    /without requiring the complete set to be repeated in every response/,
   );
   assert.match(
     questions,
-    /Never relabel an unasked Blocking decision as Deferred merely because the batch limit was reached/,
-  );
-  assert.match(
-    questions,
-    /Blocking count, questions being asked, queued blockers/,
+    /compact Current progression summary when it materially helps/,
   );
   assert.match(
     gate,
@@ -732,6 +721,50 @@ test("question batches retain the complete blocker set and define proceeding", (
   assert.match(
     gate,
     /keep them Proposed or Unresolved rather than presenting them as Confirmed/,
+  );
+});
+
+test("clarification is unnecessary when no Blocking authoring decision remains", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const prompt = renderSkillGuidePrompt(
+    buildSkillAuthoringGuidance("test-version"),
+  );
+
+  assert.match(interaction.openingRule, /evaluate the creation gate/);
+  assert.match(
+    interaction.openingRule,
+    /proceed without mandatory clarification/,
+  );
+  assert.match(
+    interaction.questionRules.join("\n"),
+    /If no Blocking decision remains, clarification is not required/,
+  );
+  assert.match(prompt, /proceed without mandatory clarification/);
+});
+
+test("questioning is prerequisite-aware without prescribing a decision algorithm", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const questions = interaction.questionRules.join("\n");
+  const json = renderSkillGuideJson(
+    buildSkillAuthoringGuidance("test-version"),
+  );
+
+  assert.match(
+    questions,
+    /Do not ask for a downstream authoring decision when a meaningful answer depends on an unresolved upstream authoring decision/,
+  );
+  assert.match(questions, /Resolve or investigate the prerequisite first/);
+  assert.match(
+    questions,
+    /any temporary reasoning or dependency-tracking strategy/,
+  );
+  assert.match(
+    questions,
+    /no explicit decision graph, frontier, round-based algorithm, persisted state, or metadata/,
+  );
+  assert.doesNotMatch(
+    json,
+    /must (?:build|maintain|persist) (?:a |an )?(?:decision )?(?:tree|graph|frontier)/i,
   );
 });
 
@@ -863,7 +896,7 @@ test("creation gate distinguishes blocking truth from refinable details", () => 
   );
 });
 
-test("platform-native handoff occurs only after the Renma clarification gate", () => {
+test("platform-native handoff occurs only after the Renma creation gate", () => {
   const handoff =
     buildSkillAuthoringGuidance("test-version").interaction.handoffRules.join(
       "\n",
@@ -871,7 +904,7 @@ test("platform-native handoff occurs only after the Renma clarification gate", (
 
   assert.match(
     handoff,
-    /must not independently generate.*before the Renma clarification gate/,
+    /must not independently generate.*before the Renma creation gate passes/,
   );
   assert.match(handoff, /After the gate/);
   assert.match(handoff, /from the Renma scaffold and agreed structure/);
@@ -969,7 +1002,7 @@ test("asset-boundary discoveries re-enter clarification and the creation gate", 
     /ask only when human truth remains necessary|ask if needed/,
   );
   assert.match(combined, /re-enter the creation gate/);
-  assert.match(combined, /update the agreed structure after it passes/);
+  assert.match(combined, /before updating the agreed structure/);
   assert.match(
     handoff,
     /instead of silently changing files, metadata, Context relationships, scripts, examples, or support assets/,
@@ -992,7 +1025,6 @@ test("Example Product API separates authoring blockers from runtime source knowl
   const clarification = illustration.clarification;
   assert.ok(clarification.progression);
   assert.ok(clarification.runtimeTaskUnknowns);
-  const prompt = renderSkillGuidePrompt(guidance);
   const unresolved = clarification.unresolved.join("\n");
   const blockers = clarification.progression.blocking.join("\n");
 
@@ -1029,14 +1061,9 @@ test("Example Product API separates authoring blockers from runtime source knowl
     unresolved,
     /current Example Product API schema|current documented fields and constraints|Operation-specific behavior/,
   );
-  assert.match(
-    prompt,
-    /Epistemically unresolved runtime task knowledge handled by the finished Skill/,
-  );
   for (const runtimeUnknown of clarification.runtimeTaskUnknowns) {
     assert.ok(!clarification.unresolved.includes(runtimeUnknown));
     assert.ok(!clarification.progression.blocking.includes(runtimeUnknown));
-    assert.equal(countOccurrences(prompt, runtimeUnknown), 1, runtimeUnknown);
   }
   assert.equal(clarification.questions.length, 3);
   assert.equal(clarification.progression.blocking.length, 5);
@@ -1093,44 +1120,19 @@ test("Example Product API separates authoring blockers from runtime source knowl
   );
 });
 
-test("progression rendering distinguishes proposed defaults and queued subsets", () => {
-  const prompt = renderSkillGuidePrompt(
-    buildSkillAuthoringGuidance("test-version"),
-  );
-  const exampleStart = prompt.indexOf(
-    "Illustration: Source-backed authority and access boundary",
-  );
-  const start = prompt.indexOf("Current progression", exampleStart);
-  const end = prompt.indexOf("Questions", start);
-  const progression = prompt.slice(start, end);
-  const owner =
-    "The Context owner when applicable repository evidence does not supply one.";
-
-  assert.match(progression, /Blocking decisions: 5/);
-  assert.match(progression, /Proposed reversible defaults/);
-  assert.doesNotMatch(progression, /Proceeding with reversible defaults/);
-  assert.match(
-    progression,
-    /Queued from the complete blocker list above \(not additional\): 3, 4\./,
-  );
-  assert.equal(countOccurrences(progression, owner), 1);
-});
-
-test("review progression renders safe proceeding without mandatory questions", () => {
+test("complete JSON retains illustration progression while prompt omits it", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
   const prompt = renderSkillGuidePrompt(guidance);
-  const exampleStart = prompt.indexOf(
-    "Illustration: Report-first progression with runtime findings",
-  );
-  const start = prompt.indexOf("Current progression", exampleStart);
-  const end = prompt.indexOf("Illustration:", start);
-  const progression = prompt.slice(start, end);
+  const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
+  const review = getIllustration(json, "report-first-progression");
+  const sourceBacked = getIllustration(json, "source-backed-boundary");
 
-  assert.match(progression, /Blocking decisions: 0/);
-  assert.match(progression, /Proceeding with reversible defaults/);
-  assert.doesNotMatch(progression, /Proposed reversible defaults/);
-  assert.doesNotMatch(progression, /Asking now: 0/);
-  assert.doesNotMatch(progression, /\nQuestions?\n/);
+  assert.deepEqual(review.clarification.progression?.blocking, []);
+  assert.equal(review.clarification.questions.length, 0);
+  assert.equal(sourceBacked.clarification.progression?.blocking.length, 5);
+  assert.equal(sourceBacked.clarification.questions.length, 3);
+  assert.doesNotMatch(prompt, /Blocking decisions: 5/);
+  assert.doesNotMatch(prompt, /Example Product API/);
 });
 
 test("workflow summary cross-references interaction rules without duplicating them", () => {
@@ -1140,7 +1142,7 @@ test("workflow summary cross-references interaction rules without duplicating th
   assert.equal(guidance.workflow.length, 2);
   assert.match(
     guidance.workflow.join("\n"),
-    /normative interactive phases above/,
+    /without treating the interaction phases as a mandatory reasoning algorithm/,
   );
   for (const rule of [
     "A finding is not a deterministic repair merely because its detection is deterministic.",

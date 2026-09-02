@@ -27,12 +27,14 @@ Renma does not call an LLM, conduct an authoring conversation, ask the user
 questions, retain session state, select, retrieve, or load runtime context,
 assemble prompts, inject context, execute agents, or collect runtime telemetry.
 
-Run `renma guide skill` before generation. It prints a deterministic protocol
-that tells the consuming LLM to clarify the request, inspect applicable
-user-provided artifacts, repository evidence, and permitted authoritative
+Run `renma guide skill` before generation. It prints a deterministic authoring
+contract that tells the consuming LLM to evaluate the creation gate, inspect
+applicable user-provided artifacts, repository evidence, and permitted authoritative
 source content, separate confirmed facts from proposals and unresolved human
-truth, classify progression separately, and ask one to three focused questions
-per batch while retaining the complete blocker set. Renma itself remains
+truth, classify progression separately, and ask only about unresolved Blocking
+authoring decisions that still require human truth. Clarification is unnecessary
+when the request and applicable evidence already establish every gate
+requirement. Renma itself remains
 non-interactive. The external LLM investigates and proposes, Renma validates
 the supplied structure and repository evidence it can determine, and a human
 reviews meaningful decisions. Renma does not independently certify that an
@@ -57,7 +59,7 @@ authoring evidence, not a Renma asset or conversation file:
 
 ```text
 renma guide skill
-  -> external LLM clarifies and reviews available evidence
+  -> external LLM reviews applicable evidence and clarifies only if needed
   -> no declared Blocking authoring decision remains
   -> external LLM writes renma.skill-authoring-handoff.v1 JSON
   -> renma scaffold skill <agreed-path> --handoff <handoff.json>
@@ -765,8 +767,9 @@ Read these reports together:
 - `graph` shows how skills and contexts are connected.
 - `readiness` summarizes repository-level health and checks.
 
-When creating a Skill, run `renma guide skill`; let the consuming LLM clarify
-human truth, inspect relevant evidence, and pass the creation gate; then define
+When creating a Skill, run `renma guide skill`; let the consuming LLM inspect
+relevant evidence, clarify unresolved Blocking human truth only when needed,
+and pass the creation gate; then define
 the smallest intended asset graph, record a
 `renma.skill-authoring-handoff.v1` exchange artifact, run
 `scaffold skill <path> --handoff <handoff.json>` once, create or reuse only
@@ -886,12 +889,15 @@ deterministic. Renma never moves a file based on content. A successful
 Use this flow when adding a new agent-facing Skill. Renma defines the repository
 contract and creates one compatible starting point; platform-native Skill
 authoring guidance refines Skill semantics within that contract only after the
-clarification gate.
+creation gate passes.
 
 ```mermaid
 flowchart LR
-  Guide["Run renma guide skill"] --> Clarify["LLM clarifies truth and batches blockers"]
-  Clarify --> Structure["Declare no blockers and define the smallest asset structure"]
+  Guide["Run renma guide skill"] --> Gate["LLM investigates evidence and evaluates the gate"]
+  Gate --> Clarify{"Blocking human truth remains?"}
+  Clarify -- Yes --> Ask["Ask the smallest dependency-ready clarification"]
+  Ask --> Gate
+  Clarify -- No --> Structure["Declare no blockers and define the smallest asset structure"]
   Structure --> Handoff["Write renma.skill-authoring-handoff.v1"]
   Handoff --> Scaffold["Run renma scaffold skill --handoff once"]
   Scaffold --> Context["Scaffold or reuse justified Context"]
@@ -899,7 +905,7 @@ flowchart LR
   Complete --> Validate["Run renma scan . --fail-on high"]
   Validate --> Evidence["Classify findings and inspect evidence"]
   Evidence --> Boundary{"Asset boundary change?"}
-  Boundary -- Yes --> Clarify
+  Boundary -- Yes --> Gate
   Boundary -- No --> Fix["Apply uniquely supported repairs and rerun"]
   Fix --> Review["Human review"]
 ```
@@ -910,20 +916,26 @@ finished Skill later according to its own runtime behavior.
 1. Run `renma guide skill`. The consuming LLM develops a provisional
    understanding, inspects only applicable truth sources, separates Confirmed,
    Proposed, and Unresolved decisions from Blocking, Reversible default, and
-   Deferred progression, and asks one to three focused questions per turn. The
-   complete Blocking set remains visible; additional blockers are queued for the
-   next batch rather than hidden or relabeled Deferred. The user need not provide
-   a plan-quality specification. Repository evidence must be applicable,
+   Deferred progression, and evaluates the creation gate. If the request and
+   evidence establish every gate requirement, it proceeds without clarification.
+   Otherwise it asks only about unresolved Blocking authoring decisions that
+   still require human truth. Retain the complete Blocking set in temporary
+   authoring state rather than hiding blockers or relabeling them Deferred; show
+   enough state for the user to understand material blockers and progress. The
+   user need not provide a plan-quality specification. Repository evidence must be applicable,
    effective, and unambiguous; supplied artifacts need clear provenance and
    applicability; source content must be successfully consulted or supplied
    rather than recalled from model memory.
 
-   Classify unknown scope before progression. Ask now or queue only authoring
+   Classify unknown scope before progression. Ask now or retain only authoring
    decision themes that block the current stage; use safe Proposed defaults,
    Defer non-material items, and make evidence-backed runtime unknowns findings
-   in the finished Skill's output. Group related raw gaps into themes and
-   reassess them only at meaningful workflow stage transitions. When the next
-   execution stage depends on a runtime task unknown, treat it as a runtime-stage
+   in the finished Skill's output. Do not ask a downstream decision when a
+   meaningful answer depends on an unresolved upstream decision; investigate or
+   resolve the prerequisite first. A small focused question batch is a useful
+   default, not a fixed correctness rule or required decision-graph algorithm.
+   Reassess relevant unknowns at meaningful workflow stage transitions. When
+   the next execution stage depends on a runtime task unknown, treat it as a runtime-stage
    blocker and follow the Skill's authored ask, report, defer, or stop policy;
    do not add the task-instance fact to the authoring creation-gate blocker set.
    Return to authoring clarification only when that policy or an asset boundary
@@ -936,8 +948,8 @@ finished Skill later according to its own runtime behavior.
    tags, examples, and speculative future extensions do not block creation.
    Proceed when no Blocking decision remains; visible safe reversible defaults
    and meaningful Deferred decisions may remain Proposed or Unresolved. See the
-   [Authoring Guide](authoring-guide.md#progression-and-question-batches) for the
-   complete batching and boundary-reconsideration protocol.
+   [Authoring Guide](authoring-guide.md#progression-and-adaptive-questioning) for the
+   complete interaction and boundary-reconsideration contract.
 
 2. After the supplied state declares no Blocking decisions, have the external
    LLM write a `renma.skill-authoring-handoff.v1` JSON file. Its
@@ -2945,45 +2957,48 @@ renma guide skill --format json
 renma guide skill --json
 ```
 
-Prompt is the default. Prompt and JSON are projections of the same structured
-guidance data and include the installed Renma version. The command writes only
+Prompt is the default. It is a compact execution projection of the core
+contract; JSON is the complete deterministic structured reference. Both derive
+from the same guidance data and include the installed Renma version. The command writes only
 to stdout, needs no repository, and performs no filesystem or network
 operations. Missing or unknown topics and unsupported arguments exit `2`; use
 `renma guide --help` for the supported contract.
 
-The default prompt always includes the interactive authoring protocol. It tells
-the consuming LLM—not Renma—to develop a provisional understanding, inspect
-applicable truth sources, distinguish Confirmed, Proposed, and Unresolved
-decisions, classify Blocking, Reversible default, and Deferred progression
-separately, ask one to three focused questions per batch without dropping queued
-blockers, pass the creation gate, classify findings conservatively, and re-enter
-the gate when asset boundaries may change. It also distinguishes authoring
-decisions from runtime task unknowns and gives unresolved items an action:
+The default prompt includes the smallest sufficient authoring contract. It tells
+the consuming LLM—not Renma—to inspect applicable truth sources, distinguish
+Confirmed, Proposed, and Unresolved decisions, classify Blocking, Reversible
+default, and Deferred progression separately, evaluate and pass the creation
+gate, ask only when unresolved Blocking human truth remains, classify findings
+conservatively, and re-enter the gate when asset boundaries may change. It also
+distinguishes authoring decisions from runtime task unknowns and gives unresolved items an action:
 Ask now, Queue as blocker, Proceed with reversible default, Defer, or Report as
-finding. These working classifications are not repository metadata or stored
-conversation state.
+finding. Questions should respect prerequisite dependencies; their count and
+batching are adaptive, and Renma requires no decision graph, frontier, or
+round-based algorithm. These working classifications are not repository metadata
+or stored conversation state.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 
 Both projections describe the small
 `renma.skill-authoring-handoff.v1` contract. JSON includes a structured
 `handoff` section with its purpose, trust boundary, construction rules, and a
-template; the default prompt includes a concise template rather than a full
-JSON Schema. The consuming LLM creates a filled handoff only after no declared
+template; the default prompt includes the handoff boundary and directs
+consumers to JSON for the template and complete reference. The consuming LLM
+creates a filled handoff only after no declared
 Blocking authoring decision remains. `guide` never fills or writes one itself.
 
-The protocol is domain-neutral and structurally separate from its optional
-illustrations. Renma does not classify a request by matching it to a built-in
+The complete reference is domain-neutral and structurally separate from its
+optional illustrations. Renma does not classify a request by matching it to a built-in
 example or ask the LLM to choose the closest one. The consuming LLM applies the
-normative protocol to current evidence. It may ignore illustrations or combine
+core contract to current evidence. It may ignore illustrations or combine
 individual decision patterns, but must not copy their workflows, structures,
 questions, completion criteria, security policies, unresolved items, or domain
-assumptions as templates. Optional illustrations do not change the normative
-interaction protocol.
+assumptions as templates. Optional illustrations do not change the core
+authoring contract.
 
-The default prompt keeps illustrations compact to reduce anchoring. JSON retains
-their useful optional structures and source-specific review details. Both
-projections derive from the same structured guidance source; they are not
+The default prompt omits illustrations to reduce anchoring. JSON retains their
+useful optional structures and source-specific review details. Both projections
+derive from the same structured guidance source; they are intentionally not
 required to render every field identically.
 
 Use it before generation, or when intentionally redesigning asset boundaries,
