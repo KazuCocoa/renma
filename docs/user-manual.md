@@ -45,22 +45,27 @@ contract from runtime task unknowns the finished Skill should detect, report,
 request, or handle safely. Runtime task unknowns do not automatically block
 creation, and “do not guess” does not mean stop on every unknown.
 
-After blocking creation-gate decisions are resolved, platform-native Skill
-authoring guidance may refine trigger descriptions, instructions, workflows,
-constraints, completion criteria, and ambiguity-resolving examples only within
-the agreed Renma boundaries. It is not the authority for Renma metadata,
-Context placement, file count, source-of-truth representation, or support files
-and scripts.
+Only after every creation-gate requirement is established, including the
+smallest justified asset structure, no Blocking authoring decision remains, and
+the gate is declared passed may platform-native Skill authoring guidance refine
+trigger descriptions, instructions, workflows, constraints, completion
+criteria, and ambiguity-resolving examples within the agreed Renma boundaries.
+It is not the authority for Renma metadata, Context placement, file count,
+source-of-truth representation, or support files and scripts.
 
 For agent workflows, the consuming LLM records the result in the versioned
-`renma.skill-authoring-handoff.v1` exchange contract after the supplied state
-declares no remaining Blocking decisions. The handoff is caller-declared
-authoring evidence, not a Renma asset or conversation file:
+`renma.skill-authoring-handoff.v1` exchange contract only after every
+creation-gate requirement is established, including the smallest justified
+asset structure, no Blocking decision remains, and the gate is declared passed.
+The handoff is caller-declared authoring evidence, not a Renma asset or
+conversation file:
 
 ```text
 renma guide skill
   -> external LLM reviews applicable evidence and clarifies only if needed
+  -> establish every creation-gate requirement, including the smallest justified asset structure
   -> no declared Blocking authoring decision remains
+  -> declare the creation gate passed
   -> external LLM writes renma.skill-authoring-handoff.v1 JSON
   -> renma scaffold skill <agreed-path> --handoff <handoff.json>
   -> external LLM authors within the scaffold
@@ -68,14 +73,20 @@ renma guide skill
   -> human review
 ```
 
+These arrows show externally observable dependencies, not a prescribed LLM
+reasoning algorithm. The LLM may combine and revisit activities internally, and
+clarification remains unnecessary when applicable evidence already establishes
+the gate requirements.
+
 Renma reads this file locally, validates its version, bounded structure,
 declared gate state, canonical Skill identity, target agreement, relationship
 consistency, and resource kinds, then applies the supplied structural values.
 It does not prove that clarification happened, every blocker was discovered,
 a designated source is authoritative or was consulted, a human approved every
 decision, or the declared facts are true. Proposed reversible defaults and
-Unresolved Deferred items may remain; only a non-empty `progression.blocking`
-list prevents scaffolding.
+Unresolved Deferred items may remain. At Renma's structural validation boundary,
+a non-empty `progression.blocking` list prevents scaffolding; an empty list does
+not independently prove that the authoring creation gate passed.
 
 ## Install And Build
 

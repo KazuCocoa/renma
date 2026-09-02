@@ -145,8 +145,10 @@ structure and the resulting repository evidence it can determine, and a human
 reviews meaningful decisions. Renma does not certify caller-declared human or
 domain truth.
 
-After no declared Blocking authoring decision remains, the external LLM can
-write `renma.skill-authoring-handoff.v1` and invoke:
+After every creation-gate requirement is established, including the smallest
+justified asset structure, no Blocking authoring decision remains, and the gate
+is declared passed, the external LLM can write
+`renma.skill-authoring-handoff.v1` and invoke:
 
 ```bash
 renma scaffold skill skills/example/SKILL.md --handoff /tmp/example-handoff.json
@@ -208,7 +210,8 @@ The normal sequence is:
 
 ```bash
 npx renma guide skill
-# The consuming LLM clarifies blocking human decisions and passes the gate.
+# The LLM establishes every gate requirement, including the smallest justified
+# asset structure, clarifies only if needed, and then declares the gate passed.
 npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 # Use platform-native Skill authoring guidance within the agreed boundaries.
 npx renma scan . --fail-on high
