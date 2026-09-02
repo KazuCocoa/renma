@@ -5,10 +5,10 @@
   "principle": "Create the smallest non-redundant Renma asset graph that preserves execution clarity and traceability.",
   "handoff": {
     "schemaVersion": "renma.skill-authoring-handoff.v1",
-    "purpose": "Record caller-declared authoring decisions after no Blocking decision remains, then pass them from an external LLM or agent to `renma scaffold skill <path> --handoff <handoff.json>`.",
+    "purpose": "Record caller-declared authoring decisions only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking authoring decision remains; then pass them from an external LLM or agent to `renma scaffold skill <path> --handoff <handoff.json>`.",
     "boundary": "The handoff records supplied authoring evidence. Renma validates its structure and internal consistency; it does not prove that clarification occurred, every blocker was discovered, sources are authoritative, human review occurred, or declared facts are true.",
     "rules": [
-      "Construct the handoff only after the supplied authoring state declares no remaining Blocking decisions. Proposed reversible defaults and Unresolved Deferred decisions may remain in their original epistemic classes.",
+      "Construct the handoff only after the supplied authoring state declares that every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decisions remain. Proposed reversible defaults and Unresolved Deferred decisions may remain in their original epistemic classes.",
       "Keep the handoff small: creation-gate state, the core Skill contract, the smallest asset graph, ownership, declared Context and Lens relationships, local resource decisions, and significant source, security, and runtime-unknown decisions.",
       "Do not include finished Markdown, a conversation transcript, question history, private reasoning, or a complete implementation plan.",
       "Use provided, consulted, and designated_unconsulted source states without treating source designation as proof that source content was consulted.",
@@ -76,7 +76,7 @@
       "Investigate only the applicable evidence needed for material authoring decisions.",
       "Keep authoring decisions separate from runtime task unknowns, Confirmed facts separate from Proposed choices and Unresolved truth, and Blocking decisions separate from Reversible defaults and Deferred items.",
       "Resolve creation-gate requirements through applicable evidence, safe reversible defaults, or the smallest necessary clarification; do not ask when no Blocking decision remains.",
-      "Establish the smallest justified Skill, Context, and support-file structure, then scaffold and author only within it.",
+      "Establish the smallest justified Skill, Context, and support-file structure as a creation-gate requirement, then scaffold and author only within it after the gate passes.",
       "Validate with relevant Renma commands, classify findings, apply only uniquely supported repairs, and rerun relevant validation after changes.",
       "If refinement, source review, usage, or validation reveals a possible boundary change, stop structural edits, record the need as Proposed or Unresolved, investigate applicable evidence, ask only if human truth remains necessary, and re-enter the creation gate before updating the agreed structure."
     ],
@@ -140,9 +140,9 @@
       "Do not create files while any blocking decision remains unresolved, merely because a generic generator is available, or to make progress appear complete.",
       "Do not block creation on task-instance unknowns when the Skill contract can safely detect and report them with evidence, continue unaffected work, request runtime input only when needed, and stop without inventing truth when the requested output cannot be produced.",
       "Do not block creation on a complete plan, every edge case, final prose, all examples, finalized tags, speculative future capabilities, or perfect certainty about non-blocking details.",
-      "Proceed when no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.",
+      "The creation gate may be declared passed and authoring may proceed only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.",
       "When proceeding, identify the reversible defaults being used and meaningful Deferred decisions, keep them Proposed or Unresolved rather than presenting them as Confirmed, do not ask for redundant confirmation after the user has authorized progress, and re-enter clarification if later evidence changes their impact.",
-      "Once the gate passes, present the smallest proposed asset structure; ask for confirmation only for a meaningful discretionary boundary that remains uncertain.",
+      "Before declaring the gate passed, identify and present the smallest proposed asset structure; ask for confirmation only for a meaningful discretionary boundary that remains uncertain.",
       "Run the appropriate Renma scaffold commands, then refine generated content only within the established boundaries; re-enter this gate before changing those boundaries later."
     ],
     "postValidationActions": [
@@ -171,7 +171,7 @@
       "Platform-native Skill authoring guidance must not independently add metadata, Context Assets, scripts, examples, or support files outside the agreed structure.",
       "Platform-native Skill authoring guidance must not create a second target file through another generator.",
       "If semantic refinement reveals a justified asset-boundary change, stop structural edits and return the need to the Renma clarification protocol as Proposed or Unresolved; inspect evidence and re-enter the creation gate instead of silently changing files, metadata, Context relationships, scripts, examples, or support assets.",
-      "When no Blocking authoring decision remains, construct a caller-declared renma.skill-authoring-handoff.v1 handoff and invoke `renma scaffold skill <agreed-path> --handoff <handoff.json>`. Keep Proposed, Unresolved, Reversible default, and Deferred state distinct; the supplied handoff declares readiness but does not prove the creation gate independently passed.",
+      "Only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking authoring decision remains, construct a caller-declared renma.skill-authoring-handoff.v1 handoff and invoke `renma scaffold skill <agreed-path> --handoff <handoff.json>`. Keep Proposed, Unresolved, Reversible default, and Deferred state distinct; the supplied handoff declares readiness but does not prove the creation gate independently passed.",
       "Renma remains non-interactive: the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic authoring rules and repository evidence; a human approves meaningful decisions."
     ],
     "humanReviewRules": [
@@ -181,7 +181,7 @@
   },
   "workflow": [
     "Satisfy the authoring contract without treating the interaction phases as a mandatory reasoning algorithm. Use clarification only when unresolved Blocking authoring decisions still require human truth, and re-enter the creation gate whenever asset boundaries may change.",
-    "After the supplied state declares no Blocking decisions, record a renma.skill-authoring-handoff.v1 handoff, use `renma scaffold skill <agreed-path> --handoff <handoff.json>`, author within the agreed structure, run relevant Renma validation, and complete human review."
+    "After every creation-gate requirement is established, including the smallest justified asset structure, and the supplied state declares no Blocking decisions, record a renma.skill-authoring-handoff.v1 handoff, use `renma scaffold skill <agreed-path> --handoff <handoff.json>`, author within the agreed structure, run relevant Renma validation, and complete human review."
   ],
   "placementRules": [
     "Skill: keep the focused task contract in `SKILL.md`: positive and negative selection boundaries, required inputs and evidence, ordered steps and decisions, constraints and failure behavior, expected output, completion criteria, and verification.",

@@ -769,8 +769,9 @@ Read these reports together:
 
 When creating a Skill, run `renma guide skill`; let the consuming LLM inspect
 relevant evidence, clarify unresolved Blocking human truth only when needed,
-and pass the creation gate; then define
-the smallest intended asset graph, record a
+establish the smallest intended asset graph as a creation-gate requirement,
+and pass the gate only after every requirement is established and no Blocking
+decision remains; then record a
 `renma.skill-authoring-handoff.v1` exchange artifact, run
 `scaffold skill <path> --handoff <handoff.json>` once, create or reuse only
 justified Context Assets, complete the focused workflow, and validate with
@@ -897,8 +898,11 @@ flowchart LR
   Gate --> Clarify{"Blocking human truth remains?"}
   Clarify -- Yes --> Ask["Ask the smallest dependency-ready clarification"]
   Ask --> Gate
-  Clarify -- No --> Structure["Declare no blockers and define the smallest asset structure"]
-  Structure --> Handoff["Write renma.skill-authoring-handoff.v1"]
+  Clarify -- No --> Structure["Establish the smallest justified asset structure"]
+  Structure --> Ready{"Every gate requirement established and no blockers?"}
+  Ready -- No --> Gate
+  Ready -- Yes --> Pass["Declare the creation gate passed"]
+  Pass --> Handoff["Write renma.skill-authoring-handoff.v1"]
   Handoff --> Scaffold["Run renma scaffold skill --handoff once"]
   Scaffold --> Context["Scaffold or reuse justified Context"]
   Context --> Complete["Complete the focused workflow"]
@@ -909,6 +913,12 @@ flowchart LR
   Boundary -- No --> Fix["Apply uniquely supported repairs and rerun"]
   Fix --> Review["Human review"]
 ```
+
+The arrows expose gate dependencies and observable transitions, not a required
+internal reasoning algorithm. The consuming LLM may combine or revisit these
+activities in any order, but it cannot declare the gate passed before the
+smallest justified asset structure and every other gate requirement are
+established.
 
 Renma creates and validates repository assets; the consuming agent follows the
 finished Skill later according to its own runtime behavior.
@@ -946,13 +956,17 @@ finished Skill later according to its own runtime behavior.
    source authority, authoring-time consultation, finished-Skill runtime access,
    blocking security and domain decisions, and the file-mode owner. Wording,
    tags, examples, and speculative future extensions do not block creation.
-   Proceed when no Blocking decision remains; visible safe reversible defaults
-   and meaningful Deferred decisions may remain Proposed or Unresolved. See the
-   [Authoring Guide](authoring-guide.md#progression-and-adaptive-questioning) for the
-   complete interaction and boundary-reconsideration contract.
+   Declare the gate passed and proceed only after every requirement is
+   established, including the smallest justified structure, and no Blocking
+   decision remains; visible safe reversible defaults and meaningful Deferred
+   decisions may remain Proposed or Unresolved. See the
+   [Authoring Guide](authoring-guide.md#progression-and-adaptive-questioning) for
+   the complete interaction and boundary-reconsideration contract.
 
-2. After the supplied state declares no Blocking decisions, have the external
-   LLM write a `renma.skill-authoring-handoff.v1` JSON file. Its
+2. After every creation-gate requirement is established, including the smallest
+   justified asset structure, and the supplied state declares no Blocking
+   decisions, have the external LLM write a
+   `renma.skill-authoring-handoff.v1` JSON file. Its
    `currentUnderstanding` preserves Confirmed, Proposed, and Unresolved state;
    `progression` separately preserves Blocking, Reversible default, and Deferred
    state. It also records the core Skill contract, one Skill node, planned

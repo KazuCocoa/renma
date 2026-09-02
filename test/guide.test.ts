@@ -740,8 +740,10 @@ test("adaptive questions retain blockers and define safe proceeding", () => {
   );
   assert.match(
     gate,
-    /Proceed when no Blocking decision remains\. Reversible defaults and Deferred decisions may remain/,
+    /creation gate may be declared passed and authoring may proceed only after every creation-gate requirement is established/,
   );
+  assert.match(gate, /including the smallest justified asset structure/);
+  assert.match(gate, /and no Blocking decision remains/);
   assert.match(
     gate,
     /identify the reversible defaults being used and meaningful Deferred decisions/,
@@ -749,6 +751,40 @@ test("adaptive questions retain blockers and define safe proceeding", () => {
   assert.match(
     gate,
     /keep them Proposed or Unresolved rather than presenting them as Confirmed/,
+  );
+});
+
+test("creation gate cannot pass before the smallest justified asset structure is established", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const gate = guidance.interaction.creationGate;
+  const prompt = renderSkillGuidePrompt(guidance);
+  const passRule = gate.find((rule) =>
+    rule.includes("creation gate may be declared passed"),
+  );
+
+  assert.ok(passRule);
+  assert.match(
+    passRule,
+    /only after every creation-gate requirement is established/,
+  );
+  assert.match(passRule, /including the smallest justified asset structure/);
+  assert.match(passRule, /and no Blocking decision remains/);
+  assert.match(
+    gate.join("\n"),
+    /Before declaring the gate passed, identify and present the smallest proposed asset structure/,
+  );
+  assert.doesNotMatch(
+    gate.join("\n"),
+    /Once the gate passes, present the smallest proposed asset structure/,
+  );
+  assert.ok(prompt.includes(passRule));
+  assert.match(
+    guidance.handoff.purpose,
+    /only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking authoring decision remains/,
+  );
+  assert.match(
+    guidance.interaction.phases.join("\n"),
+    /not a required reasoning sequence/,
   );
 });
 

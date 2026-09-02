@@ -23,7 +23,7 @@ For a new Skill, or when intentionally redesigning asset boundaries, start with
 - workflow clarity diagnostics; and
 - repository-wide scan and readiness evidence.
 
-After the creation gate passes and those boundaries are established,
+After those boundaries are established and the creation gate passes,
 platform-native Skill authoring guidance may refine the name and trigger
 description, usage and exclusion boundaries, instructions, workflow,
 constraints, completion criteria, and examples that resolve real ambiguity. It
@@ -72,10 +72,10 @@ the contract:
 
 ```text
 understand and investigate applicable evidence
-  -> evaluate the creation gate
+  -> evaluate creation-gate requirements
   -> if needed, ask only about unresolved Blocking authoring decisions
-  -> pass the gate when no blocker remains
-  -> define the smallest justified asset structure
+  -> establish the smallest justified asset structure
+  -> pass the gate when every gate requirement is established and no blocker remains
   -> write a renma.skill-authoring-handoff.v1 exchange artifact
   -> scaffold and author
   -> validate
@@ -220,9 +220,11 @@ Deferred
 - Additional examples unless real ambiguity emerges
 ```
 
-> Proceed when no Blocking decision remains. Reversible defaults and Deferred
-> decisions may remain, provided they are visible, safe, and do not conceal
-> missing domain or governance truth.
+> Declare the gate passed and proceed only after every gate requirement is
+> established, including the smallest justified asset structure, and no
+> Blocking decision remains. Reversible defaults and Deferred decisions may
+> remain, provided they are visible, safe, and do not conceal missing domain or
+> governance truth.
 
 Do not guess does not mean stop and ask about every unknown. Never present
 missing truth as Confirmed; continue work that does not depend on it; preserve
@@ -329,10 +331,13 @@ require invented truth.
 
 The gate does not require a complete plan, every edge case, final prose, all
 examples, finalized tags, future capabilities, or perfect certainty about
-non-blocking details. Once the gate passes, present the smallest proposed
-structure, identify remaining non-blocking proposals, and ask for confirmation
-only when a meaningful discretionary boundary remains uncertain. Do not add a
-redundant confirmation after the user has already authorized creation.
+non-blocking details. Before declaring the gate passed, establish and present
+the smallest proposed structure. The gate may be declared passed only after
+every gate requirement is established, including that structure, and no
+Blocking decision remains. Identify remaining non-blocking proposals and ask
+for confirmation only when a meaningful discretionary boundary remains
+uncertain. Do not add a redundant confirmation after the user has already
+authorized creation.
 
 ### Post-validation decisions
 
@@ -436,12 +441,14 @@ The canonical defaults and their Agent Skills/Renma provenance are in the
 
 ## New Skill Workflow
 
-Use this sequence for a new Skill:
+Use these externally observable dependencies for a new Skill; they do not
+prescribe the consuming LLM's internal reasoning sequence:
 
 ```text
 renma guide skill
-  -> clarify human truth and inspect applicable evidence
-  -> pass the creation gate and define the smallest intended asset structure
+  -> investigate applicable evidence and clarify human truth only if needed
+  -> establish the smallest intended asset structure as a gate requirement
+  -> pass the creation gate when every requirement is established and no blocker remains
   -> external LLM writes renma.skill-authoring-handoff.v1
   -> renma scaffold skill <agreed-path> --handoff <handoff.json>
   -> scaffold or reuse justified Context Assets
@@ -543,10 +550,12 @@ boilerplate. Concise does not mean omitting important decisions.
 
 ### 2. Record the structured authoring handoff
 
-After no Blocking authoring decision remains, the external LLM or coding agent
-records the current decisions in `renma.skill-authoring-handoff.v1`. The guide's
-JSON output exposes construction rules and a template; the default prompt gives
-a concise version. Renma does not create or fill the exchange file.
+After every creation-gate requirement is established, including the smallest
+justified asset structure, and no Blocking authoring decision remains, the
+external LLM or coding agent records the current decisions in
+`renma.skill-authoring-handoff.v1`. The guide's JSON output exposes construction
+rules and a template; the default prompt gives a concise version. Renma does
+not create or fill the exchange file.
 
 The handoff keeps these layers separate:
 
@@ -803,7 +812,8 @@ patching, and starting with one Skill are safe Proposed reversible defaults. No
 Context Asset, Context Lens, script, support file, or external source is
 required by default.
 
-The initial creation gate can pass with no blockers and no mandatory questions:
+With that one-Skill structure and the other gate requirements established, the
+initial creation gate can pass with no blockers and no mandatory questions:
 compare the named artifacts, report evidence, mismatches, risks, and unresolved
 questions, do not decide intended behavior without authority, and do not modify
 documentation or implementation automatically. Future repository mismatches,
@@ -926,7 +936,8 @@ The LLM does not confirm source-dependent facts from memory, use future Skill
 metadata as authoring-time permission, or hard-code a fictional approved domain
 or permissive security metadata.
 
-After the creation gate, the smallest proposed Renma asset structure is:
+As part of the creation-gate state, the smallest proposed Renma asset structure
+is:
 
 ```text
 skills/build-example-product-json/SKILL.md
@@ -1288,6 +1299,7 @@ files. The expected sequence is:
 ```text
 run renma guide skill
   -> evaluate the Renma creation gate and clarify only if needed
+  -> establish the smallest justified asset structure
   -> pass the creation gate
   -> write renma.skill-authoring-handoff.v1
   -> create the Renma scaffold with --handoff
@@ -1305,7 +1317,9 @@ After passing the gate, a safe request is:
 ```text
 First run `renma guide skill`, investigate applicable evidence, evaluate the
 creation gate, and clarify only unresolved Blocking authoring decisions that
-still require human truth. Create
+still require human truth. Establish the smallest justified asset structure as
+a creation-gate requirement, and declare the gate passed only after every
+requirement is established and no Blocking authoring decision remains. Create
 the caller-declared `renma.skill-authoring-handoff.v1` exchange artifact and
 create `skills/testing/spec-review/SKILL.md` with `renma scaffold skill
 skills/testing/spec-review/SKILL.md --handoff <handoff.json>`. Then use

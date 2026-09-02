@@ -1258,11 +1258,13 @@ Epistemic and progression classifications are independent. Confirmed, Proposed,
 and Unresolved describe support for a decision; Blocking, Reversible default,
 and Deferred describe whether the consuming LLM may proceed. The interaction
 contract requires the LLM to retain unresolved Blocking decisions until they
-are resolved and to pass the gate only when none remains. Clarification is not
-required when the request and applicable evidence already establish the gate.
-Small focused batches are adaptive guidance rather than fixed correctness
-requirements, and the complete blocker set need not be reproduced in every
-response.
+are resolved and to declare the gate passed only after every gate requirement
+is established, including the smallest justified asset structure, and none
+remains. This is an externally observable dependency rather than a prescribed
+internal reasoning sequence. Clarification is not required when the request and
+applicable evidence already establish the gate. Small focused batches are
+adaptive guidance rather than fixed correctness requirements, and the complete
+blocker set need not be reproduced in every response.
 
 Question dependency is an invariant: do not ask a downstream authoring decision
 whose meaningful answer depends on an unresolved upstream decision. Investigate

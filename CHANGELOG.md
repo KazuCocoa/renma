@@ -15,9 +15,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   activities. Clarification is conditional, question batching and blocker
   presentation are adaptive, prerequisite-aware questioning is required,
   human-review rules have an explicit field, and recursive external traversal has
-  a compact applicability pointer. Consumers must branch on `schemaVersion` and
-  must not apply v1 phase-order, mandatory-clarification, fixed-batch, or
-  last-phase assumptions to v2.
+  a compact applicability pointer. The gate may be declared passed only after
+  every requirement, including the smallest justified asset structure, is
+  established and no Blocking decision remains; this dependency does not
+  prescribe an internal reasoning sequence. Consumers must branch on
+  `schemaVersion` and must not apply v1 phase-order, mandatory-clarification,
+  fixed-batch, or last-phase assumptions to v2.
 
 ## [0.37.1] - 2026-08-30
 

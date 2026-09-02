@@ -322,6 +322,7 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
 
 test("Authoring Guide preserves the Renma and platform responsibility boundary", async () => {
   const authoring = await readRepoFile("docs/authoring-guide.md");
+  const manual = await readRepoFile("docs/user-manual.md");
   const cliSource = await readRepoFile("src/cli-help.ts");
   const guidanceSource = await readRepoFile("src/guidance/skill-authoring.ts");
 
@@ -331,7 +332,19 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     authoring,
-    /After the creation gate passes[\s\S]*platform-native Skill authoring guidance may refine[\s\S]*not the authority for Renma metadata/,
+    /After those boundaries are established and the creation gate passes[\s\S]*platform-native Skill authoring guidance may refine[\s\S]*not the authority for Renma metadata/,
+  );
+  assert.match(
+    authoring,
+    /establish the smallest justified asset structure\s+-> pass the gate when every gate requirement is established and no blocker remains/,
+  );
+  assert.match(
+    manual,
+    /Structure\["Establish the smallest justified asset structure"\][\s\S]*Ready\{"Every gate requirement established and no blockers\?"\}[\s\S]*Pass\["Declare the creation gate passed"\][\s\S]*Handoff\["Write renma\.skill-authoring-handoff\.v1"\]/,
+  );
+  assert.match(
+    manual,
+    /arrows expose gate dependencies and observable transitions, not a required\s+internal reasoning algorithm/,
   );
   assert.match(
     authoring,

@@ -94,6 +94,10 @@ adaptive, and prerequisite-aware questioning is an invariant. Human review is
 owned explicitly by `interaction.humanReviewRules`, and
 `externalTraversalApplicabilityRule` dispatches consumers to the detailed
 `externalTraversalRules` when recursive external traversal may apply.
+The gate may be declared passed only after every creation-gate requirement is
+established, including the smallest justified asset structure, and no Blocking
+decision remains. This is an externally observable dependency, not a prescribed
+internal reasoning sequence.
 
 Consumers must branch on `schemaVersion`: do not parse v2 using v1 assumptions
 about phase ordering, mandatory clarification, fixed question batches, or the
