@@ -210,14 +210,20 @@ The normal sequence is:
 
 ```bash
 npx renma guide skill
-# The LLM establishes every gate requirement, including the smallest justified
-# asset structure, clarifies only if needed, and then declares the gate passed.
-npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+# The LLM investigates and clarifies only if needed, establishes every gate
+# requirement including the smallest justified asset structure, then declares
+# the gate passed and writes renma.skill-authoring-handoff.v1 to:
+# /tmp/spec-review-handoff.json
+npx renma scaffold skill skills/testing/spec-review/SKILL.md --handoff /tmp/spec-review-handoff.json
 # Use platform-native Skill authoring guidance within the agreed boundaries.
 npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
 ```
+
+This coding-agent authoring flow uses the structured handoff. Direct or manual
+scaffold usage that does not use the agent authoring handoff may continue to use
+`--owner`.
 
 For an existing Skill:
 

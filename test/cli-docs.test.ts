@@ -279,6 +279,28 @@ test("README and User Manual distinguish repository init from asset scaffold", a
   }
 });
 
+test("README coding-agent Quick Start requires the structured authoring handoff", async () => {
+  const readme = await readRepoFile("README.md");
+  const start = readme.indexOf("### Create a Skill interactively");
+  const end = readme.indexOf("For an existing Skill:", start);
+  assert.ok(start >= 0);
+  assert.ok(end > start);
+  const quickStart = readme.slice(start, end);
+
+  assert.match(
+    quickStart,
+    /npx renma guide skill[\s\S]*investigates and clarifies only if needed[\s\S]*establishes every gate[\s\S]*smallest justified asset structure[\s\S]*declares[\s\S]*the gate passed and writes renma\.skill-authoring-handoff\.v1[\s\S]*npx renma scaffold skill skills\/testing\/spec-review\/SKILL\.md --handoff \/tmp\/spec-review-handoff\.json/,
+  );
+  assert.doesNotMatch(
+    quickStart,
+    /npx renma guide skill[\s\S]*npx renma scaffold skill[^\n]*--owner/,
+  );
+  assert.match(
+    quickStart,
+    /Direct or manual\s+scaffold usage that does not use the agent authoring handoff may continue to use\s+`--owner`/,
+  );
+});
+
 test("User Manual default glob list matches DEFAULT_CONFIG", async () => {
   const manual = await readRepoFile("docs/user-manual.md");
   const start = manual.indexOf("Canonical Agent Skills entrypoints are:");

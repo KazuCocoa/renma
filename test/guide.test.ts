@@ -977,6 +977,11 @@ test("platform-native handoff occurs only after the Renma creation gate", () => 
     /must not independently add metadata, Context Assets, scripts, examples, or support files/,
   );
   assert.match(handoff, /must not create a second target file/);
+  assert.match(
+    handoff,
+    /return the Proposed or Unresolved boundary change to the Renma authoring contract/,
+  );
+  assert.doesNotMatch(handoff, /Renma clarification protocol/);
 });
 
 test("post-validation and persistence rules preserve human truth", () => {
