@@ -73,21 +73,21 @@ test("generated artifacts remain qualified evidence", () => {
 
 test("human review exposes material decisions", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  const phases = guidance.interaction.phases.join("\n");
+  const rules = guidance.interaction.humanReviewRules.join("\n");
   const prompt = renderSkillGuidePrompt(guidance);
   const json = renderSkillGuideJson(guidance);
 
-  assert.match(phases, /human review supported by a compact summary/);
-  assert.match(phases, /each material non-obvious decision/);
-  assert.match(phases, /its governing evidence or authority/);
-  assert.match(phases, /evidence-backed consequence of changing it/);
+  assert.match(rules, /human review supported by a compact summary/);
+  assert.match(rules, /each material non-obvious decision/);
+  assert.match(rules, /its governing evidence or authority/);
+  assert.match(rules, /evidence-backed consequence of changing it/);
   assert.match(
-    phases,
+    rules,
     /potential impact explicitly labeled Proposed or Unresolved/,
   );
-  assert.match(phases, /when the consequence is not established/);
-  assert.match(phases, /Do not claim that the reviewer understood/);
-  assert.match(phases, /approved, or independently verified the proposal/);
+  assert.match(rules, /when the consequence is not established/);
+  assert.match(rules, /Do not claim that the reviewer understood/);
+  assert.match(rules, /approved, or independently verified the proposal/);
   for (const projection of [prompt, json]) {
     assert.match(projection, /evidence-backed consequence of changing it/);
     assert.match(

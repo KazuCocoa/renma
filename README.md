@@ -139,14 +139,16 @@ fields. See
 for the exact current and compatibility forms.
 
 Run `renma guide skill` before generating a new Skill. It prints a deterministic
-clarification and creation-gate protocol for the consuming LLM. Renma remains
+creation-gate contract with adaptive clarification guidance for the consuming LLM. Renma remains
 non-interactive: the LLM investigates and proposes, Renma validates supplied
 structure and the resulting repository evidence it can determine, and a human
 reviews meaningful decisions. Renma does not certify caller-declared human or
 domain truth.
 
-After no declared Blocking authoring decision remains, the external LLM can
-write `renma.skill-authoring-handoff.v1` and invoke:
+After every creation-gate requirement is established, including the smallest
+justified asset structure, no Blocking authoring decision remains, and the gate
+is declared passed, the external LLM can write
+`renma.skill-authoring-handoff.v1` and invoke:
 
 ```bash
 renma scaffold skill skills/example/SKILL.md --handoff /tmp/example-handoff.json
@@ -208,13 +210,20 @@ The normal sequence is:
 
 ```bash
 npx renma guide skill
-# The consuming LLM clarifies blocking human decisions and passes the gate.
-npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+# The LLM investigates and clarifies only if needed, establishes every gate
+# requirement including the smallest justified asset structure, then declares
+# the gate passed and writes renma.skill-authoring-handoff.v1 to:
+# /tmp/spec-review-handoff.json
+npx renma scaffold skill skills/testing/spec-review/SKILL.md --handoff /tmp/spec-review-handoff.json
 # Use platform-native Skill authoring guidance within the agreed boundaries.
 npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
 ```
+
+This coding-agent authoring flow uses the structured handoff. Direct or manual
+scaffold usage that does not use the agent authoring handoff may continue to use
+`--owner`.
 
 For an existing Skill:
 

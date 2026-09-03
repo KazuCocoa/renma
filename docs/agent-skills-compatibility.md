@@ -54,14 +54,16 @@ must not replace behavior-critical instructions.
 
 For a new Skill, or when intentionally redesigning asset boundaries, use
 `renma guide skill` to establish Renma repository asset, metadata, Context, and
-file boundaries. Then use platform-native Skill authoring guidance for the name, trigger
-description, instructions, workflow, constraints, completion criteria, and
-ambiguity-resolving examples within those boundaries. A name change that alters
-the canonical Skill directory/name relationship is an intentional path and
-identity change that requires validation, not an ordinary semantic rewrite. The
-[Authoring Guide](authoring-guide.md) owns the general new-Skill and
-existing-Skill workflows; this document owns the canonical format and migration
-contract.
+file boundaries. Declare the creation gate passed only after every gate
+requirement is established, including the smallest justified asset structure,
+and no Blocking decision remains. Then use platform-native Skill authoring
+guidance for the name, trigger description, instructions, workflow, constraints,
+completion criteria, and ambiguity-resolving examples within those boundaries.
+A name change that alters the canonical Skill directory/name relationship is an
+intentional path and identity change that requires validation, not an ordinary
+semantic rewrite. The [Authoring Guide](authoring-guide.md) owns the general
+new-Skill and existing-Skill workflows; this document owns the canonical format
+and migration contract.
 
 ## Canonical 0.16.0 Frontmatter
 

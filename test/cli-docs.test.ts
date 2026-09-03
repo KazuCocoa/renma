@@ -279,6 +279,28 @@ test("README and User Manual distinguish repository init from asset scaffold", a
   }
 });
 
+test("README coding-agent Quick Start requires the structured authoring handoff", async () => {
+  const readme = await readRepoFile("README.md");
+  const start = readme.indexOf("### Create a Skill interactively");
+  const end = readme.indexOf("For an existing Skill:", start);
+  assert.ok(start >= 0);
+  assert.ok(end > start);
+  const quickStart = readme.slice(start, end);
+
+  assert.match(
+    quickStart,
+    /npx renma guide skill[\s\S]*investigates and clarifies only if needed[\s\S]*establishes every gate[\s\S]*smallest justified asset structure[\s\S]*declares[\s\S]*the gate passed and writes renma\.skill-authoring-handoff\.v1[\s\S]*npx renma scaffold skill skills\/testing\/spec-review\/SKILL\.md --handoff \/tmp\/spec-review-handoff\.json/,
+  );
+  assert.doesNotMatch(
+    quickStart,
+    /npx renma guide skill[\s\S]*npx renma scaffold skill[^\n]*--owner/,
+  );
+  assert.match(
+    quickStart,
+    /Direct or manual\s+scaffold usage that does not use the agent authoring handoff may continue to use\s+`--owner`/,
+  );
+});
+
 test("User Manual default glob list matches DEFAULT_CONFIG", async () => {
   const manual = await readRepoFile("docs/user-manual.md");
   const start = manual.indexOf("Canonical Agent Skills entrypoints are:");
@@ -322,6 +344,10 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
 
 test("Authoring Guide preserves the Renma and platform responsibility boundary", async () => {
   const authoring = await readRepoFile("docs/authoring-guide.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const installHeadingIndex = manual.indexOf("## Install And Build");
+  assert.ok(installHeadingIndex > 0);
+  const earlyManual = manual.slice(0, installHeadingIndex);
   const cliSource = await readRepoFile("src/cli-help.ts");
   const guidanceSource = await readRepoFile("src/guidance/skill-authoring.ts");
 
@@ -331,7 +357,39 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     authoring,
-    /After the clarification gate[\s\S]*platform-native Skill authoring guidance may refine[\s\S]*not the authority for Renma metadata/,
+    /After those boundaries are established and the creation gate passes[\s\S]*platform-native Skill authoring guidance may refine[\s\S]*not the authority for Renma metadata/,
+  );
+  assert.match(
+    authoring,
+    /establish the smallest justified asset structure\s+-> pass the gate when every gate requirement is established and no blocker remains/,
+  );
+  assert.match(
+    manual,
+    /Structure\["Establish the smallest justified asset structure"\][\s\S]*Ready\{"Every gate requirement established and no blockers\?"\}[\s\S]*Pass\["Declare the creation gate passed"\][\s\S]*Handoff\["Write renma\.skill-authoring-handoff\.v1"\]/,
+  );
+  assert.match(
+    manual,
+    /arrows expose gate dependencies and observable transitions, not a required\s+internal reasoning algorithm/,
+  );
+  assert.match(
+    earlyManual,
+    /Only after every creation-gate requirement is established, including the\s+smallest justified asset structure, no Blocking authoring decision remains, and\s+the gate is declared passed may platform-native Skill authoring guidance refine/,
+  );
+  assert.match(
+    earlyManual,
+    /reviews applicable evidence and clarifies only if needed\s+-> establish every creation-gate requirement, including the smallest justified asset structure\s+-> no declared Blocking authoring decision remains\s+-> declare the creation gate passed\s+-> external LLM writes renma\.skill-authoring-handoff\.v1 JSON/,
+  );
+  assert.match(
+    earlyManual,
+    /externally observable dependencies, not a prescribed LLM\s+reasoning algorithm/,
+  );
+  assert.match(
+    earlyManual,
+    /an empty list does\s+not independently prove that the authoring creation gate passed/,
+  );
+  assert.doesNotMatch(
+    earlyManual,
+    /After blocking creation-gate decisions are resolved|after the supplied state\s+declares no remaining Blocking decisions/,
   );
   assert.match(
     authoring,
@@ -339,7 +397,11 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     authoring,
-    /`renma guide skill` remains deterministic and non-interactive[\s\S]*the consuming LLM conducts the conversation/,
+    /`renma guide skill` remains deterministic and non-interactive[\s\S]*the consuming LLM conducts any needed conversation/,
+  );
+  assert.match(
+    authoring,
+    /authoritative for Renma's authoring boundaries[\s\S]*not an authoritative description[\s\S]*internal reasoning algorithm/,
   );
   assert.match(
     authoring,

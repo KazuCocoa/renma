@@ -2,6 +2,10 @@
 
 This is the canonical guide for placing, authoring, and improving Skills,
 Context Assets, Context Lenses, and Skill-local support in a Renma repository.
+It is authoritative for Renma's authoring boundaries, evidence rules, creation
+gate, asset responsibilities, and handoff contract. Its interaction strategies
+are guidance for satisfying those invariants, not an authoritative description
+of the consuming LLM's internal reasoning algorithm.
 
 ## Responsibility Boundary
 
@@ -19,7 +23,7 @@ For a new Skill, or when intentionally redesigning asset boundaries, start with
 - workflow clarity diagnostics; and
 - repository-wide scan and readiness evidence.
 
-After the clarification gate and those boundaries are established,
+After those boundaries are established and the creation gate passes,
 platform-native Skill authoring guidance may refine the name and trigger
 description, usage and exclusion boundaries, instructions, workflow,
 constraints, completion criteria, and examples that resolve real ambiguity. It
@@ -49,12 +53,12 @@ continues to be inspected. Keep operational instructions visible in Markdown.
 HTML comments are hidden by renderers but readable in raw source by an agent,
 so security-sensitive instructions placed there receive a dedicated finding.
 
-## Interactive Clarification Protocol
+## Authoring Contract And Adaptive Clarification
 
 `renma guide skill` remains deterministic and non-interactive. It prints the
-protocol; the consuming LLM conducts the conversation and investigates
-applicable evidence, the user supplies domain and governance truth, Renma
-supplies deterministic rules and repository evidence, and a human approves
+authoring contract; the consuming LLM conducts any needed conversation and
+investigates applicable evidence, the user supplies domain and governance truth,
+Renma supplies deterministic rules and repository evidence, and a human approves
 meaningful decisions. The external LLM investigates and proposes, Renma
 validates supplied structure and deterministic repository evidence, and the
 human reviews meaningful decisions. Renma does not accept task text, ask
@@ -62,16 +66,16 @@ questions, retain conversation state, interpret answers, or create assets from
 the guide. It does not certify that a handoff's conversation, human review,
 source authority, blocker completeness, or domain facts are true.
 
-When the user asks to create a Skill, the consuming LLM starts with
-clarification instead of file creation:
+When the user asks to create a Skill, the consuming LLM evaluates the creation
+gate before file creation. It may organize its work in any way that preserves
+the contract:
 
 ```text
-understand
-  -> investigate available evidence
-  -> classify scope, epistemic support, progression, and disposition separately
-  -> ask one to three focused questions per batch and retain queued blockers
-  -> propose the smallest asset structure
-  -> pass the creation gate when no blocker remains
+understand and investigate applicable evidence
+  -> evaluate creation-gate requirements
+  -> if needed, ask only about unresolved Blocking authoring decisions
+  -> establish the smallest justified asset structure
+  -> pass the gate when every gate requirement is established and no blocker remains
   -> write a renma.skill-authoring-handoff.v1 exchange artifact
   -> scaffold and author
   -> validate
@@ -80,8 +84,15 @@ understand
   -> human review
 ```
 
-The user does not need to supply a plan-quality specification before this loop
-begins. On the first meaningful response, keep the working state compact:
+The arrows show dependencies and externally observable transitions, not a
+required internal reasoning algorithm. The consuming LLM may combine and revisit
+activities in any useful order, and may skip one only when its required outcome
+is already established or its condition does not apply. In particular,
+clarification is not mandatory when every creation-gate requirement is already
+established.
+
+The user does not need to supply a plan-quality specification. When a decision
+summary helps the interaction, keep the working state compact:
 
 ```text
 Current understanding
@@ -95,8 +106,8 @@ Proposed
 Unresolved
 - Human truth or missing applicable evidence that must not be invented.
 
-Question
-- One to three closely related questions about the highest-impact gap.
+Question, when needed
+- The smallest effective clarification of unresolved Blocking authoring decisions.
 ```
 
 A proposal never silently becomes confirmed. Explicit user delegation can
@@ -143,7 +154,7 @@ Possible authoring blocker:
   that situation.
 ```
 
-### Progression and question batches
+### Progression and adaptive questioning
 
 Confirmed, Proposed, and Unresolved describe epistemic support. A separate
 progression classification determines whether authoring can proceed:
@@ -158,8 +169,8 @@ Keep disposition separate from epistemic support, scope, and progression:
 
 | Disposition | Action |
 | --- | --- |
-| Ask now | Select a current-stage Blocking theme for this batch |
-| Queue as blocker | Keep an unasked Blocking theme visible in the complete set |
+| Ask now | Ask an answerable Blocking authoring decision that still requires human truth |
+| Queue as blocker | Retain a Blocking decision that is not yet appropriate to ask or resolve |
 | Proceed with reversible default | Use a safe Proposed choice that invents no truth or permission |
 | Defer | Keep an item visible when the current stage does not depend on it |
 | Report as finding | Preserve an evidence-backed runtime unknown in the Skill's output with impact or risk |
@@ -169,12 +180,24 @@ visible rather than becoming forgotten or implicitly resolved. If later
 evidence makes a Deferred decision material to correctness, security,
 completion, or asset boundaries, move it to Blocking and re-enter clarification.
 
-Keep the complete current set of unresolved and Blocking decisions. The limit
-of one to three closely related questions applies only to the current turn, not
-to the total set. Ask about the highest-impact blockers, show additional ones
-as queued, update the set after the user answers, and continue with the next
-batch without repeating unchanged decisions in full. Never relabel an unasked
-blocker as Deferred merely because the batch limit was reached. For example:
+Keep the complete current set of unresolved and Blocking decisions in temporary
+authoring state. Never hide an unasked blocker or relabel it Deferred merely
+because it is not part of the current interaction. Present enough state for the
+user to understand material blockers and progress; the full set need not be
+repeated mechanically in every response.
+
+Do not ask for a downstream authoring decision when a meaningful answer depends
+on an unresolved upstream authoring decision. Resolve or investigate the
+prerequisite first. This is a dependency invariant, not a required decision-tree,
+frontier, round-based, or persisted-state implementation.
+
+Use the smallest effective interaction. A focused batch—often one to three
+closely related questions—is a useful default when several answerable Blocking
+decisions can be resolved together. The consuming LLM may instead ask one
+question, ask a larger coherent set, or use another interaction strategy when
+that better satisfies the contract. Question count and turn structure are not
+correctness invariants. A compact progression summary can help when several
+material decisions remain. For example:
 
 ```text
 Current progression
@@ -184,7 +207,7 @@ Blocking decisions: 4
 - Required input boundary
 - Runtime source-access policy
 - Context owner
-- Asking now: 3 highest-impact questions below
+- Asking now: the answerable highest-impact questions below
 
 Queued from the complete blocker list above (not additional): 4
 
@@ -197,9 +220,11 @@ Deferred
 - Additional examples unless real ambiguity emerges
 ```
 
-> Proceed when no Blocking decision remains. Reversible defaults and Deferred
-> decisions may remain, provided they are visible, safe, and do not conceal
-> missing domain or governance truth.
+> Declare the gate passed and proceed only after every gate requirement is
+> established, including the smallest justified asset structure, and no
+> Blocking decision remains. Reversible defaults and Deferred decisions may
+> remain, provided they are visible, safe, and do not conceal missing domain or
+> governance truth.
 
 Do not guess does not mean stop and ask about every unknown. Never present
 missing truth as Confirmed; continue work that does not depend on it; preserve
@@ -306,10 +331,13 @@ require invented truth.
 
 The gate does not require a complete plan, every edge case, final prose, all
 examples, finalized tags, future capabilities, or perfect certainty about
-non-blocking details. Once the gate passes, present the smallest proposed
-structure, identify remaining non-blocking proposals, and ask for confirmation
-only when a meaningful discretionary boundary remains uncertain. Do not add a
-redundant confirmation after the user has already authorized creation.
+non-blocking details. Before declaring the gate passed, establish and present
+the smallest proposed structure. The gate may be declared passed only after
+every gate requirement is established, including that structure, and no
+Blocking decision remains. Identify remaining non-blocking proposals and ask
+for confirmation only when a meaningful discretionary boundary remains
+uncertain. Do not add a redundant confirmation after the user has already
+authorized creation.
 
 ### Post-validation decisions
 
@@ -413,12 +441,14 @@ The canonical defaults and their Agent Skills/Renma provenance are in the
 
 ## New Skill Workflow
 
-Use this sequence for a new Skill:
+Use these externally observable dependencies for a new Skill; they do not
+prescribe the consuming LLM's internal reasoning sequence:
 
 ```text
 renma guide skill
-  -> clarify human truth and inspect applicable evidence
-  -> pass the creation gate and define the smallest intended asset structure
+  -> investigate applicable evidence and clarify human truth only if needed
+  -> establish the smallest intended asset structure as a gate requirement
+  -> pass the creation gate when every requirement is established and no blocker remains
   -> external LLM writes renma.skill-authoring-handoff.v1
   -> renma scaffold skill <agreed-path> --handoff <handoff.json>
   -> scaffold or reuse justified Context Assets
@@ -437,6 +467,15 @@ Before generating files, run:
 ```bash
 renma guide skill
 ```
+
+The complete JSON reference uses
+`schemaVersion: "renma.skill-authoring-guide.v2"`. Consumers must branch on
+`schemaVersion`; v2 does not preserve v1 assumptions that phases are ordered,
+clarification is mandatory, question batches are fixed, or the last phase owns
+human-review semantics. Human review is explicit in
+`interaction.humanReviewRules`. The compact prompt includes a conditional
+pointer to the complete JSON `externalTraversalRules` when the finished Skill
+may recursively follow references discovered inside an external source.
 
 Use its deterministic prompt to define:
 
@@ -511,10 +550,12 @@ boilerplate. Concise does not mean omitting important decisions.
 
 ### 2. Record the structured authoring handoff
 
-After no Blocking authoring decision remains, the external LLM or coding agent
-records the current decisions in `renma.skill-authoring-handoff.v1`. The guide's
-JSON output exposes construction rules and a template; the default prompt gives
-a concise version. Renma does not create or fill the exchange file.
+After every creation-gate requirement is established, including the smallest
+justified asset structure, and no Blocking authoring decision remains, the
+external LLM or coding agent records the current decisions in
+`renma.skill-authoring-handoff.v1`. The guide's JSON output exposes construction
+rules and a template; the default prompt gives a concise version. Renma does
+not create or fill the exchange file.
 
 The handoff keeps these layers separate:
 
@@ -575,7 +616,7 @@ run, and each asset should be used.
 
 Do not run two independent generators against the same target file. Some tools
 that provide platform-native Skill authoring guidance create files themselves,
-so choose one of these safe approaches after the clarification gate:
+so choose one of these safe approaches after the creation gate passes:
 
 1. Run `renma scaffold skill`, then ask the platform tool to review and refine
    that existing file.
@@ -637,7 +678,7 @@ complete:
   relationships without changing those boundaries independently.
 
 If refinement or real usage reveals a justified boundary change, stop and
-return that need to the clarification protocol as Proposed or Unresolved.
+return that need to the creation-gate contract as Proposed or Unresolved.
 Inspect evidence and re-enter the creation gate before changing the agreed
 structure.
 
@@ -771,7 +812,8 @@ patching, and starting with one Skill are safe Proposed reversible defaults. No
 Context Asset, Context Lens, script, support file, or external source is
 required by default.
 
-The initial creation gate can pass with no blockers and no mandatory questions:
+With that one-Skill structure and the other gate requirements established, the
+initial creation gate can pass with no blockers and no mandatory questions:
 compare the named artifacts, report evidence, mismatches, risks, and unresolved
 questions, do not decide intended behavior without authority, and do not modify
 documentation or implementation automatically. Future repository mismatches,
@@ -873,10 +915,9 @@ Questions
    during execution?
 ```
 
-The five-item Blocking set remains visible even though the current batch asks
-only three questions; required-versus-optional Context and owner are queued by
-their positions in that set, not counted again. The reversible defaults remain
-Proposed.
+This illustration uses a three-question batch while retaining two dependent
+blockers. That is one valid interaction strategy, not a required batch size or
+presentation format. The reversible defaults remain Proposed.
 
 Current schema, fields, constraints, and operation-specific behavior are
 epistemically unresolved, source-dependent runtime knowledge. They are listed
@@ -895,7 +936,8 @@ The LLM does not confirm source-dependent facts from memory, use future Skill
 metadata as authoring-time permission, or hard-code a fictional approved domain
 or permissive security metadata.
 
-After the creation gate, the smallest proposed Renma asset structure is:
+As part of the creation-gate state, the smallest proposed Renma asset structure
+is:
 
 ```text
 skills/build-example-product-json/SKILL.md
@@ -1256,7 +1298,8 @@ files. The expected sequence is:
 
 ```text
 run renma guide skill
-  -> conduct Renma clarification
+  -> evaluate the Renma creation gate and clarify only if needed
+  -> establish the smallest justified asset structure
   -> pass the creation gate
   -> write renma.skill-authoring-handoff.v1
   -> create the Renma scaffold with --handoff
@@ -1264,16 +1307,19 @@ run renma guide skill
 ```
 
 If `skill-creator` is available or activates automatically, do not let it
-independently create files before the Renma clarification gate is satisfied.
+independently create files before the Renma creation gate passes.
 If semantic refinement reveals a justified asset-boundary change,
-`skill-creator` must return that need to the Renma clarification protocol rather
+`skill-creator` must return that need to the Renma creation-gate contract rather
 than silently changing the repository structure.
 
 After passing the gate, a safe request is:
 
 ```text
-First run `renma guide skill`, conduct focused clarification, and resolve the
-blocking creation-gate decisions. Create
+First run `renma guide skill`, investigate applicable evidence, evaluate the
+creation gate, and clarify only unresolved Blocking authoring decisions that
+still require human truth. Establish the smallest justified asset structure as
+a creation-gate requirement, and declare the gate passed only after every
+requirement is established and no Blocking authoring decision remains. Create
 the caller-declared `renma.skill-authoring-handoff.v1` exchange artifact and
 create `skills/testing/spec-review/SKILL.md` with `renma scaffold skill
 skills/testing/spec-review/SKILL.md --handoff <handoff.json>`. Then use

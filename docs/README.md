@@ -23,9 +23,10 @@ They describe implementation rationale and are not normative user guidance.
   references and for current CLI workflows, command purposes, options, formats,
   examples, expected outputs, and next steps. Emitted `renma --help` and
   `renma <command> --help` remain the command-line authority.
-- [Authoring Guide](authoring-guide.md) is authoritative for new-Skill and
-  existing-Skill authoring workflows, clarification, the creation gate, and the
-  boundary between Renma and the consuming LLM.
+- [Authoring Guide](authoring-guide.md) is authoritative for Renma authoring
+  boundaries, evidence rules, the creation gate, asset responsibilities, and the
+  handoff contract. It offers adaptive interaction guidance but does not prescribe
+  the consuming LLM's internal reasoning algorithm.
 
 ## Diagnostics And Security
 

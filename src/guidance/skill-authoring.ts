@@ -11,7 +11,7 @@ export const SKILL_AUTHORING_PRINCIPLE =
 export const RENMA_FIRST_AUTHORING_BOUNDARY =
   "Use Renma to establish repository asset and metadata boundaries first. Use platform-native Skill authoring guidance to refine semantics within those boundaries.";
 export const SKILL_AUTHORING_GUIDE_SCHEMA_VERSION =
-  "renma.skill-authoring-guide.v1" as const;
+  "renma.skill-authoring-guide.v2" as const;
 
 export interface SkillAuthoringProgressionClasses {
   blocking: string;
@@ -66,6 +66,7 @@ export interface SkillAuthoringInteraction {
   postValidationActions: string[];
   persistenceRules: string[];
   handoffRules: string[];
+  humanReviewRules: string[];
 }
 
 export interface SkillAuthoringIllustration {
@@ -98,6 +99,7 @@ export interface SkillAuthoringGuidance {
   artifactRules: string[];
   concisenessRules: string[];
   metadataRules: string[];
+  externalTraversalApplicabilityRule: string;
   externalTraversalRules: string[];
   illustrationRules: string[];
   illustrations: SkillAuthoringIllustration[];
@@ -128,11 +130,11 @@ export function buildSkillAuthoringGuidance(
     handoff: {
       schemaVersion: SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
       purpose:
-        "Record caller-declared authoring decisions after no Blocking decision remains, then pass them from an external LLM or agent to `renma scaffold skill <path> --handoff <handoff.json>`.",
+        "Record caller-declared authoring decisions only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking authoring decision remains; then pass them from an external LLM or agent to `renma scaffold skill <path> --handoff <handoff.json>`.",
       boundary:
         "The handoff records supplied authoring evidence. Renma validates its structure and internal consistency; it does not prove that clarification occurred, every blocker was discovered, sources are authoritative, human review occurred, or declared facts are true.",
       rules: [
-        "Construct the handoff only after the supplied authoring state declares no remaining Blocking decisions. Proposed reversible defaults and Unresolved Deferred decisions may remain in their original epistemic classes.",
+        "Construct the handoff only after the supplied authoring state declares that every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decisions remain. Proposed reversible defaults and Unresolved Deferred decisions may remain in their original epistemic classes.",
         "Keep the handoff small: creation-gate state, the core Skill contract, the smallest asset graph, ownership, declared Context and Lens relationships, local resource decisions, and significant source, security, and runtime-unknown decisions.",
         "Do not include finished Markdown, a conversation transcript, question history, private reasoning, or a complete implementation plan.",
         "Use provided, consulted, and designated_unconsulted source states without treating source designation as proof that source content was consulted.",
@@ -188,23 +190,16 @@ export function buildSkillAuthoringGuidance(
     },
     interaction: {
       openingRule:
-        "When a user asks to create a Skill with `renma guide skill`, begin with interactive clarification. Do not create files immediately.",
+        "Before creating files, evaluate the creation gate against the request and applicable evidence. If every gate requirement is already established, proceed without mandatory clarification. Otherwise investigate applicable evidence, then ask only about unresolved Blocking authoring decisions that still require human truth.",
       phases: [
-        "Understand the provisional recurring task and expected result; do not require a complete upfront specification.",
-        "Investigate only the applicable evidence needed for current decisions.",
-        "Before treating an unknown as a creation-gate decision, classify it as an authoring decision or a runtime task unknown.",
-        "Classify the current understanding as Confirmed, Proposed, and Unresolved.",
-        "Separately classify each pending authoring decision as Blocking, a Reversible default, or Deferred, and choose an unresolved-item disposition.",
-        "Group related raw unknowns into decision themes while preserving their underlying evidence.",
-        "Ask one to three focused questions about the highest-impact Blocking decisions in the current batch while retaining the complete blocker set.",
-        "Propose the smallest justified Skill, Context, and support-file structure.",
-        "Continue focused question batches and pass the creation gate when no Blocking decision remains.",
-        "Scaffold the agreed structure and author within it.",
-        "Validate with relevant Renma commands.",
-        "Classify each finding with the post-validation rules, apply only uniquely supported repairs, and rerun relevant validation after changes.",
-        "If refinement, source review, usage, or validation reveals a possible boundary change, stop structural edits.",
-        "Record the boundary-change need as Proposed or Unresolved, inspect relevant evidence, ask only when human truth remains necessary, re-enter the creation gate, update the agreed structure after it passes, and then continue authoring and validation.",
-        "Finish with human review supported by a compact summary of each material non-obvious decision, its governing evidence or authority, any evidence-backed consequence of changing it or, when the consequence is not established, a potential impact explicitly labeled Proposed or Unresolved, and remaining non-blocking uncertainty. Do not claim that the reviewer understood, approved, or independently verified the proposal.",
+        "Treat these as authoring activities, not a required reasoning sequence; perform, combine, and revisit them in any order suited to the request, evidence, dependencies, and current gate state. Skip an activity only when its required outcome is already established or its condition does not apply.",
+        "Establish the focused recurring task and expected result without requiring a complete upfront specification.",
+        "Investigate only the applicable evidence needed for material authoring decisions.",
+        "Keep authoring decisions separate from runtime task unknowns, Confirmed facts separate from Proposed choices and Unresolved truth, and Blocking decisions separate from Reversible defaults and Deferred items.",
+        "Resolve creation-gate requirements through applicable evidence, safe reversible defaults, or the smallest necessary clarification; do not ask when no Blocking decision remains.",
+        "Establish the smallest justified Skill, Context, and support-file structure as a creation-gate requirement, then scaffold and author only within it after the gate passes.",
+        "Validate with relevant Renma commands, classify findings, apply only uniquely supported repairs, and rerun relevant validation after changes.",
+        "If refinement, source review, usage, or validation reveals a possible boundary change, stop structural edits, record the need as Proposed or Unresolved, investigate applicable evidence, ask only if human truth remains necessary, and re-enter the creation gate before updating the agreed structure.",
       ],
       truthSources: [
         "Explicit user statements: confirm user intent, governance decisions, source designation, fallback choices, and other decisions the user has authority to make; they do not by themselves prove the contents of a separately designated authoritative specification.",
@@ -241,9 +236,9 @@ export function buildSkillAuthoringGuidance(
       },
       unresolvedItemDispositions: {
         askNow:
-          "Select a current-stage Blocking decision theme for this question batch.",
+          "Ask about a Blocking authoring decision that still requires human truth after applicable investigation, at a point when its prerequisites make the question answerable.",
         queueAsBlocker:
-          "Keep a Blocking theme visible in the complete blocker set when it is not addressed by the current question batch.",
+          "Retain a Blocking decision in temporary authoring state when it is not yet appropriate to ask or resolve; do not hide it, relabel it Deferred, or persist a decision graph for it.",
         proceedWithReversibleDefault:
           "Use a safe Proposed choice that invents no domain or governance truth and broadens no permission.",
         defer:
@@ -252,19 +247,20 @@ export function buildSkillAuthoringGuidance(
           "Preserve an evidence-backed runtime task unknown in the finished Skill's current-stage output with its impact or risk instead of requiring immediate resolution. Reassess it at meaningful stage transitions.",
       },
       questionRules: [
-        "Before asking, check whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default; ask only when human truth or unavailable source content is still required.",
+        "Before asking, investigate whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default; ask only about an unresolved Blocking authoring decision when human truth or unavailable source content is still required. If no Blocking decision remains, clarification is not required.",
         "In an existing repository, use only commands that answer the current question, such as `renma scan . --fail-on high --format json`, `renma catalog . --format json`, `renma inspect <relevant-file> --format json`, or `renma graph . --focus <relevant-id-or-path> --format json`; do not make every command mandatory ceremony.",
         "Look for an existing Skill that owns the workflow, reusable Context Assets, naming and ownership evidence, security profiles, nearby validated examples, and conflicting or unhealthy conventions before asking questions those sources can answer.",
         "Preserve raw unknowns and their evidence, group related items by the decision they depend on, prioritize themes by risk and downstream impact, ask only about Blocking themes, keep non-blocking themes as findings or Deferred items, and expand an individual item only when the distinction materially changes the result. For a service workflow, timeout, retry, partial success, and rollback may form one failure-handling theme. For a review workflow, unclear authority, missing evidence, and unresolved acceptance criteria may form one decision theme.",
-        "Maintain the complete current set of unresolved and proposed decisions with separate progression classifications. The limit of one to three closely related questions applies to the current turn, not to the total number of unresolved or Blocking decisions; never impose an arbitrary maximum on that total set.",
-        "Prioritize the highest-impact Blocking decisions, ask at most three closely related questions in the current batch, keep additional Blocking decisions visible as queued blockers, and continue with the next batch after the user answers. Never relabel an unasked Blocking decision as Deferred merely because the batch limit was reached.",
-        "When more unresolved items exist than can be asked about now, use a compact Current progression summary with the Blocking count, questions being asked, queued blockers, reversible defaults, and meaningful Deferred decisions; later report only material changes instead of repeating the unchanged set in full.",
+        "Retain the complete current set of unresolved and proposed decisions with separate progression classifications in temporary authoring state. Do not hide a Blocking decision or relabel it Deferred merely because it is not being asked about yet; present enough of the state for the user to understand material blockers and progress, without requiring the complete set to be repeated in every response.",
+        "Do not ask for a downstream authoring decision when a meaningful answer depends on an unresolved upstream authoring decision. Resolve or investigate the prerequisite first. The consuming LLM may use any temporary reasoning or dependency-tracking strategy that satisfies this rule; Renma requires no explicit decision graph, frontier, round-based algorithm, persisted state, or metadata.",
+        "Prefer the smallest effective interaction. A small focused batch, often one to three closely related questions, is a useful default when several answerable Blocking decisions can be resolved together, but question count, batching, and turn structure are adaptive strategies rather than correctness requirements.",
+        "Use a compact Current progression summary when it materially helps coordination or review, including relevant blockers, reversible defaults, and meaningful Deferred decisions; report material changes without mechanically repeating unchanged state.",
         "Do not guess does not mean stop and ask about every unknown: never present missing truth as Confirmed, continue work that does not depend on it, preserve the unknown with evidence, report assumptions and uncertainty, ask only when it blocks the current stage, and never manufacture expected behavior merely to complete an output.",
         "Ask the author only about authoring decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire. Do not ask the author to resolve future repository mismatches or other runtime task unknowns that the finished Skill should detect, report, request, or handle safely.",
         "A runtime-stage blocker is execution behavior that the authored Skill must handle. It does not enter the authoring creation-gate blocker set merely because a future task instance may encounter it. Only an unresolved authoring decision about whether the Skill should ask, report, defer, or stop for that runtime blocker may block Skill creation.",
         "At each meaningful stage transition, when the workflow actually has stages, reassess unresolved decision themes. Treat a runtime task unknown as a runtime-stage blocker when the next execution stage depends on it, follow the Skill's authored ask, report, defer, or stop policy, and return it to Report as finding when a later requested output does not require resolution. Do not add the task-instance fact to the authoring creation-gate blocker set; re-enter authoring clarification only when the Skill's handling policy or asset boundary itself is unresolved.",
         "Do not require a plan-mode-quality specification, ask the user to choose metadata syntax, repeat supplied facts, request unneeded future extensions, or block on wording, tags, examples, or formatting that can be refined later.",
-        "On the first meaningful response, present a compact Current understanding with Confirmed, Proposed, Unresolved, and Question sections plus progression status when useful; never write this temporary summary as a Renma asset.",
+        "Present a compact Current understanding with Confirmed, Proposed, Unresolved, questions, or progression status when that distinction materially helps the interaction; no fixed first-response format is required, and temporary state must never become a Renma asset.",
         "If the user does not know, retain domain or governance truth as unresolved, continue with other decisions when possible, and stop before creation only when it is blocking.",
         "If the user says to use your judgment, treat that as delegation only for identified reversible choices: record the authority as Confirmed, keep the selected default Proposed, explain the smallest safe choice, and do not infer product behavior, source authority, ownership, security permission, or unrelated facts.",
         "A high number of raw unknowns or themes alone does not imply a Skill split; for review Skills, many unknowns may be the expected output. Reconsider the boundary only when Blocking themes reveal materially independent tasks, inputs, outputs, users, security contracts, completion criteria, or workflows. Then propose a split or narrower first Skill, explain the independent responsibilities, keep the boundary Proposed, ask only if evidence cannot resolve it, and re-enter the creation gate after the decision.",
@@ -278,9 +274,9 @@ export function buildSkillAuthoringGuidance(
         "Do not create files while any blocking decision remains unresolved, merely because a generic generator is available, or to make progress appear complete.",
         "Do not block creation on task-instance unknowns when the Skill contract can safely detect and report them with evidence, continue unaffected work, request runtime input only when needed, and stop without inventing truth when the requested output cannot be produced.",
         "Do not block creation on a complete plan, every edge case, final prose, all examples, finalized tags, speculative future capabilities, or perfect certainty about non-blocking details.",
-        "Proceed when no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.",
+        "The creation gate may be declared passed and authoring may proceed only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.",
         "When proceeding, identify the reversible defaults being used and meaningful Deferred decisions, keep them Proposed or Unresolved rather than presenting them as Confirmed, do not ask for redundant confirmation after the user has authorized progress, and re-enter clarification if later evidence changes their impact.",
-        "Once the gate passes, present the smallest proposed asset structure; ask for confirmation only for a meaningful discretionary boundary that remains uncertain.",
+        "Before declaring the gate passed, identify and present the smallest proposed asset structure; ask for confirmation only for a meaningful discretionary boundary that remains uncertain.",
         "Run the appropriate Renma scaffold commands, then refine generated content only within the established boundaries; re-enter this gate before changing those boundaries later.",
       ],
       postValidationActions: [
@@ -304,18 +300,22 @@ export function buildSkillAuthoringGuidance(
         "Do not introduce Renma metadata fields for decision state or conversation history.",
       ],
       handoffRules: [
-        "Platform-native Skill authoring guidance must not independently generate a generic Skill before the Renma clarification gate.",
+        "Platform-native Skill authoring guidance must not independently generate a generic Skill before the Renma creation gate passes.",
         "After the gate, platform-native Skill authoring guidance may refine trigger descriptions, instructions, workflow, constraints, completion criteria, and ambiguity-resolving examples from the Renma scaffold and agreed structure.",
         "Platform-native Skill authoring guidance must not independently add metadata, Context Assets, scripts, examples, or support files outside the agreed structure.",
         "Platform-native Skill authoring guidance must not create a second target file through another generator.",
-        "If semantic refinement reveals a justified asset-boundary change, stop structural edits and return the need to the Renma clarification protocol as Proposed or Unresolved; inspect evidence and re-enter the creation gate instead of silently changing files, metadata, Context relationships, scripts, examples, or support assets.",
-        `When no Blocking authoring decision remains, construct a caller-declared ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff and invoke \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`. Keep Proposed, Unresolved, Reversible default, and Deferred state distinct; the supplied handoff declares readiness but does not prove the creation gate independently passed.`,
+        "If semantic refinement reveals a justified asset-boundary change, stop structural edits and return the Proposed or Unresolved boundary change to the Renma authoring contract; inspect evidence and re-enter the creation gate instead of silently changing files, metadata, Context relationships, scripts, examples, or support assets.",
+        `Only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking authoring decision remains, construct a caller-declared ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff and invoke \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`. Keep Proposed, Unresolved, Reversible default, and Deferred state distinct; the supplied handoff declares readiness but does not prove the creation gate independently passed.`,
         "Renma remains non-interactive: the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic authoring rules and repository evidence; a human approves meaningful decisions.",
+      ],
+      humanReviewRules: [
+        "Finish with human review supported by a compact summary of each material non-obvious decision, its governing evidence or authority, any evidence-backed consequence of changing it or, when the consequence is not established, a potential impact explicitly labeled Proposed or Unresolved, and remaining non-blocking uncertainty.",
+        "Do not claim that the reviewer understood, approved, or independently verified the proposal.",
       ],
     },
     workflow: [
-      "Follow the normative interactive phases above from clarification through human review, including creation-gate re-entry whenever asset boundaries may change.",
-      `After the supplied state declares no Blocking decisions, record a ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff, use \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`, author within the agreed structure, run relevant Renma validation, and complete human review.`,
+      "Satisfy the authoring contract without treating the interaction phases as a mandatory reasoning algorithm. Use clarification only when unresolved Blocking authoring decisions still require human truth, and re-enter the creation gate whenever asset boundaries may change.",
+      `After every creation-gate requirement is established, including the smallest justified asset structure, and the supplied state declares no Blocking decisions, record a ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff, use \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`, author within the agreed structure, run relevant Renma validation, and complete human review.`,
     ],
     placementRules: [
       "Skill: keep the focused task contract in `SKILL.md`: positive and negative selection boundaries, required inputs and evidence, ordered steps and decisions, constraints and failure behavior, expected output, completion criteria, and verification.",
@@ -366,6 +366,8 @@ export function buildSkillAuthoringGuidance(
       "Preserve unknown existing vendor metadata when reviewing an existing Skill, but do not manufacture new provider-specific metadata without a requirement.",
       "Platform-native Skill authoring guidance is not the authority for Renma metadata, Context placement, repository asset boundaries, file count, source-of-truth representation, or whether scripts and support files should exist.",
     ],
+    externalTraversalApplicabilityRule:
+      "If the finished Skill may recursively follow references discovered inside an external source, consult and apply `externalTraversalRules` from the complete JSON reference before passing the creation gate.",
     externalTraversalRules: [
       "Apply this section only when the finished Skill may recursively follow references discovered inside an external source. Reading one or more explicitly named external sources is named source reading and does not by itself require a recursive traversal contract.",
       "When recursive external traversal is possible, define an explicit contract in the Skill body or justified Skill-local support owned by that Skill. Cover the approved source boundary, logical-source identity, visited-source registry, repeated-source behavior, relevance criteria, termination condition, page-count and depth safety caps, cycle behavior, ambiguous identity behavior, inaccessible-source behavior, and unresolved-reference reporting.",

@@ -1701,6 +1701,10 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   assert.match(help.stdout, /Start here: new skill/);
   assert.match(
     help.stdout,
+    /establish every creation-gate requirement, including the smallest intended asset structure[\s\S]*declare the gate passed only after those requirements are established and no Blocking authoring decision remains[\s\S]*record renma\.skill-authoring-handoff\.v1 with that established structure/,
+  );
+  assert.match(
+    help.stdout,
     /renma scaffold skill skills\/<name>\/SKILL\.md --owner <owner>/,
   );
   assert.match(

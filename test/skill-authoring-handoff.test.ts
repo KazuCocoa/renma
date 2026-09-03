@@ -645,8 +645,9 @@ test("guide prompt and JSON expose the v1 handoff construction contract", async 
   assert.equal(guide.handoff.template.progression.blocking.length, 0);
   assert.match(guide.handoff.boundary, /does not prove/);
   assert.match(guide.handoff.rules.join("\n"), /Proposed reversible defaults/);
-  assert.match(promptResult.stdout, /Structured guide-to-scaffold handoff/);
+  assert.match(promptResult.stdout, /Durable handoff boundary/);
   assert.match(promptResult.stdout, /renma\.skill-authoring-handoff\.v1/);
+  assert.doesNotMatch(promptResult.stdout, /"currentUnderstanding"/);
   assert.match(
     promptResult.stdout,
     /no Blocking authoring decision remains.*construct.*handoff/is,

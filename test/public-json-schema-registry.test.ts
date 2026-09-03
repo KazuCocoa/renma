@@ -14,7 +14,7 @@ const RELEASE_CANDIDATE_1_0_SCHEMA_IDENTITIES = {
   "ci-report": "renma.ci-report.v1",
   "inspect outline": "renma.inspect-outline.v1",
   "inspect --lines": "renma.inspect-slice.v1",
-  "guide skill": "renma.skill-authoring-guide.v1",
+  "guide skill": "renma.skill-authoring-guide.v2",
   scaffold: "renma.scaffold.v1",
   "suggest-metadata": "renma.metadata-suggestion.v1",
   "suggest-semantic-split": "renma.semantic-split-suggestion.v1",
@@ -78,6 +78,11 @@ test("public JSON schema registry matches the documented top-level inventory", a
       "execution-contract":
         "Explicitly experimental tests; no stable 1.x assurance",
     },
+  );
+  assert.match(documentation, /Skill Authoring Guide v2 replaces v1/);
+  assert.match(
+    documentation,
+    /Consumers must branch on `schemaVersion`:[\s\S]*`renma\.skill-authoring-guide\.v1` is\s+not reinterpreted or emitted as the new contract/,
   );
 });
 
