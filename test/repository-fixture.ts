@@ -19,7 +19,13 @@ export interface SkillFixtureOptions {
   id?: string;
   description?: string;
   owner?: string;
-  status?: "experimental" | "stable" | "suspended" | "deprecated" | "archived";
+  status?:
+    | "experimental"
+    | "stable"
+    | "suspended"
+    | "revoked"
+    | "deprecated"
+    | "archived";
   statusReason?: string;
   statusChangedAt?: string;
   continuesWith?: readonly string[];
@@ -31,7 +37,14 @@ export interface SkillFixtureOptions {
 export interface ContextFixtureOptions {
   id: string;
   owner?: string;
-  status?: "experimental" | "stable" | "deprecated" | "archived" | string;
+  status?:
+    | "experimental"
+    | "stable"
+    | "suspended"
+    | "revoked"
+    | "deprecated"
+    | "archived"
+    | string;
   statusReason?: string;
   statusChangedAt?: string;
   whenToUse?: readonly string[];

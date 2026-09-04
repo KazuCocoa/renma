@@ -26,8 +26,10 @@ first-class support evidence.
 Asset node properties additively expose current lifecycle `statusReason` and
 `statusChangedAt` when declared. `has_lifecycle_status` edge properties expose
 the same current evidence next to status, and `suspended` is a supported
-lifecycle value. The shared lifecycle-status node remains keyed only by the
-status value; reason and changed date are asset-specific transition evidence.
+lifecycle value. `revoked` is also a first-class value and remains distinct
+from suspension, deprecation, and archival. The shared lifecycle-status node
+remains keyed only by the status value; reason and changed date are
+asset-specific transition evidence.
 These optional properties do not change `renma.trustGraph.v2`, do not encode
 history or runtime use, and do not alter security `riskClass` semantics.
 Static support uses `owns_local_resource`, `statically_references`,

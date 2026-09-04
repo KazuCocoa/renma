@@ -464,7 +464,7 @@ ${
 }Constraints:
 
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
-- Use only supported statuses: experimental, stable, suspended, deprecated, archived. Suspended requires a reviewed non-blank reason and real YYYY-MM-DD status-changed date.
+- Use only supported statuses: experimental, stable, suspended, revoked, deprecated, archived. Suspended and revoked require a reviewed non-blank reason and real YYYY-MM-DD status-changed date; revoked means trust or authorization was explicitly withdrawn because of a known problem.
 - Move knowledge into a Context Asset under \`contexts/\` only when it has an independent maintenance or governance reason. Keep task-specific knowledge in the Skill or justified Skill-local support.
 ${skillGuidance.join("\n")}
 ${contextLensGuidance.join("\n")}

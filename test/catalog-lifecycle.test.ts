@@ -81,7 +81,13 @@ test("lifecycleDiagnostics warns when superseded_by chain forms a cycle", () => 
 
 function contextEntry(options: {
   id: string;
-  status: "experimental" | "stable" | "deprecated" | "archived";
+  status:
+    | "experimental"
+    | "stable"
+    | "suspended"
+    | "revoked"
+    | "deprecated"
+    | "archived";
   supersededBy?: string[];
 }): CatalogEntry {
   return {

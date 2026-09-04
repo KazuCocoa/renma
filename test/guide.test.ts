@@ -872,7 +872,7 @@ test("truth sources qualify artifacts, repository evidence, and external content
   assert.match(truth, /cite or identify the artifact/);
   assert.match(
     truth,
-    /applicable, effective, and unambiguous[\s\S]*deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked/,
+    /applicable, effective, and unambiguous[\s\S]*revoked, deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked/,
   );
   assert.match(
     truth,

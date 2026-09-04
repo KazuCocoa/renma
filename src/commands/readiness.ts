@@ -43,6 +43,10 @@ import type {
   InspectionCoverage,
   InspectionCoverageIssue,
 } from "../inspection-coverage.js";
+import {
+  isInactiveLifecycleStatus,
+  isRevokedLifecycleStatus,
+} from "../lifecycle.js";
 
 type ReadinessFormat = "json" | "markdown";
 export const READINESS_JSON_SCHEMA_VERSION = "renma.readiness.v2" as const;
@@ -69,6 +73,7 @@ const WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS = new Set<string>([
 const DISCOVERY_PUBLICATION_DIAGNOSTIC_IDS = new Set<string>([
   DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
   DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT,
+  DIAGNOSTIC_IDS.DISCOVERY_REVOKED_PUBLISHED_ENTRYPOINT,
   DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
 ]);
 const DISCOVERY_ROUTE_VALIDITY_DIAGNOSTIC_IDS = new Set<string>([
@@ -77,16 +82,22 @@ const DISCOVERY_ROUTE_VALIDITY_DIAGNOSTIC_IDS = new Set<string>([
   DIAGNOSTIC_IDS.DISCOVERY_ROUTE_TARGET_NOT_SKILL,
   DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
   DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET,
+  DIAGNOSTIC_IDS.DISCOVERY_REVOKED_ROUTE_TARGET,
   DIAGNOSTIC_IDS.DISCOVERY_DUPLICATE_DECLARED_ROUTE,
 ]);
 const DISCOVERY_EVIDENCE_LIMIT = QUALITY.presentation.topSummaryItemCap;
-const SUSPENSION_READINESS_DIAGNOSTIC_IDS = new Set<string>([
+const LIFECYCLE_REVIEW_READINESS_DIAGNOSTIC_IDS = new Set<string>([
   DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+  DIAGNOSTIC_IDS.META_REVOKED_STATUS_METADATA_INCOMPLETE,
   DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
   DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
   DIAGNOSTIC_IDS.META_OPTIONAL_SUSPENDED_DEPENDENCY,
+  DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY,
+  DIAGNOSTIC_IDS.META_OPTIONAL_REVOKED_DEPENDENCY,
   DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT,
   DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET,
+  DIAGNOSTIC_IDS.DISCOVERY_REVOKED_PUBLISHED_ENTRYPOINT,
+  DIAGNOSTIC_IDS.DISCOVERY_REVOKED_ROUTE_TARGET,
 ]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
@@ -226,7 +237,7 @@ export function readinessDiagnosticsFromRepositorySnapshot(
   scanDiagnostics: readonly Diagnostic[],
   projectionOptions: ReadinessProjectionOptions = {},
 ): Diagnostic[] {
-  const suspensionDiagnostics = [
+  const lifecycleReviewDiagnostics = [
     ...snapshot.catalogDiagnostics,
     ...(projectionOptions.includeSkillDiscovery === false
       ? []
@@ -234,9 +245,9 @@ export function readinessDiagnosticsFromRepositorySnapshot(
   ].filter(
     (diagnostic) =>
       diagnostic.code !== undefined &&
-      SUSPENSION_READINESS_DIAGNOSTIC_IDS.has(diagnostic.code),
+      LIFECYCLE_REVIEW_READINESS_DIAGNOSTIC_IDS.has(diagnostic.code),
   );
-  return [...scanDiagnostics, ...suspensionDiagnostics];
+  return [...scanDiagnostics, ...lifecycleReviewDiagnostics];
 }
 
 export function buildReadinessReport(
@@ -265,11 +276,8 @@ export function buildReadinessReport(
     resolvedEdges,
     graphReport.edges.length,
   );
-  const lifecycleAssets = graphReport.nodes.filter(
-    (node) =>
-      node.status === "suspended" ||
-      node.status === "deprecated" ||
-      node.status === "archived",
+  const lifecycleAssets = graphReport.nodes.filter((node) =>
+    isInactiveLifecycleStatus(node.status),
   );
   const discoveryReadiness = buildSkillDiscoveryReadiness(skillDiscovery);
   const scaffoldResidueFindings = findings.filter(
@@ -1464,11 +1472,7 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
         },
       ];
     }
-    if (
-      target.status === "suspended" ||
-      target.status === "deprecated" ||
-      target.status === "archived"
-    ) {
+    if (isInactiveLifecycleStatus(target.status)) {
       return [
         {
           id: edge.from,
@@ -1541,11 +1545,7 @@ function workflowOptionalContextCheck(
         },
       ];
     }
-    if (
-      target.status === "suspended" ||
-      target.status === "deprecated" ||
-      target.status === "archived"
-    ) {
+    if (isInactiveLifecycleStatus(target.status)) {
       return [
         {
           id: edge.from,
@@ -1757,7 +1757,7 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
       title: "Asset lifecycle",
       status: "pass",
       severity: "info",
-      summary: "No deprecated or archived assets were cataloged.",
+      summary: "No inactive lifecycle assets were cataloged.",
     };
   }
 
@@ -1767,7 +1767,10 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
     status: "pass",
     severity: "info",
     summary: `${nodes.length} intentionally retained ${
-      nodes.some((node) => node.status === "suspended")
+      nodes.some(
+        (node) =>
+          node.status === "suspended" || isRevokedLifecycleStatus(node.status),
+      )
         ? "inactive"
         : "deprecated or archived"
     } asset${

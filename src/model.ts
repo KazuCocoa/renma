@@ -5,7 +5,12 @@ import type { MetadataFieldEvidence } from "./types/metadata.js";
 
 /** Lifecycle state for a skill or context asset. */
 export type AssetStatus =
-  "experimental" | "stable" | "suspended" | "deprecated" | "archived";
+  | "experimental"
+  | "stable"
+  | "suspended"
+  | "revoked"
+  | "deprecated"
+  | "archived";
 
 /** Artifact kinds Renma keeps in the normalized model. */
 export type AssetKind = Exclude<ArtifactKind, "unknown">;

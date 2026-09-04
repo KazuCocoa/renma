@@ -2243,7 +2243,13 @@ function skill(
   options: {
     id: string;
     routes?: string[];
-    status?: "experimental" | "stable" | "deprecated" | "archived";
+    status?:
+      | "experimental"
+      | "stable"
+      | "suspended"
+      | "revoked"
+      | "deprecated"
+      | "archived";
     body?: string;
     extraMetadata?: string[];
     published?: boolean;

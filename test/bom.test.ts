@@ -1435,7 +1435,7 @@ function expectedBomContract(): BomReport {
           title: "Asset lifecycle",
           status: "pass",
           severity: "info",
-          summary: "No deprecated or archived assets were cataloged.",
+          summary: "No inactive lifecycle assets were cataloged.",
         },
         {
           id: "assets.freshness",

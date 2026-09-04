@@ -191,6 +191,7 @@
             "experimental",
             "stable",
             "suspended",
+            "revoked",
             "deprecated",
             "archived"
           ]
@@ -208,6 +209,7 @@
                 "experimental",
                 "stable",
                 "suspended",
+                "revoked",
                 "deprecated",
                 "archived"
               ]

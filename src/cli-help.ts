@@ -348,7 +348,7 @@ export const COMMAND_HELP = [
     ],
     doNotUseFor: [
       "Proving that a relationship executed or must execute.",
-      "Authorizing a suspended Skill or any command execution.",
+      "Authorizing a suspended or revoked Skill, or any command execution.",
       "Importing observations, verifying conformance, or asking Renma to inspect Git revision state.",
     ],
     examples: [

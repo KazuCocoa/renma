@@ -80,6 +80,8 @@ test("catalog error diagnostics retain the established High Finding conversion",
     DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
     DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
     DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+    DIAGNOSTIC_IDS.META_REVOKED_STATUS_METADATA_INCOMPLETE,
+    DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY,
   ]) {
     const [finding] = catalogDiagnosticFindings([
       { ...codedDiagnostic(code, "error case"), severity: "error" },
@@ -89,6 +91,12 @@ test("catalog error diagnostics retain the established High Finding conversion",
   assert.equal(
     catalogDiagnosticDefaultFindingSeverity(
       DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+    ),
+    "high",
+  );
+  assert.equal(
+    catalogDiagnosticDefaultFindingSeverity(
+      DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY,
     ),
     "high",
   );
@@ -226,8 +234,10 @@ optional_context:
   - context.unknown
   - context.inactive
   - context.suspended
+  - context.revoked
 requires_context:
   - context.suspended
+  - context.revoked
 ---
 # Source
 `,
@@ -261,6 +271,21 @@ when_not_to_use: current guidance
 `,
     ),
     document(
+      "contexts/revoked.md",
+      "context",
+      `---
+id: context.revoked
+owner: qa
+status: revoked
+status_reason: Trust was explicitly withdrawn after a known correctness failure.
+status_changed_at: 2026-09-03
+when_to_use: historical review
+when_not_to_use: current guidance
+---
+# Revoked
+`,
+    ),
+    document(
       "contexts/incomplete-suspension.md",
       "context",
       `---
@@ -271,6 +296,19 @@ when_to_use: historical review
 when_not_to_use: current guidance
 ---
 # Incomplete Suspension
+`,
+    ),
+    document(
+      "contexts/incomplete-revocation.md",
+      "context",
+      `---
+id: context.incomplete-revocation
+owner: qa
+status: revoked
+when_to_use: historical review
+when_not_to_use: current guidance
+---
+# Incomplete Revocation
 `,
     ),
   ];

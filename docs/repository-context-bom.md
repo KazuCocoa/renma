@@ -131,13 +131,13 @@ and inherited-ownership fields appear only when their evidence exists. Owner
 values are explicitly nullable; missing optional fields are omitted rather
 than serialized as `null`.
 
-BOM v3 carries forward v2's `suspended` lifecycle status. Asset and
-`lifecycle` projections may include optional `statusReason` and
-`statusChangedAt` strings adjacent to status. These are current declaration
-evidence only: BOM does not store transition history, infer dates, schedule
-expiry, or restore an asset. Archived v2 documents without the optional fields
-remain valid under the published v2 schema; the same fields remain optional in
-v3.
+BOM v3 carries forward v2's lifecycle status vocabulary and additively accepts
+`revoked`. Asset and `lifecycle` projections may include optional
+`statusReason` and `statusChangedAt` strings adjacent to status. These are
+current declaration evidence only: BOM does not store transition history,
+infer dates, schedule expiry, restore an asset, or propagate revocation.
+Archived v2 documents without the optional fields remain valid under the
+published v2 schema; the same fields remain optional in v3.
 
 Arrays are deterministically ordered by their identity/path keys, and count
 fields are non-negative integers. Count maps contain every declared enum

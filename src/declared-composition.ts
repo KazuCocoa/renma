@@ -11,7 +11,12 @@ import type {
   DependencyKind,
 } from "./model.js";
 import type { Evidence, Finding } from "./types/diagnostics.js";
-import { isLifecycleUsable } from "./lifecycle.js";
+import {
+  isInactiveLifecycleStatus,
+  isLifecycleUsable,
+  isRevokedLifecycleStatus,
+  type InactiveLifecycleStatus,
+} from "./lifecycle.js";
 
 export type CompositionMembership = "required" | "optional";
 export type CompositionRelationship =
@@ -102,7 +107,7 @@ export interface CompositionLifecycleFinding {
   sourcePath: string;
   membership: CompositionMembership;
   isRoot: boolean;
-  status: "suspended" | "deprecated" | "archived";
+  status: InactiveLifecycleStatus;
   statusReason?: string;
   statusChangedAt?: string;
 }
@@ -357,11 +362,12 @@ export function resolveDeclaredCompositionFromIndex(
   const optionalMismatch = kindMismatches.some(
     (mismatch) => mismatch.membership === "optional",
   );
-  const requiredSuspension = governance.lifecycle.some(
+  const requiredUnavailableAsset = governance.lifecycle.some(
     (finding) =>
       !finding.isRoot &&
       finding.membership === "required" &&
-      finding.status === "suspended" &&
+      (finding.status === "suspended" ||
+        isRevokedLifecycleStatus(finding.status)) &&
       isLifecycleUsable(root.metadata.status),
   );
 
@@ -382,7 +388,7 @@ export function resolveDeclaredCompositionFromIndex(
     requiredComplete:
       unresolvedRequired.length === 0 &&
       !requiredMismatch &&
-      !requiredSuspension,
+      !requiredUnavailableAsset,
     optionalComplete: unresolvedOptional.length === 0 && !optionalMismatch,
     cycleFree: requiredCycles.length === 0 && optionalCycles.length === 0,
   };
@@ -1333,11 +1339,7 @@ function compositionGovernanceFindings(
         ...metadataEvidence(asset, "last_reviewed_at"),
       });
     }
-    if (
-      asset.metadata.status === "suspended" ||
-      asset.metadata.status === "deprecated" ||
-      asset.metadata.status === "archived"
-    ) {
+    if (isInactiveLifecycleStatus(asset.metadata.status)) {
       lifecycle.push({
         assetId: asset.id,
         sourcePath: asset.sourcePath,

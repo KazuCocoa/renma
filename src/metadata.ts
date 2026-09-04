@@ -12,6 +12,7 @@ import type {
   ParsedDocument,
 } from "./types/metadata.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
+import { isRevokedLifecycleStatus } from "./lifecycle.js";
 import {
   DEFAULT_QUALITY_PROFILE,
   TOKEN_BUDGET_OVERRIDE_VALIDATION_BASELINE,
@@ -37,6 +38,7 @@ const STATUSES: AssetStatus[] = [
   "experimental",
   "stable",
   "suspended",
+  "revoked",
   "deprecated",
   "archived",
 ];
@@ -613,6 +615,40 @@ export function parseAssetMetadata(document: ParsedDocument): {
     }
   }
 
+  if (isRevokedLifecycleStatus(status)) {
+    const reasonDeclared =
+      metadataFieldEvidence(source, "status_reason") !== undefined;
+    const changedAtDeclared =
+      metadataFieldEvidence(source, "status_changed_at") !== undefined;
+    const missingFields = [
+      ...(!reasonDeclared ? ["status_reason"] : []),
+      ...(!changedAtDeclared ? ["status_changed_at"] : []),
+    ];
+    const invalidFields = [
+      ...(reasonDeclared && statusReason === undefined
+        ? ["status_reason"]
+        : []),
+      ...(changedAtDeclared && !statusChangedAtValid
+        ? ["status_changed_at"]
+        : []),
+      ...(changedAtDeclared && statusChangedAt === undefined
+        ? ["status_changed_at"]
+        : []),
+    ];
+    if (missingFields.length > 0 || invalidFields.length > 0) {
+      diagnostics.push(
+        revokedMetadataIncompleteDiagnostic(
+          document,
+          source,
+          statusReason,
+          statusChangedAt,
+          missingFields,
+          invalidFields,
+        ),
+      );
+    }
+  }
+
   if (
     reviewCycle !== undefined &&
     parseDayDuration(reviewCycle) === undefined
@@ -880,10 +916,10 @@ function statusChangedAtDiagnostic(
   status: AssetStatus | undefined,
   statusChangedAt: string,
 ): Diagnostic {
-  const suspended = status === "suspended";
+  const blocking = status === "suspended" || isRevokedLifecycleStatus(status);
   const evidence = metadataFieldEvidence(source, "status_changed_at");
   return withDiagnosticId(DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT, {
-    severity: suspended ? "error" : "warning",
+    severity: blocking ? "error" : "warning",
     path: document.artifact.path,
     message: `Invalid status_changed_at "${statusChangedAt}". Expected a real ISO calendar date in YYYY-MM-DD format.`,
     ...(evidence ? { evidence } : {}),
@@ -972,6 +1008,72 @@ function suspendedMetadataIncompleteDiagnostic(
         sourcePath: document.artifact.path,
         status: "suspended",
         missingFields,
+        ...(statusReason ? { statusReason } : {}),
+        ...(statusChangedAt ? { statusChangedAt } : {}),
+      },
+    },
+  );
+}
+
+function revokedMetadataIncompleteDiagnostic(
+  document: ParsedDocument,
+  source: OperationalMetadataSource,
+  statusReason: string | undefined,
+  statusChangedAt: string | undefined,
+  missingFields: string[],
+  invalidFields: string[],
+): Diagnostic {
+  const statusEvidence = metadataFieldEvidence(source, "status");
+  const issueSummary = [
+    ...(missingFields.length > 0
+      ? [`missing ${missingFields.join(" and ")}`]
+      : []),
+    ...(invalidFields.length > 0
+      ? [`invalid ${invalidFields.join(" and ")}`]
+      : []),
+  ].join("; ");
+  return withDiagnosticId(
+    DIAGNOSTIC_IDS.META_REVOKED_STATUS_METADATA_INCOMPLETE,
+    {
+      severity: "error",
+      path: document.artifact.path,
+      message: `Revoked lifecycle metadata is incomplete (${issueSummary}). Record a non-blank status_reason and a real status_changed_at date with reviewed revocation evidence.`,
+      ...(statusEvidence ? { evidence: statusEvidence } : {}),
+      repairConstraints: [
+        {
+          kind: "must_preserve",
+          text: "Preserve the revoked asset, its contents, inventory evidence, and any reviewed reason/date declarations that already exist.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not restore, suspend, deprecate, archive, delete, clone, or replace the asset merely to clear this diagnostic.",
+        },
+        {
+          kind: "allowed_change",
+          text: "Add or correct only the explicit non-blank reason and real YYYY-MM-DD date for the reviewed revocation decision.",
+        },
+        {
+          kind: "requires_human_decision",
+          text: "Confirm the known problem, explicit withdrawal of trust or authorization, and date of that reviewed decision.",
+        },
+      ],
+      verificationSteps: [
+        {
+          text: "Add or correct the canonical revocation evidence and rerun metadata validation.",
+          command: "renma scan . --format json",
+          expected: `No ${DIAGNOSTIC_IDS.META_REVOKED_STATUS_METADATA_INCOMPLETE} diagnostic remains for this asset.`,
+        },
+      ],
+      llmHint:
+        "Keep the asset revoked and add only human-reviewed evidence of the explicit trust or authorization withdrawal. Skills use flat metadata.renma.status-reason and metadata.renma.status-changed-at strings; non-Skills use status_reason and status_changed_at.",
+      details: {
+        assetId:
+          optionalText(metadataText(source.values.id)) ??
+          document.artifact.path,
+        sourcePath: document.artifact.path,
+        status: "revoked",
+        missingFields,
+        invalidFields,
         ...(statusReason ? { statusReason } : {}),
         ...(statusChangedAt ? { statusChangedAt } : {}),
       },

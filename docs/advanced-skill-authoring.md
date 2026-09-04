@@ -160,6 +160,22 @@ Git and pull-request history retain the full audit trail. Do not use
 `last-reviewed-at` as the lifecycle transition date, and do not infer or
 backfill either date from filesystem timestamps.
 
+Use `revoked` instead when trust or authorization for continued use has been
+explicitly withdrawn because of a known problem. Revocation is stronger than
+temporary suspension and also requires reviewed reason/date evidence:
+
+```yaml
+metadata:
+  renma.status: revoked
+  renma.status-reason: Revoked because the documented procedure can cause unsafe destructive behavior.
+  renma.status-changed-at: "2026-09-03"
+```
+
+A revoked Skill is unusable for active dependencies and Discovery. Renma emits
+review evidence for its active dependents but does not revoke them, choose a
+replacement, require `superseded-by`, or automatically restore or archive the
+target.
+
 ## Router, Workflow, And Operational Responsibilities
 
 A normal Skill may act as a published entrypoint, a broad router, an

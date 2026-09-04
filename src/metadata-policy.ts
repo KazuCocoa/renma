@@ -300,6 +300,7 @@ function validTextSemantics(
         "experimental",
         "stable",
         "suspended",
+        "revoked",
         "deprecated",
         "archived",
       ].includes(value);

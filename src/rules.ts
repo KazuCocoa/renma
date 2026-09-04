@@ -37,7 +37,7 @@ import {
   localSupportReachabilityDepth,
   staticSupportReferences,
 } from "./static-support.js";
-import { isLifecycleUsable } from "./lifecycle.js";
+import { isLifecycleUsable, isRevokedLifecycleStatus } from "./lifecycle.js";
 import {
   RENMA_SCAFFOLD_PLACEHOLDER_MARKERS,
   type RenmaScaffoldPlaceholderMarker,
@@ -748,6 +748,7 @@ function contextLensAppliesToInactiveContextFindings(
     if (
       !isActiveAsset(source) ||
       target.metadata.status === "suspended" ||
+      isRevokedLifecycleStatus(target.metadata.status) ||
       isActiveAsset(target)
     )
       return [];
