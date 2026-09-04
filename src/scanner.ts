@@ -2,6 +2,7 @@ import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { catalogDiagnosticFindings } from "./catalog-findings.js";
 import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import { applyDiagnosticSeverityPolicy } from "./diagnostic-severity-policy.js";
 import {
   createScanDiagnostics,
   createReviewBundles,
@@ -104,7 +105,7 @@ export function scanFromRepositorySnapshot(
     snapshot.config,
     { plainTextSupportReachability },
   );
-  const rawFindings = [
+  const producerFindings = [
     ...runRules(
       snapshot.documents,
       snapshot.config,
@@ -121,12 +122,16 @@ export function scanFromRepositorySnapshot(
       if (byPath !== 0) return byPath;
       return a.evidence.startLine - b.evidence.startLine;
     });
+  const effectiveFindings = applyDiagnosticSeverityPolicy(
+    producerFindings,
+    snapshot.config.diagnostics,
+  );
   const evaluationDate =
     options.evaluationDate === undefined
       ? new Date()
       : new Date(options.evaluationDate);
   const suppressed = applySuppressions(
-    rawFindings,
+    effectiveFindings,
     options.enforcementSuppressions ?? snapshot.config.suppressions,
     evaluationDate,
   );

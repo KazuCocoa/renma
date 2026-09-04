@@ -88,6 +88,16 @@ export interface MetadataConfig {
   requiredSource: MetadataRequiredSource;
 }
 
+export type DiagnosticsCiPolicyMode = "off" | "warn" | "fail";
+
+/** Effective repository policy for scan-finding severity by stable diagnostic id. */
+export interface DiagnosticsConfig {
+  /** CI review mode for repository severity-policy weakening. Defaults to fail. */
+  ciPolicy: DiagnosticsCiPolicyMode;
+  /** Exact effective severities selected by stable diagnostic id. */
+  severity: Record<string, Severity>;
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -102,6 +112,7 @@ export interface ScanConfig {
   executableSurface: ExecutableSurfaceConfig;
   quality: QualityConfig;
   metadata: MetadataConfig;
+  diagnostics: DiagnosticsConfig;
   security: SecurityConfig;
   skillDiscovery: SkillDiscoveryConfig;
 }

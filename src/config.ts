@@ -8,6 +8,7 @@ import {
   type ParseError,
 } from "jsonc-parser";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   REQUIRED_METADATA_POLICY_FIELDS,
   type RequiredMetadataPolicyField,
@@ -37,6 +38,7 @@ const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const EXECUTABLE_SURFACE_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const QUALITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const METADATA_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const DIAGNOSTICS_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const CONTENT_TOKEN_BUDGET_KINDS = [
   "context",
   "reference",
@@ -53,6 +55,7 @@ const QUALITY_CONFIG_KEYS = [
   ]),
 ] as const;
 const METADATA_CONFIG_KEYS = ["ci_policy", "required"] as const;
+const DIAGNOSTICS_CONFIG_KEYS = ["ci_policy", "severity"] as const;
 const SUPPRESSION_CONFIG_KEYS = ["id", "paths", "reason", "expires"] as const;
 const SCAN_BOUNDARY_CONFIG_KEYS = ["ci_policy"] as const;
 const EXECUTABLE_SURFACE_CONFIG_KEYS = ["ci_policy"] as const;
@@ -70,6 +73,7 @@ const TOP_LEVEL_CONFIG_KEYS = [
   "executable_surface",
   "quality",
   "metadata",
+  "diagnostics",
   "security",
   "skill_discovery",
 ] as const;
@@ -113,6 +117,9 @@ const QUALITY_CONFIG_KEY_REGISTRY =
   configurationKeyRegistry(QUALITY_CONFIG_KEYS);
 const METADATA_CONFIG_KEY_REGISTRY =
   configurationKeyRegistry(METADATA_CONFIG_KEYS);
+const DIAGNOSTICS_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  DIAGNOSTICS_CONFIG_KEYS,
+);
 const SUPPRESSION_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
   SUPPRESSION_CONFIG_KEYS,
 );
@@ -181,6 +188,10 @@ export const DEFAULT_CONFIG: ScanConfig = {
     required: [],
     requiredSource: "renma_default",
   },
+  diagnostics: {
+    ciPolicy: "fail",
+    severity: {},
+  },
   security: {
     approvedDomains: [],
     approvedUploadDomains: [],
@@ -228,6 +239,7 @@ export async function loadConfig(
       ...config,
       quality: config.quality ?? cloneDefaultQualityConfig(),
       metadata: config.metadata ?? cloneDefaultMetadataConfig(),
+      diagnostics: config.diagnostics ?? cloneDefaultDiagnosticsConfig(),
       failOn: overrides.failOn ?? config.failOn ?? DEFAULT_CONFIG.failOn,
       format: overrides.format ?? config.format ?? DEFAULT_CONFIG.format,
     },
@@ -485,12 +497,51 @@ function normalizeConfig(
     config.quality = qualityPolicy(value.quality);
   if (value.metadata !== undefined)
     config.metadata = metadataPolicy(value.metadata);
+  if (value.diagnostics !== undefined)
+    config.diagnostics = diagnosticsPolicy(value.diagnostics);
 
   if (value.security !== undefined)
     config.security = securityPolicy(value.security);
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function diagnosticsPolicy(value: unknown): ScanConfig["diagnostics"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("diagnostics must be an object.");
+  }
+
+  const severitySource =
+    value.severity === undefined
+      ? {}
+      : objectRecord("diagnostics.severity", value.severity);
+  const knownIds = new Set<string>(Object.values(DIAGNOSTIC_IDS));
+  const severity = Object.create(null) as Record<string, Severity>;
+  for (const id of Object.keys(severitySource).sort(compareUtf16CodeUnits)) {
+    if (!knownIds.has(id)) {
+      throw new ConfigError(
+        `diagnostics.severity contains unknown diagnostic id ${JSON.stringify(id)}. Use a stable id from Renma's diagnostic registry.`,
+      );
+    }
+    severity[id] = enumValue(
+      `diagnostics.severity.${id}`,
+      severitySource[id],
+      SEVERITIES,
+    );
+  }
+
+  return {
+    ciPolicy:
+      value.ci_policy === undefined
+        ? "fail"
+        : enumValue(
+            "diagnostics.ci_policy",
+            value.ci_policy,
+            DIAGNOSTICS_CI_POLICY_MODES,
+          ),
+    severity,
+  };
 }
 
 function metadataPolicy(value: unknown): ScanConfig["metadata"] {
@@ -646,6 +697,13 @@ function cloneDefaultMetadataConfig(): ScanConfig["metadata"] {
   return {
     ...DEFAULT_CONFIG.metadata,
     required: [...DEFAULT_CONFIG.metadata.required],
+  };
+}
+
+function cloneDefaultDiagnosticsConfig(): ScanConfig["diagnostics"] {
+  return {
+    ...DEFAULT_CONFIG.diagnostics,
+    severity: { ...DEFAULT_CONFIG.diagnostics.severity },
   };
 }
 
@@ -879,6 +937,7 @@ type ConfigurationKeyScope =
   | "top-level"
   | "quality"
   | "metadata"
+  | "diagnostics"
   | "suppression"
   | "scan-boundary"
   | "executable-surface"
@@ -904,12 +963,13 @@ const CONFIGURATION_KEY_SCOPE_ORDER: Record<ConfigurationKeyScope, number> = {
   "top-level": 0,
   quality: 1,
   metadata: 2,
-  suppression: 3,
-  "scan-boundary": 4,
-  "executable-surface": 5,
-  security: 6,
-  "security-profile": 7,
-  "skill-discovery": 8,
+  diagnostics: 3,
+  suppression: 4,
+  "scan-boundary": 5,
+  "executable-surface": 6,
+  security: 7,
+  "security-profile": 8,
+  "skill-discovery": 9,
 };
 const CONFIGURATION_KEY_SCOPES_IN_ORDER = (
   Object.keys(CONFIGURATION_KEY_SCOPE_ORDER) as ConfigurationKeyScope[]
@@ -924,6 +984,16 @@ function validateConfigurationStructure(config: Record<string, unknown>): void {
   }
   if (config.metadata !== undefined && !isRecord(config.metadata)) {
     throw new ConfigError("metadata must be an object.");
+  }
+  if (config.diagnostics !== undefined && !isRecord(config.diagnostics)) {
+    throw new ConfigError("diagnostics must be an object.");
+  }
+  if (
+    isRecord(config.diagnostics) &&
+    config.diagnostics.severity !== undefined &&
+    !isRecord(config.diagnostics.severity)
+  ) {
+    throw new ConfigError("diagnostics.severity must be an object.");
   }
   if (config.suppressions !== undefined) {
     if (!Array.isArray(config.suppressions)) {
@@ -996,6 +1066,14 @@ function validateConfigurationKeys(
       "metadata",
       config.metadata,
       METADATA_CONFIG_KEY_REGISTRY,
+      issues,
+    );
+  }
+  if (isRecord(config.diagnostics)) {
+    collectUnknownConfigurationKeys(
+      "diagnostics",
+      config.diagnostics,
+      DIAGNOSTICS_CONFIG_KEY_REGISTRY,
       issues,
     );
   }
@@ -1149,6 +1227,8 @@ function configurationKeyIssueGroup(issue: ConfigurationKeyIssue): string {
       return "quality";
     case "metadata":
       return "metadata";
+    case "diagnostics":
+      return "diagnostics";
     case "suppression":
       return `suppressions[${issue.suppressionIndex}]`;
     case "scan-boundary":
@@ -1191,6 +1271,11 @@ function allowedConfigurationKeys(scope: ConfigurationKeyScope): string {
       return allowedConfigurationKeysMessage(
         "metadata",
         METADATA_CONFIG_KEY_REGISTRY,
+      );
+    case "diagnostics":
+      return allowedConfigurationKeysMessage(
+        "diagnostics",
+        DIAGNOSTICS_CONFIG_KEY_REGISTRY,
       );
     case "suppression":
       return allowedConfigurationKeysMessage(

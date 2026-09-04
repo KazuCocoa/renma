@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added repository-wide scan-finding severity policy through
+  `diagnostics.severity`, keyed by stable diagnostic ID. Effective severity now
+  feeds scan output, suppression evidence, failure thresholds, Readiness, diff,
+  and CI projections while retaining the producer default as traceability.
+  `diagnostics.ci_policy` governs severity-policy weakening with the stricter
+  compared endpoint, including attempts to weaken the guard in the same change.
+
 ## [0.37.2] - 2026-09-02
 
 ### Changed

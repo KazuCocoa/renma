@@ -82,6 +82,12 @@ import {
   type MetadataPolicyCiEvaluation,
 } from "../metadata-policy-ci-policy.js";
 import { REQUIRED_METADATA_CONFIGURATION_KEY } from "../metadata-definitions.js";
+import type { DiagnosticSeverityPolicyChange } from "../diagnostic-severity-policy-diff.js";
+import {
+  evaluateDiagnosticSeverityCiPolicy,
+  type DiagnosticSeverityCiConfiguration,
+  type DiagnosticSeverityCiEvaluation,
+} from "../diagnostic-severity-ci-policy.js";
 
 type CiReportFormat = DiffFormat;
 export const CI_REPORT_JSON_SCHEMA_VERSION = "renma.ci-report.v1" as const;
@@ -132,6 +138,7 @@ export interface CiReport {
   executableSurfacePolicy: ExecutableSurfaceCiEvaluation;
   qualityPolicy: QualityPolicyCiEvaluation;
   metadataPolicy?: MetadataPolicyCiEvaluation;
+  diagnosticSeverityPolicy?: DiagnosticSeverityCiEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -151,6 +158,7 @@ export type CiReportFormatInput =
       | "executableSurfacePolicy"
       | "qualityPolicy"
       | "metadataPolicy"
+      | "diagnosticSeverityPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     })
@@ -164,6 +172,7 @@ export type CiReportFormatInput =
       | "executableSurfacePolicy"
       | "qualityPolicy"
       | "metadataPolicy"
+      | "diagnosticSeverityPolicy"
     > & {
       diff: CiFormatCompatibleDiffReport;
     });
@@ -230,6 +239,7 @@ export async function ciReport(
     execution.executableSurfaceCiPolicy,
     execution.qualityCiPolicy,
     execution.metadataCiPolicy,
+    execution.diagnosticSeverityCiPolicy,
   );
 }
 
@@ -257,6 +267,10 @@ export function buildCiReportFromDiff(
     to: "fail",
   },
   configuredMetadataPolicy: MetadataPolicyCiConfiguration = {
+    from: "fail",
+    to: "fail",
+  },
+  configuredDiagnosticSeverityPolicy: DiagnosticSeverityCiConfiguration = {
     from: "fail",
     to: "fail",
   },
@@ -297,6 +311,10 @@ export function buildCiReportFromDiff(
     },
     configuredMetadataPolicy,
   );
+  const diagnosticSeverityPolicy = evaluateDiagnosticSeverityCiPolicy(
+    ciCompatibleDiff.diagnosticSeverityPolicy ?? { changes: [] },
+    configuredDiagnosticSeverityPolicy,
+  );
   const status = composeCiReportStatus(
     existingStatus,
     skillDiscoveryPolicy.outcome,
@@ -305,6 +323,7 @@ export function buildCiReportFromDiff(
     executableSurfacePolicy.outcome,
     qualityPolicy.outcome,
     metadataPolicy.outcome,
+    diagnosticSeverityPolicy.outcome,
   );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
@@ -315,6 +334,11 @@ export function buildCiReportFromDiff(
     metadataPolicy.configured.from !== metadataPolicy.configured.to ||
     (ciCompatibleDiff.metadataPolicy?.changes.length ?? 0) > 0 ||
     metadataPolicy.matchCount > 0;
+  const hasDiagnosticSeverityPolicyEvidence =
+    diagnosticSeverityPolicy.configured.from !==
+      diagnosticSeverityPolicy.configured.to ||
+    (ciCompatibleDiff.diagnosticSeverityPolicy?.changes.length ?? 0) > 0 ||
+    diagnosticSeverityPolicy.matchCount > 0;
   return {
     root: ciCompatibleDiff.root,
     from: ciCompatibleDiff.from,
@@ -328,6 +352,9 @@ export function buildCiReportFromDiff(
     executableSurfacePolicy,
     qualityPolicy,
     ...(hasMetadataPolicyEvidence ? { metadataPolicy } : {}),
+    ...(hasDiagnosticSeverityPolicyEvidence
+      ? { diagnosticSeverityPolicy }
+      : {}),
     securityPosture,
     notes: reviewNotes(
       ciCompatibleDiff,
@@ -339,6 +366,7 @@ export function buildCiReportFromDiff(
       executableSurfacePolicy,
       qualityPolicy,
       metadataPolicy,
+      diagnosticSeverityPolicy,
     ),
     diff: ciCompatibleDiff,
   };
@@ -411,6 +439,7 @@ export function composeCiReportStatus(
   executableSurfacePolicyOutcome: ExecutableSurfaceCiEvaluation["outcome"] = "pass",
   qualityPolicyOutcome: QualityPolicyCiEvaluation["outcome"] = "pass",
   metadataPolicyOutcome: MetadataPolicyCiEvaluation["outcome"] = "pass",
+  diagnosticSeverityPolicyOutcome: DiagnosticSeverityCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
   if (
     existingStatus === "fail" ||
@@ -418,7 +447,8 @@ export function composeCiReportStatus(
     scanBoundaryPolicyOutcome === "fail" ||
     executableSurfacePolicyOutcome === "fail" ||
     qualityPolicyOutcome === "fail" ||
-    metadataPolicyOutcome === "fail"
+    metadataPolicyOutcome === "fail" ||
+    diagnosticSeverityPolicyOutcome === "fail"
   )
     return "fail";
   if (
@@ -428,7 +458,8 @@ export function composeCiReportStatus(
     scanBoundaryPolicyOutcome === "warn" ||
     executableSurfacePolicyOutcome === "warn" ||
     qualityPolicyOutcome === "warn" ||
-    metadataPolicyOutcome === "warn"
+    metadataPolicyOutcome === "warn" ||
+    diagnosticSeverityPolicyOutcome === "warn"
   )
     return "warn";
   return "pass";
@@ -470,6 +501,7 @@ function reviewNotes(
   executableSurfacePolicy: ExecutableSurfaceCiEvaluation,
   qualityPolicy: QualityPolicyCiEvaluation,
   metadataPolicy: MetadataPolicyCiEvaluation,
+  diagnosticSeverityPolicy: DiagnosticSeverityCiEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -507,7 +539,8 @@ function reviewNotes(
     securityPolicy.matchCount === 0 &&
     scanBoundaryPolicy.matchCount === 0 &&
     qualityPolicy.matchCount === 0 &&
-    metadataPolicy.matchCount === 0
+    metadataPolicy.matchCount === 0 &&
+    diagnosticSeverityPolicy.matchCount === 0
   ) {
     notes.push("Scan findings decreased.");
   }
@@ -593,6 +626,27 @@ function reviewNotes(
       `Metadata CI mode was tightened from ${metadataPolicy.modeTransition.from} to ${metadataPolicy.modeTransition.to}; the transition is non-blocking.`,
     );
   }
+  if (diagnosticSeverityPolicy.severityChanges.weakenings > 0) {
+    notes.push(
+      `Diagnostic severity policy matched ${diagnosticSeverityPolicy.severityChanges.weakenings} weakening${diagnosticSeverityPolicy.severityChanges.weakenings === 1 ? "" : "s"}.`,
+    );
+    if (report.summary.findingsDelta < 0) {
+      notes.push(
+        "Scan findings decreased alongside diagnostic severity-policy weakening; this is not treated as verified remediation.",
+      );
+    }
+  }
+  if (diagnosticSeverityPolicy.modeTransition.direction === "weakening") {
+    notes.push(
+      `Diagnostics CI mode was relaxed from ${diagnosticSeverityPolicy.modeTransition.from} to ${diagnosticSeverityPolicy.modeTransition.to}; the stricter ${diagnosticSeverityPolicy.configured.effective} endpoint mode governs this comparison.`,
+    );
+  } else if (
+    diagnosticSeverityPolicy.modeTransition.direction === "tightening"
+  ) {
+    notes.push(
+      `Diagnostics CI mode was tightened from ${diagnosticSeverityPolicy.modeTransition.from} to ${diagnosticSeverityPolicy.modeTransition.to}; the transition is non-blocking.`,
+    );
+  }
   if (executableSurfacePolicy.matchCount > 0) {
     if (executableSurfacePolicy.configured.effective === "off") {
       const suffix =
@@ -637,6 +691,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     changes: [],
   };
   const metadataDiff = report.diff.metadataPolicy;
+  const diagnosticSeverityDiff = report.diff.diagnosticSeverityPolicy;
   const skillDiscoveryLines =
     "skillDiscovery" in report
       ? [
@@ -779,6 +834,29 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
         ),
       ]
     : [];
+  const diagnosticSeverityPolicy =
+    "diagnosticSeverityPolicy" in report
+      ? report.diagnosticSeverityPolicy
+      : undefined;
+  if (diagnosticSeverityPolicy) {
+    const effect =
+      diagnosticSeverityPolicy.matchCount > 0 &&
+      diagnosticSeverityPolicy.configured.effective === "off"
+        ? "GATE OFF"
+        : diagnosticSeverityPolicy.outcome.toUpperCase();
+    summaryLines.push(
+      `- Diagnostic severity policy: ${effect} — mode ${diagnosticSeverityPolicy.modeTransition.direction}; ${diagnosticSeverityPolicy.severityChanges.weakenings} weakenings / ${diagnosticSeverityPolicy.severityChanges.tightenings} strengthenings`,
+    );
+  }
+  const diagnosticSeverityPolicyLines = diagnosticSeverityPolicy
+    ? [
+        "",
+        ...formatDiagnosticSeverityPolicySection(
+          diagnosticSeverityPolicy,
+          diagnosticSeverityDiff?.changes ?? [],
+        ),
+      ]
+    : [];
 
   const detailLines = [
     "## Readiness",
@@ -802,6 +880,11 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     `- Quality token-threshold changes: ${qualityDiff.changes.length}`,
     ...(metadataPolicy || metadataDiff
       ? [`- Required metadata changes: ${metadataDiff?.changes.length ?? 0}`]
+      : []),
+    ...(diagnosticSeverityPolicy || diagnosticSeverityDiff
+      ? [
+          `- Diagnostic severity changes: ${diagnosticSeverityDiff?.changes.length ?? 0}`,
+        ]
       : []),
     "",
     "## Asset Changes",
@@ -894,6 +977,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...executableSurfacePolicyLines,
     ...qualityPolicyLines,
     ...metadataPolicyLines,
+    ...diagnosticSeverityPolicyLines,
     "",
     "## Review Notes",
     "",
@@ -1033,6 +1117,12 @@ function formatChangeOverview(
       0,
       0,
       report.diff.qualityPolicy?.changes.length ?? 0,
+    ],
+    [
+      "diagnostic severity policy",
+      0,
+      0,
+      report.diff.diagnosticSeverityPolicy?.changes.length ?? 0,
     ],
     [
       "required metadata",
@@ -1218,6 +1308,42 @@ function formatMetadataPolicyChange(
   const direction =
     change.direction === "weakening" ? "WEAKENING" : "tightening";
   return `${direction}: required ${formatMarkdownInlineCode(change.field)} ${formatMetadataPolicyEndpoint(change.from)} -> ${formatMetadataPolicyEndpoint(change.to)}; ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatDiagnosticSeverityPolicySection(
+  policy: DiagnosticSeverityCiEvaluation,
+  changes: readonly DiagnosticSeverityPolicyChange[],
+): string[] {
+  const { from, to, effective } = policy.configured;
+  return [
+    "## Diagnostic Severity Policy",
+    "",
+    `- Configured CI review policy: ${from} -> ${to}`,
+    `- Effective CI review policy: ${effective}`,
+    `- Policy outcome: ${policy.outcome.toUpperCase()}`,
+    `- Mode-transition direction: ${policy.modeTransition.direction}`,
+    `- Severity weakenings: ${policy.severityChanges.weakenings}`,
+    `- Severity strengthenings: ${policy.severityChanges.tightenings}`,
+    `- Evaluator matches: ${policy.matchCount}`,
+    ...(effective === "off" && policy.matchCount > 0
+      ? ["- CI status effect: none — gate disabled"]
+      : []),
+    "",
+    ...changes
+      .slice(0, MAX_LIST_ITEMS)
+      .map((change) => `- ${formatDiagnosticSeverityPolicyChange(change)}`),
+    ...formatOverflow(changes.length),
+  ];
+}
+
+function formatDiagnosticSeverityPolicyChange(
+  change: DiagnosticSeverityPolicyChange,
+): string {
+  const direction =
+    change.direction === "weakening" ? "WEAKENING" : "tightening";
+  const from = change.from.severity ?? "unobserved producer default";
+  const to = change.to.severity ?? "unobserved producer default";
+  return `${direction}: ${formatMarkdownInlineCode(change.diagnosticId)} ${from} (${change.from.source}) -> ${to} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
 }
 
 function formatMetadataPolicyEndpoint(

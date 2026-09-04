@@ -428,7 +428,9 @@ function findingFromCatalogDiagnostic(
     id: definition.code,
     title: definition.title,
     category: definition.category,
-    severity: diagnostic.severity === "error" ? "high" : definition.severity,
+    // Catalog Diagnostic transport severity and scan Finding severity are
+    // separate contracts. The stable finding definition owns the latter.
+    severity: definition.severity,
     confidence: definition.confidence,
     evidence: diagnostic.evidence ?? {
       path: diagnostic.path ?? "(catalog)",

@@ -83,6 +83,15 @@ array. Suppressed results use the same diagnostic shape under
 must branch on `schemaVersion` and migrate field access rather than treating v2
 as an additive v1 extension.
 
+When `diagnostics.severity` applies to a scan finding, its existing
+`details.findingSeverity` value is the repository-effective severity and the
+additive `details.defaultSeverity` and `details.severitySource` fields preserve
+producer-default traceability. Diff v1 may add an optional
+`diagnosticSeverityPolicy` object when severity policy changes; CI report v1
+may add the corresponding optional evaluation. Existing documents without
+configured severity policy retain their established shape, so these additions
+do not require new top-level schema identifiers.
+
 Skill Authoring Guide v2 replaces v1 because established interaction semantics
 changed. The overall Renma boundary is unchanged: the consuming LLM investigates,
 reasons, clarifies when needed, and edits; Renma supplies deterministic guidance

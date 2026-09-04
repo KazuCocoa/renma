@@ -1,5 +1,11 @@
 {
   "fail_on": "high",
+  "diagnostics": {
+    "ci_policy": "fail",
+    "severity": {
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "high"
+    }
+  },
   "format": "text",
   "globs": [
     "skills/**/SKILL.md",

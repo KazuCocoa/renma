@@ -63,6 +63,8 @@ test("all inspectable config scopes aggregate independently of author order", as
     "metadata:",
     '- "legacyRequiredFields" (unknown)',
     '- "unexpected" (unknown)',
+    "diagnostics:",
+    '- "diagnosticUnexpected" (unknown)',
     "suppressions[0]:",
     '- "aSuppressionKey" (unknown)',
     '- "zSuppressionKey" (unknown)',
@@ -84,6 +86,7 @@ test("all inspectable config scopes aggregate independently of author order", as
     "Allowed top-level keys:",
     "Allowed quality keys:",
     "Allowed metadata keys:",
+    "Allowed diagnostics keys:",
     "Allowed suppression keys:",
     "Allowed scan_boundary keys:",
     "Allowed executable_surface keys:",
@@ -127,6 +130,16 @@ test("malformed nested containers fail before unsupported-key collection", async
       "metadata",
       { mysteryTop: true, metadata: null },
       /metadata must be an object/,
+    ],
+    [
+      "diagnostics",
+      { mysteryTop: true, diagnostics: [] },
+      /diagnostics must be an object/,
+    ],
+    [
+      "diagnostic severity",
+      { mysteryTop: true, diagnostics: { severity: [] } },
+      /diagnostics\.severity must be an object/,
     ],
     [
       "suppressions",
@@ -206,6 +219,10 @@ test("representative canonical keys in every config scope continue to load", asy
       example_token_high: 2000,
     },
     metadata: { ci_policy: "warn", required: [] },
+    diagnostics: {
+      ci_policy: "warn",
+      severity: { "META-REQUIRED-SUSPENDED-DEPENDENCY": "high" },
+    },
     security: {
       approvedDomains: ["example.com"],
       approvedUploadDomains: ["uploads.example.com"],
@@ -234,6 +251,11 @@ test("representative canonical keys in every config scope continue to load", asy
   assert.equal(loaded.config.failOn, "medium");
   assert.equal(loaded.config.quality.ciPolicy, "warn");
   assert.deepEqual(loaded.config.metadata.required, []);
+  assert.equal(loaded.config.diagnostics.ciPolicy, "warn");
+  assert.equal(
+    loaded.config.diagnostics.severity["META-REQUIRED-SUSPENDED-DEPENDENCY"],
+    "high",
+  );
   assert.equal(loaded.config.scanBoundary.ciPolicy, "warn");
   assert.equal(loaded.config.executableSurface.ciPolicy, "warn");
   assert.equal(
@@ -304,6 +326,7 @@ function invalidConfigInFirstOrder(): Record<string, unknown> {
       },
     ],
     metadata: { unexpected: true, legacyRequiredFields: [] },
+    diagnostics: { diagnosticUnexpected: true },
     quality: { wrongQualityKey: 1, anotherWrongQualityKey: 2 },
     mysteryTop: true,
     layout: {},
@@ -316,6 +339,7 @@ function invalidConfigInSecondOrder(): Record<string, unknown> {
     mysteryTop: true,
     quality: { anotherWrongQualityKey: 2, wrongQualityKey: 1 },
     metadata: { legacyRequiredFields: [], unexpected: true },
+    diagnostics: { diagnosticUnexpected: true },
     suppressions: [
       {
         aSuppressionKey: true,

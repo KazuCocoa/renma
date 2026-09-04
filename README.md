@@ -365,6 +365,28 @@ policy requiring an explicit `owner` declaration. Removing a requirement or
 weakening `metadata.ci_policy` is governed by the stricter archived endpoint
 mode in `ci-report`. See the User Manual for the exact supported vocabulary.
 
+Repositories can also select the effective severity of a scan finding by
+stable diagnostic ID:
+
+```jsonc
+{
+  "fail_on": "high",
+  "diagnostics": {
+    "ci_policy": "fail",
+    "severity": {
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "high"
+    }
+  }
+}
+```
+
+This leaves the producer's built-in severity unchanged. `fail_on` consumes the
+effective severity, while path-scoped suppressions remain explicit reviewed
+exceptions. Lowering or removing an override, or weakening
+`diagnostics.ci_policy`, is governed by the stricter archived endpoint in
+`ci-report`. Renma reports a suspended required dependency for review but does
+not automatically suspend or rewrite the dependent asset.
+
 Repositories may set effective warning and High token-budget thresholds for
 Skills and each governed Markdown content kind:
 
