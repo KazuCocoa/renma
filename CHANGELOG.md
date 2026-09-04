@@ -14,6 +14,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   and CI projections while retaining the producer default as traceability.
   `diagnostics.ci_policy` governs severity-policy weakening with the stricter
   compared endpoint, including attempts to weaken the guard in the same change.
+  Policy diff resolves built-in severity independently of emitted findings,
+  compares effective values for both added and removed overrides, represents
+  equal transitions as neutral, and requires review when the built-in severity
+  cannot be resolved to one static value. Existing catalog `error` diagnostics
+  retain their established High scan-Finding conversion.
 
 ## [0.37.2] - 2026-09-02
 

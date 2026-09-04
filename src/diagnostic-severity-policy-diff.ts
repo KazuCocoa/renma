@@ -1,4 +1,5 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
+import { diagnosticDefaultSeverity } from "./diagnostic-default-severity.js";
 import type { DiagnosticsConfig } from "./types/configuration.js";
 import type { Severity } from "./types/diagnostics.js";
 
@@ -6,7 +7,7 @@ export const DIAGNOSTIC_SEVERITY_POLICY_DIFF_SCHEMA_VERSION =
   "renma.diagnostic-severity-policy-diff.v1" as const;
 
 export type DiagnosticSeverityPolicyChangeDirection =
-  "weakening" | "tightening";
+  "weakening" | "tightening" | "neutral" | "review_required";
 export type DiagnosticSeverityPolicyChangeKind =
   "added" | "removed" | "changed";
 
@@ -30,11 +31,8 @@ export interface DiagnosticSeverityPolicyDiff {
   changes: DiagnosticSeverityPolicyChange[];
   strengthenedDiagnosticIds: string[];
   weakenedDiagnosticIds: string[];
-}
-
-export interface ObservedDiagnosticDefaultSeverities {
-  from?: Readonly<Record<string, Severity>>;
-  to?: Readonly<Record<string, Severity>>;
+  neutralDiagnosticIds: string[];
+  reviewRequiredDiagnosticIds: string[];
 }
 
 const SEVERITY_RANK: Record<Severity, number> = {
@@ -50,7 +48,6 @@ export function buildDiagnosticSeverityPolicyDiff(
   to: DiagnosticsConfig,
   fromConfigPath?: string,
   toConfigPath?: string,
-  observedDefaults: ObservedDiagnosticDefaultSeverities = {},
 ): DiagnosticSeverityPolicyDiff {
   const ids = [
     ...new Set([...Object.keys(from.severity), ...Object.keys(to.severity)]),
@@ -65,15 +62,10 @@ export function buildDiagnosticSeverityPolicyDiff(
         : toOverride === undefined
           ? "removed"
           : "changed";
-    const fromDefault = observedDefaults.from?.[diagnosticId];
-    const toDefault = observedDefaults.to?.[diagnosticId];
-    const producerDefault = toDefault ?? fromDefault;
-    const direction = changeDirection(
-      change,
-      fromOverride,
-      toOverride,
-      producerDefault,
-    );
+    const producerDefault = diagnosticDefaultSeverity(diagnosticId);
+    const fromEffective = fromOverride ?? producerDefault;
+    const toEffective = toOverride ?? producerDefault;
+    const direction = changeDirection(fromEffective, toEffective);
     return [
       {
         diagnosticId,
@@ -95,26 +87,29 @@ export function buildDiagnosticSeverityPolicyDiff(
     weakenedDiagnosticIds: changes
       .filter((change) => change.direction === "weakening")
       .map((change) => change.diagnosticId),
+    neutralDiagnosticIds: changes
+      .filter((change) => change.direction === "neutral")
+      .map((change) => change.diagnosticId),
+    reviewRequiredDiagnosticIds: changes
+      .filter((change) => change.direction === "review_required")
+      .map((change) => change.diagnosticId),
   };
 }
 
 function changeDirection(
-  change: DiagnosticSeverityPolicyChangeKind,
-  fromOverride: Severity | undefined,
-  toOverride: Severity | undefined,
-  toDefault: Severity | undefined,
+  fromEffective: Severity | undefined,
+  toEffective: Severity | undefined,
 ): DiagnosticSeverityPolicyChangeDirection {
-  if (change === "removed") return "weakening";
-  if (change === "added") {
-    return toDefault !== undefined &&
-      toOverride !== undefined &&
-      SEVERITY_RANK[toOverride] < SEVERITY_RANK[toDefault]
-      ? "weakening"
-      : "tightening";
+  if (fromEffective === undefined || toEffective === undefined) {
+    return "review_required";
   }
-  return SEVERITY_RANK[toOverride!] < SEVERITY_RANK[fromOverride!]
-    ? "weakening"
-    : "tightening";
+  if (SEVERITY_RANK[toEffective] < SEVERITY_RANK[fromEffective]) {
+    return "weakening";
+  }
+  if (SEVERITY_RANK[toEffective] > SEVERITY_RANK[fromEffective]) {
+    return "tightening";
+  }
+  return "neutral";
 }
 
 function endpoint(

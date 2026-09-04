@@ -92,6 +92,15 @@ may add the corresponding optional evaluation. Existing documents without
 configured severity policy retain their established shape, so these additions
 do not require new top-level schema identifiers.
 
+Diagnostic severity-policy changes compare effective severities resolved from
+the repository override or the static built-in authority; they do not infer a
+default from findings observed in either snapshot. The change direction may be
+`weakening`, `tightening`, `neutral`, or `review_required`. The last value is a
+conservative CI-review signal for IDs whose built-in Finding severity cannot be
+resolved to one static value. Diff summaries expose the corresponding neutral and
+review-required ID lists, and CI summaries count both without treating neutral
+changes as policy matches.
+
 Skill Authoring Guide v2 replaces v1 because established interaction semantics
 changed. The overall Renma boundary is unchanged: the consuming LLM investigates,
 reasons, clarifies when needed, and edits; Renma supplies deterministic guidance

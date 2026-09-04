@@ -221,7 +221,7 @@ test("representative canonical keys in every config scope continue to load", asy
     metadata: { ci_policy: "warn", required: [] },
     diagnostics: {
       ci_policy: "warn",
-      severity: { "META-REQUIRED-SUSPENDED-DEPENDENCY": "high" },
+      severity: { "QUAL-MISSING-EXAMPLES": "low" },
     },
     security: {
       approvedDomains: ["example.com"],
@@ -253,8 +253,8 @@ test("representative canonical keys in every config scope continue to load", asy
   assert.deepEqual(loaded.config.metadata.required, []);
   assert.equal(loaded.config.diagnostics.ciPolicy, "warn");
   assert.equal(
-    loaded.config.diagnostics.severity["META-REQUIRED-SUSPENDED-DEPENDENCY"],
-    "high",
+    loaded.config.diagnostics.severity["QUAL-MISSING-EXAMPLES"],
+    "low",
   );
   assert.equal(loaded.config.scanBoundary.ciPolicy, "warn");
   assert.equal(loaded.config.executableSurface.ciPolicy, "warn");

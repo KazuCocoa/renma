@@ -10,6 +10,8 @@ export const DIAGNOSTIC_SEVERITY_CI_POLICY_SCHEMA_VERSION =
 export const DIAGNOSTIC_SEVERITY_CI_MATCH_IDS = {
   CI_POLICY_RELAXED: "diagnostic_severity_ci.ci_policy_relaxed",
   SEVERITY_POLICY_WEAKENED: "diagnostic_severity_ci.severity_policy_weakened",
+  SEVERITY_POLICY_REVIEW_REQUIRED:
+    "diagnostic_severity_ci.severity_policy_review_required",
 } as const;
 
 export interface DiagnosticSeverityCiConfiguration {
@@ -38,6 +40,13 @@ export type DiagnosticSeverityCiMatch =
       id: typeof DIAGNOSTIC_SEVERITY_CI_MATCH_IDS.SEVERITY_POLICY_WEAKENED;
       summary: string;
       change: DiagnosticSeverityPolicyChange & { direction: "weakening" };
+    }
+  | {
+      id: typeof DIAGNOSTIC_SEVERITY_CI_MATCH_IDS.SEVERITY_POLICY_REVIEW_REQUIRED;
+      summary: string;
+      change: DiagnosticSeverityPolicyChange & {
+        direction: "review_required";
+      };
     };
 
 export interface DiagnosticSeverityCiEvaluation {
@@ -49,6 +58,8 @@ export interface DiagnosticSeverityCiEvaluation {
   severityChanges: {
     weakenings: number;
     tightenings: number;
+    neutrals: number;
+    reviewRequired: number;
   };
   outcome: "pass" | "warn" | "fail";
   matchCount: number;
@@ -114,7 +125,25 @@ export function evaluateDiagnosticSeverityCiPolicy(
       summary: "A repository diagnostic severity policy was weakened.",
       change,
     }));
-  const matches = [...modeMatches, ...severityMatches];
+  const reviewRequiredMatches: DiagnosticSeverityCiMatch[] = diff.changes
+    .filter(
+      (
+        change,
+      ): change is DiagnosticSeverityPolicyChange & {
+        direction: "review_required";
+      } => change.direction === "review_required",
+    )
+    .map((change) => ({
+      id: DIAGNOSTIC_SEVERITY_CI_MATCH_IDS.SEVERITY_POLICY_REVIEW_REQUIRED,
+      summary:
+        "A repository diagnostic severity policy requires review because its built-in severity cannot be resolved to one static value.",
+      change,
+    }));
+  const matches = [
+    ...modeMatches,
+    ...severityMatches,
+    ...reviewRequiredMatches,
+  ];
 
   return {
     schemaVersion: DIAGNOSTIC_SEVERITY_CI_POLICY_SCHEMA_VERSION,
@@ -122,7 +151,12 @@ export function evaluateDiagnosticSeverityCiPolicy(
     modeTransition,
     severityChanges: {
       weakenings: severityMatches.length,
-      tightenings: diff.changes.length - severityMatches.length,
+      tightenings: diff.changes.filter(
+        (change) => change.direction === "tightening",
+      ).length,
+      neutrals: diff.changes.filter((change) => change.direction === "neutral")
+        .length,
+      reviewRequired: reviewRequiredMatches.length,
     },
     outcome:
       effective === "off" || matches.length === 0

@@ -542,7 +542,7 @@ test("isolated, required, and optional suspension states project through Readine
     (diagnostic) =>
       diagnostic.code === DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
   );
-  assert.equal(requiredDiagnosticV2?.severity, "warning");
+  assert.equal(requiredDiagnosticV2?.severity, "error");
   assert.ok((requiredDiagnosticV2?.repairConstraints?.length ?? 0) > 0);
   assert.ok((requiredDiagnosticV2?.verificationSteps?.length ?? 0) > 0);
   assert.equal(
@@ -550,7 +550,7 @@ test("isolated, required, and optional suspension states project through Readine
       (finding) =>
         finding.id === DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
     )?.severity,
-    "medium",
+    "high",
   );
 
   const optional = await RepositoryFixture.create({

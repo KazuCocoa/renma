@@ -38,6 +38,12 @@ so a path-scoped suppression still removes an overridden finding from the
 active set while the suppressed evidence retains both effective and default
 severity. See the [configuration contract](user-manual.md#configuration).
 
+`META-REQUIRED-SUSPENDED-DEPENDENCY` retains its established built-in scan
+Finding severity of High (and DiagnosticV2 transport severity of `error`). With
+the default `fail_on: "high"`, an active asset that requires a suspended target
+already blocks. Repository policy can still strengthen it to Critical or lower
+it explicitly; Renma never propagates suspension or rewrites the dependent.
+
 ## Diagnostic and Rule Evolution during 1.x
 
 Diagnostic behavior is a compatibility surface distinct from wire

@@ -370,22 +370,24 @@ stable diagnostic ID:
 
 ```jsonc
 {
-  "fail_on": "high",
+  "fail_on": "critical",
   "diagnostics": {
     "ci_policy": "fail",
     "severity": {
-      "META-REQUIRED-SUSPENDED-DEPENDENCY": "high"
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
     }
   }
 }
 ```
 
-This leaves the producer's built-in severity unchanged. `fail_on` consumes the
-effective severity, while path-scoped suppressions remain explicit reviewed
-exceptions. Lowering or removing an override, or weakening
-`diagnostics.ci_policy`, is governed by the stricter archived endpoint in
-`ci-report`. Renma reports a suspended required dependency for review but does
-not automatically suspend or rewrite the dependent asset.
+Required dependency on a suspended asset is already built-in High severity and
+therefore blocks with the default `fail_on: "high"`. The example strengthens
+that repository-effective severity to Critical without changing the producer.
+`fail_on` consumes the effective severity, while path-scoped suppressions remain
+explicit reviewed exceptions. Changes that lower effective severity, or weaken
+`diagnostics.ci_policy`, are governed by the stricter archived endpoint in
+`ci-report`. Renma does not automatically suspend or rewrite the dependent
+asset.
 
 Repositories may set effective warning and High token-budget thresholds for
 Skills and each governed Markdown content kind:

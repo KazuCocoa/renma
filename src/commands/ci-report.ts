@@ -636,6 +636,11 @@ function reviewNotes(
       );
     }
   }
+  if (diagnosticSeverityPolicy.severityChanges.reviewRequired > 0) {
+    notes.push(
+      `Diagnostic severity policy matched ${diagnosticSeverityPolicy.severityChanges.reviewRequired} change${diagnosticSeverityPolicy.severityChanges.reviewRequired === 1 ? "" : "s"} requiring review because the built-in severity cannot be resolved to one static value.`,
+    );
+  }
   if (diagnosticSeverityPolicy.modeTransition.direction === "weakening") {
     notes.push(
       `Diagnostics CI mode was relaxed from ${diagnosticSeverityPolicy.modeTransition.from} to ${diagnosticSeverityPolicy.modeTransition.to}; the stricter ${diagnosticSeverityPolicy.configured.effective} endpoint mode governs this comparison.`,
@@ -845,7 +850,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
         ? "GATE OFF"
         : diagnosticSeverityPolicy.outcome.toUpperCase();
     summaryLines.push(
-      `- Diagnostic severity policy: ${effect} — mode ${diagnosticSeverityPolicy.modeTransition.direction}; ${diagnosticSeverityPolicy.severityChanges.weakenings} weakenings / ${diagnosticSeverityPolicy.severityChanges.tightenings} strengthenings`,
+      `- Diagnostic severity policy: ${effect} — mode ${diagnosticSeverityPolicy.modeTransition.direction}; ${diagnosticSeverityPolicy.severityChanges.weakenings} weakenings / ${diagnosticSeverityPolicy.severityChanges.tightenings} strengthenings / ${diagnosticSeverityPolicy.severityChanges.neutrals} neutral / ${diagnosticSeverityPolicy.severityChanges.reviewRequired} review required`,
     );
   }
   const diagnosticSeverityPolicyLines = diagnosticSeverityPolicy
@@ -1324,6 +1329,8 @@ function formatDiagnosticSeverityPolicySection(
     `- Mode-transition direction: ${policy.modeTransition.direction}`,
     `- Severity weakenings: ${policy.severityChanges.weakenings}`,
     `- Severity strengthenings: ${policy.severityChanges.tightenings}`,
+    `- Severity neutral changes: ${policy.severityChanges.neutrals}`,
+    `- Severity review-required changes: ${policy.severityChanges.reviewRequired}`,
     `- Evaluator matches: ${policy.matchCount}`,
     ...(effective === "off" && policy.matchCount > 0
       ? ["- CI status effect: none — gate disabled"]
@@ -1340,9 +1347,15 @@ function formatDiagnosticSeverityPolicyChange(
   change: DiagnosticSeverityPolicyChange,
 ): string {
   const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  const from = change.from.severity ?? "unobserved producer default";
-  const to = change.to.severity ?? "unobserved producer default";
+    change.direction === "weakening"
+      ? "WEAKENING"
+      : change.direction === "tightening"
+        ? "tightening"
+        : change.direction === "neutral"
+          ? "neutral"
+          : "REVIEW REQUIRED";
+  const from = change.from.severity ?? "unknown producer default";
+  const to = change.to.severity ?? "unknown producer default";
   return `${direction}: ${formatMarkdownInlineCode(change.diagnosticId)} ${from} (${change.from.source}) -> ${to} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
 }
 

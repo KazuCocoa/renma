@@ -46,7 +46,6 @@ import type {
   QualityConfig,
   SecurityConfig,
 } from "../types/configuration.js";
-import type { Severity } from "../types/diagnostics.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
   collectRepositorySnapshot,
@@ -110,7 +109,6 @@ import {
   REQUIRED_METADATA_POLICY_FIELDS,
 } from "../metadata-definitions.js";
 import type {
-  Finding,
   SuppressedFindingEvidence,
   SuppressionConfig,
 } from "../types/diagnostics.js";
@@ -294,7 +292,6 @@ interface DiffSnapshot {
   qualityConfig?: QualityConfig;
   metadataConfig?: MetadataConfig;
   diagnosticsConfig?: DiagnosticsConfig;
-  diagnosticDefaultSeverities?: Record<string, Severity>;
   scanBoundary?: ScanBoundaryEvidence;
   inspectionCoverage?: InspectionCoverage;
   configPath?: string;
@@ -655,14 +652,6 @@ function buildDiffReportProjection(
     toSnapshot.diagnosticsConfig ?? DEFAULT_CONFIG.diagnostics,
     fromSnapshot.configPath,
     toSnapshot.configPath,
-    {
-      ...(fromSnapshot.diagnosticDefaultSeverities
-        ? { from: fromSnapshot.diagnosticDefaultSeverities }
-        : {}),
-      ...(toSnapshot.diagnosticDefaultSeverities
-        ? { to: toSnapshot.diagnosticDefaultSeverities }
-        : {}),
-    },
   );
   const sharedAssetPairs = [...toAssets].flatMap(([key, toAsset]) => {
     const fromAsset = fromAssets.get(key);
@@ -897,6 +886,8 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
           `- Severity changes: ${diagnosticSeverityPolicy.changes.length}`,
           `- Strengthenings: ${diagnosticSeverityPolicy.strengthenedDiagnosticIds.length}`,
           `- Weakenings: ${diagnosticSeverityPolicy.weakenedDiagnosticIds.length}`,
+          `- Neutral changes: ${diagnosticSeverityPolicy.neutralDiagnosticIds.length}`,
+          `- Review-required changes: ${diagnosticSeverityPolicy.reviewRequiredDiagnosticIds.length}`,
           ...diagnosticSeverityPolicy.changes
             .slice(0, DIFF_DETAIL_LIMIT)
             .map(formatDiagnosticSeverityPolicyChange),
@@ -1054,11 +1045,19 @@ function formatMetadataPolicyChange(
 function formatDiagnosticSeverityPolicyChange(
   change: DiagnosticSeverityPolicyChange,
 ): string {
-  const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  const from = change.from.severity ?? "(producer default not observed)";
-  const to = change.to.severity ?? "(producer default not observed)";
+  const direction = formatDiagnosticSeverityDirection(change.direction);
+  const from = change.from.severity ?? "(producer default unknown)";
+  const to = change.to.severity ?? "(producer default unknown)";
   return `- ${direction}: ${formatMarkdownInlineCode(change.diagnosticId)} ${from} (${change.from.source}) -> ${to} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatDiagnosticSeverityDirection(
+  direction: DiagnosticSeverityPolicyChange["direction"],
+): string {
+  if (direction === "weakening") return "WEAKENING";
+  if (direction === "tightening") return "tightening";
+  if (direction === "neutral") return "neutral";
+  return "REVIEW REQUIRED";
 }
 
 function formatMetadataRequirementEndpoint(
@@ -1803,10 +1802,6 @@ function projectDiffSnapshot(
       qualityConfig: repositorySnapshot.config.quality,
       metadataConfig: repositorySnapshot.config.metadata,
       diagnosticsConfig: repositorySnapshot.config.diagnostics,
-      diagnosticDefaultSeverities: findingDefaultSeverities([
-        ...scanResult.findings,
-        ...scanResult.suppressedFindings.map((item) => item.finding),
-      ]),
       scanBoundary: canonicalScanBoundary(
         scanBoundarySource(
           repositorySnapshot.config,
@@ -2077,42 +2072,6 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
         projectedFinding,
       ] as const;
     }),
-  );
-}
-
-function findingDefaultSeverities(
-  findings: readonly Finding[],
-): Record<string, Severity> {
-  const defaults = Object.create(null) as Record<string, Severity>;
-  for (const finding of findings) {
-    const configuredDefault = finding.details?.defaultSeverity;
-    const producerDefault = isFindingSeverity(configuredDefault)
-      ? configuredDefault
-      : finding.severity;
-    const current = defaults[finding.id];
-    if (
-      current === undefined ||
-      findingSeverityRank(producerDefault) > findingSeverityRank(current)
-    ) {
-      defaults[finding.id] = producerDefault;
-    }
-  }
-  return defaults;
-}
-
-function findingSeverityRank(severity: Severity): number {
-  if (severity === "critical") return 3;
-  if (severity === "high") return 2;
-  if (severity === "medium") return 1;
-  return 0;
-}
-
-function isFindingSeverity(value: unknown): value is Severity {
-  return (
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "critical"
   );
 }
 

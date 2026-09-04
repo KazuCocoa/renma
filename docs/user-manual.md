@@ -1271,7 +1271,7 @@ For example:
     // Elevate selected findings without changing producer definitions.
     "ci_policy": "fail",
     "severity": {
-      "META-REQUIRED-SUSPENDED-DEPENDENCY": "high"
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
     }
   },
   "skill_discovery": {
@@ -1432,17 +1432,18 @@ fail_on                 -> scan / CI failure threshold
 diagnostics.ci_policy   -> governance for weakening severity policy
 ```
 
-For example, a repository can elevate
-`META-REQUIRED-SUSPENDED-DEPENDENCY` from its built-in Medium severity to High
-so `fail_on: "high"` requires review:
+An active asset with a required dependency on a suspended asset already emits
+`META-REQUIRED-SUSPENDED-DEPENDENCY` at built-in High severity. The default
+`fail_on: "high"` therefore already blocks. A repository that wants an even
+stronger threshold can elevate the effective severity from High to Critical:
 
 ```jsonc
 {
-  "fail_on": "high",
+  "fail_on": "critical",
   "diagnostics": {
     "ci_policy": "fail",
     "severity": {
-      "META-REQUIRED-SUSPENDED-DEPENDENCY": "high"
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
     }
   },
   "suppressions": [
@@ -1462,6 +1463,13 @@ effective severity, and lets CI stop for a human or agent decision. Valid
 review outcomes include suspending the dependent, removing or changing the
 dependency, migrating to a replacement, or retaining a narrow justified
 suppression. Renma does not prescribe which remediation is correct.
+
+Severity-policy diff compares effective values (`repository override ??
+built-in severity`), not whether an override key was added or removed. An
+override equal to the built-in value is reported as `neutral`. When one stable
+ID cannot be resolved to one static built-in Finding severity, Renma reports the
+policy transition as `review_required` and lets `diagnostics.ci_policy` govern
+it instead of guessing a non-blocking direction.
 
 Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exception is intentionally permanent. Permanent suppressions should still use narrow path patterns and a clear reason. Suppression path patterns are repository-relative and support exact paths, directory-prefix matches for non-glob patterns, `*` within one path segment, and `**` across directories.
 

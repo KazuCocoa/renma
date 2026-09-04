@@ -4,6 +4,7 @@ import test from "node:test";
 import { ConfigError, loadConfig } from "../src/config.js";
 import { ciReport, formatCiReport } from "../src/commands/ci-report.js";
 import { runScanCommand } from "../src/commands/scan.js";
+import { diagnosticDefaultSeverity } from "../src/diagnostic-default-severity.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import {
   buildDiagnosticSeverityPolicyDiff,
@@ -21,60 +22,71 @@ import type {
 } from "../src/types/configuration.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
-const ID = DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY;
-const HIGH_ID = DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING;
+const LOW_ID = DIAGNOSTIC_IDS.QUAL_MISSING_EXAMPLES;
+const MEDIUM_ID = DIAGNOSTIC_IDS.QUAL_MISSING_DESCRIPTION;
+const HIGH_ID = DIAGNOSTIC_IDS.SUPPORT_MISSING_PATH;
 
-test("diagnostic severity policy elevates a finding centrally and gates fail_on", async (t) => {
-  const fixture = await suspendedDependencyFixture(t);
-  const sourceBefore = await fixture.read("skills/source/SKILL.md");
-  const targetBefore = await fixture.read("contexts/suspended.md");
+test("diagnostic defaults resolve statically without repository findings", () => {
+  assert.equal(diagnosticDefaultSeverity(LOW_ID), "low");
+  assert.equal(diagnosticDefaultSeverity(MEDIUM_ID), "medium");
+  assert.equal(diagnosticDefaultSeverity(HIGH_ID), "high");
+  assert.equal(
+    diagnosticDefaultSeverity(DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET),
+    undefined,
+  );
+});
+
+test("diagnostic severity policy elevates a built-in low finding for output and fail_on", async (t) => {
+  const fixture = await missingExamplesFixture(t);
+  await fixture.writeConfig({ fail_on: "critical" });
 
   const baseline = await scan(fixture.root);
   const baselineFinding = baseline.findings.find(
-    (finding) => finding.id === ID,
+    (finding) => finding.id === LOW_ID,
   );
-  assert.equal(baselineFinding?.severity, "medium");
+  const baselineDiagnostic = baseline.diagnostics.find(
+    (diagnostic) => diagnostic.code === LOW_ID,
+  );
+  assert.equal(baselineFinding?.severity, "low");
+  assert.equal(baselineDiagnostic?.severity, "warning");
   assert.equal(baselineFinding?.details?.defaultSeverity, undefined);
+  assert.equal(
+    (await captureStdout(() => runScanCommand(fixture.root, {}, {}))).code,
+    0,
+  );
 
   await fixture.writeConfig({
-    fail_on: "high",
-    diagnostics: { severity: { [ID]: "high" } },
+    fail_on: "critical",
+    diagnostics: { severity: { [LOW_ID]: "critical" } },
   });
   const result = await scan(fixture.root);
-  const finding = result.findings.find((candidate) => candidate.id === ID);
+  const finding = result.findings.find((candidate) => candidate.id === LOW_ID);
   const diagnostic = result.diagnostics.find(
-    (candidate) => candidate.code === ID,
+    (candidate) => candidate.code === LOW_ID,
   );
 
-  assert.equal(finding?.severity, "high");
-  assert.equal(finding?.details?.defaultSeverity, "medium");
+  assert.equal(finding?.severity, "critical");
+  assert.equal(finding?.details?.defaultSeverity, "low");
   assert.equal(finding?.details?.severitySource, "repository_configuration");
   assert.equal(diagnostic?.severity, "error");
-  assert.equal(diagnostic?.details?.findingSeverity, "high");
-  assert.equal(diagnostic?.details?.defaultSeverity, "medium");
-  assert.match(formatText(result), new RegExp(`HIGH ${ID}`));
-  assert.match(formatJson(result), /"defaultSeverity": "medium"/);
+  assert.equal(diagnostic?.details?.findingSeverity, "critical");
+  assert.equal(diagnostic?.details?.defaultSeverity, "low");
+  assert.match(formatText(result), new RegExp(`CRITICAL ${LOW_ID}`));
+  assert.match(formatJson(result), /"defaultSeverity": "low"/);
 
   const command = await captureStdout(() =>
     runScanCommand(fixture.root, {}, {}),
   );
   assert.equal(command.code, 1);
-  assert.equal(await fixture.read("skills/source/SKILL.md"), sourceBefore);
-  assert.equal(await fixture.read("contexts/suspended.md"), targetBefore);
 });
 
 test("diagnostic severity policy lowers a built-in high finding for output and fail_on", async (t) => {
-  const fixture = await RepositoryFixture.create({ testContext: t });
-  await fixture.skill("demo");
-  await fixture.writeConfig({
-    fail_on: "high",
-    metadata: { required: ["owner"] },
-  });
+  const fixture = await missingSupportPathFixture(t);
+  await fixture.writeConfig({ fail_on: "high" });
 
   const baseline = await scan(fixture.root);
   const baselineFinding = baseline.findings.find(
-    (finding) =>
-      finding.id === HIGH_ID && finding.details?.requiredField === "owner",
+    (finding) => finding.id === HIGH_ID,
   );
   assert.equal(baselineFinding?.severity, "high");
   assert.equal(
@@ -84,14 +96,10 @@ test("diagnostic severity policy lowers a built-in high finding for output and f
 
   await fixture.writeConfig({
     fail_on: "high",
-    metadata: { required: ["owner"] },
     diagnostics: { severity: { [HIGH_ID]: "low" } },
   });
   const result = await scan(fixture.root);
-  const finding = result.findings.find(
-    (candidate) =>
-      candidate.id === HIGH_ID && candidate.details?.requiredField === "owner",
-  );
+  const finding = result.findings.find((candidate) => candidate.id === HIGH_ID);
   const diagnostic = result.diagnostics.find(
     (candidate) => candidate.code === HIGH_ID,
   );
@@ -116,12 +124,15 @@ test("diagnostic severity policy parses equivalently from JSON and JSONC", async
     [
       "json",
       JSON.stringify({
-        diagnostics: { ci_policy: "warn", severity: { [ID]: "critical" } },
+        diagnostics: {
+          ci_policy: "warn",
+          severity: { [LOW_ID]: "critical" },
+        },
       }),
     ],
     [
       "jsonc",
-      `{ // Repository risk policy.\n  "diagnostics": { "ci_policy": "warn", "severity": { "${ID}": "critical" } }\n}`,
+      `{ // Repository risk policy.\n  "diagnostics": { "ci_policy": "warn", "severity": { "${LOW_ID}": "critical" } }\n}`,
     ],
   ] as const) {
     await t.test(extension, async (caseContext) => {
@@ -133,7 +144,7 @@ test("diagnostic severity policy parses equivalently from JSON and JSONC", async
       assert.deepEqual(
         { ...loaded.config.diagnostics.severity },
         {
-          [ID]: "critical",
+          [LOW_ID]: "critical",
         },
       );
       assert.equal(loaded.config.diagnostics.ciPolicy, "warn");
@@ -145,8 +156,8 @@ test("diagnostic severity policy validates its closed configuration", async (t) 
   const cases: Array<[string, unknown, RegExp]> = [
     [
       "invalid severity",
-      { diagnostics: { severity: { [ID]: "very-high" } } },
-      /diagnostics\.severity\.META-REQUIRED-SUSPENDED-DEPENDENCY must be one of: low, medium, high, critical/,
+      { diagnostics: { severity: { [LOW_ID]: "very-high" } } },
+      /diagnostics\.severity\.QUAL-MISSING-EXAMPLES must be one of: low, medium, high, critical/,
     ],
     [
       "unknown diagnostic id",
@@ -181,7 +192,7 @@ test("diagnostic severity defaults are request-local and preserve existing behav
     ciPolicy: "fail",
     severity: {},
   });
-  first.config.diagnostics.severity[ID] = "critical";
+  first.config.diagnostics.severity[LOW_ID] = "critical";
   const second = await loadConfig(fixture.root, {});
   assert.deepEqual(second.config.diagnostics, {
     ciPolicy: "fail",
@@ -190,14 +201,14 @@ test("diagnostic severity defaults are request-local and preserve existing behav
 });
 
 test("suppression remains a scoped exception after severity override", async (t) => {
-  const fixture = await suspendedDependencyFixture(t);
+  const fixture = await missingSupportPathFixture(t);
   await fixture.writeConfig({
-    fail_on: "high",
-    diagnostics: { severity: { [ID]: "high" } },
+    fail_on: "critical",
+    diagnostics: { severity: { [HIGH_ID]: "critical" } },
     suppressions: [
       {
-        id: ID,
-        paths: ["skills/source/**"],
+        id: HIGH_ID,
+        paths: ["skills/demo/**"],
         reason: "Temporary migration exception",
         expires: "2026-12-31",
       },
@@ -206,48 +217,134 @@ test("suppression remains a scoped exception after severity override", async (t)
 
   const result = await scan(fixture.root);
   assert.equal(
-    result.findings.some((finding) => finding.id === ID),
+    result.findings.some((finding) => finding.id === HIGH_ID),
     false,
   );
   const suppressed = result.suppressedFindings.find(
-    (item) => item.finding.id === ID,
+    (item) => item.finding.id === HIGH_ID,
   );
-  assert.equal(suppressed?.finding.severity, "high");
-  assert.equal(suppressed?.finding.details?.defaultSeverity, "medium");
+  assert.equal(suppressed?.finding.severity, "critical");
+  assert.equal(suppressed?.finding.details?.defaultSeverity, "high");
   assert.equal(suppressed?.suppression.reason, "Temporary migration exception");
 });
 
-test("diagnostic severity policy diff classifies strengthening, weakening, and removal", () => {
-  const strengthening = buildDiagnosticSeverityPolicyDiff(
-    policy("fail", {}),
-    policy("fail", { [ID]: "high" }),
-    undefined,
-    "renma.config.json",
-    { to: { [ID]: "medium" } },
-  );
-  assertPolicyChange(strengthening, "added", "tightening", "medium", "high");
+test("diagnostic severity policy diff compares effective severities for add and removal", () => {
+  const cases = [
+    {
+      name: "default high to override low",
+      diagnosticId: HIGH_ID,
+      from: {},
+      to: { [HIGH_ID]: "low" },
+      change: "added",
+      direction: "weakening",
+      fromSeverity: "high",
+      toSeverity: "low",
+    },
+    {
+      name: "override low to default high",
+      diagnosticId: HIGH_ID,
+      from: { [HIGH_ID]: "low" },
+      to: {},
+      change: "removed",
+      direction: "tightening",
+      fromSeverity: "low",
+      toSeverity: "high",
+    },
+    {
+      name: "default medium to override high",
+      diagnosticId: MEDIUM_ID,
+      from: {},
+      to: { [MEDIUM_ID]: "high" },
+      change: "added",
+      direction: "tightening",
+      fromSeverity: "medium",
+      toSeverity: "high",
+    },
+    {
+      name: "override high to default medium",
+      diagnosticId: MEDIUM_ID,
+      from: { [MEDIUM_ID]: "high" },
+      to: {},
+      change: "removed",
+      direction: "weakening",
+      fromSeverity: "high",
+      toSeverity: "medium",
+    },
+    {
+      name: "default high to explicit high",
+      diagnosticId: HIGH_ID,
+      from: {},
+      to: { [HIGH_ID]: "high" },
+      change: "added",
+      direction: "neutral",
+      fromSeverity: "high",
+      toSeverity: "high",
+    },
+    {
+      name: "explicit high to default high",
+      diagnosticId: HIGH_ID,
+      from: { [HIGH_ID]: "high" },
+      to: {},
+      change: "removed",
+      direction: "neutral",
+      fromSeverity: "high",
+      toSeverity: "high",
+    },
+  ] as const;
 
-  const weakening = buildDiagnosticSeverityPolicyDiff(
-    policy("fail", { [ID]: "critical" }),
-    policy("fail", { [ID]: "high" }),
-  );
-  assertPolicyChange(weakening, "changed", "weakening", "critical", "high");
+  for (const item of cases) {
+    const diff = buildDiagnosticSeverityPolicyDiff(
+      policy("fail", item.from),
+      policy("fail", item.to),
+      "base/renma.config.json",
+      "target/renma.config.json",
+    );
+    assertPolicyChange(
+      diff,
+      item.diagnosticId,
+      item.change,
+      item.direction,
+      item.fromSeverity,
+      item.toSeverity,
+      item.name,
+    );
+    if (item.direction === "neutral") {
+      assert.deepEqual(diff.neutralDiagnosticIds, [item.diagnosticId]);
+      const evaluation = evaluateDiagnosticSeverityCiPolicy(diff, {
+        from: "fail",
+        to: "fail",
+      });
+      assert.equal(evaluation.outcome, "pass", item.name);
+      assert.equal(evaluation.matchCount, 0, item.name);
+      assert.equal(evaluation.severityChanges.neutrals, 1, item.name);
+    }
+  }
+});
 
-  const removal = buildDiagnosticSeverityPolicyDiff(
-    policy("fail", { [ID]: "high" }),
+test("diagnostic severity policy diff requires review for a variable built-in severity", () => {
+  const variableId = DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET;
+  const diff = buildDiagnosticSeverityPolicyDiff(
     policy("fail", {}),
-    "base/renma.config.json",
-    "target/renma.config.json",
-    { to: { [ID]: "medium" } },
+    policy("fail", { [variableId]: "low" }),
   );
-  assertPolicyChange(removal, "removed", "weakening", "high", "medium");
-  assert.deepEqual(removal.weakenedDiagnosticIds, [ID]);
+  assertPolicyChange(diff, variableId, "added", "review_required", null, "low");
+  assert.deepEqual(diff.reviewRequiredDiagnosticIds, [variableId]);
+  const evaluation = evaluateDiagnosticSeverityCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+  assert.equal(evaluation.outcome, "fail");
+  assert.equal(evaluation.severityChanges.reviewRequired, 1);
+  assert.equal(
+    evaluation.matches[0]?.id,
+    DIAGNOSTIC_SEVERITY_CI_MATCH_IDS.SEVERITY_POLICY_REVIEW_REQUIRED,
+  );
 });
 
 test("diagnostics CI policy uses the stricter endpoint for mode weakening", () => {
   const diff = buildDiagnosticSeverityPolicyDiff(
-    policy("fail", { [ID]: "critical" }),
-    policy("off", { [ID]: "high" }),
+    policy("fail", { [HIGH_ID]: "critical" }),
+    policy("off", { [HIGH_ID]: "high" }),
   );
   const evaluation = evaluateDiagnosticSeverityCiPolicy(diff, {
     from: "fail",
@@ -266,18 +363,58 @@ test("diagnostics CI policy uses the stricter endpoint for mode weakening", () =
   );
 });
 
+test("ci-report detects severity weakening when the finding is absent from both snapshots", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("healthy", { owner: "qa-platform", status: "stable" });
+  await fixture.initializeGit();
+  await fixture.writeConfig({ diagnostics: { ci_policy: "fail" } });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base without severity override"]);
+  await fixture.git(["tag", "base"]);
+
+  await fixture.writeConfig({
+    diagnostics: { ci_policy: "fail", severity: { [HIGH_ID]: "low" } },
+  });
+  await fixture.git(["add", "renma.config.json"]);
+  await fixture.git(["commit", "-m", "lower absent diagnostic"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const change = report.diff.diagnosticSeverityPolicy?.changes[0];
+  assert.equal(report.status, "fail");
+  assert.equal(report.diagnosticSeverityPolicy?.severityChanges.weakenings, 1);
+  assert.equal(change?.diagnosticId, HIGH_ID);
+  assert.equal(change?.direction, "weakening");
+  assert.equal(change?.from.severity, "high");
+  assert.equal(change?.to.severity, "low");
+  assert.equal(
+    report.diff.findings.added.some((finding) => finding.id === HIGH_ID),
+    false,
+  );
+  assert.equal(
+    report.diff.findings.removed.some((finding) => finding.id === HIGH_ID),
+    false,
+  );
+});
+
 test("ci-report rejects same-change severity and diagnostics guard weakening", async (t) => {
-  const fixture = await suspendedDependencyFixture(t);
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("healthy", { owner: "qa-platform", status: "stable" });
   await fixture.initializeGit();
   await fixture.writeConfig({
-    diagnostics: { ci_policy: "fail", severity: { [ID]: "critical" } },
+    diagnostics: {
+      ci_policy: "fail",
+      severity: { [HIGH_ID]: "critical" },
+    },
   });
   await fixture.git(["add", "."]);
   await fixture.git(["commit", "-m", "strict diagnostic severity"]);
   await fixture.git(["tag", "base"]);
 
   await fixture.writeConfig({
-    diagnostics: { ci_policy: "off", severity: { [ID]: "high" } },
+    diagnostics: { ci_policy: "off", severity: { [HIGH_ID]: "high" } },
   });
   await fixture.git(["add", "renma.config.json"]);
   await fixture.git(["commit", "-m", "weaken diagnostic severity"]);
@@ -304,24 +441,29 @@ test("ci-report rejects same-change severity and diagnostics guard weakening", a
   );
 });
 
-async function suspendedDependencyFixture(
+async function missingExamplesFixture(
   testContext: test.TestContext,
 ): Promise<RepositoryFixture> {
   const fixture = await RepositoryFixture.create({ testContext });
-  await fixture.skill("source", {
-    id: "skill.source",
+  await fixture.skill("demo", {
     owner: "qa-platform",
     status: "stable",
-    metadata: {
-      "requires-context": JSON.stringify(["context.suspended"]),
-    },
   });
-  await fixture.context("contexts/suspended.md", {
-    id: "context.suspended",
+  return fixture;
+}
+
+async function missingSupportPathFixture(
+  testContext: test.TestContext,
+): Promise<RepositoryFixture> {
+  const fixture = await RepositoryFixture.create({ testContext });
+  await fixture.skill("demo", {
     owner: "qa-platform",
-    status: "suspended",
-    statusReason: "Temporarily disabled pending review.",
-    statusChangedAt: "2026-08-03",
+    status: "stable",
+    body: [
+      "# demo",
+      "",
+      "Read references/missing.md before reporting completion.",
+    ].join("\n"),
   });
   return fixture;
 }
@@ -335,17 +477,20 @@ function policy(
 
 function assertPolicyChange(
   diff: DiagnosticSeverityPolicyDiff,
+  diagnosticId: string,
   change: "added" | "removed" | "changed",
-  direction: "weakening" | "tightening",
-  fromSeverity: string,
+  direction: "weakening" | "tightening" | "neutral" | "review_required",
+  fromSeverity: string | null,
   toSeverity: string,
+  message?: string,
 ): void {
-  assert.equal(diff.changes.length, 1);
-  assert.equal(diff.changes[0]?.diagnosticId, ID);
-  assert.equal(diff.changes[0]?.change, change);
-  assert.equal(diff.changes[0]?.direction, direction);
-  assert.equal(diff.changes[0]?.from.severity, fromSeverity);
-  assert.equal(diff.changes[0]?.to.severity, toSeverity);
+  const assertionMessage = message ?? diagnosticId;
+  assert.equal(diff.changes.length, 1, assertionMessage);
+  assert.equal(diff.changes[0]?.diagnosticId, diagnosticId, assertionMessage);
+  assert.equal(diff.changes[0]?.change, change, assertionMessage);
+  assert.equal(diff.changes[0]?.direction, direction, assertionMessage);
+  assert.equal(diff.changes[0]?.from.severity, fromSeverity, assertionMessage);
+  assert.equal(diff.changes[0]?.to.severity, toSeverity, assertionMessage);
 }
 
 async function captureStdout(
