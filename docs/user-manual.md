@@ -314,9 +314,9 @@ implementation-owned registries.
 | —                                     | `type`                          | Trimmed text; `context_lens` is the supported Lens discriminator                                      | Non-Skill assets; only Context/Context Lens for Lens validation                              | Conditional when a file under a Context root must be classified as a Context Lens                              | Classification evidence, catalog kind, inspect, and Context Lens diagnostics                                                                                                                                                                      |
 | `renma.version`                       | `version`                       | Trimmed text; a Context Lens accepts only `1` when present                                            | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting                                                                                                                                                                            |
 | `renma.owner` | `owner` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; recommended for shared Context; optional elsewhere | Declared/effective ownership, ownership reports, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| `renma.status`                        | `status`                        | `experimental`, `stable`, `suspended`, `deprecated`, or `archived`                                    | Skill and cataloged non-Skill assets                                                         | Optional lifecycle declaration; `suspended` is temporarily inactive and requires reason/date evidence          | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                  |
-| `renma.status-reason`                 | `status_reason`                 | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Required when status is `suspended`; optional for other statuses                                               | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                      |
-| `renma.status-changed-at`             | `status_changed_at`             | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Required and blocking when status is `suspended`; optional for other statuses, but invalid declared dates warn | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                         |
+| `renma.status`                        | `status`                        | `experimental`, `stable`, `suspended`, `revoked`, `deprecated`, or `archived`                         | Skill and cataloged non-Skill assets                                                         | Optional lifecycle declaration; `suspended` and `revoked` are inactive and require reason/date evidence        | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                  |
+| `renma.status-reason`                 | `status_reason`                 | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Required when status is `suspended` or `revoked`; optional for other statuses                                  | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                      |
+| `renma.status-changed-at`             | `status_changed_at`             | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Required and blocking when status is `suspended` or `revoked`; optional for other statuses                    | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                         |
 | `renma.purpose`                       | `purpose`                       | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Context Lens requires it; optional elsewhere                                                                   | Catalog/inspect metadata and Context Lens governance diagnostics                                                                                                                                                                                  |
 | `renma.last-reviewed-at`              | `last_reviewed_at`              | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Optional; recommended when freshness is governed                                                               | Freshness diagnostics, catalog, Readiness, BOM, semantic diff, and CI reporting                                                                                                                                                                   |
 | `renma.review-cycle`                  | `review_cycle`                  | `P<positive integer>D`                                                                                | Skill and cataloged non-Skill assets                                                         | Conditional on cycle-based freshness review; meaningful with `last-reviewed-at`                                | Review-due calculation, freshness diagnostics, catalog, Readiness, BOM, diff, and CI reporting                                                                                                                                                    |
@@ -483,21 +483,29 @@ transition rules for upload permission and human approval.
   repository policy is never lowered. `token_budget_reviewed_at` is
   optional but valid only alongside an override and does not imply a recurring
   review cycle.
-- Lifecycle status is exactly `experimental`, `stable`, `suspended`,
+- Lifecycle status is exactly `experimental`, `stable`, `suspended`, `revoked`,
   `deprecated`, or `archived`. Experimental and stable are declared active;
-  suspended, deprecated, and archived are inactive for use. Omitted status
-  retains its existing use-eligible meaning.
+  suspended, revoked, deprecated, and archived are inactive for use. Omitted
+  status retains its existing use-eligible meaning.
 - `status_reason` describes the latest reviewed lifecycle transition, and
   `status_changed_at` dates that transition. It is distinct from
-  `last_reviewed_at`, which records freshness review. A suspended asset requires
-  both a non-blank reason and a real calendar date; other statuses accept both
-  fields without requiring them.
+  `last_reviewed_at`, which records freshness review. Suspended and revoked
+  assets require both a non-blank reason and a real calendar date; other
+  statuses accept both fields without requiring them.
 - Suspension preserves inventory and evidence but excludes the asset from
   active dependency, composition, Skill publication, routing, reachability,
   coverage, and cycle use. A required direct declaration from an active source
   to a uniquely resolved suspended asset is an error; an optional declaration
   is a warning. An isolated suspended asset is not a blocker merely because it
   is suspended.
+- Revocation means trust or authorization for continued use was explicitly
+  withdrawn because of a known problem. It is stronger than suspension and is
+  not an alias for deprecation or archival. Required active dependencies to a
+  uniquely resolved revoked asset emit
+  `META-REQUIRED-REVOKED-DEPENDENCY` as a built-in High Finding; optional
+  dependencies emit `META-OPTIONAL-REVOKED-DEPENDENCY` as a built-in Low
+  Finding. Renma does not propagate `revoked` to dependents or require
+  `superseded_by`.
 - A security profile is a non-empty selected name. The name must resolve in
   `security.profiles`; a missing or cyclic chain is diagnosed rather than
   silently substituted. Profile configuration uses the exact canonical fields
@@ -549,6 +557,20 @@ metadata:
 Renma compares the three fields independently in semantic diff and CI evidence.
 It does not store lifecycle history, schedule automatic expiry, or restore an
 asset automatically; repository history remains the complete audit trail.
+
+Revocation uses the same canonical fields but records an explicit negative
+trust decision:
+
+```yaml
+metadata:
+  renma.status: revoked
+  renma.status-reason: Revoked after the upstream source was found to be compromised.
+  renma.status-changed-at: "2026-09-03"
+```
+
+A revoked asset may have no replacement. Renma keeps it as current static
+repository evidence and does not automatically archive, replace, delete,
+restore, or propagate its status to dependents.
 
 ### Consumer and inheritance boundaries
 
@@ -1467,6 +1489,26 @@ review outcomes include suspending the dependent, removing or changing the
 dependency, migrating to a replacement, or retaining a narrow justified
 suppression. Renma does not prescribe which remediation is correct.
 
+A required dependency on a revoked asset instead emits the semantically
+distinct `META-REQUIRED-REVOKED-DEPENDENCY`, also at built-in High severity.
+Optional revoked dependencies emit `META-OPTIONAL-REVOKED-DEPENDENCY` at
+built-in Low severity. Repositories can configure those Finding IDs
+independently—for example, elevate only required revocation evidence:
+
+```jsonc
+{
+  "diagnostics": {
+    "severity": {
+      "META-REQUIRED-REVOKED-DEPENDENCY": "critical"
+    }
+  }
+}
+```
+
+Only the effective Finding severity changes; the built-in High default remains
+in structured traceability. Raw-only Discovery diagnostics are not
+configurable through `diagnostics.severity`.
+
 Severity-policy diff compares effective values (`repository override ??
 built-in severity`), not whether an override key was added or removed. An
 override equal to the built-in value is reported as `neutral`. When one stable
@@ -2102,9 +2144,9 @@ repository-script relationships reuse the executable graph's canonical edge
 semantics, while line-level duplicates remain in each relationship's evidence.
 `contains` remains separate structural placement and is never traversed as
 invocation. Neither relationship implies ownership, exclusive belonging,
-required execution, runtime use, or authorization. A suspended Skill retains
-its declared lifecycle evidence, but generating its contract does not permit
-execution.
+required execution, runtime use, or authorization. A suspended or revoked Skill
+retains its declared lifecycle evidence, but generating its contract does not
+permit execution.
 
 The command calls repository collection once and derives every section from
 the same in-memory snapshot. It does not call the public BOM or graph commands,

@@ -1106,7 +1106,7 @@ status: active
   assert.match(finding?.evidence.snippet ?? "", /status: active/);
   assert.match(
     finding?.remediation ?? "",
-    /experimental, stable, suspended, deprecated, archived/,
+    /experimental, stable, suspended, revoked, deprecated, archived/,
   );
   assert.match(finding?.llmHint ?? "", /superseded_by/);
 });

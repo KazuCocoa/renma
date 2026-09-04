@@ -8,6 +8,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added `revoked` as a first-class inactive lifecycle status for explicit
+  withdrawal of trust or authorization because of a known problem. Revoked
+  assets require reviewed reason/date evidence, remain unusable for active
+  composition and Discovery, retain lifecycle evidence across catalog,
+  inspect, Readiness, BOM, and Trust Graph projections, and produce dedicated
+  required/optional dependency findings without propagating status to
+  dependents. Required revoked dependencies default to High and optional ones
+  to Low, with repository overrides through `diagnostics.severity`.
 - Added repository-wide scan-finding severity policy through
   `diagnostics.severity`, keyed by stable diagnostic ID. Effective severity now
   feeds scan output, suppression evidence, failure thresholds, Readiness, diff,

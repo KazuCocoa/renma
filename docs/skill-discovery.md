@@ -105,6 +105,13 @@ and routes are excluded from effective entrypoints, route eligibility,
 reachability, coverage, and route-cycle analysis. Deprecated and archived
 publication and route attempts keep their established warning behavior.
 
+A revoked Skill is likewise retained with its current reason and transition
+date but is unusable for publication and routing. Its valid publication marker
+emits blocking `DISCOVERY-REVOKED-PUBLISHED-ENTRYPOINT`; an active route to it
+emits blocking `DISCOVERY-REVOKED-ROUTE-TARGET`. These IDs remain distinct from
+suspension because revocation records explicit withdrawal of trust or
+authorization, not a temporary stop.
+
 A published Skill may have an incoming route or no outgoing route. A Skill
 with no outgoing route can itself be a complete first-hop workflow. Graph
 position never determines publication.

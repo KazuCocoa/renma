@@ -44,6 +44,15 @@ test("published Draft 2020-12 schemas validate representative generated reports"
     statusChangedAt: suspendedBomAsset.statusChangedAt,
   };
   assertValid(validateBom, suspendedBom);
+  const revokedBom = structuredClone(suspendedBom);
+  const revokedBomAsset = revokedBom.assets[0];
+  assert.ok(revokedBomAsset);
+  revokedBomAsset.status = "revoked";
+  revokedBomAsset.lifecycle = {
+    ...(revokedBomAsset.lifecycle ?? {}),
+    status: "revoked",
+  };
+  assertValid(validateBom, revokedBom);
   assert.equal(defaultBom.outputMode, "default");
   assert.equal(typeof defaultBom.generatedAt, "string");
   assert.equal(omittedBom.outputMode, "omit_generated_at");
@@ -149,6 +158,16 @@ test("published Draft 2020-12 schemas validate representative generated reports"
     "Temporarily disabled while issue QE-1234 is corrected.",
   );
   assert.equal(lifecycleEdge.properties?.statusChangedAt, "2026-08-03");
+  const revokedGraph = structuredClone(graph);
+  const revokedLifecycleEdge = requiredEdge(
+    revokedGraph,
+    "has_lifecycle_status",
+  );
+  revokedLifecycleEdge.properties = {
+    ...(revokedLifecycleEdge.properties ?? {}),
+    status: "revoked",
+  };
+  assertValid(validateTrustGraph, revokedGraph);
 });
 
 test("BOM schema enforces output modes, timestamps, formats, and score bounds", async () => {

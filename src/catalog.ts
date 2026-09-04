@@ -28,7 +28,7 @@ import type { AssetOwnership } from "./types/governance.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
-import { isLifecycleUsable } from "./lifecycle.js";
+import { isLifecycleUsable, isRevokedLifecycleStatus } from "./lifecycle.js";
 import { resolveUniqueDependencyTarget } from "./dependency-resolution.js";
 import { RENMA_METADATA_NAMESPACE_PREFIX } from "./metadata-definitions.js";
 import {
@@ -497,11 +497,12 @@ function dependencyDiagnostics(
     );
     const source = sourceMatches.length === 1 ? sourceMatches[0] : undefined;
     const uniqueTarget = resolveUniqueDependencyTarget(dependency, entries);
-    const suspensionMembership = suspensionDependencyMembership(dependency);
+    const lifecycleReviewMembership =
+      lifecycleDependencyReviewMembership(dependency);
     if (
       source &&
       uniqueTarget?.metadata.status === "suspended" &&
-      suspensionMembership &&
+      lifecycleReviewMembership &&
       isLifecycleUsable(source.metadata.status)
     ) {
       diagnostics.push(
@@ -509,7 +510,22 @@ function dependencyDiagnostics(
           source,
           uniqueTarget,
           dependency,
-          suspensionMembership,
+          lifecycleReviewMembership,
+        ),
+      );
+    }
+    if (
+      source &&
+      isRevokedLifecycleStatus(uniqueTarget?.metadata.status) &&
+      lifecycleReviewMembership &&
+      isLifecycleUsable(source.metadata.status)
+    ) {
+      diagnostics.push(
+        revokedDependencyDiagnostic(
+          source,
+          uniqueTarget,
+          dependency,
+          lifecycleReviewMembership,
         ),
       );
     }
@@ -564,7 +580,7 @@ function dependencyDiagnostics(
   return diagnostics;
 }
 
-function suspensionDependencyMembership(
+function lifecycleDependencyReviewMembership(
   dependency: Dependency,
 ): "required" | "optional" | undefined {
   if (dependency.kind === "optional") return "optional";
@@ -572,6 +588,78 @@ function suspensionDependencyMembership(
     return "required";
   }
   return undefined;
+}
+
+function revokedDependencyDiagnostic(
+  source: CatalogEntry,
+  target: Asset,
+  dependency: Dependency,
+  membership: "required" | "optional",
+): Diagnostic {
+  const required = membership === "required";
+  const code = required
+    ? DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY
+    : DIAGNOSTIC_IDS.META_OPTIONAL_REVOKED_DEPENDENCY;
+  const relationship = dependency.declaration ?? dependency.kind;
+  return withDiagnosticId(code, {
+    severity: required ? "error" : "warning",
+    path: dependency.sourcePath,
+    message: `${required ? "Required" : "Optional"} ${relationship} declaration "${dependency.to}" from "${dependency.from}" resolves to revoked asset "${target.id}", whose trust or authorization for use has been explicitly withdrawn.`,
+    ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+    repairConstraints: [
+      {
+        kind: "must_preserve",
+        text: "Preserve the revoked target and its current lifecycle evidence while reviewing the direct declaration.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not automatically restore, suspend, deprecate, archive, clone, delete, bypass, or replace the revoked asset.",
+      },
+      {
+        kind: "allowed_change",
+        text: required
+          ? "After review, remove the dependency, retarget it to a reviewed replacement, change the dependent lifecycle if it cannot operate safely, retain a justified exception through existing policy, or restore/change the target only through a separate reviewed lifecycle decision."
+          : "After review, retain a justified optional exception through existing policy, remove the dependency, retarget it to a reviewed replacement, or restore/change the target only through a separate reviewed lifecycle decision.",
+      },
+      {
+        kind: "requires_human_decision",
+        text: "Determine whether continued use by this active source remains authorized and safe; Renma does not choose the remediation.",
+      },
+    ],
+    verificationSteps: [
+      {
+        text: "Review the direct declaration and rerun repository validation.",
+        command: "renma scan . --format json",
+        expected: `No ${code} diagnostic remains after an evidence-backed decision; unrelated lifecycle diagnostics remain visible.`,
+      },
+    ],
+    llmHint:
+      "Treat this as explicit withdrawal of trust or authorization, not ordinary deprecation or temporary suspension. Review only the direct declaration; do not propagate revoked status, infer a replacement, or reactivate the target.",
+    details: {
+      sourceId: source.id,
+      sourcePath: source.sourcePath,
+      ...(source.metadata.status
+        ? { sourceStatus: source.metadata.status }
+        : {}),
+      targetId: target.id,
+      targetPath: target.sourcePath,
+      targetStatus: "revoked",
+      ...(target.metadata.statusReason
+        ? { targetStatusReason: target.metadata.statusReason }
+        : {}),
+      ...(target.metadata.statusChangedAt
+        ? { targetStatusChangedAt: target.metadata.statusChangedAt }
+        : {}),
+      relationship,
+      dependencyKind: dependency.kind,
+      membership,
+      direct: true,
+      metadataKey: dependency.declaration ?? dependency.kind,
+      ...(dependency.declarationIndex !== undefined
+        ? { declarationIndex: dependency.declarationIndex }
+        : {}),
+    },
+  });
 }
 
 function suspendedDependencyDiagnostic(

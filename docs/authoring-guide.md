@@ -273,7 +273,7 @@ to this protocol.
 | Explicit user statements | Intent, governance decisions, source designation, fallback, and other decisions the user has authority to make | Designating a specification does not prove its contents |
 | User-provided artifacts | Facts in supplied documents, specifications, examples, logs, or schemas | Provenance and applicability must be clear; identify the artifact |
 | Generated and derived artifacts | Bounded observations made by an identified producer in Renma reports, test results, logs, diagnostics, machine-generated review summaries or comments, external-review artifacts, and other derived output | Provenance, subject, scope, applicability, and currentness must be clear; apply this qualification together with any user-provided, repository, or external-source classification because delivery or location does not broaden the supported evidence boundary; evidentiary value does not make the artifact governing authority for domain behavior, policy, completeness, or safety |
-| Repository evidence | Applicable and effective repository facts | Evidence must be unambiguous; deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed merely because it exists; identify the file, metadata, lifecycle evidence, or command result |
+| Repository evidence | Applicable and effective repository facts | Evidence must be unambiguous; revoked, deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed merely because it exists; identify the file, metadata, lifecycle evidence, or command result |
 | Reviewed authoritative external source content | Domain facts governed by a user-designated source | The authoring environment must be permitted and able to consult it successfully; identify the source and relevant section or evidence |
 | Renma structural rules | Structural constraints and proposed defaults | They do not establish product or domain truth |
 
@@ -1161,6 +1161,13 @@ schedule, expire, or restore lifecycle state automatically, and
 `last_reviewed_at` remains the separate freshness-review date. See
 [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md) for the full
 dependency and evidence policy.
+
+For an explicit withdrawal of trust or authorization because of a known
+problem, use `renma.status: revoked` with the same required canonical reason
+and real transition-date fields. Revocation is stronger than suspension, is
+not deprecation or archival, and does not require a replacement. Renma reports
+active direct dependents for review but does not propagate the revoked status
+or choose a remediation.
 
 ## Context Asset And Context Lens Authoring
 

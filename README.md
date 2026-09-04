@@ -390,6 +390,13 @@ explicit reviewed exceptions. Changes that lower effective severity, or weaken
 asset. Raw discovery/configuration diagnostic IDs are not configurable through
 this Finding policy and are rejected instead of being silently ignored.
 
+Revoked assets use the separate
+`META-REQUIRED-REVOKED-DEPENDENCY` (built-in High) and
+`META-OPTIONAL-REVOKED-DEPENDENCY` (built-in Low) Finding IDs. Revocation means
+trust or authorization was explicitly withdrawn because of a known problem;
+Renma keeps that current lifecycle evidence and does not propagate the status
+or automatically rewrite dependents.
+
 Repositories may set effective warning and High token-budget thresholds for
 Skills and each governed Markdown content kind:
 

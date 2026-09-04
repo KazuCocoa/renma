@@ -28,9 +28,9 @@ const STATUS_FINDING = {
   severity: "medium",
   confidence: "high",
   whyItMatters:
-    "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, deprecated, or archived.",
+    "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, revoked, deprecated, or archived.",
   remediation:
-    "Use one of the supported lifecycle status values: experimental, stable, suspended, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+    "Use one of the supported lifecycle status values: experimental, stable, suspended, revoked, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
   repairConstraints: [
     {
       kind: "must_not_change",
@@ -294,6 +294,36 @@ const CATALOG_FINDING_DEFINITION_LIST = [
     severity: "low",
   },
   {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_REVOKED_STATUS_METADATA_INCOMPLETE,
+    title: "Revoked lifecycle metadata is incomplete",
+    severity: "medium",
+    whyItMatters:
+      "Revocation is an explicit withdrawal of trust or authorization because of a known problem. Without a reviewed reason and transition date, that negative trust decision is not auditable.",
+    remediation:
+      "Record the reviewed revocation reason and real transition date without changing the revoked status or inventing evidence.",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY,
+    title: "Required dependency targets a revoked asset",
+    severity: "medium",
+    whyItMatters:
+      "An active asset requires a target whose trust or authorization for use has been explicitly withdrawn because of a known problem.",
+    remediation:
+      "Review the direct dependency and choose an evidence-backed outcome; Renma does not propagate lifecycle status or prescribe one repair.",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_OPTIONAL_REVOKED_DEPENDENCY,
+    title: "Optional dependency targets a revoked asset",
+    severity: "low",
+    whyItMatters:
+      "An active asset optionally references a target whose trust or authorization for use has been explicitly withdrawn because of a known problem.",
+    remediation:
+      "Review whether to retain a justified exception, remove or retarget the optional declaration, or handle the target through a separate reviewed lifecycle decision.",
+  },
+  {
     code: DIAGNOSTIC_IDS.META_FRONTMATTER_TOO_LARGE,
     title: "Frontmatter metadata is too large",
     ...METADATA_BUDGET_FINDING,
@@ -403,12 +433,14 @@ const CATALOG_ERROR_DIAGNOSTIC_CODES = new Set<string>([
   DIAGNOSTIC_IDS.META_INVALID_RENMA_FRONTMATTER,
   DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
   DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+  DIAGNOSTIC_IDS.META_REVOKED_STATUS_METADATA_INCOMPLETE,
+  DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY,
   DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING,
 ]);
 
 const CATALOG_VARIABLE_DIAGNOSTIC_CODES = new Set<string>([
-  // Suspended assets produce an error while other lifecycle states produce a
-  // warning for this same stable diagnostic ID.
+  // Suspended and revoked assets produce an error while other lifecycle states
+  // produce a warning for this same stable diagnostic ID.
   DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
 ]);
 

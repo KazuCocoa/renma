@@ -25,7 +25,7 @@ import type {
   MetadataFieldEvidence,
   ParsedDocument,
 } from "./types/metadata.js";
-import { isLifecycleUsable } from "./lifecycle.js";
+import { isLifecycleUsable, isRevokedLifecycleStatus } from "./lifecycle.js";
 
 export const SKILL_ROUTE_USABILITY_REASONS = [
   "invalid-source",
@@ -1139,18 +1139,24 @@ function publicationDiagnosticFor(
     : ambiguousMarker
       ? (marker.reason ?? "the marker declaration is ambiguous")
       : `the Skill lifecycle is ${skill.lifecycle ?? "inactive"}`;
+  const revokedAttempt =
+    inactiveAttempt && isRevokedLifecycleStatus(skill.lifecycle);
+  const suspendedAttempt = inactiveAttempt && skill.lifecycle === "suspended";
   const action = ambiguousMarker
     ? "Resolve the declaration ambiguity with human review, then retain one exact intended marker or omit it."
-    : inactiveAttempt
-      ? "Remove the stale publication attempt or review the lifecycle decision; do not reactivate or clone the Skill merely to publish it."
-      : 'Use the exact YAML string "true" to request publication, or omit the marker.';
-  const suspendedAttempt = inactiveAttempt && skill.lifecycle === "suspended";
-  const code = suspendedAttempt
-    ? DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT
-    : DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT;
+    : revokedAttempt
+      ? "Remove the stale publication attempt or review the lifecycle decision; do not restore, clone, or replace the Skill merely to publish it."
+      : inactiveAttempt
+        ? "Remove the stale publication attempt or review the lifecycle decision; do not reactivate or clone the Skill merely to publish it."
+        : 'Use the exact YAML string "true" to request publication, or omit the marker.';
+  const code = revokedAttempt
+    ? DIAGNOSTIC_IDS.DISCOVERY_REVOKED_PUBLISHED_ENTRYPOINT
+    : suspendedAttempt
+      ? DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT
+      : DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT;
   return {
     code,
-    severity: suspendedAttempt ? "error" : "warning",
+    severity: suspendedAttempt || revokedAttempt ? "error" : "warning",
     path: skill.sourcePath,
     message: `Skill "${skill.id}" cannot be published because ${reason}. ${action}`,
     ...(marker.evidence ? { evidence: marker.evidence } : {}),
@@ -1593,9 +1599,7 @@ function routeDiagnostics(
     route.resolvedTarget?.kind === "skill" &&
     skillsByPath.get(route.sourcePath)?.routeEligible === true &&
     route.resolvedTarget.agentSkillsValid === true &&
-    (route.resolvedTarget.lifecycle === "suspended" ||
-      route.resolvedTarget.lifecycle === "deprecated" ||
-      route.resolvedTarget.lifecycle === "archived")
+    !isLifecycleUsable(route.resolvedTarget.lifecycle)
   ) {
     return [inactiveTargetDiagnostic(route)];
   }
@@ -1692,19 +1696,23 @@ function wrongKindRouteDiagnostic(route: DeclaredSkillRoute): Diagnostic {
 function inactiveTargetDiagnostic(route: DeclaredSkillRoute): Diagnostic {
   const target = route.resolvedTarget!;
   const suspended = target.lifecycle === "suspended";
-  const code = suspended
-    ? DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET
-    : DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET;
+  const revoked = isRevokedLifecycleStatus(target.lifecycle);
+  const code = revoked
+    ? DIAGNOSTIC_IDS.DISCOVERY_REVOKED_ROUTE_TARGET
+    : suspended
+      ? DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET
+      : DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET;
   return {
     code,
-    severity: suspended ? "error" : "warning",
+    severity: suspended || revoked ? "error" : "warning",
     path: route.sourcePath,
     message: `Skill continuation ${route.declarationIndex} targets ${target.lifecycle} Skill "${target.id}" at ${target.sourcePath}. The declaration remains visible but is unusable for structural Discovery.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(),
     verificationSteps: routeVerificationSteps(code),
-    llmHint:
-      "Preserve the intended continuation while reviewing a real active replacement. Correct or remove a stale declaration; do not reactivate or clone a Skill only to silence the diagnostic.",
+    llmHint: revoked
+      ? "Treat the target as explicitly untrusted or unauthorized. Preserve the direct evidence while reviewing whether to remove or retarget the route; do not restore, clone, or replace the target merely to silence the diagnostic."
+      : "Preserve the intended continuation while reviewing a real active replacement. Correct or remove a stale declaration; do not reactivate or clone a Skill only to silence the diagnostic.",
     details: {
       sourceId: route.sourceId,
       sourcePath: route.sourcePath,

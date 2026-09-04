@@ -1864,7 +1864,13 @@ async function writeSkill(
   name: string,
   id: string,
   routes?: string[],
-  status?: "experimental" | "stable" | "deprecated" | "archived",
+  status?:
+    | "experimental"
+    | "stable"
+    | "suspended"
+    | "revoked"
+    | "deprecated"
+    | "archived",
   published = false,
   owner?: string,
 ): Promise<void> {
@@ -1890,7 +1896,13 @@ function skillText(
   id: string,
   routes?: string[],
   rawRouteValue?: string,
-  status?: "experimental" | "stable" | "deprecated" | "archived",
+  status?:
+    | "experimental"
+    | "stable"
+    | "suspended"
+    | "revoked"
+    | "deprecated"
+    | "archived",
   published = false,
   owner?: string,
 ): string {

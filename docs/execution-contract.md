@@ -57,7 +57,8 @@ does not imply ownership, exclusive belonging, runtime execution, or required
 execution. Shared repository scripts do not inherit ownership from a caller.
 
 The contract is static repository evidence, not an authorization decision.
-Generating a contract for a suspended Skill does not permit executing it.
+Generating a contract for a suspended or revoked Skill does not permit
+executing it.
 
 ## One Snapshot And Deterministic Output
 

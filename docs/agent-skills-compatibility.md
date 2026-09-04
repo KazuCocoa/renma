@@ -127,12 +127,13 @@ report, Trust Graph, BOM, ownership, init, scaffold, guide, and suggestions do
 not gain Skill Index fields.
 
 Text values are trimmed strings. `renma.status` accepts `experimental`,
-`stable`, `suspended`, `deprecated`, and `archived`. A suspended Skill also
-requires non-blank `renma.status-reason` and a real `YYYY-MM-DD`
-`renma.status-changed-at` string. These flat keys describe the latest reviewed
-lifecycle transition and are distinct from freshness field
-`renma.last-reviewed-at`. List values are JSON-array strings containing strings
-only:
+`stable`, `suspended`, `revoked`, `deprecated`, and `archived`. A suspended or
+revoked Skill also requires non-blank `renma.status-reason` and a real
+`YYYY-MM-DD` `renma.status-changed-at` string. Revoked means trust or
+authorization for use was explicitly withdrawn because of a known problem.
+These flat keys describe the latest reviewed lifecycle transition and are
+distinct from freshness field `renma.last-reviewed-at`. List values are
+JSON-array strings containing strings only:
 
 ```yaml
 metadata:

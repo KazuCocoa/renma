@@ -190,6 +190,7 @@
             "experimental",
             "stable",
             "suspended",
+            "revoked",
             "deprecated",
             "archived"
           ]

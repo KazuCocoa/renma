@@ -169,12 +169,16 @@ Supported lifecycle states are:
 
 - `experimental`
 - `stable`
+- `suspended`
+- `revoked`
 - `deprecated`
 - `archived`
 
 Lifecycle is not replacement, delegation, or provenance. A superseded local
 support file may remain as a documented compatibility shim, but its lifecycle
 state and its explicit supersession relationship remain separate facts.
+Revocation is an explicit withdrawal of trust or authorization because of a
+known problem; it is not an ordinal stage after archival.
 
 ## Explicit Relationships
 

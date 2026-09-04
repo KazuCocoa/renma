@@ -19,7 +19,7 @@ The checks apply only to shared context assets that are active and canonical:
 - the artifact kind is `context`
 - the asset has an `id` that starts with `context.`
 - the asset has an `owner`
-- the asset status is not `deprecated` or `archived`
+- the asset status is omitted, `experimental`, or `stable`
 
 ## Vague wording
 
