@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-09-04
+
 ### Added
 
 - Added `revoked` as a first-class inactive lifecycle status for explicit
@@ -2761,7 +2763,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.37.2...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.38.0...HEAD
+[0.38.0]: https://github.com/KazuCocoa/renma/compare/v0.37.2...v0.38.0
 [0.37.2]: https://github.com/KazuCocoa/renma/compare/v0.37.1...v0.37.2
 [0.37.1]: https://github.com/KazuCocoa/renma/compare/v0.37.0...v0.37.1
 [0.37.0]: https://github.com/KazuCocoa/renma/compare/v0.36.1...v0.37.0

@@ -1,7 +1,7 @@
 name: Renma CI Report
 
 # One-time consumer-repository setup:
-#   npm install --save-dev --save-exact renma@0.37.2
+#   npm install --save-dev --save-exact renma@0.38.0
 # Commit package.json and package-lock.json so npm ci installs this exact Renma version.
 
 on:
