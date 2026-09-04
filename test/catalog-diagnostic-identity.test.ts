@@ -9,8 +9,13 @@ import { buildCatalog } from "../src/catalog.js";
 import {
   CATALOG_FINDING_DEFINITIONS,
   CATALOG_FINDING_DIAGNOSTIC_CODES,
+  catalogDiagnosticDefaultFindingSeverity,
   catalogDiagnosticFindings,
 } from "../src/catalog-findings.js";
+import {
+  diagnosticDefaultSeverity,
+  diagnosticFindingSeverityDefinition,
+} from "../src/diagnostic-default-severity.js";
 import { createScanDiagnostics } from "../src/scan-diagnostics.js";
 import {
   DIAGNOSTIC_IDS,
@@ -43,6 +48,7 @@ test("every known metadata diagnostic has a registered code conversion", () => {
   );
   for (const code of CATALOG_FINDING_DIAGNOSTIC_CODES) {
     assert.ok(registeredIds.has(code));
+    assert.ok(diagnosticFindingSeverityDefinition(code), code);
     const finding = catalogDiagnosticFindings([
       codedDiagnostic(code, "wording"),
     ]);
@@ -67,6 +73,31 @@ test("every known metadata diagnostic has a registered code conversion", () => {
       [code],
     );
   }
+});
+
+test("catalog error diagnostics retain the established High Finding conversion", () => {
+  for (const code of [
+    DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
+    DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+    DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+  ]) {
+    const [finding] = catalogDiagnosticFindings([
+      { ...codedDiagnostic(code, "error case"), severity: "error" },
+    ]);
+    assert.equal(finding?.severity, "high", code);
+  }
+  assert.equal(
+    catalogDiagnosticDefaultFindingSeverity(
+      DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+    ),
+    "high",
+  );
+  assert.equal(
+    catalogDiagnosticDefaultFindingSeverity(
+      DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
+    ),
+    undefined,
+  );
 });
 
 test("catalog Finding retains diagnostic-specific and definition repair constraints", () => {
@@ -263,6 +294,16 @@ when_not_to_use: current guidance
     ),
     [],
   );
+  for (const code of CATALOG_FINDING_DIAGNOSTIC_CODES) {
+    const registeredDefault = diagnosticDefaultSeverity(code);
+    if (registeredDefault === undefined) continue;
+    const producedSeverities = new Set(
+      catalogDiagnosticFindings(
+        diagnostics.filter((diagnostic) => diagnostic.code === code),
+      ).map((finding) => finding.severity),
+    );
+    assert.deepEqual(producedSeverities, new Set([registeredDefault]), code);
+  }
   for (const diagnostic of diagnostics.filter((candidate) =>
     producedCodes.has(candidate.code ?? ""),
   )) {

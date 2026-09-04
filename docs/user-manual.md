@@ -1267,6 +1267,13 @@ For example:
     "ci_policy": "fail",
     "required": ["owner"]
   },
+  "diagnostics": {
+    // Elevate selected findings without changing producer definitions.
+    "ci_policy": "fail",
+    "severity": {
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
+    }
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1341,6 +1348,21 @@ The configuration supports the same names used by the implementation, including:
   the comparison. Requirement additions and mode tightening remain visible but
   are non-blocking solely as policy transitions. A decrease in findings caused
   by requirement removal is policy weakening, not verified remediation.
+- `diagnostics`: repository-wide effective severity policy for scan findings,
+  keyed by stable configurable Finding ID. Supported keys are `severity` and
+  `ci_policy`; unknown keys, unknown diagnostic IDs, stable IDs that do not
+  identify configurable scan Findings, and values outside `low`, `medium`,
+  `high`, and `critical` are configuration errors. Raw discovery and
+  configuration diagnostics retain their separate `error | warning | info`
+  path. `severity`
+  defaults to `{}`, so repositories without this section retain producer
+  severities and existing scan behavior. `ci_policy` supports `off`, `warn`,
+  and `fail` and defaults to `fail`. Lowering an override, removing an
+  override, or weakening the CI mode is reviewable in `ci-report`; the stricter
+  base/target mode governs the comparison, so the same change cannot disable
+  its own review. Strengthening remains visible as a non-blocking policy
+  transition, although a newly effective High or Critical finding still uses
+  the ordinary scan and CI finding rules.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1402,6 +1424,55 @@ diagnostic, evidence location, matching rule and path pattern, reason, and
 expiration. A suppression applies only when both `id` and `paths` match.
 Each suppression includes `id`, `paths`, required `reason`, and optional
 `expires`; the reason lives in config for auditability.
+
+Diagnostic severity policy and suppression have separate responsibilities:
+
+```text
+diagnostic producer     -> built-in severity
+diagnostics.severity    -> repository effective severity
+suppressions            -> explicit reviewed path-scoped exceptions
+fail_on                 -> scan / CI failure threshold
+diagnostics.ci_policy   -> governance for weakening severity policy
+```
+
+An active asset with a required dependency on a suspended asset already emits
+`META-REQUIRED-SUSPENDED-DEPENDENCY` at built-in High severity. The default
+`fail_on: "high"` therefore already blocks. A repository that wants an even
+stronger threshold can elevate the effective severity from High to Critical:
+
+```jsonc
+{
+  "fail_on": "critical",
+  "diagnostics": {
+    "ci_policy": "fail",
+    "severity": {
+      "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
+    }
+  },
+  "suppressions": [
+    {
+      "id": "META-REQUIRED-SUSPENDED-DEPENDENCY",
+      "paths": ["skills/legacy/**"],
+      "reason": "Temporary migration exception",
+      "expires": "2026-12-31"
+    }
+  ]
+}
+```
+
+The dependency becoming suspended does not make Renma rewrite or suspend its
+active dependent. Renma detects the unresolved impact, applies the configured
+effective severity, and lets CI stop for a human or agent decision. Valid
+review outcomes include suspending the dependent, removing or changing the
+dependency, migrating to a replacement, or retaining a narrow justified
+suppression. Renma does not prescribe which remediation is correct.
+
+Severity-policy diff compares effective values (`repository override ??
+built-in severity`), not whether an override key was added or removed. An
+override equal to the built-in value is reported as `neutral`. When one stable
+ID cannot be resolved to one static built-in Finding severity, Renma reports the
+policy transition as `review_required` and lets `diagnostics.ci_policy` govern
+it instead of guessing a non-blocking direction.
 
 Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exception is intentionally permanent. Permanent suppressions should still use narrow path patterns and a clear reason. Suppression path patterns are repository-relative and support exact paths, directory-prefix matches for non-glob patterns, `*` within one path segment, and `**` across directories.
 

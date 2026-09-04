@@ -38,6 +38,8 @@ import type { SecurityCiPolicyMode } from "../types/configuration.js";
 import type { ScanBoundaryCiPolicyMode } from "../types/configuration.js";
 import type { ExecutableSurfaceCiPolicyMode } from "../types/configuration.js";
 import type {
+  DiagnosticsCiPolicyMode,
+  DiagnosticsConfig,
   MetadataCiPolicyMode,
   MetadataConfig,
   QualityCiPolicyMode,
@@ -96,6 +98,11 @@ import {
   type MetadataPolicyDiff,
   type MetadataPolicyRequiredFieldChange,
 } from "../metadata-policy-diff.js";
+import {
+  buildDiagnosticSeverityPolicyDiff,
+  type DiagnosticSeverityPolicyDiff,
+  type DiagnosticSeverityPolicyChange,
+} from "../diagnostic-severity-policy-diff.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import {
   REQUIRED_METADATA_CONFIGURATION_KEY,
@@ -165,6 +172,7 @@ export interface DiffReport {
   scanBoundary: ScanBoundaryDiff;
   qualityPolicy: QualityPolicyDiff;
   metadataPolicy?: MetadataPolicyDiff;
+  diagnosticSeverityPolicy?: DiagnosticSeverityPolicyDiff;
   inspectionCoverage: InspectionCoverageDiff;
   findings: {
     added: FindingDelta[];
@@ -261,7 +269,7 @@ interface FindingDelta {
   riskClass?: string | undefined;
   title: string;
   evidence?: EvidenceDelta | undefined;
-  /** Retained only for required-metadata policy findings. */
+  /** Retained for required-metadata or repository severity-policy evidence. */
   details?: Record<string, unknown> | undefined;
 }
 
@@ -283,6 +291,7 @@ interface DiffSnapshot {
   securityConfig?: SecurityConfig;
   qualityConfig?: QualityConfig;
   metadataConfig?: MetadataConfig;
+  diagnosticsConfig?: DiagnosticsConfig;
   scanBoundary?: ScanBoundaryEvidence;
   inspectionCoverage?: InspectionCoverage;
   configPath?: string;
@@ -319,6 +328,10 @@ interface DiffExecutionContext {
   metadataCiPolicy: {
     from: MetadataCiPolicyMode;
     to: MetadataCiPolicyMode;
+  };
+  diagnosticSeverityCiPolicy: {
+    from: DiagnosticsCiPolicyMode;
+    to: DiagnosticsCiPolicyMode;
   };
   effectiveCiScanBoundary?: EffectiveCiScanBoundaryEvidence;
 }
@@ -526,6 +539,10 @@ async function executeDiffWithProjection(
           from: fromCollected.metadataCiPolicy,
           to: toCollected.metadataCiPolicy,
         },
+        diagnosticSeverityCiPolicy: {
+          from: fromCollected.diagnosticSeverityCiPolicy,
+          to: toCollected.diagnosticSeverityCiPolicy,
+        },
         ...(effectiveCiBoundary
           ? { effectiveCiScanBoundary: effectiveCiBoundary }
           : {}),
@@ -627,6 +644,12 @@ function buildDiffReportProjection(
   const metadataPolicy = buildMetadataPolicyDiff(
     fromSnapshot.metadataConfig ?? DEFAULT_CONFIG.metadata,
     toSnapshot.metadataConfig ?? DEFAULT_CONFIG.metadata,
+    fromSnapshot.configPath,
+    toSnapshot.configPath,
+  );
+  const diagnosticSeverityPolicy = buildDiagnosticSeverityPolicyDiff(
+    fromSnapshot.diagnosticsConfig ?? DEFAULT_CONFIG.diagnostics,
+    toSnapshot.diagnosticsConfig ?? DEFAULT_CONFIG.diagnostics,
     fromSnapshot.configPath,
     toSnapshot.configPath,
   );
@@ -734,6 +757,9 @@ function buildDiffReportProjection(
       toSnapshot.qualityConfig ?? DEFAULT_CONFIG.quality,
     ),
     ...(metadataPolicy.changes.length > 0 ? { metadataPolicy } : {}),
+    ...(diagnosticSeverityPolicy.changes.length > 0
+      ? { diagnosticSeverityPolicy }
+      : {}),
     inspectionCoverage: buildInspectionCoverageDiff(
       fromSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
       toSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
@@ -793,6 +819,7 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     changes: [],
   };
   const metadataPolicy = report.metadataPolicy;
+  const diagnosticSeverityPolicy = report.diagnosticSeverityPolicy;
   const discoveryLines = discovery
     ? ["", ...formatSkillDiscoveryChanges(discovery)]
     : [];
@@ -849,6 +876,22 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
             .slice(0, DIFF_DETAIL_LIMIT)
             .map(formatMetadataPolicyChange),
           ...formatPolicyOverflow(metadataPolicy.changes.length, 0),
+        ]
+      : []),
+    ...(diagnosticSeverityPolicy
+      ? [
+          "",
+          "## Diagnostic Severity Policy",
+          "",
+          `- Severity changes: ${diagnosticSeverityPolicy.changes.length}`,
+          `- Strengthenings: ${diagnosticSeverityPolicy.strengthenedDiagnosticIds.length}`,
+          `- Weakenings: ${diagnosticSeverityPolicy.weakenedDiagnosticIds.length}`,
+          `- Neutral changes: ${diagnosticSeverityPolicy.neutralDiagnosticIds.length}`,
+          `- Review-required changes: ${diagnosticSeverityPolicy.reviewRequiredDiagnosticIds.length}`,
+          ...diagnosticSeverityPolicy.changes
+            .slice(0, DIFF_DETAIL_LIMIT)
+            .map(formatDiagnosticSeverityPolicyChange),
+          ...formatPolicyOverflow(diagnosticSeverityPolicy.changes.length, 0),
         ]
       : []),
     "",
@@ -997,6 +1040,24 @@ function formatMetadataPolicyChange(
   const direction =
     change.direction === "weakening" ? "WEAKENING" : "tightening";
   return `- ${direction}: required ${formatMarkdownInlineCode(change.field)} ${formatMetadataRequirementEndpoint(change.from)} -> ${formatMetadataRequirementEndpoint(change.to)}; ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatDiagnosticSeverityPolicyChange(
+  change: DiagnosticSeverityPolicyChange,
+): string {
+  const direction = formatDiagnosticSeverityDirection(change.direction);
+  const from = change.from.severity ?? "(producer default unknown)";
+  const to = change.to.severity ?? "(producer default unknown)";
+  return `- ${direction}: ${formatMarkdownInlineCode(change.diagnosticId)} ${from} (${change.from.source}) -> ${to} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
+}
+
+function formatDiagnosticSeverityDirection(
+  direction: DiagnosticSeverityPolicyChange["direction"],
+): string {
+  if (direction === "weakening") return "WEAKENING";
+  if (direction === "tightening") return "tightening";
+  if (direction === "neutral") return "neutral";
+  return "REVIEW REQUIRED";
 }
 
 function formatMetadataRequirementEndpoint(
@@ -1667,6 +1728,7 @@ async function snapshot(
   executableSurfaceCiPolicy: ExecutableSurfaceCiPolicyMode;
   qualityCiPolicy: QualityCiPolicyMode;
   metadataCiPolicy: MetadataCiPolicyMode;
+  diagnosticSeverityCiPolicy: DiagnosticsCiPolicyMode;
 }> {
   const repositorySnapshot = await collectRepositorySnapshot(
     prepared.target,
@@ -1690,6 +1752,7 @@ async function snapshot(
       repositorySnapshot.config.executableSurface.ciPolicy,
     qualityCiPolicy: repositorySnapshot.config.quality.ciPolicy,
     metadataCiPolicy: repositorySnapshot.config.metadata.ciPolicy,
+    diagnosticSeverityCiPolicy: repositorySnapshot.config.diagnostics.ciPolicy,
   };
 }
 
@@ -1738,6 +1801,7 @@ function projectDiffSnapshot(
       securityConfig: repositorySnapshot.config.security,
       qualityConfig: repositorySnapshot.config.quality,
       metadataConfig: repositorySnapshot.config.metadata,
+      diagnosticsConfig: repositorySnapshot.config.diagnostics,
       scanBoundary: canonicalScanBoundary(
         scanBoundarySource(
           repositorySnapshot.config,
@@ -1978,12 +2042,18 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
         evidence,
       };
       const rawDetails = objectField(finding, "details");
-      const details =
-        deltaFinding.id === DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING &&
+      const detailsRecord =
         rawDetails !== null &&
         typeof rawDetails === "object" &&
         !Array.isArray(rawDetails)
           ? (rawDetails as Record<string, unknown>)
+          : undefined;
+      const details =
+        detailsRecord &&
+        (deltaFinding.id ===
+          DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING ||
+          detailsRecord.severitySource === "repository_configuration")
+          ? detailsRecord
           : undefined;
       const projectedFinding = {
         ...deltaFinding,
@@ -1992,6 +2062,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
       return [
         [
           deltaFinding.id,
+          deltaFinding.severity,
           evidence?.path ?? "",
           ...findingDetailIdentity(deltaFinding.id, details),
           evidence?.startLine ?? "",

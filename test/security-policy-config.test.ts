@@ -247,7 +247,7 @@ security.profiles.restricted:
 - "allowedData" -> use "allowed_data" (historical)
 - "totallyUnknownField" (unknown)
 
-Allowed top-level keys: concurrency, exclude, executable_surface, fail_on, format, globs, max_depth, max_file_size_bytes, metadata, quality, scan_boundary, security, skill_discovery, suppressions.
+Allowed top-level keys: concurrency, diagnostics, exclude, executable_surface, fail_on, format, globs, max_depth, max_file_size_bytes, metadata, quality, scan_boundary, security, skill_discovery, suppressions.
 
 Allowed security keys: approvedDomains, approvedUploadDomains, ci_policy, disallowedCommands, profiles.
 
@@ -291,7 +291,7 @@ security.profiles.a-profile:
 security.profiles.z-profile:
 - "zUnknown" (unknown)
 
-Allowed top-level keys: concurrency, exclude, executable_surface, fail_on, format, globs, max_depth, max_file_size_bytes, metadata, quality, scan_boundary, security, skill_discovery, suppressions.
+Allowed top-level keys: concurrency, diagnostics, exclude, executable_surface, fail_on, format, globs, max_depth, max_file_size_bytes, metadata, quality, scan_boundary, security, skill_discovery, suppressions.
 
 Allowed security keys: approvedDomains, approvedUploadDomains, ci_policy, disallowedCommands, profiles.
 

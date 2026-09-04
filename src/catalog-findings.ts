@@ -399,6 +399,37 @@ const CATALOG_FINDING_DEFINITION_BY_CODE: ReadonlyMap<
   ]),
 );
 
+const CATALOG_ERROR_DIAGNOSTIC_CODES = new Set<string>([
+  DIAGNOSTIC_IDS.META_INVALID_RENMA_FRONTMATTER,
+  DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+  DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+  DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING,
+]);
+
+const CATALOG_VARIABLE_DIAGNOSTIC_CODES = new Set<string>([
+  // Suspended assets produce an error while other lifecycle states produce a
+  // warning for this same stable diagnostic ID.
+  DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
+]);
+
+/**
+ * Resolve a stable catalog diagnostic's built-in scan-Finding severity without
+ * requiring that a repository happen to emit the diagnostic. Undefined means
+ * the producer can use more than one built-in severity for the same ID.
+ */
+export function catalogDiagnosticDefaultFindingSeverity(
+  diagnosticId: string,
+): Finding["severity"] | undefined {
+  if (
+    diagnosticId === DIAGNOSTIC_IDS.META_CATALOG_DIAGNOSTIC ||
+    CATALOG_VARIABLE_DIAGNOSTIC_CODES.has(diagnosticId)
+  ) {
+    return undefined;
+  }
+  if (CATALOG_ERROR_DIAGNOSTIC_CODES.has(diagnosticId)) return "high";
+  return CATALOG_FINDING_DEFINITION_BY_CODE.get(diagnosticId)?.severity;
+}
+
 /** Convert catalog diagnostics by stable producer identity, never by prose. */
 export function catalogDiagnosticFindings(
   diagnostics: readonly Diagnostic[],

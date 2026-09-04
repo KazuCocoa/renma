@@ -25,6 +25,27 @@ renma uses two severity systems:
 
 In JSON output, diagnostics usually appear as structured objects with a `severity`, a `message`, and, when available, a `path`.
 
+Repository configuration can set an effective scan-finding severity by stable
+configurable Finding ID through `diagnostics.severity`. IDs that exist only as
+raw discovery/configuration diagnostics are rejected because this policy does
+not affect their `error | warning | info` path. Producer definitions remain
+unchanged. When an override applies, scan JSON retains the effective value as
+`details.findingSeverity` and adds `details.defaultSeverity` plus
+`details.severitySource: "repository_configuration"`. The v2
+`error | warning | info` transport severity continues to be derived from the
+effective finding severity by the existing normalization.
+
+`fail_on` evaluates the effective severity. Suppressions are applied afterward,
+so a path-scoped suppression still removes an overridden finding from the
+active set while the suppressed evidence retains both effective and default
+severity. See the [configuration contract](user-manual.md#configuration).
+
+`META-REQUIRED-SUSPENDED-DEPENDENCY` retains its established built-in scan
+Finding severity of High (and DiagnosticV2 transport severity of `error`). With
+the default `fail_on: "high"`, an active asset that requires a suspended target
+already blocks. Repository policy can still strengthen it to Critical or lower
+it explicitly; Renma never propagates suspension or rewrites the dependent.
+
 ## Diagnostic and Rule Evolution during 1.x
 
 Diagnostic behavior is a compatibility surface distinct from wire

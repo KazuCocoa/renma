@@ -1,6 +1,6 @@
 import type { Diagnostic } from "./types/diagnostics.js";
 
-/** Stable scan finding identifiers emitted by Renma rules. */
+/** Stable Renma diagnostic identities, including raw-only and scan-Finding IDs. */
 export const DIAGNOSTIC_IDS = {
   COMPOSITION_DECLARED_CONFLICT: "COMPOSITION-DECLARED-CONFLICT",
   COMPOSITION_OPTIONAL_CONFLICT: "COMPOSITION-OPTIONAL-CONFLICT",
