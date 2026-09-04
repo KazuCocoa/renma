@@ -8,6 +8,7 @@ import {
   type ParseError,
 } from "jsonc-parser";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
+import { isConfigurableDiagnosticFindingId } from "./diagnostic-default-severity.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   REQUIRED_METADATA_POLICY_FIELDS,
@@ -522,6 +523,11 @@ function diagnosticsPolicy(value: unknown): ScanConfig["diagnostics"] {
     if (!knownIds.has(id)) {
       throw new ConfigError(
         `diagnostics.severity contains unknown diagnostic id ${JSON.stringify(id)}. Use a stable id from Renma's diagnostic registry.`,
+      );
+    }
+    if (!isConfigurableDiagnosticFindingId(id)) {
+      throw new ConfigError(
+        `diagnostics.severity does not support ${JSON.stringify(id)} because it is not a configurable scan Finding.`,
       );
     }
     severity[id] = enumValue(

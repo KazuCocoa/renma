@@ -1295,6 +1295,13 @@ const RULES = {
   },
 } satisfies Record<string, RuleMetadata>;
 
+/** Stable Finding identities owned by the security rule-definition registry. */
+export const SECURITY_RULE_FINDING_DIAGNOSTIC_IDS = Object.freeze(
+  Object.values(RULES)
+    .map((rule) => rule.id)
+    .sort(compareUtf16CodeUnits),
+);
+
 const FORBIDDEN_INPUT_ACTION_PATTERN =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
 const SAFE_FORBIDDEN_INPUT_PATTERN =

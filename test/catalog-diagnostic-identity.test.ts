@@ -12,6 +12,10 @@ import {
   catalogDiagnosticDefaultFindingSeverity,
   catalogDiagnosticFindings,
 } from "../src/catalog-findings.js";
+import {
+  diagnosticDefaultSeverity,
+  diagnosticFindingSeverityDefinition,
+} from "../src/diagnostic-default-severity.js";
 import { createScanDiagnostics } from "../src/scan-diagnostics.js";
 import {
   DIAGNOSTIC_IDS,
@@ -44,6 +48,7 @@ test("every known metadata diagnostic has a registered code conversion", () => {
   );
   for (const code of CATALOG_FINDING_DIAGNOSTIC_CODES) {
     assert.ok(registeredIds.has(code));
+    assert.ok(diagnosticFindingSeverityDefinition(code), code);
     const finding = catalogDiagnosticFindings([
       codedDiagnostic(code, "wording"),
     ]);
@@ -290,7 +295,7 @@ when_not_to_use: current guidance
     [],
   );
   for (const code of CATALOG_FINDING_DIAGNOSTIC_CODES) {
-    const registeredDefault = catalogDiagnosticDefaultFindingSeverity(code);
+    const registeredDefault = diagnosticDefaultSeverity(code);
     if (registeredDefault === undefined) continue;
     const producedSeverities = new Set(
       catalogDiagnosticFindings(

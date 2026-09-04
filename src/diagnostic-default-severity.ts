@@ -1,15 +1,26 @@
-import { catalogDiagnosticDefaultFindingSeverity } from "./catalog-findings.js";
+import {
+  CATALOG_FINDING_DIAGNOSTIC_CODES,
+  catalogDiagnosticDefaultFindingSeverity,
+} from "./catalog-findings.js";
+import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { DIAGNOSTIC_IDS, type DiagnosticId } from "./diagnostic-ids.js";
 import type { Severity } from "./types/diagnostics.js";
 
+export type DiagnosticFindingDefaultSeverity = Severity | "variable";
+
+export interface DiagnosticFindingSeverityDefinition {
+  configurable: true;
+  defaultSeverity: DiagnosticFindingDefaultSeverity;
+}
+
 /*
- * Fixed-severity producers without an existing definition registry. IDs whose
- * built-in Finding severity varies by evidence or repository policy are
- * intentionally absent and resolve to undefined so CI requires review rather
- * than guessing a direction.
+ * Finding producers without their own definition registry. This is not an
+ * observational snapshot: applyDiagnosticSeverityPolicy verifies every
+ * emitted Finding against these definitions before applying an override.
+ * Fixed producer changes therefore cannot silently drift from policy diff.
  */
-const FIXED_DIRECT_FINDING_SEVERITIES: Readonly<
-  Partial<Record<DiagnosticId, Severity>>
+const DIRECT_FINDING_DEFAULT_SEVERITIES: Readonly<
+  Partial<Record<DiagnosticId, DiagnosticFindingDefaultSeverity>>
 > = {
   [DIAGNOSTIC_IDS.COMPOSITION_DECLARED_CONFLICT]: "medium",
   [DIAGNOSTIC_IDS.COMPOSITION_OPTIONAL_CONFLICT]: "low",
@@ -55,6 +66,8 @@ const FIXED_DIRECT_FINDING_SEVERITIES: Readonly<
   [DIAGNOSTIC_IDS.QUAL_SHORT_DESCRIPTION]: "low",
   [DIAGNOSTIC_IDS.QUAL_SKILL_DESCRIPTION_HIGH_RISK_LITERAL]: "medium",
   [DIAGNOSTIC_IDS.QUAL_SKILL_MIXED_RESPONSIBILITY]: "low",
+  [DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET]: "variable",
+  [DIAGNOSTIC_IDS.QUAL_SUPPORT_ASSET_TOKEN_BUDGET]: "variable",
   [DIAGNOSTIC_IDS.QUAL_USER_LOCAL_PATHS]: "medium",
   [DIAGNOSTIC_IDS.SEC_BODY_POLICY_CONTRADICTION]: "high",
   [DIAGNOSTIC_IDS.SEC_BULK_DATA_SHARING_INSTRUCTION]: "medium",
@@ -64,26 +77,34 @@ const FIXED_DIRECT_FINDING_SEVERITIES: Readonly<
   [DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND]: "high",
   [DIAGNOSTIC_IDS.SEC_ENV_COPY]: "medium",
   [DIAGNOSTIC_IDS.SEC_EXECUTABLE_AS_POLICY_AUTHORITY]: "medium",
+  [DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION]: "variable",
   [DIAGNOSTIC_IDS.SEC_FORBIDDEN_INPUT_INSTRUCTION]: "high",
+  [DIAGNOSTIC_IDS.SEC_HIDDEN_FRONTMATTER_INSTRUCTION]: "variable",
+  [DIAGNOSTIC_IDS.SEC_HIDDEN_OPERATIONAL_INSTRUCTION]: "variable",
   [DIAGNOSTIC_IDS.SEC_INSTRUCTION_HIERARCHY_OVERRIDE]: "medium",
   [DIAGNOSTIC_IDS.SEC_INSTRUCTION_VIOLATES_POLICY]: "high",
   [DIAGNOSTIC_IDS.SEC_INVALID_CANONICAL_POLICY_METADATA]: "high",
   [DIAGNOSTIC_IDS.SEC_INVALID_RENMA_POLICY_METADATA]: "high",
   [DIAGNOSTIC_IDS.SEC_LITERAL_SECRET]: "high",
   [DIAGNOSTIC_IDS.SEC_MISSING_HUMAN_APPROVAL_GUARD]: "medium",
+  [DIAGNOSTIC_IDS.SEC_MISSING_POLICY_METADATA]: "variable",
   [DIAGNOSTIC_IDS.SEC_NO_REDACTION_INSTRUCTION]: "high",
   [DIAGNOSTIC_IDS.SEC_OVERBROAD_CONTEXT_INSTRUCTION]: "medium",
   [DIAGNOSTIC_IDS.SEC_POLICY_CONTRADICTION]: "high",
   [DIAGNOSTIC_IDS.SEC_POLICY_OVERRIDE_CONTRADICTION]: "high",
   [DIAGNOSTIC_IDS.SEC_POLICY_PROFILE_CYCLE]: "high",
   [DIAGNOSTIC_IDS.SEC_POLICY_PROFILE_NOT_FOUND]: "high",
+  [DIAGNOSTIC_IDS.SEC_PREDICTABLE_TEMP_PATH]: "variable",
   [DIAGNOSTIC_IDS.SEC_PRIVATE_KEY]: "critical",
   [DIAGNOSTIC_IDS.SEC_PRIVILEGED_COMMAND_WITHOUT_GUARD]: "medium",
   [DIAGNOSTIC_IDS.SEC_REMOTE_DEFAULT]: "medium",
+  [DIAGNOSTIC_IDS.SEC_RISKY_OPERATION_ERROR_SUPPRESSION]: "variable",
   [DIAGNOSTIC_IDS.SEC_SAFEGUARD_BYPASS_INSTRUCTION]: "medium",
+  [DIAGNOSTIC_IDS.SEC_SECRET_MATERIAL_INSTRUCTION]: "variable",
   [DIAGNOSTIC_IDS.SEC_SENSITIVE_FILE_REFERENCE]: "high",
   [DIAGNOSTIC_IDS.SEC_SUSPICIOUS_BIDI_CONTROL]: "high",
   [DIAGNOSTIC_IDS.SEC_SUSPICIOUS_INVISIBLE_CHARACTER]: "medium",
+  [DIAGNOSTIC_IDS.SEC_UNBOUNDED_EXTERNAL_SOURCE_TRAVERSAL]: "variable",
   [DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION]: "high",
   [DIAGNOSTIC_IDS.SEC_UNAPPROVED_UPLOAD_DESTINATION]: "high",
   [DIAGNOSTIC_IDS.SEC_UNPINNED_DEPENDENCY_INSTALL]: "medium",
@@ -100,12 +121,85 @@ const FIXED_DIRECT_FINDING_SEVERITIES: Readonly<
   [DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_SCRIPT]: "low",
 };
 
+const CATALOG_FINDING_IDS = [
+  DIAGNOSTIC_IDS.META_CATALOG_DIAGNOSTIC,
+  ...CATALOG_FINDING_DIAGNOSTIC_CODES,
+] as const;
+
+/** The complete repository-configurable scan-Finding severity surface. */
+export const DIAGNOSTIC_FINDING_SEVERITY_DEFINITIONS: Readonly<
+  Partial<Record<DiagnosticId, DiagnosticFindingSeverityDefinition>>
+> = Object.freeze(
+  Object.fromEntries([
+    ...CATALOG_FINDING_IDS.map((diagnosticId) => [
+      diagnosticId,
+      definition(
+        catalogDiagnosticDefaultFindingSeverity(diagnosticId) ?? "variable",
+      ),
+    ]),
+    ...Object.entries(DIRECT_FINDING_DEFAULT_SEVERITIES).map(
+      ([diagnosticId, defaultSeverity]) => [
+        diagnosticId,
+        definition(defaultSeverity),
+      ],
+    ),
+  ]),
+);
+
+export const CONFIGURABLE_DIAGNOSTIC_FINDING_IDS = Object.freeze(
+  Object.keys(DIAGNOSTIC_FINDING_SEVERITY_DEFINITIONS).sort(
+    compareUtf16CodeUnits,
+  ),
+);
+
+export function diagnosticFindingSeverityDefinition(
+  diagnosticId: string,
+): DiagnosticFindingSeverityDefinition | undefined {
+  return DIAGNOSTIC_FINDING_SEVERITY_DEFINITIONS[diagnosticId as DiagnosticId];
+}
+
+export function isConfigurableDiagnosticFindingId(
+  diagnosticId: string,
+): boolean {
+  return diagnosticFindingSeverityDefinition(diagnosticId) !== undefined;
+}
+
 /** Resolve built-in scan-Finding severity independently of scan occurrence. */
 export function diagnosticDefaultSeverity(
   diagnosticId: string,
 ): Severity | undefined {
-  return (
-    catalogDiagnosticDefaultFindingSeverity(diagnosticId) ??
-    FIXED_DIRECT_FINDING_SEVERITIES[diagnosticId as DiagnosticId]
-  );
+  const defaultSeverity =
+    diagnosticFindingSeverityDefinition(diagnosticId)?.defaultSeverity;
+  return defaultSeverity === "variable" ? undefined : defaultSeverity;
+}
+
+/**
+ * Resolve and verify the producer's built-in severity before repository policy
+ * is applied. Variable definitions intentionally retain emitted evidence.
+ */
+export function verifiedDiagnosticFindingSeverity(
+  diagnosticId: string,
+  emittedSeverity: Severity,
+): Severity {
+  const severityDefinition = diagnosticFindingSeverityDefinition(diagnosticId);
+  if (!severityDefinition) {
+    throw new Error(
+      `Scan Finding ${JSON.stringify(diagnosticId)} has no configurable severity definition.`,
+    );
+  }
+  if (
+    severityDefinition.defaultSeverity !== "variable" &&
+    severityDefinition.defaultSeverity !== emittedSeverity
+  ) {
+    throw new Error(
+      `Scan Finding ${JSON.stringify(diagnosticId)} emitted ${JSON.stringify(emittedSeverity)} but its registered built-in severity is ${JSON.stringify(severityDefinition.defaultSeverity)}.`,
+    );
+  }
+  return emittedSeverity;
+}
+
+function definition(
+  defaultSeverity: DiagnosticFindingDefaultSeverity,
+): DiagnosticFindingSeverityDefinition {
+  return { configurable: true, defaultSeverity };
 }

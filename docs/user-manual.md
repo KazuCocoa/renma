@@ -1349,9 +1349,12 @@ The configuration supports the same names used by the implementation, including:
   are non-blocking solely as policy transitions. A decrease in findings caused
   by requirement removal is policy weakening, not verified remediation.
 - `diagnostics`: repository-wide effective severity policy for scan findings,
-  keyed by stable diagnostic ID. Supported keys are `severity` and
-  `ci_policy`; unknown keys, unknown diagnostic IDs, and values outside `low`,
-  `medium`, `high`, and `critical` are configuration errors. `severity`
+  keyed by stable configurable Finding ID. Supported keys are `severity` and
+  `ci_policy`; unknown keys, unknown diagnostic IDs, stable IDs that do not
+  identify configurable scan Findings, and values outside `low`, `medium`,
+  `high`, and `critical` are configuration errors. Raw discovery and
+  configuration diagnostics retain their separate `error | warning | info`
+  path. `severity`
   defaults to `{}`, so repositories without this section retain producer
   severities and existing scan behavior. `ci_policy` supports `off`, `warn`,
   and `fail` and defaults to `fail`. Lowering an override, removing an

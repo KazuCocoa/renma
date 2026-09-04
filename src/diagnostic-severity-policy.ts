@@ -1,5 +1,6 @@
 import type { DiagnosticsConfig } from "./types/configuration.js";
 import type { Finding } from "./types/diagnostics.js";
+import { verifiedDiagnosticFindingSeverity } from "./diagnostic-default-severity.js";
 
 export const REPOSITORY_SEVERITY_SOURCE = "repository_configuration" as const;
 
@@ -13,6 +14,10 @@ export function applyDiagnosticSeverityPolicy(
   policy: DiagnosticsConfig,
 ): Finding[] {
   return findings.map((finding) => {
+    const defaultSeverity = verifiedDiagnosticFindingSeverity(
+      finding.id,
+      finding.severity,
+    );
     const effectiveSeverity = policy.severity[finding.id];
     if (effectiveSeverity === undefined) return finding;
     return {
@@ -20,7 +25,7 @@ export function applyDiagnosticSeverityPolicy(
       severity: effectiveSeverity,
       details: {
         ...(finding.details ?? {}),
-        defaultSeverity: finding.severity,
+        defaultSeverity,
         severitySource: REPOSITORY_SEVERITY_SOURCE,
       },
     };

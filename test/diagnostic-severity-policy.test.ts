@@ -4,7 +4,13 @@ import test from "node:test";
 import { ConfigError, loadConfig } from "../src/config.js";
 import { ciReport, formatCiReport } from "../src/commands/ci-report.js";
 import { runScanCommand } from "../src/commands/scan.js";
-import { diagnosticDefaultSeverity } from "../src/diagnostic-default-severity.js";
+import {
+  CONFIGURABLE_DIAGNOSTIC_FINDING_IDS,
+  DIAGNOSTIC_FINDING_SEVERITY_DEFINITIONS,
+  diagnosticDefaultSeverity,
+  diagnosticFindingSeverityDefinition,
+  verifiedDiagnosticFindingSeverity,
+} from "../src/diagnostic-default-severity.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import {
   buildDiagnosticSeverityPolicyDiff,
@@ -16,6 +22,7 @@ import {
 } from "../src/diagnostic-severity-ci-policy.js";
 import { formatJson, formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
+import { SECURITY_RULE_FINDING_DIAGNOSTIC_IDS } from "../src/security-diagnostics.js";
 import type {
   DiagnosticsCiPolicyMode,
   DiagnosticsConfig,
@@ -33,6 +40,37 @@ test("diagnostic defaults resolve statically without repository findings", () =>
   assert.equal(
     diagnosticDefaultSeverity(DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET),
     undefined,
+  );
+  assert.deepEqual(
+    diagnosticFindingSeverityDefinition(DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET),
+    { configurable: true, defaultSeverity: "variable" },
+  );
+});
+
+test("every configurable Finding severity definition uses a stable diagnostic ID", () => {
+  const stableIds = new Set<string>(Object.values(DIAGNOSTIC_IDS));
+  assert.deepEqual(
+    CONFIGURABLE_DIAGNOSTIC_FINDING_IDS,
+    Object.keys(DIAGNOSTIC_FINDING_SEVERITY_DEFINITIONS).sort(),
+  );
+  for (const diagnosticId of CONFIGURABLE_DIAGNOSTIC_FINDING_IDS) {
+    assert.ok(stableIds.has(diagnosticId), diagnosticId);
+  }
+});
+
+test("the security Finding registry is covered by the configurable severity authority", () => {
+  for (const diagnosticId of SECURITY_RULE_FINDING_DIAGNOSTIC_IDS) {
+    assert.ok(
+      DIAGNOSTIC_FINDING_SEVERITY_DEFINITIONS[diagnosticId],
+      diagnosticId,
+    );
+  }
+});
+
+test("fixed Finding producers cannot drift from the severity authority", () => {
+  assert.throws(
+    () => verifiedDiagnosticFindingSeverity(HIGH_ID, "medium"),
+    /emitted "medium" but its registered built-in severity is "high"/,
   );
 });
 
@@ -163,6 +201,17 @@ test("diagnostic severity policy validates its closed configuration", async (t) 
       "unknown diagnostic id",
       { diagnostics: { severity: { "META-TYPO-DOES-NOT-EXIST": "high" } } },
       /unknown diagnostic id "META-TYPO-DOES-NOT-EXIST"/,
+    ],
+    [
+      "known non-Finding diagnostic id",
+      {
+        diagnostics: {
+          severity: {
+            [DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT]: "high",
+          },
+        },
+      },
+      /diagnostics\.severity does not support "DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT" because it is not a configurable scan Finding/,
     ],
     [
       "unknown diagnostics key",

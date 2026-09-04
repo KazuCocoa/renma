@@ -92,6 +92,10 @@ may add the corresponding optional evaluation. Existing documents without
 configured severity policy retain their established shape, so these additions
 do not require new top-level schema identifiers.
 
+Only stable IDs registered on the configurable scan-Finding surface are valid
+keys. Stable raw diagnostic IDs are rejected at configuration load time because
+this policy does not alter their transport severity.
+
 Diagnostic severity-policy changes compare effective severities resolved from
 the repository override or the static built-in authority; they do not infer a
 default from findings observed in either snapshot. The change direction may be

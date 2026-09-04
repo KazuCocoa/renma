@@ -26,8 +26,10 @@ renma uses two severity systems:
 In JSON output, diagnostics usually appear as structured objects with a `severity`, a `message`, and, when available, a `path`.
 
 Repository configuration can set an effective scan-finding severity by stable
-ID through `diagnostics.severity`. Producer definitions remain unchanged. When
-an override applies, scan JSON retains the effective value as
+configurable Finding ID through `diagnostics.severity`. IDs that exist only as
+raw discovery/configuration diagnostics are rejected because this policy does
+not affect their `error | warning | info` path. Producer definitions remain
+unchanged. When an override applies, scan JSON retains the effective value as
 `details.findingSeverity` and adds `details.defaultSeverity` plus
 `details.severitySource: "repository_configuration"`. The v2
 `error | warning | info` transport severity continues to be derived from the

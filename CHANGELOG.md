@@ -18,7 +18,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   compares effective values for both added and removed overrides, represents
   equal transitions as neutral, and requires review when the built-in severity
   cannot be resolved to one static value. Existing catalog `error` diagnostics
-  retain their established High scan-Finding conversion.
+  retain their established High scan-Finding conversion. Configuration now
+  accepts only IDs registered on the configurable scan-Finding surface and
+  rejects stable raw-diagnostic IDs that the policy cannot affect.
 
 ## [0.37.2] - 2026-09-02
 
