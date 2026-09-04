@@ -263,6 +263,41 @@ test("inactive source Skills retain declarations but cannot create usable routes
   );
 });
 
+test("an active continuation to a revoked Skill stays resolved but unusable", () => {
+  const discovery = prepare([
+    skill("skills/source/SKILL.md", {
+      id: "skill.source",
+      status: "stable",
+      routes: ["skill.revoked"],
+    }),
+    skill("skills/revoked/SKILL.md", {
+      id: "skill.revoked",
+      status: "revoked",
+      extraMetadata: [
+        "  renma.status-reason: Explicitly revoked after a known correctness failure.",
+        '  renma.status-changed-at: "2026-09-03"',
+      ],
+    }),
+  ]);
+  const route = discovery.routes[0];
+  const diagnostic = discovery.diagnostics.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_REVOKED_ROUTE_TARGET,
+  );
+
+  assert.equal(route?.resolution, "resolved");
+  assert.equal(route?.usable, false);
+  assert.deepEqual(route?.usabilityReasons, ["inactive-target"]);
+  assert.equal(diagnostic?.severity, "error");
+  assert.equal(
+    discovery.diagnostics.some(
+      (item) =>
+        item.code === DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET ||
+        item.code === DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET,
+    ),
+    false,
+  );
+});
+
 test("a duplicate-ID source retains declarations but cannot create a usable route", () => {
   const discovery = prepare([
     skill("skills/source/SKILL.md", {
@@ -786,6 +821,36 @@ test("publication rejection preserves invalid, inactive, and duplicate identity 
         item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
     ).length,
     2,
+  );
+});
+
+test("a revoked published Skill emits only the dedicated revocation diagnostic", () => {
+  const discovery = prepare([
+    skill("skills/revoked/SKILL.md", {
+      id: "skill.revoked",
+      status: "revoked",
+      published: true,
+      extraMetadata: [
+        "  renma.status-reason: Explicitly revoked after a known policy violation.",
+        '  renma.status-changed-at: "2026-09-03"',
+      ],
+    }),
+  ]);
+  const diagnostic = discovery.diagnostics.find(
+    (item) =>
+      item.code === DIAGNOSTIC_IDS.DISCOVERY_REVOKED_PUBLISHED_ENTRYPOINT,
+  );
+
+  assert.equal(diagnostic?.severity, "error");
+  assert.equal(discovery.skills[0]?.publication.requested, true);
+  assert.equal(discovery.skills[0]?.publication.accepted, false);
+  assert.equal(
+    discovery.diagnostics.some(
+      (item) =>
+        item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT ||
+        item.code === DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT,
+    ),
+    false,
   );
 });
 

@@ -7,6 +7,7 @@ import {
   createScanDiagnostics,
   createReviewBundles,
 } from "../src/scan-diagnostics.js";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -275,6 +276,31 @@ test("Context Lens target bundles use structured source and target facts", async
   assert.equal(bundle.id, "unknown-reference:lenses/testing/spec-review.md");
   assert.ok(bundle.affectedAssets?.includes("context.testing.missing"));
   assert.deepEqual(bundle.affectedFiles, ["lenses/testing/spec-review.md"]);
+});
+
+test("revoked dependency and route diagnostics use dependency-review bundles", () => {
+  for (const code of [
+    DIAGNOSTIC_IDS.META_REQUIRED_REVOKED_DEPENDENCY,
+    DIAGNOSTIC_IDS.META_OPTIONAL_REVOKED_DEPENDENCY,
+    DIAGNOSTIC_IDS.DISCOVERY_REVOKED_ROUTE_TARGET,
+  ]) {
+    const bundle = bundleWithCode(
+      createReviewBundles([
+        {
+          version: 2,
+          code,
+          severity: "error",
+          message: "Revoked dependency requires review.",
+          location: { path: "skills/source/SKILL.md" },
+          details: { sourcePath: "skills/source/SKILL.md" },
+        },
+      ]),
+      code,
+    );
+
+    assert.match(bundle.id, /^dependency-review:/, code);
+    assert.doesNotMatch(bundle.id, /^code-review:/, code);
+  }
 });
 
 test("suppressed findings are omitted from diagnostics v2 and review bundles", async () => {
