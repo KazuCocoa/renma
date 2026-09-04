@@ -22,6 +22,7 @@ import type {
 import { RepositoryFixture } from "./repository-fixture.js";
 
 const ID = DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY;
+const HIGH_ID = DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING;
 
 test("diagnostic severity policy elevates a finding centrally and gates fail_on", async (t) => {
   const fixture = await suspendedDependencyFixture(t);
@@ -60,6 +61,54 @@ test("diagnostic severity policy elevates a finding centrally and gates fail_on"
   assert.equal(command.code, 1);
   assert.equal(await fixture.read("skills/source/SKILL.md"), sourceBefore);
   assert.equal(await fixture.read("contexts/suspended.md"), targetBefore);
+});
+
+test("diagnostic severity policy lowers a built-in high finding for output and fail_on", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("demo");
+  await fixture.writeConfig({
+    fail_on: "high",
+    metadata: { required: ["owner"] },
+  });
+
+  const baseline = await scan(fixture.root);
+  const baselineFinding = baseline.findings.find(
+    (finding) =>
+      finding.id === HIGH_ID && finding.details?.requiredField === "owner",
+  );
+  assert.equal(baselineFinding?.severity, "high");
+  assert.equal(
+    (await captureStdout(() => runScanCommand(fixture.root, {}, {}))).code,
+    1,
+  );
+
+  await fixture.writeConfig({
+    fail_on: "high",
+    metadata: { required: ["owner"] },
+    diagnostics: { severity: { [HIGH_ID]: "low" } },
+  });
+  const result = await scan(fixture.root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === HIGH_ID && candidate.details?.requiredField === "owner",
+  );
+  const diagnostic = result.diagnostics.find(
+    (candidate) => candidate.code === HIGH_ID,
+  );
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.details?.defaultSeverity, "high");
+  assert.equal(finding?.details?.severitySource, "repository_configuration");
+  assert.equal(diagnostic?.severity, "warning");
+  assert.equal(diagnostic?.details?.findingSeverity, "low");
+  assert.equal(diagnostic?.details?.defaultSeverity, "high");
+  assert.match(formatText(result), new RegExp(`LOW ${HIGH_ID}`));
+  assert.match(formatJson(result), /"findingSeverity": "low"/);
+  assert.match(formatJson(result), /"defaultSeverity": "high"/);
+  assert.equal(
+    (await captureStdout(() => runScanCommand(fixture.root, {}, {}))).code,
+    0,
+  );
 });
 
 test("diagnostic severity policy parses equivalently from JSON and JSONC", async (t) => {
