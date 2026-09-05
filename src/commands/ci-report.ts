@@ -1320,26 +1320,40 @@ function formatDiagnosticSeverityPolicySection(
   changes: readonly DiagnosticSeverityPolicyChange[],
 ): string[] {
   const { from, to, effective } = policy.configured;
+  const impact = [
+    ...(policy.severityChanges.tightenings > 0
+      ? [
+          "Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
+        ]
+      : []),
+    ...(policy.matchCount > 0
+      ? [
+          effective === "off"
+            ? "CI status effect: none — gate disabled."
+            : `CI status effect: ${policy.outcome.toUpperCase()} — effective CI review policy: ${effective}.`,
+        ]
+      : []),
+  ];
   return [
     "## Diagnostic Severity Policy",
     "",
-    `- Configured CI review policy: ${from} -> ${to}`,
-    `- Effective CI review policy: ${effective}`,
-    `- Policy outcome: ${policy.outcome.toUpperCase()}`,
-    `- Mode-transition direction: ${policy.modeTransition.direction}`,
-    `- Severity weakenings: ${policy.severityChanges.weakenings}`,
-    `- Severity strengthenings: ${policy.severityChanges.tightenings}`,
-    `- Severity neutral changes: ${policy.severityChanges.neutrals}`,
-    `- Severity review-required changes: ${policy.severityChanges.reviewRequired}`,
-    `- Evaluator matches: ${policy.matchCount}`,
-    ...(effective === "off" && policy.matchCount > 0
-      ? ["- CI status effect: none — gate disabled"]
+    ...(changes.length > 0
+      ? [
+          "Configuration keys: `diagnostics.severity.<Diagnostic>`.",
+          "",
+          "| Diagnostic | Previous | Current | Change |",
+          "| --- | --- | --- | --- |",
+          ...changes
+            .slice(0, MAX_LIST_ITEMS)
+            .map(formatDiagnosticSeverityPolicyChange),
+          "",
+        ]
       : []),
-    "",
-    ...changes
-      .slice(0, MAX_LIST_ITEMS)
-      .map((change) => `- ${formatDiagnosticSeverityPolicyChange(change)}`),
+    ...(impact.length > 0 ? [`> ${impact.join(" ")}`, ""] : []),
     ...formatOverflow(changes.length),
+    `- Configured CI review policy: ${from} -> ${to}; Effective CI review policy: ${effective}; Policy outcome: ${policy.outcome.toUpperCase()}`,
+    `- Mode-transition direction: ${policy.modeTransition.direction}; Evaluator matches: ${policy.matchCount}`,
+    `- Severity weakenings: ${policy.severityChanges.weakenings}; Severity strengthenings: ${policy.severityChanges.tightenings}; Severity neutral changes: ${policy.severityChanges.neutrals}; Severity review-required changes: ${policy.severityChanges.reviewRequired}`,
   ];
 }
 
@@ -1348,15 +1362,19 @@ function formatDiagnosticSeverityPolicyChange(
 ): string {
   const direction =
     change.direction === "weakening"
-      ? "WEAKENING"
+      ? "↓ WEAKENING"
       : change.direction === "tightening"
-        ? "tightening"
+        ? "↑ tightening"
         : change.direction === "neutral"
           ? "neutral"
           : "REVIEW REQUIRED";
   const from = change.from.severity ?? "unknown producer default";
   const to = change.to.severity ?? "unknown producer default";
-  return `${direction}: ${formatMarkdownInlineCode(change.diagnosticId)} ${from} (${change.from.source}) -> ${to} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
+  const diagnostic = formatMarkdownInlineCode(change.diagnosticId).replaceAll(
+    "|",
+    "\\|",
+  );
+  return `| ${diagnostic} | ${from} (${change.from.source}) | ${to} (${change.to.source}) | ${direction} |`;
 }
 
 function formatMetadataPolicyEndpoint(
