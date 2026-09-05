@@ -13,6 +13,13 @@ export const RENMA_FIRST_AUTHORING_BOUNDARY =
 export const SKILL_AUTHORING_GUIDE_SCHEMA_VERSION =
   "renma.skill-authoring-guide.v2" as const;
 
+export const AUTHORING_VALIDATION_RULE =
+  "After authoring or changes, run `renma scan . --fail-on high` and all repository-required checks for the current change and stage.";
+export const AUTHORING_REPORTS_RULE =
+  "Beyond required checks, use `renma inspect`, `renma catalog`, `renma graph`, or `renma readiness` only when they answer a current structural or governance question.";
+export const AUTHORING_REVALIDATION_RULE =
+  "After relevant checks pass, repeat or broaden validation only for further changes, failed checks, or unresolved concerns. Reuse existing evidence only while it remains applicable to the current content, environment, and required scope. Required CI and release checks still apply.";
+
 export interface SkillAuthoringProgressionClasses {
   blocking: string;
   reversibleDefault: string;
@@ -247,15 +254,16 @@ export function buildSkillAuthoringGuidance(
           "Preserve an evidence-backed runtime task unknown in the finished Skill's current-stage output with its impact or risk instead of requiring immediate resolution. Reassess it at meaningful stage transitions.",
       },
       questionRules: [
-        "Before asking, investigate whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default; ask only about an unresolved Blocking authoring decision when human truth or unavailable source content is still required. If no Blocking decision remains, clarification is not required.",
+        "Authoring requirements govern evidence, authority, ownership, security, asset boundaries, completion, and the handoff contract. Decision tables, question themes, and progress-summary formats are optional working aids, not additional gate requirements; preserve the distinctions they explain without prescribing an internal reasoning process.",
+        "Before asking, investigate whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default. Use existing decisions and authorizations only while they remain applicable to the same scope and action; preserve any requirement for separate or immediate approval. Ask only about an unresolved Blocking authoring decision that cannot be resolved through applicable evidence or an authorized reversible choice and still requires human truth or unavailable source content. If no Blocking decision remains, clarification is not required.",
         "In an existing repository, use only commands that answer the current question, such as `renma scan . --fail-on high --format json`, `renma catalog . --format json`, `renma inspect <relevant-file> --format json`, or `renma graph . --focus <relevant-id-or-path> --format json`; do not make every command mandatory ceremony.",
         "Look for an existing Skill that owns the workflow, reusable Context Assets, naming and ownership evidence, security profiles, nearby validated examples, and conflicting or unhealthy conventions before asking questions those sources can answer.",
-        "Preserve raw unknowns and their evidence, group related items by the decision they depend on, prioritize themes by risk and downstream impact, ask only about Blocking themes, keep non-blocking themes as findings or Deferred items, and expand an individual item only when the distinction materially changes the result. For a service workflow, timeout, retry, partial success, and rollback may form one failure-handling theme. For a review workflow, unclear authority, missing evidence, and unresolved acceptance criteria may form one decision theme.",
+        "Preserve unknowns and their evidence. When grouping helps resolve several related items, group related items by the decision they depend on and prioritize themes by risk and downstream impact. Keep non-blocking items as findings or Deferred decisions, and expand an individual item only when the distinction materially changes the result. For a service workflow, timeout, retry, partial success, and rollback may form one failure-handling theme. For a review workflow, unclear authority, missing evidence, and unresolved acceptance criteria may form one decision theme.",
         "Retain the complete current set of unresolved and proposed decisions with separate progression classifications in temporary authoring state. Do not hide a Blocking decision or relabel it Deferred merely because it is not being asked about yet; present enough of the state for the user to understand material blockers and progress, without requiring the complete set to be repeated in every response.",
         "Do not ask for a downstream authoring decision when a meaningful answer depends on an unresolved upstream authoring decision. Resolve or investigate the prerequisite first. The consuming LLM may use any temporary reasoning or dependency-tracking strategy that satisfies this rule; Renma requires no explicit decision graph, frontier, round-based algorithm, persisted state, or metadata.",
         "Prefer the smallest effective interaction. A small focused batch, often one to three closely related questions, is a useful default when several answerable Blocking decisions can be resolved together, but question count, batching, and turn structure are adaptive strategies rather than correctness requirements.",
         "Use a compact Current progression summary when it materially helps coordination or review, including relevant blockers, reversible defaults, and meaningful Deferred decisions; report material changes without mechanically repeating unchanged state.",
-        "Do not guess does not mean stop and ask about every unknown: never present missing truth as Confirmed, continue work that does not depend on it, preserve the unknown with evidence, report assumptions and uncertainty, ask only when it blocks the current stage, and never manufacture expected behavior merely to complete an output.",
+        "Do not guess does not mean stop and ask about every unknown: never present missing truth as Confirmed, continue work that does not depend on it, preserve the unknown with evidence, report assumptions and uncertainty, ask only when it blocks the current stage, and never manufacture expected behavior merely to complete an output. Continue independent investigation and preparation while a question is pending; the creation gate still blocks file creation until every requirement is established.",
         "Ask the author only about authoring decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire. Do not ask the author to resolve future repository mismatches or other runtime task unknowns that the finished Skill should detect, report, request, or handle safely.",
         "A runtime-stage blocker is execution behavior that the authored Skill must handle. It does not enter the authoring creation-gate blocker set merely because a future task instance may encounter it. Only an unresolved authoring decision about whether the Skill should ask, report, defer, or stop for that runtime blocker may block Skill creation.",
         "At each meaningful stage transition, when the workflow actually has stages, reassess unresolved decision themes. Treat a runtime task unknown as a runtime-stage blocker when the next execution stage depends on it, follow the Skill's authored ask, report, defer, or stop policy, and return it to Report as finding when a later requested output does not require resolution. Do not add the task-instance fact to the authoring creation-gate blocker set; re-enter authoring clarification only when the Skill's handling policy or asset boundary itself is unresolved.",
@@ -277,7 +285,7 @@ export function buildSkillAuthoringGuidance(
         "The creation gate may be declared passed and authoring may proceed only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.",
         "When proceeding, identify the reversible defaults being used and meaningful Deferred decisions, keep them Proposed or Unresolved rather than presenting them as Confirmed, do not ask for redundant confirmation after the user has authorized progress, and re-enter clarification if later evidence changes their impact.",
         "Before declaring the gate passed, identify and present the smallest proposed asset structure; ask for confirmation only for a meaningful discretionary boundary that remains uncertain.",
-        "Run the appropriate Renma scaffold commands, then refine generated content only within the established boundaries; re-enter this gate before changing those boundaries later.",
+        "Run the appropriate Renma scaffold commands, then refine generated content only within the established boundaries; re-enter this gate before changing those boundaries later. Platform-native Skill authoring guidance may refine trigger descriptions, instructions, workflow, constraints, completion criteria, and ambiguity-resolving examples within that agreed structure. Do not create a second target file through another generator.",
       ],
       postValidationActions: [
         "A finding is not a deterministic repair merely because its detection is deterministic.",
@@ -583,12 +591,14 @@ export function buildSkillAuthoringGuidance(
       },
     ],
     verification: [
-      "Run the Renma validation commands relevant to the authored or changed repository structure.",
-      "Use `renma scan . --fail-on high` to validate supported metadata, placement, relationships, workflow quality, repeated content, mixed responsibility, and security policy when those checks apply.",
-      "Use catalog, inspect, graph, readiness, or other available projections only when they answer a current structural or governance question; do not require every command as ceremony.",
+      AUTHORING_VALIDATION_RULE,
+      AUTHORING_REPORTS_RULE,
       "Inspect every created or reused asset and declared relationship to confirm that its responsibility, ownership, lifecycle, dependency semantics, and evidence agree with the reviewed authoring decisions.",
       "When a Context Asset, Context Lens, external source, script, security policy, or other optional structure exists, perform the additional verification appropriate to that structure.",
+      "Verify new or changed scripts and existing executable behavior affected by the change with relevant tests or observable checks. Do not execute unrelated or unchanged scripts solely because they exist. Report unavailable required validation and its impact; do not claim an unrun check passed.",
+      "Use external runtime evaluation for complex Skill behavior when the change, unresolved execution evidence, or repository requirements call for it. Use representative raw user prompts, outputs, and execution logs without leaking expected answers, diagnoses, or intended fixes to evaluation agents. Runtime evaluation stays outside Renma.",
       "Classify findings with the interaction protocol, apply only uniquely supported repairs, and rerun the relevant validation after changes.",
+      AUTHORING_REVALIDATION_RULE,
       "Have a human review semantic correctness, meaningful design decisions, authoritative evidence when applicable, and unresolved uncertainty. Clean deterministic output does not prove semantic correctness.",
     ],
   };

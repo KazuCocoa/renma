@@ -11,6 +11,9 @@ import {
   repositoryClassificationPath,
 } from "../discovery.js";
 import {
+  AUTHORING_REPORTS_RULE,
+  AUTHORING_REVALIDATION_RULE,
+  AUTHORING_VALIDATION_RULE,
   RENMA_FIRST_AUTHORING_BOUNDARY,
   SKILL_AUTHORING_PRINCIPLE,
 } from "../guidance/skill-authoring.js";
@@ -296,7 +299,7 @@ Move knowledge into a Context Asset under \`contexts/\` only when it has an inde
 
 ## Validation
 
-- Run \`renma scan\`, \`renma catalog\`, and \`renma graph\` before review.
+${renderAuthoringValidation()}
 `;
 }
 
@@ -345,7 +348,7 @@ ${RENMA_SCAFFOLD_PLACEHOLDERS.context.doesNotApplyWhen}
 
 ## Validation
 
-- Run \`renma scan\`, \`renma catalog\`, and \`renma graph\` before review.
+${renderAuthoringValidation()}
 `;
 }
 
@@ -397,7 +400,7 @@ Replace this section and every frontmatter placeholder. Explain why the declared
 ## Validation
 
 - Confirm that every \`applies_to\` target resolves to an existing Context Asset and that this Lens adds meaningful purpose-specific interpretation.
-- Run \`renma scan . --fail-on high\`, \`renma catalog . --format markdown\`, and \`renma graph . --focus ${metadata.id} --format mermaid\` after authoring.
+${renderAuthoringValidation()}
 `;
 }
 
@@ -459,7 +462,7 @@ ${input.content}\`\`\`
 
 ${
   input.kind === "skill"
-    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native Skill authoring guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, inspect catalog and graph evidence, address relevant findings, and rerun validation. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
+    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native Skill authoring guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
     : ""
 }Constraints:
 
@@ -480,7 +483,6 @@ ${contextLensGuidance.join("\n")}
 - Scaffold generation performs no network operations. A finished Skill may access a reviewed external source only when its authored workflow and effective security policy explicitly permit it.
 - Keep the asset LLM-facing and Renma-verifiable.
 - Renma reports its own exact generated Skill and Context starter markers as High findings. Replace every marker before the strict release/CI scan; this exact-marker check does not prove broader semantic completeness.
-- After creating files, run \`renma scan .\`, \`renma catalog . --format json\`, and \`renma graph . --focus ${input.id} --format mermaid\`.
 `;
 }
 
@@ -541,15 +543,25 @@ function promptList(items: readonly string[]): string {
     : "- None declared.";
 }
 
+function renderAuthoringValidation(): string {
+  return [
+    AUTHORING_VALIDATION_RULE,
+    AUTHORING_REPORTS_RULE,
+    AUTHORING_REVALIDATION_RULE,
+  ]
+    .map((rule) => `- ${rule}`)
+    .join("\n");
+}
+
 function renderSkillNextSteps(fromHandoff = false): string {
   if (fromHandoff) {
     return [
       "Next steps:",
       "1. Author within the supplied handoff's asset boundary without promoting Proposed or Unresolved state to Confirmed.",
       "2. Create supporting assets only through separate explicit scaffold commands when intended.",
-      "3. Re-enter clarification if new evidence creates a Blocking decision or changes the agreed asset boundary.",
-      "4. Run `renma scan . --fail-on high` and inspect catalog, graph, and readiness evidence; exact generated scaffold residue is a High finding.",
-      "5. Fix relevant findings and rerun validation.",
+      "3. Re-enter the creation gate if new evidence creates a Blocking decision or changes the agreed asset boundary; clarify only when human truth remains unresolved.",
+      `4. ${AUTHORING_VALIDATION_RULE} ${AUTHORING_REPORTS_RULE} Exact generated scaffold residue is a High finding.`,
+      `5. Fix relevant findings and rerun affected checks. ${AUTHORING_REVALIDATION_RULE}`,
       "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",
     ].join("\n");
   }
@@ -559,8 +571,8 @@ function renderSkillNextSteps(fromHandoff = false): string {
     "2. Scaffold or reuse only Context Assets justified by an independent maintenance or governance boundary.",
     "3. Complete the focused workflow and any evidence-backed security policy; use platform-native Skill authoring guidance only to refine semantics within Renma boundaries.",
     "4. Use `renma guide skill` again only when intentionally reconsidering the agreed asset boundaries.",
-    "5. Run `renma scan . --fail-on high` and inspect catalog and graph evidence; exact generated scaffold residue is a High finding.",
-    "6. Fix relevant findings and rerun validation.",
+    `5. ${AUTHORING_VALIDATION_RULE} ${AUTHORING_REPORTS_RULE} Exact generated scaffold residue is a High finding.`,
+    `6. Fix relevant findings and rerun affected checks. ${AUTHORING_REVALIDATION_RULE}`,
     "7. Have a human review meaningful semantic changes and unresolved decisions before merging.",
   ].join("\n");
 }

@@ -858,11 +858,13 @@ Recommended evidence-first preflight:
 2. Run `renma inspect <SKILL.md> --format json`.
 3. Inspect relevant local resources and referenced Context Assets.
 4. Use `renma suggest-metadata` only when retrofit or migration evidence exists.
-5. Prepare the smallest intended patch.
-6. Rerun `renma scan . --fail-on high --format json`.
-7. Stop without manufacturing work when `suggest-metadata` reports
-   `decisionStatus: "no-change-recommended"`; this currently uses
-   `suggestedMode: "no-proposal"`.
+5. When `suggest-metadata` reports `decisionStatus: "no-change-recommended"`
+   with `suggestedMode: "no-proposal"`, do not manufacture a metadata or
+   migration patch. Continue any separately requested Skill-body improvement;
+   stop only when no other intended work remains.
+6. Prepare the smallest intended patch.
+7. After changes, rerun `renma scan . --fail-on high --format json` and the
+   repository-required checks for the change and stage.
 8. Report unresolved human decisions.
 
 For one classification question, `renma inspect <target> --format json` may be
@@ -953,6 +955,11 @@ activities in any order, but it cannot declare the gate passed before the
 smallest justified asset structure and every other gate requirement are
 established.
 
+Evidence, authority, ownership, security, asset responsibilities, completion,
+and the handoff contract remain requirements. Decision tables, question themes,
+and progress-summary formats are optional working aids, not extra gate
+requirements. The handoff's structured fields remain unchanged.
+
 Renma creates and validates repository assets; the consuming agent follows the
 finished Skill later according to its own runtime behavior.
 
@@ -961,13 +968,18 @@ finished Skill later according to its own runtime behavior.
    Proposed, and Unresolved decisions from Blocking, Reversible default, and
    Deferred progression, and evaluates the creation gate. If the request and
    evidence establish every gate requirement, it proceeds without clarification.
-   Otherwise it asks only about unresolved Blocking authoring decisions that
-   still require human truth. Retain the complete Blocking set in temporary
-   authoring state rather than hiding blockers or relabeling them Deferred; show
+   Otherwise it uses applicable evidence, still-valid decisions and
+   authorizations, and authorized reversible defaults before asking only about
+   unresolved Blocking authoring decisions that still require human truth.
+   Existing authorization applies only to the same scope and action; preserve
+   any requirement for separate or immediate approval. Continue independent
+   investigation and preparation while waiting, but do not create files before
+   the gate passes. Retain the complete Blocking set in temporary authoring
+   state rather than hiding blockers or relabeling them Deferred; show
    enough state for the user to understand material blockers and progress. The
-   user need not provide a plan-quality specification. Repository evidence must be applicable,
-   effective, and unambiguous; supplied artifacts need clear provenance and
-   applicability; source content must be successfully consulted or supplied
+   user need not provide a plan-quality specification. Repository evidence must
+   be applicable, effective, and unambiguous; supplied artifacts need clear
+   provenance and applicability; source content must be successfully consulted or supplied
    rather than recalled from model memory.
 
    Classify unknown scope before progression. Ask now or retain only authoring
@@ -1080,14 +1092,23 @@ not make Renma choose runtime context for an agent.
 
 7. Run repository validation.
 
+After authoring or changes, run the scan and all repository-required checks for
+the current change and stage:
+
 ```bash
 renma scan . --fail-on high
+```
+
+Use additional views only when they answer a current structural or governance
+question, for example:
+
+```bash
 renma catalog . --format markdown
 renma graph . --format markdown
 renma readiness . --format markdown
 ```
 
-7. Fix relevant diagnostics and rerun the scan.
+8. Fix relevant diagnostics and rerun affected checks.
 
 Use `scan` for concrete problems, `catalog` for discovered assets and metadata,
 `graph` for Skill-to-Context relationships, and `readiness` for repository-level
@@ -1104,13 +1125,23 @@ review.
 Neither a clean scan nor a valid graph proves the external source is
 authoritative or accessible at runtime.
 
+Verify new or changed scripts and affected existing executable behavior with
+relevant tests or observable checks, rather than executing every script in the
+repository. Use external runtime evaluation for complex Skill behavior when
+the change, unresolved execution evidence, or repository requirements call for
+it. Report unavailable required checks and their impact. After relevant checks
+pass, repeat or broaden validation only for further changes, failed checks, or
+unresolved concerns. Existing evidence is reusable only while it applies to
+the current content, environment, and required scope. Required CI and release
+checks still apply.
+
 Persist only durable reviewed workflow, boundary, relationship, authority,
 fallback, metadata, and security decisions. Do not write the conversation
 transcript, temporary Confirmed / Proposed / Unresolved summary, rejected
 proposals, unanswered questions, or invented conversation-state metadata into
 the repository.
 
-8. Optionally generate a BOM for review or CI artifacts.
+9. Optionally generate a BOM for review or CI artifacts.
 
 ```bash
 renma bom . --format markdown

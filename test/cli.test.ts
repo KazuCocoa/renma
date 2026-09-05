@@ -2430,10 +2430,10 @@ test("scaffold context_lens writes deterministic file output", async () => {
   assert.match(content, /questions to ask, risks and checks to emphasize/);
   assert.match(content, /every `applies_to` target resolves/);
   assert.match(content, /renma scan \. --fail-on high/);
-  assert.match(content, /renma catalog \. --format markdown/);
+  assert.match(content, /`renma catalog`/);
   assert.match(
     content,
-    /renma graph \. --focus lens\.testing\.spec-review\.boundary-values --format mermaid/,
+    /`renma graph`[\s\S]*only when they answer a current structural or governance question/,
   );
   assert.doesNotMatch(content, /^version:/m);
 
@@ -2773,10 +2773,10 @@ test("scaffold context_lens prompt requires repository-grounded semantics", asyn
     /Keep the focused task and workflow in the Skill/,
   );
   assert.match(result.stdout, /renma scan \. --fail-on high/);
-  assert.match(result.stdout, /renma catalog \. --format markdown/);
+  assert.match(result.stdout, /`renma catalog`, `renma graph`/);
   assert.match(
     result.stdout,
-    /renma graph \. --focus lens\.testing\.quality-review --format mermaid/,
+    /only when they answer a current structural or governance question/,
   );
 });
 
@@ -2861,7 +2861,7 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
   assert.match(result.stdout, /Correctness importance alone is not sufficient/);
   assert.match(
     result.stdout,
-    /renma graph \. --focus testing\.spec-review --format mermaid/,
+    /`renma graph`[\s\S]*only when they answer a current structural or governance question/,
   );
   assert.doesNotMatch(result.stdout, /does\.not\.exist/);
   assert.match(result.stdout, /Do not invent owners/);

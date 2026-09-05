@@ -6,7 +6,13 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { main } from "../src/cli.js";
-import { buildSkillAuthoringGuidance } from "../src/guidance/skill-authoring.js";
+import { buildScaffoldBundle } from "../src/commands/scaffold.js";
+import {
+  AUTHORING_REPORTS_RULE,
+  AUTHORING_REVALIDATION_RULE,
+  AUTHORING_VALIDATION_RULE,
+  buildSkillAuthoringGuidance,
+} from "../src/guidance/skill-authoring.js";
 import {
   renderSkillGuideJson,
   renderSkillGuidePrompt,
@@ -280,12 +286,10 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
     decisionClasses: guidance.interaction.decisionClasses,
     unknownScopes: guidance.interaction.unknownScopes,
     progressionClasses: guidance.interaction.progressionClasses,
-    unresolvedItemDispositions: guidance.interaction.unresolvedItemDispositions,
     questionRules: guidance.interaction.questionRules,
     creationGate: guidance.interaction.creationGate,
     postValidationActions: guidance.interaction.postValidationActions,
     persistenceRules: guidance.interaction.persistenceRules,
-    handoffRules: guidance.interaction.handoffRules,
     humanReviewRules: guidance.interaction.humanReviewRules,
     placementRules: guidance.placementRules,
     artifactRules: guidance.artifactRules,
@@ -315,6 +319,113 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
   assert.doesNotMatch(prompt, /visited-source registry/);
   assert.doesNotMatch(prompt, /skills\/build-example-product-json\/SKILL\.md/);
   assert.doesNotMatch(prompt, /Inspect the Context body/);
+  assert.doesNotMatch(prompt, /Unresolved-item dispositions:/);
+  assert.doesNotMatch(prompt, /Platform-native semantic authoring:/);
+  assert.deepEqual(
+    json.interaction.unresolvedItemDispositions,
+    guidance.interaction.unresolvedItemDispositions,
+  );
+  assert.deepEqual(
+    json.interaction.handoffRules,
+    guidance.interaction.handoffRules,
+  );
+  // Required handoff outcomes remain in the prompt even without the duplicate table.
+  assert.match(
+    prompt,
+    /Do not create files while any blocking decision remains unresolved/,
+  );
+  assert.match(prompt, /Platform-native Skill authoring guidance may refine/);
+  assert.match(prompt, /only within the established boundaries/);
+  assert.match(prompt, /re-enter this gate before changing those boundaries/);
+  assert.match(
+    prompt,
+    /Do not create a second target file through another generator/,
+  );
+  assert.match(prompt, /renma scaffold skill <path> --handoff <handoff\.json>/);
+  assert.match(prompt, /human reviews meaningful decisions/);
+});
+
+test("authoring aids and pending questions do not add gates or broaden authorization", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  for (const output of [
+    renderSkillGuidePrompt(guidance),
+    renderSkillGuideJson(guidance),
+  ]) {
+    assert.match(
+      output,
+      /Decision tables, question themes, and progress-summary formats are optional working aids/,
+    );
+    assert.match(output, /preserve the distinctions they explain/);
+    assert.match(
+      output,
+      /same scope and action; preserve any requirement for separate or immediate approval/,
+    );
+    assert.match(
+      output,
+      /cannot be resolved through applicable evidence or an authorized reversible choice/,
+    );
+    assert.match(
+      output,
+      /Continue independent investigation and preparation while a question is pending/,
+    );
+    assert.match(
+      output,
+      /creation gate still blocks file creation until every requirement is established/,
+    );
+    assert.match(
+      output,
+      /do not infer product behavior, source authority, ownership, security permission/,
+    );
+  }
+});
+
+test("guide and every scaffold share scoped validation without weakening required checks", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const outputs = [
+    renderSkillGuidePrompt(guidance),
+    renderSkillGuideJson(guidance),
+  ];
+  for (const [kind, targetPath] of [
+    ["skill", "skills/review/SKILL.md"],
+    ["context", "contexts/review.md"],
+    ["context_lens", "lenses/review.md"],
+  ] as const) {
+    const bundle = buildScaffoldBundle({
+      kind,
+      targetPath,
+      format: "json",
+      owner: "maintainers",
+    });
+    outputs.push(bundle.content, bundle.prompt);
+  }
+  for (const output of outputs) {
+    for (const rule of [
+      AUTHORING_VALIDATION_RULE,
+      AUTHORING_REPORTS_RULE,
+      AUTHORING_REVALIDATION_RULE,
+    ]) {
+      assert.ok(output.includes(rule), rule);
+    }
+    assert.doesNotMatch(
+      output,
+      /Run `renma scan`, `renma catalog`, and `renma graph` before review/,
+    );
+  }
+  const verification = guidance.verification.join("\n");
+  assert.match(
+    verification,
+    /new or changed scripts and existing executable behavior affected by the change/,
+  );
+  assert.match(
+    verification,
+    /Do not execute unrelated or unchanged scripts solely because they exist/,
+  );
+  assert.match(
+    verification,
+    /Report unavailable required validation and its impact/,
+  );
+  assert.match(verification, /without leaking expected answers/);
+  assert.match(verification, /Runtime evaluation stays outside Renma/);
 });
 
 test("illustration rules prohibit template selection and preserve normative control", () => {
@@ -1238,7 +1349,7 @@ test("workflow summary cross-references interaction rules without duplicating th
   for (const rule of [
     "A finding is not a deterministic repair merely because its detection is deterministic.",
     "When authoring-time access is unavailable",
-    "If semantic refinement reveals a justified asset-boundary change",
+    "Boundary-change re-entry:",
   ]) {
     assert.equal(countOccurrences(prompt, rule), 1, rule);
   }

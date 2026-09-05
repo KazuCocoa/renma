@@ -221,7 +221,7 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
   assert.doesNotMatch(promptResult.stdout, /renma guide skill/);
   assert.match(
     promptResult.stdout,
-    /No metadata or migration change is proposed; preserve the existing source/,
+    /No metadata or migration change is proposed; this result alone does not justify changing the source/,
   );
   assert.match(
     promptResult.stdout,
@@ -229,15 +229,24 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
   );
   assert.match(
     promptResult.stdout,
-    /Only if a separate, intentional authoring change is made: run `renma scan \. --fail-on high`, fix relevant diagnostics, and rerun the scan/,
+    /Only if a separate, intentional authoring change is made: run `renma scan \. --fail-on high` and repository-required checks for that change and stage/,
   );
+  assert.match(promptResult.stdout, /rerun affected checks after corrections/);
   assert.match(
     promptResult.stdout,
     /If no separate change is intended, stop without manufacturing work/,
   );
   assert.match(
     promptResult.stdout,
-    /Do not return or apply a frontmatter patch; preserve the existing source/,
+    /Do not return or apply a frontmatter patch from this result/,
+  );
+  assert.match(
+    promptResult.stdout,
+    /Continue any separately requested Skill-body improvement within its authorized scope/,
+  );
+  assert.match(
+    promptResult.stdout,
+    /stop only when no other intended work remains/,
   );
   assert.doesNotMatch(promptResult.stdout, /- Run `renma scan \.`\./);
   assert.doesNotMatch(
