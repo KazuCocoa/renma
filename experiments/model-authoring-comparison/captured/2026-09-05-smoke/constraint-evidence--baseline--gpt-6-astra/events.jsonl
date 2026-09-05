@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a071ce-0d35-7eb3-b89e-b35ba4e3c4cf"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Skill内の制約文は、次の英文に置き換えられます。\n\n> Do not publish the report. Save the report as a local draft and include its local path in the response.\n\n公開禁止を維持し、適用済みの正式なContextで定められた代替行動を明記しています。"}}
+{"type":"turn.completed","usage":{"input_tokens":8993,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":112,"reasoning_output_tokens":33}}

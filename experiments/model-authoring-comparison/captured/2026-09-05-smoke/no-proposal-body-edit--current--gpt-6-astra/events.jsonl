@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a071cd-bccf-7300-bc95-84a6bb7b77e0"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Read this guide to review the change."}}
+{"type":"turn.completed","usage":{"input_tokens":8991,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":12,"reasoning_output_tokens":0}}

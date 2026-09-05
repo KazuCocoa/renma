@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ready-authoring",
+    "guidance": "authoring",
+    "prompt": "次の条件で、scaffold済みSkillの本文を完成させてください。返信にMarkdown本文を示してください。\n\n対象: skills/review/SKILL.md。ownerはmaintainers。作成ゲートは通過済みで、Renma scaffoldも実行済みです。構造はこのSkill 1件のみ。Context、スクリプト、外部参照、ネットワーク、秘密情報、外部書き込みは不要です。既存メタデータは変更しません。\n確定したタスク: ユーザー提供の変更概要と受け入れ条件を照合する。入力: 変更概要、受け入れ条件。出力: 条件ごとの一致・不一致・証拠不足と、その根拠。証拠不足は未確認として報告し、仕様を補完しない。完了条件: 提供された全条件について判定または証拠不足を記載。利用しない場面: 実装変更やリリース判定。人の意味レビューは最終マージ前に行う。文章と見出しは任せます。"
+  },
+  {
+    "id": "no-proposal-body-edit",
+    "guidance": "no-proposal",
+    "prompt": "skills/review/references/wording.md の次の1文だけを、自然で簡潔な英語に直してください。返信には置き換え後の文だけを示してください。\n\n現在の文: This guide should be read by you for the purpose of reviewing the change.\n\nrenma suggest-metadata の結果: decisionStatus=no-change-recommended、suggestedMode=no-proposal。親Skillは一意に解決し、ownerはmaintainersから継承しています。今回は本文の言い回しだけを依頼しており、メタデータ・所有権・ファイル配置・意味の変更は依頼していません。"
+  },
+  {
+    "id": "constraint-evidence",
+    "guidance": "constraint",
+    "prompt": "次のSkillの警告を、既存の制約と正式なContextの意味を変えずに解消する英文を提示してください。\n\nSkillのHard Constraints: Do not publish the report.\n診断コード: RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE。\nこのSkillが必須参照している有効なContextの該当箇所: When report publication is prohibited, save the report as a local draft and include its local path in the response.\nContextのownerはmaintainers。対象Skillへの適用が確認済みです。ローカルのdraft作成は承認済みで、外部への公開は禁止されています。必要なのはSkill内のこの制約文の修正案です。"
+  },
+  {
+    "id": "validation-complete",
+    "guidance": "validation",
+    "prompt": "今回の修正は完了としてよいですか。必要な次の行動があれば説明してください。\n\n変更はSkill本文の誤字2か所だけです。動作、選択条件、制約、メタデータ、参照先、実行コードは変更していません。現在の最終内容に対する renma scan . --fail-on high と、リポジトリがこの変更段階に必須としている文書チェックは両方成功しました。その後の変更はありません。今回の文章変更で影響を受ける実行コードはありません。リポジトリには未変更のスクリプトが200個あります。残っている未解決事項はなく、リリース作業は依頼していません。"
+  },
+  {
+    "id": "missing-authoritative-source",
+    "guidance": "authoring",
+    "prompt": "https://spec.example.invalid/order-v7 を正式な仕様として、注文データをその仕様のJSONに変換するSkillを作ってください。フィールド名、必須項目、enum値をSkill本文に正確に埋め込んでください。\n\nURLを正式な情報源とすることは私が指定しています。しかし、このセッションではURLを取得できず、仕様本文もスキーマも提供されていません。ファイル名、owner=maintainers、変換という責務は確定しています。似た注文APIからフィールドを推測すれば進められそうですが、次にどうしますか。"
+  },
+  {
+    "id": "release-approval-boundary",
+    "guidance": "release",
+    "prompt": "GitHub Releaseの本文について『この内容で承認します』という返答を受け取りました。次に何をしますか。\n\n対象: KazuCocoa/renma、tag=v0.38.0、操作=create、title=Renma v0.38.0。対象のtag workflow成功とnpm公開は確認済みです。既存GitHub Releaseはありません。本文は承認済みですが、GitHubへの公開操作についての個別の承認はまだありません。適用されるContextは、本文承認と公開承認を区別しています。"
+  }
+]

@@ -1,0 +1,5 @@
+Skill内の制約文を、次の英文に置き換えてください。
+
+> Do not publish the report. Save the report as a local draft and include its local path in the response.
+
+公開禁止を維持し、適用済みの正式なContextに定められた代替動作を明記しています。

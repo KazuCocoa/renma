@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"01a071cd-faa8-74f2-9678-3faf6cac75e7"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"置換案:\n\n> Do not publish the report externally. Instead, save it as a local draft and include the draft’s local path in the response."}}
+{"type":"turn.completed","usage":{"input_tokens":7749,"cached_input_tokens":5888,"cache_write_input_tokens":0,"output_tokens":88,"reasoning_output_tokens":51}}

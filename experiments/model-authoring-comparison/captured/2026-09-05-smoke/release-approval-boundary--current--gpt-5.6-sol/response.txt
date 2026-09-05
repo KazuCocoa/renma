@@ -1,0 +1,14 @@
+本文の承認とは別に、GitHubへの公開操作について明示的な承認を取得します。まだ Release は作成しません。
+
+次のように確認します。
+
+> 承認済みの内容で、以下の GitHub Release を新規作成してよいですか？
+>
+> - Repository: `KazuCocoa/renma`
+> - Tag: `v0.38.0`
+> - Title: `Renma v0.38.0`
+> - Operation: `create`
+>
+> GitHubへの公開を承認する場合は、「この対象と操作で公開を承認します」と明示してください。
+
+この公開承認を受けた後にのみ GitHub Release を作成し、URLと公開内容を確認します。

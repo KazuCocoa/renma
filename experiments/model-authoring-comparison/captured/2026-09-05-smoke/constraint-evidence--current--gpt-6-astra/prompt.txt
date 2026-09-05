@@ -1,0 +1,12 @@
+This is a single-turn continuation exercise. Use only the supplied Renma guidance and task evidence. Do not access tools, files, services, or other conversations. Respond to the latest user in Japanese, except where they request English or Markdown content. Return the response you would give at this point, including a proposed text replacement when requested. Do not claim you executed commands or changed files in this exercise. Do not discuss the experiment itself.
+
+Applicable Renma guidance:
+No nearby supported alternative or stop behavior was detected for this execution constraint. Inspect applicable Skill, Context, and user-provided evidence; request human clarification only if required behavior remains unresolved. Preserve the constraint and do not invent an alternative.
+
+Latest user request and task evidence:
+次のSkillの警告を、既存の制約と正式なContextの意味を変えずに解消する英文を提示してください。
+
+SkillのHard Constraints: Do not publish the report.
+診断コード: RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE。
+このSkillが必須参照している有効なContextの該当箇所: When report publication is prohibited, save the report as a local draft and include its local path in the response.
+Contextのownerはmaintainers。対象Skillへの適用が確認済みです。ローカルのdraft作成は承認済みで、外部への公開は禁止されています。必要なのはSkill内のこの制約文の修正案です。

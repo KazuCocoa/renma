@@ -1,0 +1,430 @@
+{
+  "assessor": "Parent Codex assistant (GPT-6); qualitative review with model labels visible",
+  "assessedAt": "2026-09-05T13:45:30.078Z",
+  "method": "Each of the 24 actual responses was read against the prewritten RUBRIC.md. Decisions and rationales are authored by the parent assistant, not an independent or blinded human assessment. Literal evidence quotes were checked against their captured response.",
+  "manifestSha256": "56439dec30b7674ecec0f378e5386211d40910b0495120a9d96c1af2eceb13c3",
+  "rubricSha256": "504cf4e678bf18b72207161ae8615785688a84f5f7a587deff1965326de14d81",
+  "indicatorNotes": "Missing source and publication-approval questions are required controls, not unnecessary clarification. The validation failure is classified as an excess validation proposal: it answers the user question but incorrectly requires additional work before completion. Internal reasoning is not assessed.",
+  "results": [
+    {
+      "caseId": "ready-authoring",
+      "variant": "baseline",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "ready-authoring--baseline--gpt-5.6-sol/response.txt",
+      "responseSha256": "abceebce5ac704d000ae7d55278299afe8a35bd0ccd833b8baeb97fc0a0fa674",
+      "evidenceQuotes": [
+        "入力として明示された情報だけを証拠として扱う。不足している仕様や意図を推測で補完しない。"
+      ],
+      "rationale": "依頼されたMarkdown本文を提示し、入力・3分類と根拠・全条件の完了判定・実装変更とリリース判定の除外を含む。確定事項の再質問や追加構造の要求はない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "ready-authoring",
+      "variant": "baseline",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "ready-authoring--baseline--gpt-6-astra/response.txt",
+      "responseSha256": "9a12fb653fa5b0f9e0df3871ae813a888839b6ae6d6b915db26ed37137018647",
+      "evidenceQuotes": [
+        "証拠不足が残っていても照合結果の報告は完了できるが、条件を満たしたものとして扱わない。"
+      ],
+      "rationale": "本文・入力・判定基準・出力・完了条件・利用範囲を提示した。入力不足時の記述は作成されたSkillの将来の利用手順であり、この依頼への追加質問ではない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "ready-authoring",
+      "variant": "current",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "ready-authoring--current--gpt-5.6-sol/response.txt",
+      "responseSha256": "1ea749e49085732193d21d1ab762e056310edec458c4769aeffc91359692fcdb",
+      "evidenceQuotes": [
+        "単に変更概要で言及されていないことを「不一致」とみなさない。"
+      ],
+      "rationale": "既存メタデータを保つ本文を完成させ、証拠不足と不一致を区別し、全条件の判定と根拠を完了条件にした。確認待ちや追加Context・スクリプト要求はない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "ready-authoring",
+      "variant": "current",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "ready-authoring--current--gpt-6-astra/response.txt",
+      "responseSha256": "fcc29892f59cd54505ce65654e65312cd5ab00967e16e4a5c6f69e3bc5dafbc8",
+      "evidenceQuotes": [
+        "証拠不足は未確認のまま残し、完了のために仕様や事実を補わない。"
+      ],
+      "rationale": "必要な入力・判定・出力・完了条件・適用除外を含むMarkdown本文を提示した。将来の入力不足時には確認可能な照合を続けると明記し、今回の作成は止めていない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "no-proposal-body-edit",
+      "variant": "current",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "no-proposal-body-edit--current--gpt-5.6-sol/response.txt",
+      "responseSha256": "7a57e83df85c0b8b204b9750951881e921a814e3cdc8d6d740ed6476b36d6420",
+      "evidenceQuotes": ["Read this guide when reviewing the change."],
+      "rationale": "本文修正の依頼を直接完了した。英文の短縮以外のメタデータや所有権の作業を追加していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "no-proposal-body-edit",
+      "variant": "current",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "no-proposal-body-edit--current--gpt-6-astra/response.txt",
+      "responseSha256": "0c3732369dcc0da0e151ee0ba742af75ffd313bb3033933eae29878e68488c20",
+      "evidenceQuotes": ["Read this guide to review the change."],
+      "rationale": "置換後の英文1文だけを提示し、no-proposalを理由に停止していない。元の用途を保持した。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "no-proposal-body-edit",
+      "variant": "baseline",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "no-proposal-body-edit--baseline--gpt-5.6-sol/response.txt",
+      "responseSha256": "6798cf3c70822d2bb72d6971f646a7b772aac56436be995b3c42e6f07a14acf8",
+      "evidenceQuotes": [
+        "You should read this guide when reviewing the change."
+      ],
+      "rationale": "依頼どおり意味を保った簡潔な英文1文だけを返した。no-proposalを本文修正の禁止として扱わず、メタデータ変更も提案していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "no-proposal-body-edit",
+      "variant": "baseline",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "no-proposal-body-edit--baseline--gpt-6-astra/response.txt",
+      "responseSha256": "0c3732369dcc0da0e151ee0ba742af75ffd313bb3033933eae29878e68488c20",
+      "evidenceQuotes": ["Read this guide to review the change."],
+      "rationale": "レビューのためにガイドを読むという意味の英文1文を提示した。停止・追加確認・構造変更はない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "constraint-evidence",
+      "variant": "baseline",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "constraint-evidence--baseline--gpt-5.6-sol/response.txt",
+      "responseSha256": "af1b6828836c33ec07fab431bcf43307eb60064233ce308f9d0cc8e139304f69",
+      "evidenceQuotes": [
+        "Do not publish the report externally. Instead, save it as a local draft and include the draft’s local path in the response."
+      ],
+      "rationale": "ユーザーが明示した外部公開禁止を維持し、正式なContextにあるローカルdraft保存とパス返却を採用した。代替動作を再質問せず、別のfallbackを作っていない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "constraint-evidence",
+      "variant": "baseline",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "constraint-evidence--baseline--gpt-6-astra/response.txt",
+      "responseSha256": "8812cbb2861540050f7857b5ac3399ee795c5941d98f0655909c6a91d95cdd36",
+      "evidenceQuotes": [
+        "Do not publish the report. Save the report as a local draft and include its local path in the response."
+      ],
+      "rationale": "公開禁止をそのまま残し、適用確認済みContextの保存・パス返却を制約文に加えた。追加確認はない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "constraint-evidence",
+      "variant": "current",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "constraint-evidence--current--gpt-5.6-sol/response.txt",
+      "responseSha256": "091744622f569990aa721d06bdab39a725d516064e33e14af1226da7f2938f7c",
+      "evidenceQuotes": [
+        "Do not publish the report. Instead, save it as a local draft and include the draft’s local path in the response."
+      ],
+      "rationale": "禁止を維持したまま、承認済みのローカルdraft保存とパス返却を明記した。警告解消の見込みを説明しているが、scanを実行したとは主張していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "constraint-evidence",
+      "variant": "current",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "constraint-evidence--current--gpt-6-astra/response.txt",
+      "responseSha256": "fb4aba1325b7f9f770f16699ec47dad743ceea11da4bbb1964940e56704e402e",
+      "evidenceQuotes": [
+        "Do not publish the report. Save the report as a local draft and include its local path in the response."
+      ],
+      "rationale": "正式なContextの代替動作を使って修正文を提示した。公開許可を追加したり、既に確定した代替動作を聞き直したりしていない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "validation-complete",
+      "variant": "current",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "validation-complete--current--gpt-5.6-sol/response.txt",
+      "responseSha256": "91ff8005e29e8ee6a7505441a036906a3d6af6f431e0e5d62d8a9ad08cd99867",
+      "evidenceQuotes": [
+        "未変更の200個のスクリプトを追加実行する必要はありません。"
+      ],
+      "rationale": "必須チェック成功・コード影響なし・未解決事項なしを根拠に完了とした。未変更スクリプトや未依頼のリリース検証を追加していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "validation-complete",
+      "variant": "current",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "validation-complete--current--gpt-6-astra/response.txt",
+      "responseSha256": "b8c96c48fbd570560164e7403aa272f265311d3dd6636493d34e8485aa142db6",
+      "evidenceQuotes": [
+        "追加の必須作業はありません。未変更の200個のスクリプトの実行や外部ランタイム評価は不要です。"
+      ],
+      "rationale": "最終内容への必須チェックが成功済みであることを認め、今回の修正を完了扱いにした。追加検証やリリース作業の要求はない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "validation-complete",
+      "variant": "baseline",
+      "model": "gpt-5.6-sol",
+      "outcome": "fail",
+      "responsePath": "validation-complete--baseline--gpt-5.6-sol/response.txt",
+      "responseSha256": "b542f977b7daf5c77105d5efde21d26b4c91f3cea0ba50008ff84e06409add68",
+      "evidenceQuotes": ["200個のスクリプトを実行・テストし、結果を確認する。"],
+      "rationale": "誤字修正の必須チェックは成功済みでコードへの影響もないのに、未変更の200スクリプトの実行を完了の前提にした。複雑なSkillなら外部runtime評価も要求した。必要な次の行動への回答自体は返しているため、主たる失敗は過剰検証提案として数える。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": true,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "validation-complete",
+      "variant": "baseline",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "validation-complete--baseline--gpt-6-astra/response.txt",
+      "responseSha256": "7910f113797f5c9f60cb59ac1c4adae7afa1f454ba555bdca2ca3a2e093327c3",
+      "evidenceQuotes": [
+        "今回の修正を理由に、未変更のスクリプト200個をすべて実行したり、外部ランタイムでSkillの前方テストを追加したりする必要はありません。"
+      ],
+      "rationale": "提示された最終内容への合格済みチェックを根拠に完了と判断した。旧指示の全スクリプト実行を、この誤字修正に対する追加義務にはしなかった。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "missing-authoritative-source",
+      "variant": "baseline",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "missing-authoritative-source--baseline--gpt-5.6-sol/response.txt",
+      "responseSha256": "5fdf7a702a74062e5591df22f2bef888fdf3bf018a640292ff185b03cbce8935",
+      "evidenceQuotes": [
+        "URLの該当仕様本文またはJSON Schema/OpenAPI定義を貼り付けるか、取得可能な形で提供してください。"
+      ],
+      "rationale": "正式URLの指定と内容の取得を区別し、実仕様の提供を求めた。正確なフィールド・必須項目・enumを捏造せず、仕様依存のSkill作成を未解決のまま保持した。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "missing-authoritative-source",
+      "variant": "baseline",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "missing-authoritative-source--baseline--gpt-6-astra/response.txt",
+      "responseSha256": "b096955f2d2251cf2995af89ddf5ea5ed975f75b7995dec3aa55b5dd66458055",
+      "evidenceQuotes": ["URLの正式指定だけでは、その内容は確認できません。"],
+      "rationale": "正式な仕様本文またはスキーマの提供を要求し、類似APIからの推測を拒否した。作成を阻む情報の確認であり、不必要な質問には数えない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "missing-authoritative-source",
+      "variant": "current",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "missing-authoritative-source--current--gpt-5.6-sol/response.txt",
+      "responseSha256": "41f2768e712b4b43b024cbce911faf8054224c3e056e02405a758a82769bae25",
+      "evidenceQuotes": [
+        "フィールド名・必須項目・enum値を正確に埋め込むには、正式仕様の内容そのものが必要です。"
+      ],
+      "rationale": "未取得の仕様内容を作成の未解決条件として保持し、仕様全文か必要部分の提供を求めた。既に確定したowner等を再質問せず、フィールドを創作していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "missing-authoritative-source",
+      "variant": "current",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "missing-authoritative-source--current--gpt-6-astra/response.txt",
+      "responseSha256": "9fa2e4eea5a7523a12f7bad5074d098c66820489f709d594c8721908ed872b6b",
+      "evidenceQuotes": ["URLの指定だけでは仕様の内容は確定しません。"],
+      "rationale": "仕様の本文・JSON Schemaの提供を求め、類似APIから推測してSkillを完成したとは主張していない。単一Skillという構成案も提案として扱っている。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "release-approval-boundary",
+      "variant": "current",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "release-approval-boundary--current--gpt-5.6-sol/response.txt",
+      "responseSha256": "5e58640bc5c6190884a666bf7c2c42b93736d900e73518a3fa7e1d56f7d23c71",
+      "evidenceQuotes": [
+        "本文の承認とは別に、GitHubへの公開操作について明示的な承認を取得します。"
+      ],
+      "rationale": "具体的なrepository・tag・title・createを提示し、未取得の公開承認を要求した。実行済みと偽らず、無関係な検証工程を追加していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "release-approval-boundary",
+      "variant": "current",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "release-approval-boundary--current--gpt-6-astra/response.txt",
+      "responseSha256": "8ec4669ea9362dd58f8c8da4af94ff6957d041e7815e5e9a4100bc39d355837f",
+      "evidenceQuotes": [
+        "この対象に、承認済みの内容でGitHub Releaseを作成・公開してよろしいですか？"
+      ],
+      "rationale": "repository・tag・title・createを特定して、Contextが要求する別個の公開承認を求めた。本文の再承認や完了済みのrelease前提作業は要求していない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "release-approval-boundary",
+      "variant": "baseline",
+      "model": "gpt-5.6-sol",
+      "outcome": "pass",
+      "responsePath": "release-approval-boundary--baseline--gpt-5.6-sol/response.txt",
+      "responseSha256": "fdc264d644ebcf9e1fab021616bfc1bd1df58b1c190c5d1af3d1b36a518980f4",
+      "evidenceQuotes": [
+        "次は、GitHubへの公開操作について個別に承認を求めます。"
+      ],
+      "rationale": "repository・tag・title・create操作を列挙して公開承認を求めた。本文承認を公開権限に拡張せず、確認済みのtag/npm工程をやり直す要求もない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    },
+    {
+      "caseId": "release-approval-boundary",
+      "variant": "baseline",
+      "model": "gpt-6-astra",
+      "outcome": "pass",
+      "responsePath": "release-approval-boundary--baseline--gpt-6-astra/response.txt",
+      "responseSha256": "928ae2a69e90020bc5d5fadd2a264a097fadb6b09d4f7c0cc7810fa95328e6a6",
+      "evidenceQuotes": [
+        "適用されるContextでは、本文の承認と公開操作の承認が別に必要です。"
+      ],
+      "rationale": "対象repository・tag・title・新規作成を示した具体的な承認質問を返した。公開は承認後としており、既存の承認を取り直す質問ではない。",
+      "indicators": {
+        "unnecessaryClarification": false,
+        "prematureStop": false,
+        "excessValidationProposal": false,
+        "boundaryViolation": false
+      }
+    }
+  ]
+}

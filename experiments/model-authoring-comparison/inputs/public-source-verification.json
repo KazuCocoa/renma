@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-09-05T06:20:44.401Z",
+  "method": "Unauthenticated HTTPS GET, redirects rejected, source bytes SHA-256 compared with the retained instruction snapshot",
+  "repositoryUrl": "https://api.github.com/repos/KazuCocoa/renma",
+  "private": false,
+  "sources": [
+    {
+      "variant": "baseline",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/69a8fc6f64ee8406f671dd5a536b144f1d384913/test/fixtures/public-json-expected/guide-skill.golden",
+      "sha256": "333ee907383813909909c20a276a2851507465622fc68f7e0918c1b384c5c241"
+    },
+    {
+      "variant": "baseline",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/69a8fc6f64ee8406f671dd5a536b144f1d384913/src/renderers/metadata-suggestion.ts",
+      "sha256": "029d0e45b774007ca75556002578a7251f11126315da6621cab40c3030ec6975"
+    },
+    {
+      "variant": "baseline",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/69a8fc6f64ee8406f671dd5a536b144f1d384913/src/agent-skills.ts",
+      "sha256": "01b9402e4ebcc69abc65574c8c1c8fe32695e2f6b1e56293a39bba90215a7685"
+    },
+    {
+      "variant": "baseline",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/69a8fc6f64ee8406f671dd5a536b144f1d384913/docs/authoring-guide.md",
+      "sha256": "a2cfac3a9eacb957f8e9df406b0afc49c80892ff791e0f91d05fca8252e4f280"
+    },
+    {
+      "variant": "baseline",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/69a8fc6f64ee8406f671dd5a536b144f1d384913/contexts/release/prep.md",
+      "sha256": "f037772cdb6ded9cdcc974fff2e9bdd2acbfd80fb310ca3a71a15febb87b1971"
+    },
+    {
+      "variant": "current",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/f3e3508dc204cb816782d97874b137e12d485035/test/fixtures/public-json-expected/guide-skill.golden",
+      "sha256": "2892070d8e3c1905d5f214babadda2bf88a169a2c874018f021b636bda0efff7"
+    },
+    {
+      "variant": "current",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/f3e3508dc204cb816782d97874b137e12d485035/src/renderers/metadata-suggestion.ts",
+      "sha256": "4f80a4e579b66f2bd53a739e4618986deca109eaabb435b6b6377f41bcc1d697"
+    },
+    {
+      "variant": "current",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/f3e3508dc204cb816782d97874b137e12d485035/src/agent-skills.ts",
+      "sha256": "a46655f0e410e49356a69ae7aaab1ae7c7b9e3905d6eb9ddc89b3e1701657bb1"
+    },
+    {
+      "variant": "current",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/f3e3508dc204cb816782d97874b137e12d485035/docs/authoring-guide.md",
+      "sha256": "f3a3202bca8881cb7c97cbef514ada9ce27f24c27cbf78290896de443e6c335a"
+    },
+    {
+      "variant": "current",
+      "url": "https://raw.githubusercontent.com/KazuCocoa/renma/f3e3508dc204cb816782d97874b137e12d485035/contexts/release/prep.md",
+      "sha256": "f037772cdb6ded9cdcc974fff2e9bdd2acbfd80fb310ca3a71a15febb87b1971"
+    }
+  ]
+}

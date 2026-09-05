@@ -1,0 +1,5 @@
+修正案（英文）:
+
+> Do not publish the report. Instead, save it as a local draft and include the draft’s local path in the response.
+
+外部公開の禁止を維持しつつ、承認済みの代替動作を明示するため、診断コード `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE` を解消できます。

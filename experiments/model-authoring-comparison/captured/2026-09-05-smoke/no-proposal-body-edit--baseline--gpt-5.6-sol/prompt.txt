@@ -1,0 +1,11 @@
+This is a single-turn continuation exercise. Use only the supplied Renma guidance and task evidence. Do not access tools, files, services, or other conversations. Respond to the latest user in Japanese, except where they request English or Markdown content. Return the response you would give at this point, including a proposed text replacement when requested. Do not claim you executed commands or changed files in this exercise. Do not discuss the experiment itself.
+
+Applicable Renma guidance:
+Stop without manufacturing work. Preserve the existing source.
+
+Latest user request and task evidence:
+skills/review/references/wording.md の次の1文だけを、自然で簡潔な英語に直してください。返信には置き換え後の文だけを示してください。
+
+現在の文: This guide should be read by you for the purpose of reviewing the change.
+
+renma suggest-metadata の結果: decisionStatus=no-change-recommended、suggestedMode=no-proposal。親Skillは一意に解決し、ownerはmaintainersから継承しています。今回は本文の言い回しだけを依頼しており、メタデータ・所有権・ファイル配置・意味の変更は依頼していません。

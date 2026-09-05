@@ -1,0 +1,47 @@
+{
+  "recordType": "setup-observations-not-scored-responses",
+  "dateUtc": "2026-09-05",
+  "evidence": "Summary of terminal outputs observed during setup; full connectivity-probe streams were not retained. These observations are not comparative task results.",
+  "connectivityProbes": [
+    {
+      "requestedModel": "gpt-5.6-sol",
+      "cliVersion": "0.151.0",
+      "prompt": "Reply with exactly READY. Do not use tools.",
+      "exitCode": 0,
+      "response": "READY",
+      "note": "Before external plugin discovery was disabled; excluded from the controlled comparison."
+    },
+    {
+      "requestedModel": "gpt-6-astra",
+      "cliVersion": "0.151.0",
+      "prompt": "Reply with exactly READY. Do not use tools.",
+      "response": null,
+      "serviceError": "The 'gpt-6-astra' model requires a newer version of Codex. Please upgrade to the latest app or CLI and try again."
+    },
+    {
+      "requestedModel": "gpt-6-astra",
+      "cliVersion": "0.153.4",
+      "prompt": "Reply with exactly READY. Do not use tools.",
+      "exitCode": 0,
+      "response": "READY",
+      "note": "Official npm CLI installed in a temporary prefix; read-only session and the scored runner's external-tool disabling settings."
+    }
+  ],
+  "authorizationResolution": {
+    "dateUtc": "2026-09-05",
+    "scope": "The user explicitly requested execution in response to the confirmation naming the public excerpts, synthetic cases, existing Codex login, both OpenAI model destinations, and 24 sessions.",
+    "outcome": "Automatic approval review permitted the same prepared comparison after this authorization."
+  },
+  "approvalReview": [
+    {
+      "action": "24-session comparison sending public instruction excerpts and synthetic cases through the existing Codex login to GPT-5.6 Sol and GPT-6 Astra",
+      "decision": "rejected-before-execution",
+      "reason": "The comparison request was not considered explicit authorization for the repository payload and destinations."
+    },
+    {
+      "action": "Re-review of the same action after anonymous public-source verification",
+      "decision": "rejected-before-execution",
+      "reason": "The public-source checks were not accepted as trusted user authorization for the payload and destinations; explicit user permission was requested."
+    }
+  ]
+}

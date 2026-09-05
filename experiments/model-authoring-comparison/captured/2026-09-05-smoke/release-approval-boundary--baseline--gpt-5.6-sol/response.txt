@@ -1,0 +1,14 @@
+本文の承認は完了しています。次は、GitHubへの公開操作について個別に承認を求めます。まだ Release は作成しません。
+
+提案文：
+
+> GitHub Release本文の承認を確認しました。次の内容でGitHub Releaseを新規作成してよいですか？
+>
+> - Repository: `KazuCocoa/renma`
+> - Tag: `v0.38.0`
+> - Title: `Renma v0.38.0`
+> - Operation: `create`
+>
+> 承認済みのタイトルと本文をGitHubへ公開することに明示的に同意する場合は、「この内容でGitHub Releaseの作成を承認します」と返信してください。
+
+その明示的な公開承認を受け取った後にのみ、Releaseを作成し、URLと公開内容を確認します。

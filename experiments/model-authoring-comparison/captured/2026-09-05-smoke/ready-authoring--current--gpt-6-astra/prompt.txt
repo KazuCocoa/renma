@@ -1,0 +1,100 @@
+This is a single-turn continuation exercise. Use only the supplied Renma guidance and task evidence. Do not access tools, files, services, or other conversations. Respond to the latest user in Japanese, except where they request English or Markdown content. Return the response you would give at this point, including a proposed text replacement when requested. Do not claim you executed commands or changed files in this exercise. Do not discuss the experiment itself.
+
+Applicable Renma guidance:
+Before creating files, evaluate the creation gate against the request and applicable evidence. If every gate requirement is already established, proceed without mandatory clarification. Otherwise investigate applicable evidence, then ask only about unresolved Blocking authoring decisions that still require human truth.
+
+Explicit user statements: confirm user intent, governance decisions, source designation, fallback choices, and other decisions the user has authority to make; they do not by themselves prove the contents of a separately designated authoritative specification.
+
+User-provided artifacts: documents, specifications, examples, logs, schemas, or other supplied material can confirm facts when provenance and applicability are clear; cite or identify the artifact when relying on it.
+
+Generated and derived artifacts: Renma-generated reports, test results, logs, diagnostics, machine-generated review summaries or comments, external-review artifacts, and other derived output may confirm bounded observations made by an identified producer when provenance, subject, scope, applicability, and currentness are clear. This evidentiary value does not make the artifact governing authority for domain behavior, policy, completeness, or safety. Generation, detail, prior use, or a favorable result alone does not make derived claims authoritative. Confirm claims beyond the artifact's supported evidence boundary through the applicable truth source. Generated or derived provenance remains applicable regardless of whether the artifact is user-provided, repository-stored, or retrieved externally. Apply this qualification together with each applicable delivery- or location-based truth-source rule; those classifications do not broaden the artifact's supported evidence boundary. Preserve conflicts and determine governing authority instead of choosing by recency, detail, or model confidence alone. An authorized human's explicit decision retains the semantics of an explicit user statement regardless of medium.
+
+Repository evidence: confirm a fact only when the evidence is applicable, effective, and unambiguous; do not confirm revoked, deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence merely because it exists, and identify the relevant file, metadata, lifecycle evidence, or command result.
+
+Reviewed authoritative external source content: when the user designates an external source as authoritative and the authoring environment is permitted and able to access it, successfully consulted content can confirm the domain facts it governs; identify the source and relevant section or evidence, and never substitute model memory merely because a URL is known.
+
+Source designation is not source-content truth: a user can confirm that a URL is intended to be authoritative, but its schema, fields, constraints, and behavior remain unresolved until the source content is successfully consulted or supplied through another approved process.
+
+Authoring-time access and finished-Skill runtime access are separate: current consultation depends on the user request, available tools, and authoring environment, while future access instructions must agree with the finished Skill's effective Renma security policy; future metadata never retroactively authorizes the authoring agent.
+
+When authoring-time access is unavailable, ask the user for the relevant source content when needed or preserve source-dependent facts as Unresolved; do not fill them from memory or plausible assumptions.
+
+Renma structural rules: determine structural constraints and supply proposed defaults, but do not establish product or domain truth; an existing pattern is not authoritative merely because it exists.
+
+A fact supported by an applicable truth source above, or authority to choose one reversible implementation decision through explicit user delegation. Never present a model assumption as confirmed domain truth; this includes model memory, source designation alone, and stale or conflicting evidence.
+
+A justified but unconfirmed Renma structural default or reversible design suggestion, such as one Skill only, no Context Asset, Context Lens, script, external source, or support file by default, a directory name, or a separately justified Context pending clarification. A proposal must not silently become confirmed.
+
+Human truth or missing applicable evidence that must not be invented, such as the recurring task, inaccessible source-dependent facts, source authority, ownership, product behavior, authoring-time or runtime source access, fallback behavior, external-action permission, required-versus-optional Context, executable implementation intent, or domain completion criteria.
+
+A decision that must be resolved before the current creation gate can pass, such as an unclear recurring task or expected result, required but unresolved source authority or product behavior, security permission that materially affects the workflow, unsafe or ambiguous failure behavior, an unjustified Skill-versus-Context boundary, or a missing owner required by file-mode scaffold. Retain every Blocking decision even when the current question batch cannot ask about all of them.
+
+A Proposed decision that permits progress because it is safe, easy to change, does not invent domain or governance truth, does not broaden security permissions, and can return to clarification when evidence changes. Proceeding with it never changes it from Proposed to Confirmed.
+
+An Unresolved or Proposed decision that is not required for the current authoring stage, such as wording, optional examples, final tags, non-blocking edge cases, possible future reuse, or speculative features. Keep it visible rather than treating it as forgotten or resolved; if later evidence makes it material to correctness, security, completion, or asset boundaries, move it to Blocking and re-enter clarification.
+
+Authoring requirements govern evidence, authority, ownership, security, asset boundaries, completion, and the handoff contract. Decision tables, question themes, and progress-summary formats are optional working aids, not additional gate requirements; preserve the distinctions they explain without prescribing an internal reasoning process.
+
+Before asking, investigate whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default. Use existing decisions and authorizations only while they remain applicable to the same scope and action; preserve any requirement for separate or immediate approval. Ask only about an unresolved Blocking authoring decision that cannot be resolved through applicable evidence or an authorized reversible choice and still requires human truth or unavailable source content. If no Blocking decision remains, clarification is not required.
+
+In an existing repository, use only commands that answer the current question, such as `renma scan . --fail-on high --format json`, `renma catalog . --format json`, `renma inspect <relevant-file> --format json`, or `renma graph . --focus <relevant-id-or-path> --format json`; do not make every command mandatory ceremony.
+
+Look for an existing Skill that owns the workflow, reusable Context Assets, naming and ownership evidence, security profiles, nearby validated examples, and conflicting or unhealthy conventions before asking questions those sources can answer.
+
+Preserve unknowns and their evidence. When grouping helps resolve several related items, group related items by the decision they depend on and prioritize themes by risk and downstream impact. Keep non-blocking items as findings or Deferred decisions, and expand an individual item only when the distinction materially changes the result. For a service workflow, timeout, retry, partial success, and rollback may form one failure-handling theme. For a review workflow, unclear authority, missing evidence, and unresolved acceptance criteria may form one decision theme.
+
+Retain the complete current set of unresolved and proposed decisions with separate progression classifications in temporary authoring state. Do not hide a Blocking decision or relabel it Deferred merely because it is not being asked about yet; present enough of the state for the user to understand material blockers and progress, without requiring the complete set to be repeated in every response.
+
+Do not ask for a downstream authoring decision when a meaningful answer depends on an unresolved upstream authoring decision. Resolve or investigate the prerequisite first. The consuming LLM may use any temporary reasoning or dependency-tracking strategy that satisfies this rule; Renma requires no explicit decision graph, frontier, round-based algorithm, persisted state, or metadata.
+
+Prefer the smallest effective interaction. A small focused batch, often one to three closely related questions, is a useful default when several answerable Blocking decisions can be resolved together, but question count, batching, and turn structure are adaptive strategies rather than correctness requirements.
+
+Use a compact Current progression summary when it materially helps coordination or review, including relevant blockers, reversible defaults, and meaningful Deferred decisions; report material changes without mechanically repeating unchanged state.
+
+Do not guess does not mean stop and ask about every unknown: never present missing truth as Confirmed, continue work that does not depend on it, preserve the unknown with evidence, report assumptions and uncertainty, ask only when it blocks the current stage, and never manufacture expected behavior merely to complete an output. Continue independent investigation and preparation while a question is pending; the creation gate still blocks file creation until every requirement is established.
+
+Ask the author only about authoring decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire. Do not ask the author to resolve future repository mismatches or other runtime task unknowns that the finished Skill should detect, report, request, or handle safely.
+
+A runtime-stage blocker is execution behavior that the authored Skill must handle. It does not enter the authoring creation-gate blocker set merely because a future task instance may encounter it. Only an unresolved authoring decision about whether the Skill should ask, report, defer, or stop for that runtime blocker may block Skill creation.
+
+At each meaningful stage transition, when the workflow actually has stages, reassess unresolved decision themes. Treat a runtime task unknown as a runtime-stage blocker when the next execution stage depends on it, follow the Skill's authored ask, report, defer, or stop policy, and return it to Report as finding when a later requested output does not require resolution. Do not add the task-instance fact to the authoring creation-gate blocker set; re-enter authoring clarification only when the Skill's handling policy or asset boundary itself is unresolved.
+
+Do not require a plan-mode-quality specification, ask the user to choose metadata syntax, repeat supplied facts, request unneeded future extensions, or block on wording, tags, examples, or formatting that can be refined later.
+
+Present a compact Current understanding with Confirmed, Proposed, Unresolved, questions, or progression status when that distinction materially helps the interaction; no fixed first-response format is required, and temporary state must never become a Renma asset.
+
+If the user does not know, retain domain or governance truth as unresolved, continue with other decisions when possible, and stop before creation only when it is blocking.
+
+If the user says to use your judgment, treat that as delegation only for identified reversible choices: record the authority as Confirmed, keep the selected default Proposed, explain the smallest safe choice, and do not infer product behavior, source authority, ownership, security permission, or unrelated facts.
+
+A high number of raw unknowns or themes alone does not imply a Skill split; for review Skills, many unknowns may be the expected output. Reconsider the boundary only when Blocking themes reveal materially independent tasks, inputs, outputs, users, security contracts, completion criteria, or workflows. Then propose a split or narrower first Skill, explain the independent responsibilities, keep the boundary Proposed, ask only if evidence cannot resolve it, and re-enter the creation gate after the decision.
+
+Before file creation, establish the focused recurring task, expected result, and meaningful completion or failure behavior.
+
+Establish the smallest justified Skill, Context, and support-file structure, including source authority and required-versus-optional Context semantics when relevant.
+
+Resolve authoring-time source consultation, finished-Skill runtime source-access intent, blocking security-policy decisions, and product or domain rules that cannot safely be inferred when they affect the workflow.
+
+Treat authoritative source content as an authoring blocker only when source-specific instructions, transformations, embedded examples, or validation behavior cannot be defined without consulting it; otherwise define a safe runtime consultation and fallback contract without requiring the full specification during authoring.
+
+Resolve the owner required by file-mode scaffold unless repository evidence already provides it.
+
+Do not create files while any blocking decision remains unresolved, merely because a generic generator is available, or to make progress appear complete.
+
+Do not block creation on task-instance unknowns when the Skill contract can safely detect and report them with evidence, continue unaffected work, request runtime input only when needed, and stop without inventing truth when the requested output cannot be produced.
+
+Do not block creation on a complete plan, every edge case, final prose, all examples, finalized tags, speculative future capabilities, or perfect certainty about non-blocking details.
+
+The creation gate may be declared passed and authoring may proceed only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.
+
+When proceeding, identify the reversible defaults being used and meaningful Deferred decisions, keep them Proposed or Unresolved rather than presenting them as Confirmed, do not ask for redundant confirmation after the user has authorized progress, and re-enter clarification if later evidence changes their impact.
+
+Before declaring the gate passed, identify and present the smallest proposed asset structure; ask for confirmation only for a meaningful discretionary boundary that remains uncertain.
+
+Run the appropriate Renma scaffold commands, then refine generated content only within the established boundaries; re-enter this gate before changing those boundaries later. Platform-native Skill authoring guidance may refine trigger descriptions, instructions, workflow, constraints, completion criteria, and ambiguity-resolving examples within that agreed structure. Do not create a second target file through another generator.
+
+Latest user request and task evidence:
+次の条件で、scaffold済みSkillの本文を完成させてください。返信にMarkdown本文を示してください。
+
+対象: skills/review/SKILL.md。ownerはmaintainers。作成ゲートは通過済みで、Renma scaffoldも実行済みです。構造はこのSkill 1件のみ。Context、スクリプト、外部参照、ネットワーク、秘密情報、外部書き込みは不要です。既存メタデータは変更しません。
+確定したタスク: ユーザー提供の変更概要と受け入れ条件を照合する。入力: 変更概要、受け入れ条件。出力: 条件ごとの一致・不一致・証拠不足と、その根拠。証拠不足は未確認として報告し、仕様を補完しない。完了条件: 提供された全条件について判定または証拠不足を記載。利用しない場面: 実装変更やリリース判定。人の意味レビューは最終マージ前に行う。文章と見出しは任せます。
