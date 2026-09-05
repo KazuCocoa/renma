@@ -82,14 +82,15 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
     to: DiagnosticsConfig["severity"];
     rows: string[];
     impact?: string;
-    status: "pass" | "fail";
+    mode?: DiagnosticsConfig["ciPolicy"];
+    status: "pass" | "warn" | "fail";
   }[] = [
     {
       name: "one tightening",
       from: {},
       to: { "QUAL-MISSING-EXAMPLES": "high" },
       rows: [
-        "| `QUAL-MISSING-EXAMPLES` | low (producer_default) | high (repository_configuration) | ↑ tightening | `diagnostics.severity.QUAL-MISSING-EXAMPLES` |",
+        "| `QUAL-MISSING-EXAMPLES` | low (producer_default) | high (repository_configuration) | ↑ tightening |",
       ],
       impact:
         "> Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
@@ -103,8 +104,8 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
         "QUAL-MISSING-DESCRIPTION": "critical",
       },
       rows: [
-        "| `QUAL-MISSING-DESCRIPTION` | medium (producer_default) | critical (repository_configuration) | ↑ tightening | `diagnostics.severity.QUAL-MISSING-DESCRIPTION` |",
-        "| `QUAL-MISSING-EXAMPLES` | low (producer_default) | high (repository_configuration) | ↑ tightening | `diagnostics.severity.QUAL-MISSING-EXAMPLES` |",
+        "| `QUAL-MISSING-DESCRIPTION` | medium (producer_default) | critical (repository_configuration) | ↑ tightening |",
+        "| `QUAL-MISSING-EXAMPLES` | low (producer_default) | high (repository_configuration) | ↑ tightening |",
       ],
       impact:
         "> Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
@@ -119,8 +120,8 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
         "QUAL-MISSING-DESCRIPTION": "high",
       },
       rows: [
-        "| `QUAL-MISSING-EXAMPLES` | low (producer_default) | high (repository_configuration) | ↑ tightening | `diagnostics.severity.QUAL-MISSING-EXAMPLES` |",
-        "| `SUPPORT-MISSING-PATH` | high (producer_default) | low (repository_configuration) | ↓ WEAKENING | `diagnostics.severity.SUPPORT-MISSING-PATH` |",
+        "| `QUAL-MISSING-EXAMPLES` | low (producer_default) | high (repository_configuration) | ↑ tightening |",
+        "| `SUPPORT-MISSING-PATH` | high (producer_default) | low (repository_configuration) | ↓ WEAKENING |",
       ],
       impact:
         "> Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior. CI status effect: FAIL — effective CI review policy: fail.",
@@ -131,7 +132,7 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
       from: { "SUPPORT-MISSING-PATH": "low" },
       to: {},
       rows: [
-        "| `SUPPORT-MISSING-PATH` | low (repository_configuration) | high (producer_default) | ↑ tightening | `diagnostics.severity.SUPPORT-MISSING-PATH` |",
+        "| `SUPPORT-MISSING-PATH` | low (repository_configuration) | high (producer_default) | ↑ tightening |",
       ],
       impact:
         "> Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
@@ -142,7 +143,7 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
       from: {},
       to: { "SUPPORT-MISSING-PATH": "high" },
       rows: [
-        "| `SUPPORT-MISSING-PATH` | high (producer_default) | high (repository_configuration) | neutral | `diagnostics.severity.SUPPORT-MISSING-PATH` |",
+        "| `SUPPORT-MISSING-PATH` | high (producer_default) | high (repository_configuration) | neutral |",
       ],
       status: "pass",
     },
@@ -151,10 +152,43 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
       from: {},
       to: { "QUAL-SKILL-TOKEN-BUDGET": "low" },
       rows: [
-        "| `QUAL-SKILL-TOKEN-BUDGET` | unknown producer default (producer_default) | low (repository_configuration) | REVIEW REQUIRED | `diagnostics.severity.QUAL-SKILL-TOKEN-BUDGET` |",
+        "| `QUAL-SKILL-TOKEN-BUDGET` | unknown producer default (producer_default) | low (repository_configuration) | REVIEW REQUIRED |",
       ],
       impact: "> CI status effect: FAIL — effective CI review policy: fail.",
       status: "fail",
+    },
+    {
+      name: "long diagnostic ID keeps severity-source provenance",
+      from: {},
+      to: { "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical" },
+      rows: [
+        "| `META-REQUIRED-SUSPENDED-DEPENDENCY` | high (producer_default) | critical (repository_configuration) | ↑ tightening |",
+      ],
+      impact:
+        "> Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
+      status: "pass",
+    },
+    {
+      name: "off mode preserves passing outcome for severity weakening",
+      from: {},
+      to: { "SUPPORT-MISSING-PATH": "low" },
+      rows: [
+        "| `SUPPORT-MISSING-PATH` | high (producer_default) | low (repository_configuration) | ↓ WEAKENING |",
+      ],
+      impact: "> CI status effect: none — gate disabled.",
+      mode: "off",
+      status: "pass",
+    },
+    {
+      name: "warn mode warns for severity weakening",
+      from: {},
+      to: { "SUPPORT-MISSING-PATH": "low" },
+      rows: [
+        "| `SUPPORT-MISSING-PATH` | high (producer_default) | low (repository_configuration) | ↓ WEAKENING |",
+      ],
+      impact: "> CI status effect: WARN — effective CI review policy: warn.",
+      mode: "warn",
+      status: "warn",
     },
     {
       name: "no severity policy change",
@@ -167,15 +201,11 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
 
   for (const item of cases) {
     await t.test(item.name, () => {
-      const diagnosticSeverityPolicy = buildDiagnosticSeverityPolicyDiff(
-        { ciPolicy: "fail", severity: item.from },
-        { ciPolicy: "fail", severity: item.to },
+      const mode = item.mode ?? "fail";
+      const report = diagnosticSeverityPolicyReport(
+        { ciPolicy: mode, severity: item.from },
+        { ciPolicy: mode, severity: item.to },
       );
-      const report = buildCiReportFromDiff({
-        ...policyDiffReport({}),
-        discovery: neutralSkillDiscoveryDiff(),
-        diagnosticSeverityPolicy,
-      });
       const markdown = formatCiReport(report, "markdown");
       assert.equal(report.status, item.status);
       assert.equal(formatCiReport(report, "markdown"), markdown);
@@ -184,16 +214,24 @@ test("formatCiReport renders compact diagnostic severity policy changes", async 
         return;
       }
       const evaluation = report.diagnosticSeverityPolicy!;
+      assert.equal(evaluation.outcome, item.status);
+      assert.deepEqual(evaluation.configured, {
+        from: mode,
+        to: mode,
+        effective: mode,
+      });
       const counts = evaluation.severityChanges;
       const section = [
         "## Diagnostic Severity Policy",
         "",
-        "| Diagnostic | Previous | Current | Change | Configuration key |",
-        "| --- | --- | --- | --- | --- |",
+        "Configuration keys: `diagnostics.severity.<Diagnostic>`.",
+        "",
+        "| Diagnostic | Previous | Current | Change |",
+        "| --- | --- | --- | --- |",
         ...item.rows,
         "",
         ...(item.impact ? [item.impact, ""] : []),
-        `- Configured CI review policy: fail -> fail; Effective CI review policy: fail; Policy outcome: ${item.status.toUpperCase()}`,
+        `- Configured CI review policy: ${mode} -> ${mode}; Effective CI review policy: ${mode}; Policy outcome: ${item.status.toUpperCase()}`,
         `- Mode-transition direction: unchanged; Evaluator matches: ${evaluation.matchCount}`,
         `- Severity weakenings: ${counts.weakenings}; Severity strengthenings: ${counts.tightenings}; Severity neutral changes: ${counts.neutrals}; Severity review-required changes: ${counts.reviewRequired}`,
       ].join("\n");
@@ -222,6 +260,100 @@ test("formatCiReport keeps diagnostics mode-only changes compact without an empt
   assert.doesNotMatch(markdown, /\| Diagnostic \|/);
   assert.doesNotMatch(markdown, /\n{3}## Review Notes/);
   assert.doesNotMatch(markdown, /> .*CI (?:status effect|failure behavior)/);
+});
+
+test("formatCiReport preserves the stricter fail policy for mode-only weakening", () => {
+  const report = diagnosticSeverityPolicyReport(
+    { ciPolicy: "fail", severity: {} },
+    { ciPolicy: "off", severity: {} },
+  );
+  assert.equal(report.status, "fail");
+  assert.equal(report.diagnosticSeverityPolicy?.outcome, "fail");
+  assert.deepEqual(report.diagnosticSeverityPolicy?.configured, {
+    from: "fail",
+    to: "off",
+    effective: "fail",
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const section = [
+    "## Diagnostic Severity Policy",
+    "",
+    "> CI status effect: FAIL — effective CI review policy: fail.",
+    "",
+    "- Configured CI review policy: fail -> off; Effective CI review policy: fail; Policy outcome: FAIL",
+    "- Mode-transition direction: weakening; Evaluator matches: 1",
+    "- Severity weakenings: 0; Severity strengthenings: 0; Severity neutral changes: 0; Severity review-required changes: 0",
+  ].join("\n");
+  assert.ok(markdown.includes(`\n\n${section}\n\n## Review Notes\n`));
+  assert.doesNotMatch(markdown, /\| Diagnostic \||Configuration keys:/);
+});
+
+test("formatCiReport truncates severity changes at ten rows with separated impact and metadata", () => {
+  // Reverse configuration order to exercise the diff's deterministic ID ordering.
+  const ids = [
+    "QUAL-MISSING-EXAMPLES",
+    "QUAL-MISSING-DESCRIPTION",
+    "META-UNKNOWN-REFERENCE",
+    "META-UNKNOWN-DEPENDENCY",
+    "META-REQUIRED-SUSPENDED-DEPENDENCY",
+    "META-REQUIRED-REVOKED-DEPENDENCY",
+    "META-OPTIONAL-SUSPENDED-DEPENDENCY",
+    "META-OPTIONAL-REVOKED-DEPENDENCY",
+    "META-MISSING-ID",
+    "META-INACTIVE-DEPENDENCY",
+    "META-DUPLICATE-DECLARED-DEPENDENCY",
+    "META-DUPLICATE-ASSET-ID",
+  ];
+  const report = diagnosticSeverityPolicyReport(
+    {
+      ciPolicy: "fail",
+      severity: Object.fromEntries(ids.map((id) => [id, "low"])),
+    },
+    {
+      ciPolicy: "fail",
+      severity: Object.fromEntries(ids.map((id) => [id, "critical"])),
+    },
+  );
+  const json = formatCiReport(report, "json");
+  const markdown = formatCiReport(report, "markdown");
+  const sortedIds = [...ids].sort();
+  const rows = markdown.match(/^\| `.*$/gm) ?? [];
+  assert.equal(rows.length, 10);
+  assert.deepEqual(
+    rows,
+    sortedIds
+      .slice(0, 10)
+      .map(
+        (id) =>
+          `| \`${id}\` | low (repository_configuration) | critical (repository_configuration) | ↑ tightening |`,
+      ),
+  );
+  assert.ok(
+    markdown.includes(
+      [
+        rows[9],
+        "",
+        "> Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
+        "",
+        "- 2 more not shown; see JSON for the full list.",
+        "- Configured CI review policy: fail -> fail; Effective CI review policy: fail; Policy outcome: PASS",
+        "- Mode-transition direction: unchanged; Evaluator matches: 0",
+        "- Severity weakenings: 0; Severity strengthenings: 12; Severity neutral changes: 0; Severity review-required changes: 0",
+        "",
+        "## Review Notes",
+        "",
+      ].join("\n"),
+    ),
+  );
+  assert.equal(markdown.match(/Configuration keys:/g)?.length, 1);
+  assert.equal(markdown.match(/\| Diagnostic \|/g)?.length, 1);
+  assert.equal(formatCiReport(report, "json"), json);
+  const jsonChanges = JSON.parse(json).diff.diagnosticSeverityPolicy.changes;
+  assert.equal(jsonChanges.length, 12);
+  assert.deepEqual(
+    jsonChanges.map((change: { configKey: string }) => change.configKey),
+    sortedIds.map((id) => `diagnostics.severity.${id}`),
+  );
 });
 
 test("formatCiReport renders deterministic markdown review artifact", () => {
@@ -3939,6 +4071,27 @@ function markdownInlineCodeValues(markdown: string): string[] {
   };
   visit(fromMarkdown(markdown));
   return values;
+}
+
+function diagnosticSeverityPolicyReport(
+  from: DiagnosticsConfig,
+  to: DiagnosticsConfig,
+): CiReport {
+  return buildCiReportFromDiff(
+    {
+      ...policyDiffReport({}),
+      discovery: neutralSkillDiscoveryDiff(),
+      diagnosticSeverityPolicy: buildDiagnosticSeverityPolicyDiff(from, to),
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    { from: from.ciPolicy, to: to.ciPolicy },
+  );
 }
 
 function policyDiffReport(options: {

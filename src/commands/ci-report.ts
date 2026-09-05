@@ -1339,8 +1339,10 @@ function formatDiagnosticSeverityPolicySection(
     "",
     ...(changes.length > 0
       ? [
-          "| Diagnostic | Previous | Current | Change | Configuration key |",
-          "| --- | --- | --- | --- | --- |",
+          "Configuration keys: `diagnostics.severity.<Diagnostic>`.",
+          "",
+          "| Diagnostic | Previous | Current | Change |",
+          "| --- | --- | --- | --- |",
           ...changes
             .slice(0, MAX_LIST_ITEMS)
             .map(formatDiagnosticSeverityPolicyChange),
@@ -1372,11 +1374,7 @@ function formatDiagnosticSeverityPolicyChange(
     "|",
     "\\|",
   );
-  const configKey = formatMarkdownInlineCode(change.configKey).replaceAll(
-    "|",
-    "\\|",
-  );
-  return `| ${diagnostic} | ${from} (${change.from.source}) | ${to} (${change.to.source}) | ${direction} | ${configKey} |`;
+  return `| ${diagnostic} | ${from} (${change.from.source}) | ${to} (${change.to.source}) | ${direction} |`;
 }
 
 function formatMetadataPolicyEndpoint(
