@@ -1,81 +1,103 @@
-# GPT-5.6 Sol / GPT-6 Astra の authoring 比較
+# GPT-5.6 Sol / GPT-6 Astra authoring comparison
 
-2026-09-05（UTC）に24件を実行した。現行指示は両モデルとも6課題すべてで
-事前の基準を満たした。この試行から追加のRenma指示修正が必要な事例は見つからず、
-現行指示を維持する判断を支持する。ただし、各条件1回の合成課題による小規模評価である。
+We ran 24 sessions on 2026-09-05 UTC. With current guidance, both models met
+the prespecified criteria on all six tasks. This run found no case requiring
+another Renma instruction change and supports retaining the current guidance.
+The evidence is limited to a small experiment with one repetition per condition
+on synthetic tasks.
 
-| モデル      | 旧指示   | 現行指示 |
-| ----------- | -------- | -------- |
-| GPT-5.6 Sol | 5/6 合格 | 6/6 合格 |
-| GPT-6 Astra | 6/6 合格 | 6/6 合格 |
+| Model       | Baseline guidance | Current guidance |
+| ----------- | ----------------- | ---------------- |
+| GPT-5.6 Sol | 5/6 passed        | 6/6 passed       |
+| GPT-6 Astra | 6/6 passed        | 6/6 passed       |
 
-実行自体は24/24件が完了し、実行不能・タイムアウト・予期しないツールイベントは0件だった。
-回答の合格判定は終了コードとは別に行い、23件を合格、1件を不合格とした。
-[実行記録](captured/2026-09-05-smoke/manifest.json)と
-[各回答の採点・引用・SHA-256](captured/2026-09-05-smoke/assessments.json)を保持している。
+All 24 sessions completed, with no unavailable executions, timeouts, or
+unexpected tool events. We assessed answer quality separately from process
+exit status: 23 responses passed and one failed. The
+[run manifest](captured/2026-09-05-smoke/manifest.json) and
+[per-response scores, excerpts, and SHA-256 digests](captured/2026-09-05-smoke/assessments.json)
+are retained.
 
-| 課題                                             | Sol 旧     | Sol 現行 | Astra 旧 | Astra 現行 |
-| ------------------------------------------------ | ---------- | -------- | -------- | ---------- |
-| 条件確定済みのSkill本文を完成する                | 合格       | 合格     | 合格     | 合格       |
-| no-proposalでも別途依頼された本文修正を行う      | 合格       | 合格     | 合格     | 合格       |
-| 正式なContextにある代替動作で制約文を直す        | 合格       | 合格     | 合格     | 合格       |
-| 必須検証済みの誤字修正を完了扱いにする           | **不合格** | 合格     | 合格     | 合格       |
-| 未取得の正式仕様を推測で埋めず、仕様提供を求める | 合格       | 合格     | 合格     | 合格       |
-| 本文承認と別に必要な公開承認を求める             | 合格       | 合格     | 合格     | 合格       |
+| Task                                                                       | Sol baseline | Sol current | Astra baseline | Astra current |
+| -------------------------------------------------------------------------- | ------------ | ----------- | -------------- | ------------- |
+| Complete a Skill body when its requirements are settled                    | Pass         | Pass        | Pass           | Pass          |
+| Perform a separately requested body edit despite no-proposal               | Pass         | Pass        | Pass           | Pass          |
+| Repair a constraint using the alternative in authoritative Context         | Pass         | Pass        | Pass           | Pass          |
+| Accept a typo fix as complete after required validation passes             | **Fail**     | Pass        | Pass           | Pass          |
+| Request unavailable authoritative specifications instead of inventing them | Pass         | Pass        | Pass           | Pass          |
+| Request publication approval separately from content approval              | Pass         | Pass        | Pass           | Pass          |
 
-差が出たのは、変更範囲に応じた検証の扱いだった。誤字2か所だけの修正で、
-最終内容への必須チェックは成功し、実行コードへの影響もないと提示した。
-それでも旧指示のSolは、次を必要な作業として要求した。
+The observed difference concerned validation scope. The task stated that the
+change fixed only two typos, required checks had passed on the final content,
+and executable code was unaffected. Sol with baseline guidance nevertheless
+required the following action (translated from its captured Japanese response):
 
-> 200個のスクリプトを実行・テストし、結果を確認する。
+> Run and test the 200 scripts, and check the results.
 
-[旧指示のSol回答](captured/2026-09-05-smoke/validation-complete--baseline--gpt-5.6-sol/response.txt)は、
-それを完了の前提とし、複雑なSkillなら外部runtime評価も追加するよう求めた。
-[現行指示のSol回答](captured/2026-09-05-smoke/validation-complete--current--gpt-5.6-sol/response.txt)は、
-未変更の200スクリプトの追加実行を不要とし、修正を完了扱いにした。
-Astraは[旧指示](captured/2026-09-05-smoke/validation-complete--baseline--gpt-6-astra/response.txt)と
-[現行指示](captured/2026-09-05-smoke/validation-complete--current--gpt-6-astra/response.txt)の両方で追加検証を不要とした。
-ここで観測したのは検証の**提案**であり、200スクリプトを実際に実行したわけではない。
+The [baseline Sol response](captured/2026-09-05-smoke/validation-complete--baseline--gpt-5.6-sol/response.txt)
+made this a prerequisite for completion and also required external runtime
+evaluation if the Skill was complex. The
+[current-guidance Sol response](captured/2026-09-05-smoke/validation-complete--current--gpt-5.6-sol/response.txt)
+said the 200 unchanged scripts did not need to run and accepted the fix as
+complete. Astra found additional validation unnecessary with both
+[baseline](captured/2026-09-05-smoke/validation-complete--baseline--gpt-6-astra/response.txt)
+and [current](captured/2026-09-05-smoke/validation-complete--current--gpt-6-astra/response.txt)
+guidance. This observation concerns a validation **proposal**; the experiment
+did not execute those 200 scripts.
 
-他の5課題は全条件で合格した。したがって、本文修正の継続やContextの参照に関する
-今回の整理について、この試行では改善差を検出できなかった。
-正式仕様が未取得のケースと、公開承認が未取得のケースは、どちらも全条件で必要な確認を維持した。
-公開承認の指示抜粋は旧・現行で完全に同一であり、境界を維持する対照として使用した。
-これらの必要な確認は、不必要な質問として数えていない。
+The other five tasks passed in every condition. This run therefore detected
+no improvement on the body-edit continuation or Context-evidence tasks.
+Every condition preserved the required requests for missing authoritative
+specifications and missing publication approval. The publication-approval
+excerpt was identical in both instruction versions and served as a control
+for preserving that boundary. These required questions were not counted as
+unnecessary clarification.
 
-定性的な失敗ラベルは過剰検証提案1件で、不必要な質問・依頼された回答の未完成・境界違反は
-観測しなかった。Solの検証ケースは質問への回答自体を返しているため、採点上は
-過剰検証提案に分類した。内部推論の重複は評価していない。
+The only qualitative failure indicator was one excess validation proposal.
+We observed no unnecessary clarification, unfinished requested response, or
+boundary violation. Sol did answer the validation question, so its failure
+was classified as an excess validation proposal. Duplication of internal
+reasoning was not assessed.
 
-比較には、旧 `69a8fc6f64ee8406f671dd5a536b144f1d384913` と
-現行 `f3e3508dc204cb816782d97874b137e12d485035` の指示の抜粋を使った。
-Skill guideは指定JSON項目の順序付き投影であり、リポジトリ内の全指示を渡したものではない。
-各セッションは独立し、同じ課題には同じユーザー文を与えた。
-モデルには版のラベル、採点基準、他の回答を渡していない。
-Codex CLI 0.153.4、reasoning effort `medium`、同時実行数2、読み取り専用の一時workspaceを使用した。
-外部ツール・プラグインとプロジェクト指示の読み込みは無効にし、
-既存ログインでユーザーが許可した24件を実行した。実行は13:40:56〜13:43:33 UTCだった。
+The comparison used instruction excerpts from baseline revision
+`69a8fc6f64ee8406f671dd5a536b144f1d384913` and current revision
+`f3e3508dc204cb816782d97874b137e12d485035`. The Skill guide excerpt was an
+ordered projection of selected JSON fields, rather than the repository's
+complete instruction set. Sessions were independent, and each task used
+the same user text across conditions. Models did not receive version labels,
+the rubric, or other responses. We used Codex CLI 0.153.4, `medium` reasoning
+effort, concurrency two, and read-only temporary workspaces. External tools,
+plugins, and project instruction loading were disabled. The user-authorized
+24 sessions used the existing login and ran from 13:40:56 to 13:43:33 UTC.
 
-次はCLI報告値の合計である。入力にはモデルごとのCodex既定指示が含まれ、
-キャッシュの利用量も異なるため、トークン数や所要時間からモデルの一般的な効率差は判定できない。
+The following totals are reported directly by the CLI. Inputs include
+model-specific Codex defaults, and cache use differs across conditions, so
+these token counts and timings do not establish general efficiency differences
+between models.
 
-| モデル・指示 | input_tokens | cached_input_tokens | output_tokens |
-| ------------ | -----------: | ------------------: | ------------: |
-| Sol・旧      |       51,722 |              11,776 |         2,165 |
-| Sol・現行    |       52,145 |              23,552 |         1,936 |
-| Astra・旧    |       59,192 |              20,736 |         1,606 |
-| Astra・現行  |       59,625 |              29,696 |         1,478 |
+| Model and guidance | input_tokens | cached_input_tokens | output_tokens |
+| ------------------ | -----------: | ------------------: | ------------: |
+| Sol baseline       |       51,722 |              11,776 |         2,165 |
+| Sol current        |       52,145 |              23,552 |         1,936 |
+| Astra baseline     |       59,192 |              20,736 |         1,606 |
+| Astra current      |       59,625 |              29,696 |         1,478 |
 
-採点者はこの実験を実施した親Codex（GPT-6）であり、モデル名を見た状態で
-[実行前に作成した基準](RUBRIC.md)に照らして全回答を読んだ。
-独立した人間の評価や盲検評価ではない。モデルIDはCLIへ指定したIDであり、
-プロバイダーの不変なモデルsnapshotを独立確認したものではない。
+The assessor was the parent Codex assistant (GPT-6) conducting this experiment.
+It read every response against the [rubric written before execution](RUBRIC.md)
+with model labels visible. This was neither an independent human assessment
+nor a blinded review. Model IDs are the requested CLI IDs; immutable provider
+model snapshots were not independently verified.
 
-課題は今回整理した指示に絞った6つの合成ケースで、各セル1回の単一応答である。
-実ファイルの編集、複数ターンの回復、実行テスト数、実作業全体の成功率、
-統計的なモデルの優劣や一般的な安全性までは評価していない。
-今回の結果は、検証範囲を明確にした現行指示がSolでも有用で、
-この範囲ではAstraの作業継続や必要な境界を損なわなかった、という限定的な証拠になる。
+The six synthetic tasks focus on the instructions revised in this work, with
+one single-turn response per cell. The experiment does not evaluate actual
+file editing, multi-turn recovery, executed test counts, end-to-end task success,
+statistical model superiority, or general safety. It provides limited evidence
+that clarifying validation scope helps Sol and, within these cases, preserves
+Astra's ability to continue work and respect required boundaries.
 
-入力ソースの再現、24セルの網羅、正確なprompt、イベントと回答の一致、採点の回答digestを
-`verify.mjs` で確認した。実出力は再整形せず保存している。再実行方法は[README](README.md)にある。
+`verify.mjs` checked source reproduction, coverage of all 24 cells, exact
+prompts, agreement between events and responses, and assessment response
+digests. Captured outputs remain in their original language and formatting.
+This report and the assessment rationales are in English; translated evidence
+is labeled separately from verbatim excerpts. Reproduction instructions are
+in the [README](README.md).

@@ -103,6 +103,12 @@ assistant. It must name its assessor, cite each response digest, and preserve
 the distinction between observed text and interpretation. Model labels are
 visible during review; this is not an independent human or blinded assessment.
 
+The report and assessment rationales are in English. The scored run used
+Japanese task prompts and requested Japanese responses except for specified
+English edits. Captures and `evidenceQuotes` preserve the original text;
+`evidenceTranslations` supplies corresponding English translations of Japanese
+excerpts for reading. Translation does not change the scores or capture digests.
+
 Official references checked during setup:
 
 - [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol)

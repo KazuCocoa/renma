@@ -5,15 +5,9 @@
   "repositoryStatus": "?? experiments/model-authoring-comparison/\n",
   "cliExecutable": "/private/tmp/renma-eval-codex-01534/node_modules/.bin/codex",
   "cliVersion": "codex-cli 0.153.4",
-  "models": [
-    "gpt-5.6-sol",
-    "gpt-6-astra"
-  ],
+  "models": ["gpt-5.6-sol", "gpt-6-astra"],
   "reasoningEffort": "medium",
-  "variants": [
-    "baseline",
-    "current"
-  ],
+  "variants": ["baseline", "current"],
   "repetitions": 1,
   "concurrency": 2,
   "perSessionTimeoutMs": 120000,
