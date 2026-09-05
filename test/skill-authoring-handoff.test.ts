@@ -650,11 +650,11 @@ test("guide prompt and JSON expose the v1 handoff construction contract", async 
   assert.doesNotMatch(promptResult.stdout, /"currentUnderstanding"/);
   assert.match(
     promptResult.stdout,
-    /no Blocking authoring decision remains.*construct.*handoff/is,
+    /Record caller-declared authoring decisions only after every creation-gate requirement is established[\s\S]*no Blocking authoring decision remains/,
   );
   assert.match(
     promptResult.stdout,
-    /renma scaffold skill <agreed-path> --handoff <handoff\.json>/,
+    /renma scaffold skill <path> --handoff <handoff\.json>/,
   );
   assert.match(promptResult.stdout, /does not certify.*claims are true/i);
 });

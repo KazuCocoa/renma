@@ -91,6 +91,13 @@ is already established or its condition does not apply. In particular,
 clarification is not mandatory when every creation-gate requirement is already
 established.
 
+Evidence, authority, ownership, security, asset responsibilities, completion,
+and the handoff contract are requirements. Decision tables, question themes,
+and progress-summary formats are optional working aids. Preserve the factual
+and progression distinctions they explain; neither their presentation nor an
+internal reasoning sequence is an additional gate requirement. The structured
+handoff still uses its defined fields.
+
 The user does not need to supply a plan-quality specification. When a decision
 summary helps the interaction, keep the working state compact:
 
@@ -230,14 +237,16 @@ Do not guess does not mean stop and ask about every unknown. Never present
 missing truth as Confirmed; continue work that does not depend on it; preserve
 it with evidence; report assumptions and uncertainty; ask only when it blocks
 the current stage; and never manufacture expected behavior merely to finish an
-output.
+output. Continue independent investigation and preparation while a question is
+pending. File creation still waits until every creation-gate requirement is
+established and no Blocking decision remains.
 
-Before asking, preserve the raw evidence and group related unknowns by the
-decision they depend on. Timeout, retry count, partial success, and rollback
-usually form one **Failure and recovery behavior** theme rather than four
-questions. Prioritize themes by risk and downstream impact, and expand an item
-only when its distinction changes the result. There is no fixed maximum for raw
-unknowns or themes.
+Preserve the raw evidence. When grouping helps resolve related unknowns, group
+them by the decision they depend on. Timeout, retry count, partial success, and
+rollback usually form one **Failure and recovery behavior** theme rather than
+four questions. Prioritize themes by risk and downstream impact, and expand an
+item only when its distinction changes the result. There is no fixed maximum
+for raw unknowns or themes.
 
 When a workflow has meaningful stages, reassess themes at each transition. A
 specification ambiguity can be Report as finding during review and remain
@@ -299,8 +308,12 @@ for the relevant content through an approved process or keep source-dependent
 facts Unresolved; do not fill them from memory or plausible assumptions.
 
 Before asking the user, inspect applicable evidence that can answer the current
-question. Use only the relevant commands rather than treating every view as
-ceremony:
+question and consider safe structural defaults within the user's authorization.
+Use existing decisions and authorizations only while they remain applicable to
+the same scope and action; preserve requirements for separate or immediate
+approval. Ask only when a Blocking authoring decision still requires human truth
+or unavailable source content. Use only the relevant commands rather than
+treating every view as ceremony:
 
 ```bash
 renma scan . --fail-on high --format json
@@ -476,6 +489,9 @@ human-review semantics. Human review is explicit in
 `interaction.humanReviewRules`. The compact prompt includes a conditional
 pointer to the complete JSON `externalTraversalRules` when the finished Skill
 may recursively follow references discovered inside an external source.
+Disposition and platform-handoff reference tables remain in JSON; the default
+prompt states their required outcomes in the questioning, gate, repair, and
+handoff sections without repeating those tables.
 
 Use its deterministic prompt to define:
 
@@ -693,15 +709,22 @@ Preserve Agent Skills optional fields, unknown `metadata.renma.*` values, and
 other vendors' string metadata. Provider-specific `agents/openai.yaml` is
 permitted but is not required by Renma core.
 
-Execute and test every script. Forward-test complex Skills with raw user
-prompts, outputs, and execution logs in the external runtime that consumes the
-Skill. Do not leak expected answers, diagnoses, or intended fixes to evaluation
-agents. Renma remains deterministic; runtime evaluation stays external.
+Verify new or changed scripts and existing executable behavior affected by the
+change with relevant tests or observable checks. Do not execute unrelated or
+unchanged scripts solely because they exist. Report unavailable required
+validation and its impact; do not claim an unrun check passed.
+
+Use external runtime evaluation for complex Skill behavior when the change,
+unresolved execution evidence, or repository requirements call for it. Use
+representative raw user prompts, outputs, and execution logs without leaking
+expected answers, diagnoses, or intended fixes to evaluation agents. Renma
+remains deterministic; runtime evaluation stays external.
 
 ### 4. Validate, fix, and rerun
 
-Run the validation commands relevant to the authored or changed structure. The
-usual release gate is:
+After authoring or changes, run the relevant validation and all
+repository-required checks for the current change and stage. The usual release
+gate is:
 
 ```bash
 renma scan . --fail-on high
@@ -713,6 +736,11 @@ repeated-context or boundary evidence before semantic change, ask the human
 when truth is missing, or explain why no change is justified. Follow
 Diagnostics v2 constraints and verification steps, rerun after repairs, and do
 not weaken security policy or add a suppression merely to pass.
+
+After relevant checks pass, repeat or broaden validation only for further
+changes, failed checks, or unresolved concerns. Reuse existing evidence only
+while it remains applicable to the current content, environment, and required
+scope. Required CI and release checks still apply.
 
 Use other deterministic views only when they answer a specific structural or
 governance question; do not run every command as ceremony:
@@ -1049,9 +1077,13 @@ When an LLM is asked to improve one existing Skill:
 3. Inspect relevant local resources and referenced Context Assets.
 4. Use `renma suggest-metadata` only when metadata retrofit or migration
    evidence exists.
-5. Prepare the smallest intended patch.
-6. Run `renma scan . --fail-on high --format json` again.
-7. Stop without manufacturing work when Renma returns `no-proposal`.
+5. When `suggest-metadata` reports `decisionStatus: "no-change-recommended"`
+   with `suggestedMode: "no-proposal"`, do not manufacture a metadata or
+   migration patch. Continue any separately requested Skill-body improvement;
+   stop only when no other intended work remains.
+6. Prepare the smallest intended patch.
+7. After changes, rerun `renma scan . --fail-on high --format json` and the
+   repository-required checks for the change and stage.
 8. Report unresolved human decisions.
 
 For a classification-only question, `renma inspect <target> --format json` may

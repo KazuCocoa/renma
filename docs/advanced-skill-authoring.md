@@ -265,18 +265,27 @@ For each related Skill, confirm:
 
 ## Validate And Review
 
-Run the focused and repository-wide checks after authoring:
+After authoring, run the scan and all repository-required checks for the current
+change and stage:
+
+```bash
+renma scan . --fail-on high
+```
+
+Use additional views only when they answer a current structural or governance
+question:
 
 ```bash
 renma inspect skills/setup/appium-ios-simulator/SKILL.md
 renma graph . --focus skill.setup.appium-ios-simulator --format mermaid
 renma catalog . --format markdown
-renma scan . --fail-on high
 ```
 
-Fix relevant diagnostics and rerun the scan. Do not weaken security policy or
-add a suppression merely to pass. Have a human review meaningful semantic
-changes before merging.
+Fix relevant diagnostics and rerun affected checks. After relevant checks pass,
+repeat or broaden validation only for further changes, failed checks, or
+unresolved concerns. Required CI and release checks still apply. Do not weaken
+security policy or add a suppression merely to pass. Have a human review
+meaningful semantic changes before merging.
 
 This workflow creates and governs current Agent Skills-compatible repository
 assets. It does not automatically add continuation declarations or published

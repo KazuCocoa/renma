@@ -1237,7 +1237,17 @@ projection: core gate and evidence invariants, adaptive clarification guidance,
 asset responsibilities, handoff boundary, and verification. Renderer tests
 verify presence of the sufficient contract and deliberate omission of detailed
 reference material; they do not require every JSON string to appear in the
-prompt.
+prompt. Disposition and platform-handoff reference tables stay in JSON; the
+prompt preserves their requirements in the questioning, creation-gate,
+post-validation, and structured-handoff sections.
+
+The guide and all scaffold forms share authoring validation wording from
+`src/guidance/skill-authoring.ts`. Scans and repository-required checks remain
+required for the current change and stage after authoring or changes; other
+report commands answer specific evidence questions. Repeat or broaden
+successful checks only for further changes, failures, or unresolved concerns,
+and reuse evidence only while its content, environment, and required scope
+remain applicable. This guidance does not relax required CI or release checks.
 
 The public JSON projection is `renma.skill-authoring-guide.v2`. Consumers must
 branch on `schemaVersion`; v2 must not be parsed with v1 assumptions about phase

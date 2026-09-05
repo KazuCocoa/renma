@@ -100,7 +100,7 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
     blocked
       ? "Do not return or apply a patch while the decision is blocked. Preserve the existing source."
       : noChange
-        ? "Stop without manufacturing work. Preserve the existing source."
+        ? "No metadata patch is proposed. Preserve the existing source for this metadata-only result; continue separately requested authoring work within its authorized scope. Stop only when no other intended work remains."
         : suggestion.decisionStatus === "human-confirmation-required"
           ? "After confirming the stated human decision, return only the reviewed candidate fields. Do not invent unresolved owner, lifecycle, or source-of-truth metadata, and do not rewrite the asset body."
           : "Return a small reviewed patch containing only the deterministic candidate. Do not rewrite the asset body.",
@@ -182,7 +182,7 @@ function renderAgentSkillMigrationPrompt(
     promptState === "blocked"
       ? "Do not return or apply a frontmatter patch while the decision is blocked. Preserve the existing source until every blocked item is resolved with human review."
       : promptState === "no-proposal"
-        ? "No frontmatter patch is proposed. Do not return or apply a frontmatter patch; preserve the existing source."
+        ? "No frontmatter patch is proposed. Do not return or apply a frontmatter patch from this result. Continue any separately requested Skill-body improvement within its authorized scope; stop only when no other intended work remains."
         : suggestion.decisionStatus === "human-confirmation-required" &&
             migration.canonicalFrontmatter
           ? migration.entrypointMigration === "none"
@@ -203,7 +203,7 @@ function renderSkillSuggestionVerification(
     return [
       "Verification:",
       "- No verification change is required when no separate authoring change is made.",
-      "- Only if a separate, intentional authoring change is made: run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
+      "- Only if a separate, intentional authoring change is made: run `renma scan . --fail-on high` and repository-required checks for that change and stage. Fix relevant diagnostics and rerun affected checks after corrections.",
     ];
   }
 
@@ -226,9 +226,9 @@ function renderSkillSuggestionNextSteps(
   if (state === "no-proposal") {
     return [
       "Next steps:",
-      "1. No metadata or migration change is proposed; preserve the existing source.",
-      "2. If a separate authoring change is intended, review the Skill semantics with platform-native Skill authoring guidance and keep the patch evidence-backed.",
-      "3. After a separate, intentionally reviewed authoring change, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
+      "1. No metadata or migration change is proposed; this result alone does not justify changing the source.",
+      "2. If a separate authoring change is intended, continue within its authorized scope and keep the patch evidence-backed. Platform-native Skill authoring guidance may help refine the Skill semantics.",
+      "3. Validate any separate authoring changes under the Verification guidance above.",
       "4. If no separate change is intended, stop without manufacturing work.",
     ];
   }

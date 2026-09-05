@@ -433,6 +433,27 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
 });
 
+test("authoring docs scope metadata no-change and validation to the requested work", async () => {
+  for (const filename of ["docs/authoring-guide.md", "docs/user-manual.md"]) {
+    const source = await readRepoFile(filename);
+    assert.match(
+      source,
+      /`decisionStatus: "no-change-recommended"`[\s\S]*`suggestedMode: "no-proposal"`[\s\S]*do not manufacture a metadata or\s+migration patch/,
+    );
+    assert.match(
+      source,
+      /Continue any separately requested Skill-body improvement/,
+    );
+    assert.match(source, /stop only when no other intended work remains/);
+    assert.match(
+      source,
+      /repeat or broaden validation only for further\s+changes, failed checks, or\s+unresolved concerns/,
+    );
+    assert.match(source, /Required CI and release\s+checks still apply/);
+    assert.doesNotMatch(source, /Execute and test every script/);
+  }
+});
+
 test("Context Lens docs use canonical Skill metadata and explicit semantic boundaries", async () => {
   const lensGuide = await readRepoFile("docs/context-lens.md");
   const authoring = await readRepoFile("docs/authoring-guide.md");

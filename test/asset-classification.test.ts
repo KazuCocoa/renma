@@ -591,7 +591,16 @@ test("suggest-metadata returns no-proposal for ordinary Skill-local support", as
   const prompt = renderMetadataPrompt(suggestion);
   assert.match(prompt, /No independent metadata retrofit is required/);
   assert.match(prompt, /skills\/foo\/SKILL\.md/);
-  assert.match(prompt, /Stop without manufacturing work/);
+  assert.match(prompt, /No metadata patch is proposed/);
+  assert.match(
+    prompt,
+    /Preserve the existing source for this metadata-only result/,
+  );
+  assert.match(
+    prompt,
+    /continue separately requested authoring work within its authorized scope/,
+  );
+  assert.match(prompt, /Stop only when no other intended work remains/);
   assert.doesNotMatch(prompt, /Return a small reviewed patch/);
 });
 
@@ -760,7 +769,8 @@ test("decisionStatus is authoritative across prompt outcomes", () => {
     ...base,
     decisionStatus: "no-change-recommended",
   });
-  assert.match(noChange, /Stop without manufacturing work/);
+  assert.match(noChange, /No metadata patch is proposed/);
+  assert.match(noChange, /Stop only when no other intended work remains/);
   const deterministic = renderMetadataPrompt({
     ...base,
     decisionStatus: "deterministic",

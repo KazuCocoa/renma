@@ -6,6 +6,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified model-neutral Skill authoring: decision tables and progress formats
+  are optional working aids, questions concern unresolved blocking decisions,
+  and independent investigation can continue while preserving the creation
+  gate, source authority, ownership, and separate approval requirements.
+- Reduced default guide repetition while retaining disposition and
+  platform-handoff reference tables in the complete JSON guide. Guide and
+  handoff schema identities, fields, and governance boundaries are unchanged.
+- Aligned guide, scaffold, and authoring documentation on relevant validation,
+  conditional report commands, and evidence-based repetition of checks.
+  Required CI and release checks retain their scope. Clarified that a metadata
+  `no-proposal` result does not stop separately requested Skill-body work.
+
 ## [0.38.0] - 2026-09-04
 
 ### Added
