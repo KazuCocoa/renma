@@ -363,12 +363,18 @@ values:
 | --- | --- | --- |
 | `deterministic` | Renma has enough supported evidence to construct the reported change candidate. | Review and apply only the reported candidate; do not infer additional changes. |
 | `human-confirmation-required` | Renma constructed candidate evidence, but human intent or semantics must be confirmed before application. | Do not apply until the required human confirmation occurs. |
-| `blocked` | Conflicting, incomplete, unsafe, or unresolved evidence prevents a change recommendation. | Hard stop. Do not apply a patch even if another payload field looks candidate-like. |
+| `blocked` | Conflicting, incomplete, unsafe, or unresolved evidence prevents a change recommendation. | Do not apply a patch from this result, even if another payload field looks candidate-like. |
 | `no-change-recommended` | Renma successfully determined that no edit is recommended. | Treat as a successful no-edit result; do not manufacture a patch. |
 
 `decisionStatus` is the authoritative application gate. The accompanying
 decision `reasonCode` and `summary` explain that outcome; neither changes the
 structural classification.
+
+These statuses govern the recommendation and its dependent changes. A blocked
+candidate remains inapplicable while the agent investigates missing evidence
+or continues independent, already-authorized work. Do not relabel that
+candidate as separate work to bypass its application gate. A successful
+no-edit result does not end other requested work that remains outstanding.
 
 #### Safe Consumer Rules
 
@@ -376,7 +382,8 @@ structural classification.
 2. Do not infer inheritance from `scope: "skill-local"`.
 3. Require `parentResolution: "resolved"` plus governance evidence before
    claiming inheritance.
-4. Treat `decisionStatus: "blocked"` as a hard stop.
+4. Treat `decisionStatus: "blocked"` as a hard stop on applying that
+   recommendation and its dependent changes.
 5. Treat `decisionStatus: "no-change-recommended"` as a successful no-edit
    result.
 6. Use `matchedRule` and `reasonCode` for machine branching, not the
@@ -470,29 +477,38 @@ user-facing explanation. The consumer should translate the relevant fields into
 plain language while preserving the boundary between confirmed facts,
 recommendations, and unresolved human intent.
 
-The overall loop is:
+When a change is warranted, the evidence dependencies are:
 
 ```text
 Renma emits deterministic evidence
--> LLM summarizes the evidence
--> user supplies missing intent
--> LLM performs the smallest supported change
--> Renma verifies the result
+-> LLM inspects applicable repository evidence and existing user decisions
+-> user supplies remaining required intent or approval only when needed
+-> LLM performs the smallest supported, authorized change
+-> Renma verifies the changed state
 -> LLM summarizes the new state
 ```
+
+This is not a mandatory conversation sequence. A user's existing instructions
+may already supply the required intent, and a successful no-edit result may
+complete the requested task.
 
 In practice, an LLM or coding agent should:
 
 1. Read Renma's deterministic evidence.
-2. Summarize the important facts in user-facing language.
-3. Separate confirmed facts from recommendations and unresolved intent.
-4. Ask only for human decisions that Renma cannot determine.
-5. Rerun the relevant Renma command after the user supplies new intent.
-6. Explain how the evidence or recommendation changed.
-7. Repeat until the intended repository state is explicit and Renma verifies
-   it.
+2. Inspect applicable evidence and existing user decisions before asking for
+   missing intent. Use prior authorization only while it remains applicable to
+   the same scope and action; preserve separate or immediate approval gates.
+3. Separate confirmed facts from recommendations and unresolved intent. Ask
+   only for required human decisions that remain unresolved after that review.
+4. Make the smallest supported, authorized change or explain why no change is
+   warranted. A diagnostic alone does not authorize semantic repair.
+5. Run relevant validation after changes and complete repository-required
+   checks for the current change and stage.
+6. Summarize material outcomes, verification, and remaining blockers without
+   mechanically repeating unchanged state. Finish when the requested outcome
+   is satisfied and the applicable required checks pass.
 
-A useful summary normally contains:
+When a summary helps, include the material items from:
 
 - **Confirmed repository facts:** paths, declarations, resolved relationships,
   and other evidence Renma actually observed.
@@ -503,7 +519,7 @@ A useful summary normally contains:
 - **Unresolved human decisions:** only intent that repository evidence cannot
   determine.
 - **Next safe verification step:** the relevant structured Renma command, or a
-  statement that no executable action is safe yet.
+  statement that no action for this recommendation is yet permitted.
 
 For example:
 
@@ -524,7 +540,8 @@ LLM consumers must follow these guardrails:
 
 - Do not expose raw diagnostics without summarizing their meaning when a
   user-facing explanation is expected.
-- Do not ask the user to decide facts Renma already resolved.
+- Do not ask the user to decide facts that Renma or other applicable evidence
+  already resolved.
 - Do not invent an owner, policy, lifecycle, reference, or source-of-truth
   claim.
 - Do not convert `structural-candidate` into `resolved`.
@@ -534,8 +551,10 @@ LLM consumers must follow these guardrails:
 - Do not assume every diagnostic requires an edit.
 - Do not hide unresolved human intent behind an automatic recommendation.
 - Treat `no-change-recommended` as a valid successful outcome.
-- After new user intent is provided, rerun Renma rather than relying on an old
-  result.
+- Rerun Renma when command inputs, repository scope, or evidence applicability
+  change, and after repairs. A clarification that changes none of these does
+  not by itself require rerunning the same deterministic command. Required CI
+  and release checks still apply.
 
 ### Iterative Example
 

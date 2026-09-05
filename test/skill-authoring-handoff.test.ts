@@ -164,7 +164,7 @@ test("scaffold handoff prompt passes caller decisions through without epistemic 
   assert.match(result.stdout, /Runtime unknown handling/);
   assert.match(
     result.stdout,
-    /Re-enter clarification if new evidence creates a Blocking/,
+    /Re-enter the creation gate if new evidence creates a Blocking authoring decision[\s\S]*clarify only when required human truth remains unresolved/,
   );
 });
 

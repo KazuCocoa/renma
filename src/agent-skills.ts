@@ -804,7 +804,7 @@ function authoringIssues(
         IDS.RN_EXECUTION_CONSTRAINT_MISSING_ALTERNATIVE,
         "warning",
         "renma-authoring",
-        "Execution constraint has no nearby supported alternative or stop behavior. Request human clarification; do not invent one.",
+        "No nearby supported alternative or stop behavior was detected for this execution constraint. Inspect applicable Skill, Context, and user-provided evidence; request human clarification only if required behavior remains unresolved. Preserve the constraint and do not invent an alternative.",
         constraint.line,
       ),
     );

@@ -475,6 +475,13 @@ not disable the ordinary English-primary authoring warnings.
 | `RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED`           | Execution constraints are scattered across sections.                                                                               |
 | `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE` | A prohibition has no nearby supported alternative or stop behavior.                                                                |
 
+For `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE`, inspect applicable
+Skill instructions, Context Assets, and user-provided evidence before asking
+for clarification. The warning reports a bounded detection result, not proof
+that the intended behavior is unknown to the authoring agent. Ask only if the
+required behavior remains unresolved; preserve the constraint and do not
+invent an alternative or broaden permission to clear the warning.
+
 ## One-Way Migration
 
 Pre-0.16 Renma Skill fields are migration input only:

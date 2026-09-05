@@ -33,6 +33,9 @@ type ScaffoldFormat = "file" | "prompt" | "json";
 export type ScaffoldResource = "references" | "scripts" | "assets";
 export const SCAFFOLD_JSON_SCHEMA_VERSION = "renma.scaffold.v1" as const;
 
+const HANDOFF_REENTRY_RULE =
+  "Re-enter the creation gate if new evidence creates a Blocking authoring decision or changes the agreed asset boundary; inspect applicable evidence and clarify only when required human truth remains unresolved.";
+
 export interface ScaffoldOptions {
   kind: ScaffoldKind;
   targetPath: string;
@@ -534,7 +537,7 @@ ${JSON.stringify(handoff.securityDecisions, null, 2)}
 Runtime unknown handling
 ${JSON.stringify(handoff.runtimeUnknownHandling, null, 2)}
 
-Use the supplied handoff as the current authoring state. Do not promote Proposed or Unresolved facts to Confirmed. Do not invent omitted domain or governance truth or infer broader security permission. Re-enter clarification if new evidence creates a Blocking authoring decision. Preserve caller-provided facts directly; do not synthesize new semantic prose from them.`;
+Use the supplied handoff as the current authoring state. Do not promote Proposed or Unresolved facts to Confirmed. Do not invent omitted domain or governance truth or infer broader security permission. ${HANDOFF_REENTRY_RULE} Preserve caller-provided facts directly; do not synthesize new semantic prose from them.`;
 }
 
 function promptList(items: readonly string[]): string {
@@ -559,7 +562,7 @@ function renderSkillNextSteps(fromHandoff = false): string {
       "Next steps:",
       "1. Author within the supplied handoff's asset boundary without promoting Proposed or Unresolved state to Confirmed.",
       "2. Create supporting assets only through separate explicit scaffold commands when intended.",
-      "3. Re-enter the creation gate if new evidence creates a Blocking decision or changes the agreed asset boundary; clarify only when human truth remains unresolved.",
+      `3. ${HANDOFF_REENTRY_RULE}`,
       `4. ${AUTHORING_VALIDATION_RULE} ${AUTHORING_REPORTS_RULE} Exact generated scaffold residue is a High finding.`,
       `5. Fix relevant findings and rerun affected checks. ${AUTHORING_REVALIDATION_RULE}`,
       "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",

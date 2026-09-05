@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Aligned remaining guide help, scaffold handoff, and execution-constraint
+  warning text with evidence-first, conditional clarification. Diagnostic
+  consumer guidance scopes blocked recommendations to their dependent changes
+  and avoids rerunning unchanged evidence solely because a user replied.
+  Diagnostic detection, severity, approval gates, and JSON schemas are unchanged.
 - Clarified model-neutral Skill authoring: decision tables and progress formats
   are optional working aids, questions concern unresolved blocking decisions,
   and independent investigation can continue while preserving the creation

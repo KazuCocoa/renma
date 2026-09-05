@@ -777,7 +777,7 @@ export const COMMAND_HELP = [
       "Guide prints a deterministic, non-editing authoring contract that tells a consuming LLM to evaluate the creation gate and clarify unresolved Blocking human truth only when needed before generation or an intentional asset-boundary redesign. Skill is the only supported topic.",
     useWhen: [
       "You are about to create a Skill or ask a coding agent to create one.",
-      "A short request needs focused clarification rather than an upfront plan-quality specification.",
+      "You need to establish an authoring contract from a brief request without requiring an upfront plan-quality specification.",
       "You are intentionally reconsidering Skill or Context boundaries, file or resource placement, source representation, scripts or other support, or the asset graph.",
       "You need Renma asset, metadata, responsibility, and conciseness boundaries before scaffolding.",
       "An external authoritative source may justify a separate Context Asset even when no other Skill reuses it yet.",
