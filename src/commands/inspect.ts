@@ -169,6 +169,9 @@ function inspectRepositoryForTarget(
       id: entry.id,
       kind: entry.kind,
       ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
+      ...(entry.metadata.writableBy
+        ? { writableBy: entry.metadata.writableBy }
+        : {}),
       ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
       ...(entry.metadata.statusReason
         ? { statusReason: entry.metadata.statusReason }

@@ -52,6 +52,7 @@ const CANONICAL_SKILL_KEY_TO_OPERATIONAL = new Map<string, string>(
 );
 
 const CANONICAL_LIST_KEYS = new Set<CanonicalSkillOperationalKey>([
+  "writable_by",
   "tags",
   "requires_context",
   "optional_context",
@@ -507,6 +508,11 @@ export function parseAssetMetadata(document: ParsedDocument): {
     metadata,
     "owner",
     optionalText(metadataText(source.values.owner)),
+  );
+  assignOptionalList(
+    metadata,
+    "writableBy",
+    operationalListValue(document, source, "writable_by", diagnostics),
   );
   assignOptional(metadata, "status", status);
   assignOptional(metadata, "statusReason", statusReason);
