@@ -471,6 +471,8 @@ function metadataListItemText(raw: string): string {
 }
 
 function shouldBudgetMetadataItem(key: string, value: string): boolean {
+  // Declared modification principals are opaque identifiers, not prose-budget candidates.
+  if (key === "writable_by") return false;
   if (key === "tags") return true;
   if (key === "when_to_use" || key === "when_not_to_use") return true;
   // IDs, paths, and URLs are machine-facing relationship values and may need

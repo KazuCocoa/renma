@@ -3,6 +3,8 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
+import { DEFAULT_QUALITY_PROFILE } from "../src/quality-profile.js";
 import { loadConfig } from "../src/config.js";
 import { buildCatalog } from "../src/catalog.js";
 import { catalog, formatCatalogJson } from "../src/commands/catalog.js";
@@ -210,4 +212,40 @@ test("catalog and inspection expose declarations without changing ownership, inh
   assert.equal(afterReadiness.score, beforeReadiness.score);
   assert.equal(afterReadiness.level, beforeReadiness.level);
   assert.deepEqual(after.diagnostics, beforeCatalog.diagnostics);
+});
+
+test("opaque modification principals are exempt from prose budgets in every encoding", () => {
+  // The colon deliberately avoids the generic ID-shaped value exemption.
+  const principal = `principal:${"x".repeat(DEFAULT_QUALITY_PROFILE.metadataListItemMaxChars)}`;
+  const declarations = [
+    document(skill(`  renma.writable-by: '${JSON.stringify([principal])}'\n`)),
+    document(support(`writable_by:\n  - ${principal}\n`), "reference"),
+    document(support(`writable_by: ${principal}\n`), "reference"),
+  ];
+  for (const declaration of declarations) {
+    const result = buildCatalog([declaration]);
+    assert.deepEqual(result.catalog.entries[0]?.metadata.writableBy, [
+      principal,
+    ]);
+    assert.equal(
+      result.diagnostics.some(
+        (d) => d.code === DIAGNOSTIC_IDS.META_LIST_ITEM_TOO_LONG,
+      ),
+      false,
+      declaration.artifact.content,
+    );
+  }
+
+  const prose = `Use this when ${"x".repeat(DEFAULT_QUALITY_PROFILE.metadataListItemMaxChars)}`;
+  for (const declaration of [
+    document(support(`when_to_use:\n  - ${prose}\n`), "reference"),
+    document(skill(`  renma.tags: '${JSON.stringify([prose])}'\n`)),
+  ]) {
+    const result = buildCatalog([declaration]);
+    assert.ok(
+      result.diagnostics.some(
+        (d) => d.code === DIAGNOSTIC_IDS.META_LIST_ITEM_TOO_LONG,
+      ),
+    );
+  }
 });
