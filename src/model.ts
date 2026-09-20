@@ -36,6 +36,8 @@ export interface AssetMetadata {
   type?: string;
   version?: string;
   owner?: string;
+  /** Declared modification principals; absence declares no Renma-specific constraint. No authorization is enforced. */
+  writableBy?: string[];
   status?: AssetStatus;
   statusReason?: string;
   statusChangedAt?: string;

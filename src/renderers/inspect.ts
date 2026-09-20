@@ -147,6 +147,9 @@ function renderAssetSummary(asset: InspectAssetSummary): string[] {
     `- ID: ${asset.id}`,
     `- Kind: ${asset.kind}`,
     ...(asset.owner ? [`- Owner: ${asset.owner}`] : []),
+    ...(asset.writableBy
+      ? [`- Writable by (declared): ${list(asset.writableBy)}`]
+      : []),
     ...(asset.status ? [`- Status: ${asset.status}`] : []),
     ...(asset.statusReason ? [`- Status reason: ${asset.statusReason}`] : []),
     ...(asset.statusChangedAt

@@ -27,6 +27,7 @@ export const CANONICAL_SKILL_METADATA_KEYS = {
   title: "renma.title",
   version: "renma.version",
   owner: "renma.owner",
+  writable_by: "renma.writable-by",
   status: "renma.status",
   status_reason: "renma.status-reason",
   status_changed_at: "renma.status-changed-at",
@@ -54,6 +55,7 @@ export const NON_SKILL_CATALOG_METADATA_KEYS = {
   type: "type",
   version: "version",
   owner: "owner",
+  writable_by: "writable_by",
   status: "status",
   status_reason: "status_reason",
   status_changed_at: "status_changed_at",
@@ -115,6 +117,13 @@ export const RENMA_CATALOG_METADATA_DEFINITIONS = [
     nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.owner,
     policyKey: "owner",
     policyValueKind: "text",
+  },
+  {
+    operationalField: "writableBy",
+    skillKey: CANONICAL_SKILL_METADATA_KEYS.writable_by,
+    nonSkillKey: NON_SKILL_CATALOG_METADATA_KEYS.writable_by,
+    policyKey: "writable_by",
+    policyValueKind: "list",
   },
   {
     operationalField: "status",
@@ -281,6 +290,7 @@ export const REQUIRED_METADATA_CONFIGURATION_KEY = "metadata.required" as const;
 
 /** Ordinary top-level list fields understood by the general non-Skill parser. */
 export const NON_SKILL_LIST_METADATA_KEYS = [
+  NON_SKILL_CATALOG_METADATA_KEYS.writable_by,
   NON_SKILL_CATALOG_METADATA_KEYS.tags,
   NON_SKILL_CATALOG_METADATA_KEYS.when_to_use,
   NON_SKILL_CATALOG_METADATA_KEYS.when_not_to_use,

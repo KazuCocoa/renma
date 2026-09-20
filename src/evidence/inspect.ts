@@ -38,6 +38,7 @@ export interface InspectAssetSummary {
   id: string;
   kind: AssetKind;
   owner?: string;
+  writableBy?: string[];
   status?: AssetStatus;
   statusReason?: string;
   statusChangedAt?: string;

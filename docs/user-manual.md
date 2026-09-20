@@ -314,6 +314,7 @@ implementation-owned registries.
 | —                                     | `type`                          | Trimmed text; `context_lens` is the supported Lens discriminator                                      | Non-Skill assets; only Context/Context Lens for Lens validation                              | Conditional when a file under a Context root must be classified as a Context Lens                              | Classification evidence, catalog kind, inspect, and Context Lens diagnostics                                                                                                                                                                      |
 | `renma.version`                       | `version`                       | Trimmed text; a Context Lens accepts only `1` when present                                            | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting                                                                                                                                                                            |
 | `renma.owner` | `owner` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; recommended for shared Context; optional elsewhere | Declared/effective ownership, ownership reports, Readiness, BOM, Trust Graph, diff, and CI reporting |
+| `renma.writable-by` | `writable_by` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional unless repository policy requires it | Declared modification principals in catalog JSON and inspection; no authorization enforcement or ownership effects |
 | `renma.status`                        | `status`                        | `experimental`, `stable`, `suspended`, `revoked`, `deprecated`, or `archived`                         | Skill and cataloged non-Skill assets                                                         | Optional lifecycle declaration; `suspended` and `revoked` are inactive and require reason/date evidence        | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                  |
 | `renma.status-reason`                 | `status_reason`                 | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Required when status is `suspended` or `revoked`; optional for other statuses                                  | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                      |
 | `renma.status-changed-at`             | `status_changed_at`             | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Required and blocking when status is `suspended` or `revoked`; optional for other statuses                    | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                         |
@@ -351,6 +352,37 @@ implementation-owned registries.
 | —                                     | `scope`                         | Exact `context` when present; omission defaults to `context`                                          | Context Lens only                                                                            | Optional                                                                                                       | Context Lens scope validation and summary only                                                                                                                                                                                                    |
 <!-- renma-operational-metadata:end -->
 
+`owner` identifies the party responsible for maintaining an asset. `writable_by`
+records the principals declared as allowed to modify it. Omitting `writable_by`
+declares no Renma-specific modification constraint; it does not grant or revoke
+technical access. Renma reports this repository evidence but does not enforce
+authorization. Principals are opaque identifiers, without identity resolution or
+ownership inheritance. This declaration does not create Trust Graph owner edges.
+
+Canonical Skills use the existing JSON-array string encoding:
+
+```yaml
+metadata:
+  renma.owner: qa-platform
+  renma.writable-by: '["qa-platform","release-engineering"]'
+```
+
+Non-Skill assets use the existing list encoding:
+
+```yaml
+owner: qa-platform
+writable_by:
+  - qa-platform
+  - release-engineering
+```
+
+Non-empty declarations normalize to optional `writableBy` arrays, preserving
+order and duplicates while trimming entries and dropping blank entries, like
+other list metadata. Omitted or empty lists do not emit a `writableBy` value;
+neither is an assertion of open access. Repositories may opt into
+`"metadata": { "required": ["writable_by"] }` to require an explicit non-empty
+list using the existing required-metadata diagnostics.
+
 Removed compatibility fields are deliberately outside this operational table.
 Skill `metadata.renma.when-to-use` and `metadata.renma.when-not-to-use`, Context
 Lens `target`/`targets`/`output`/`outputs`, and non-Skill
@@ -373,6 +405,7 @@ tests.
 | --- | --- | --- | --- |
 | `version` | `metadata.renma.version` | `version` | Text |
 | `owner` | `metadata.renma.owner` | `owner` | Text |
+| `writable_by` | `metadata.renma.writable-by` | `writable_by` | List |
 | `status` | `metadata.renma.status` | `status` | Text |
 | `status_reason` | `metadata.renma.status-reason` | `status_reason` | Text |
 | `status_changed_at` | `metadata.renma.status-changed-at` | `status_changed_at` | Text |
