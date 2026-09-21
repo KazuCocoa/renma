@@ -176,12 +176,15 @@ export async function runGraphCommand(
       const index = prepareDeclaredCompositionIndex(snapshot.catalog);
       const composition = resolveDeclaredCompositionFromIndex(
         index,
-        focusNode.id,
+        focusNode.sourcePath,
       );
       report = compositionGraphReport(fullReport, composition);
     } else {
       const index = prepareDeclaredImpactIndex(snapshot.catalog);
-      const impact = resolveDeclaredImpactFromIndex(index, focusNode.id);
+      const impact = resolveDeclaredImpactFromIndex(
+        index,
+        focusNode.sourcePath,
+      );
       report = impactGraphReport(fullReport, impact);
     }
   } else {
@@ -328,19 +331,31 @@ function discoveryGraphReport(
   };
 }
 
+function focusedProvenanceTarget<T extends { id: string; sourcePath: string }>(
+  edge: CompositionProvenanceEdge | ImpactProvenanceEdge,
+  nodes: T[],
+): T | undefined {
+  return nodes.find(
+    (node) =>
+      node.id === edge.to &&
+      (edge.declaredTarget === edge.to ||
+        normalizeDependencyReference(node.sourcePath) ===
+          normalizeDependencyReference(edge.declaredTarget)),
+  );
+}
+
 function compositionGraphReport(
   report: GraphReport,
   composition: DeclaredCompositionReport,
 ): GraphReport {
   const nodeIds = new Set([
-    composition.root.id,
-    ...composition.requiredAssets.map((asset) => asset.id),
-    ...composition.optionalAssets.map((asset) => asset.id),
+    composition.root.sourcePath,
+    ...composition.requiredAssets.map((asset) => asset.sourcePath),
+    ...composition.optionalAssets.map((asset) => asset.sourcePath),
   ]);
-  const nodes = report.nodes.filter((node) => nodeIds.has(node.id));
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const nodes = report.nodes.filter((node) => nodeIds.has(node.sourcePath));
   const edges = composition.provenanceEdges.map((edge): GraphEdge => {
-    const target = nodesById.get(edge.to);
+    const target = focusedProvenanceTarget(edge, nodes);
     return {
       from: edge.from,
       to: edge.declaredTarget,
@@ -375,14 +390,13 @@ function impactGraphReport(
   impact: DeclaredImpactReport,
 ): GraphReport {
   const nodeIds = new Set([
-    impact.focus.id,
-    ...impact.requiredDependents.map((asset) => asset.id),
-    ...impact.optionalDependents.map((asset) => asset.id),
+    impact.focus.sourcePath,
+    ...impact.requiredDependents.map((asset) => asset.sourcePath),
+    ...impact.optionalDependents.map((asset) => asset.sourcePath),
   ]);
-  const nodes = report.nodes.filter((node) => nodeIds.has(node.id));
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const nodes = report.nodes.filter((node) => nodeIds.has(node.sourcePath));
   const edges = impact.provenanceEdges.map((edge): GraphEdge => {
-    const target = nodesById.get(edge.to);
+    const target = focusedProvenanceTarget(edge, nodes);
     return {
       from: edge.from,
       to: edge.declaredTarget,
@@ -1042,7 +1056,9 @@ function formatCompositionMarkdown(report: GraphReport): string {
     .map((asset) => ({
       asset,
       parents: composition.provenanceEdges.filter(
-        (edge) => edge.to === asset.id,
+        (edge) =>
+          focusedProvenanceTarget(edge, report.nodes)?.sourcePath ===
+          asset.sourcePath,
       ),
     }))
     .filter(({ parents }) => parents.length > 1);
@@ -1139,7 +1155,11 @@ function renderCompositionAssetTable(
   }
   for (const asset of assets) {
     const parents = provenance
-      .filter((edge) => edge.to === asset.id)
+      .filter(
+        (edge) =>
+          focusedProvenanceTarget(edge, assets)?.sourcePath ===
+          asset.sourcePath,
+      )
       .map(
         (edge) =>
           `${edge.from} (${edge.relationship}, ${edge.membership}, ${evidenceLabel(edge.evidence, edge.sourcePath)})`,
@@ -1301,7 +1321,12 @@ function renderImpactAssetTable(
   }
   for (const asset of assets) {
     const declarations = provenance
-      .filter((edge) => edge.from === asset.id)
+      .filter(
+        (edge) =>
+          edge.from === asset.id &&
+          normalizeDependencyReference(edge.sourcePath) ===
+            normalizeDependencyReference(asset.sourcePath),
+      )
       .map(
         (edge) =>
           `${edge.relationship} ${edge.to} (${edge.dependentMembership}; ${evidenceLabel(edge.evidence, edge.sourcePath)})`,
@@ -1319,15 +1344,18 @@ function formatImpactMermaid(report: GraphReport): string {
   report.nodes.forEach((node, index) => {
     const id = `node_${index}`;
     nodeIds.set(node.id, id);
-    const focus = node.id === impact.focus.id ? "focus " : "";
+    nodeIds.set(node.sourcePath, id);
+    const focus = node.sourcePath === impact.focus.sourcePath ? "focus " : "";
     lines.push(
       `  ${id}["${escapeMermaidLabel(`${focus}${node.kind}: ${node.id}`)}"]`,
     );
   });
 
   for (const edge of impact.provenanceEdges) {
-    const source = nodeIds.get(edge.from);
-    const target = nodeIds.get(edge.to);
+    const source = nodeIds.get(edge.sourcePath);
+    const target = nodeIds.get(
+      focusedProvenanceTarget(edge, report.nodes)?.sourcePath ?? edge.to,
+    );
     if (!source || !target) continue;
     const arrow = edge.dependentMembership === "required" ? "-->" : "-.->";
     lines.push(
@@ -1336,15 +1364,15 @@ function formatImpactMermaid(report: GraphReport): string {
   }
 
   impact.invalidIncomingDeclarations.forEach((mismatch, index) => {
-    let source = nodeIds.get(mismatch.sourceId);
+    let source = nodeIds.get(mismatch.sourcePath);
     if (!source) {
       source = `invalid_source_${index}`;
-      nodeIds.set(mismatch.sourceId, source);
+      nodeIds.set(mismatch.sourcePath, source);
       lines.push(
         `  ${source}["${escapeMermaidLabel(`invalid source: ${mismatch.sourceId}`)}"]`,
       );
     }
-    const target = nodeIds.get(mismatch.resolvedTargetId);
+    const target = nodeIds.get(mismatch.resolvedTargetPath);
     if (target) {
       lines.push(
         `  ${source} -.->|${escapeMermaidLabel(`${mismatch.relationship} invalid kind`)}| ${target}`,
@@ -1352,7 +1380,7 @@ function formatImpactMermaid(report: GraphReport): string {
     }
   });
 
-  const focusNode = nodeIds.get(impact.focus.id);
+  const focusNode = nodeIds.get(impact.focus.sourcePath);
   if (focusNode) {
     lines.push("  classDef impactFocus stroke-width:3px");
     lines.push(`  class ${focusNode} impactFocus`);
@@ -1370,7 +1398,8 @@ function formatCompositionMermaid(report: GraphReport): string {
   report.nodes.forEach((node, index) => {
     const id = `node_${index}`;
     nodeIds.set(node.id, id);
-    const root = node.id === composition.root.id ? "root " : "";
+    nodeIds.set(node.sourcePath, id);
+    const root = node.sourcePath === composition.root.sourcePath ? "root " : "";
     lines.push(
       `  ${id}["${escapeMermaidLabel(`${root}${node.kind}: ${node.id}`)}"]`,
     );
@@ -1382,8 +1411,10 @@ function formatCompositionMermaid(report: GraphReport): string {
     ),
   );
   for (const edge of composition.provenanceEdges) {
-    const source = nodeIds.get(edge.from);
-    const target = nodeIds.get(edge.to);
+    const source = nodeIds.get(edge.sourcePath);
+    const target = nodeIds.get(
+      focusedProvenanceTarget(edge, report.nodes)?.sourcePath ?? edge.to,
+    );
     if (!source || !target) continue;
     const arrow = edge.membership === "required" ? "-->" : "-.->";
     const cycle = cycleEdges.has(compositionEdgeKey(edge)) ? " cycle" : "";
@@ -1401,7 +1432,7 @@ function formatCompositionMermaid(report: GraphReport): string {
     lines.push(
       `  ${missing}["${escapeMermaidLabel(`${issue.resolutionReason ?? "unresolved"}: ${issue.declaredTarget}`)}"]`,
     );
-    const source = nodeIds.get(issue.sourceId);
+    const source = nodeIds.get(issue.sourcePath);
     if (source) {
       const arrow = issue.membership === "required" ? "-->" : "-.->";
       lines.push(
@@ -1417,7 +1448,7 @@ function formatCompositionMermaid(report: GraphReport): string {
         ? `wrong target kind: ${mismatch.targetId ?? mismatch.declaredTarget} (${mismatch.actualTargetKind}, expected ${mismatch.expectedTargetKind})`
         : `wrong source kind: ${mismatch.sourceId} (${mismatch.actualSourceKind}, expected ${mismatch.expectedSourceKind})`;
     lines.push(`  ${wrong}["${escapeMermaidLabel(label)}"]`);
-    const source = nodeIds.get(mismatch.sourceId);
+    const source = nodeIds.get(mismatch.sourcePath);
     if (source) {
       const arrow = mismatch.membership === "required" ? "-->" : "-.->";
       lines.push(
@@ -1439,7 +1470,7 @@ function formatCompositionMermaid(report: GraphReport): string {
     }
   }
 
-  const rootNode = nodeIds.get(composition.root.id);
+  const rootNode = nodeIds.get(composition.root.sourcePath);
   if (rootNode) {
     lines.push("  classDef compositionRoot stroke-width:3px");
     lines.push(`  class ${rootNode} compositionRoot`);
@@ -1451,7 +1482,14 @@ function formatCompositionMermaid(report: GraphReport): string {
 }
 
 function compositionEdgeKey(edge: CompositionProvenanceEdge): string {
-  return [edge.from, edge.to, edge.relationship, edge.membership].join("\0");
+  return [
+    edge.from,
+    edge.to,
+    edge.sourcePath,
+    edge.declaredTarget,
+    edge.relationship,
+    edge.membership,
+  ].join("\0");
 }
 
 function requiredCompositionReport(

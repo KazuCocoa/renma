@@ -45,7 +45,7 @@ selection, prose merging, or conflict winner selection.
   optional, including a Context reached through a required descendant edge.
 - A required Lens makes its `applies_to` Context required; an optional Lens
   makes it optional.
-- When the same stable asset ID has required and optional routes, the asset is
+- When the same resolved asset (ID and source path) has required and optional routes, the asset is
   listed once as required while both kinds of provenance remain present.
 - The root is reported separately and is not duplicated in the required list.
 - Optional membership is a repository declaration, not a runtime choice made
@@ -56,8 +56,8 @@ contents look similar.
 
 ## Finite Resolution And Provenance
 
-The resolver operates over the existing catalog and tracks each stable asset
-ID in required and optional traversal states. Each state is processed at most
+The resolver operates over the existing catalog and tracks each resolved asset
+by declared ID and normalized source path in required and optional traversal states. Each state is processed at most
 once. A later required route upgrades final membership without discarding the
 optional state or its evidence.
 
@@ -193,3 +193,8 @@ optional-warning lifecycle diagnostics; required dependencies from usable
 roots make required composition incomplete. Deprecated/archived targets retain
 lifecycle findings and optional inactive-dependency warnings without acquiring
 suspended/revoked completeness semantics.
+
+A uniquely resolved Skill path retains that file throughout traversal, membership,
+cycle detection, freshness, and lifecycle checks, even when another Skill has the
+same declared ID. Declarations from the other file are not traversed. Public IDs
+remain unchanged; existing source paths and declaration evidence identify files.

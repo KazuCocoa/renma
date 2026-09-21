@@ -428,3 +428,237 @@ test("semantic diff and CI retain additions, removals and required/optional Skil
     );
   }
 });
+
+for (const kind of ["requires", "optional"] as const) {
+  test(`${kind} path-resolved duplicate Skill retains file identity through composition and impact`, async (t) => {
+    const fixture = await RepositoryFixture.create({ testContext: t });
+    await fixture.skill("a", {
+      status: "stable",
+      metadata: { [`${kind}-skill`]: '["skills/b2/SKILL.md"]' },
+    });
+    await fixture.skill("b1", {
+      id: "skill.b",
+      status: "stable",
+      metadata: { "requires-context": '["context.c"]' },
+    });
+    await fixture.skill("b2", {
+      id: "skill.b",
+      status: "revoked",
+      statusReason: "Authorization withdrawn",
+      statusChangedAt: "2026-09-20",
+    });
+    await fixture.context("contexts/c.md", { id: "context.c" });
+    const { catalog } = await collectRepositorySnapshot(fixture.root);
+    const report = resolveDeclaredComposition(catalog, "skill.a");
+    const members =
+      kind === "requires" ? report.requiredAssets : report.optionalAssets;
+    assert.deepEqual(
+      members.map((a) => [a.sourcePath, a.status]),
+      [["skills/b2/SKILL.md", "revoked"]],
+    );
+    assert.equal(report.requiredComplete, kind !== "requires");
+    assert.ok(
+      report.lifecycleFindings.some(
+        (f) =>
+          f.sourcePath === "skills/b2/SKILL.md" &&
+          f.status === "revoked" &&
+          !f.isRoot,
+      ),
+    );
+    assert.equal(report.provenanceEdges.length, 1);
+    assert.deepEqual(
+      resolveDeclaredComposition(catalog, "skills/b2/SKILL.md").requiredAssets,
+      [],
+    );
+    const b1Impact = resolveDeclaredImpact(catalog, "skills/b1/SKILL.md");
+    assert.deepEqual(b1Impact.requiredDependents, []);
+    assert.deepEqual(b1Impact.optionalDependents, []);
+    const b2Impact = resolveDeclaredImpact(catalog, "skills/b2/SKILL.md");
+    assert.deepEqual(
+      (kind === "requires"
+        ? b2Impact.requiredDependents
+        : b2Impact.optionalDependents
+      ).map((a) => a.id),
+      ["skill.a"],
+    );
+    const cImpact = resolveDeclaredImpact(catalog, "context.c");
+    assert.deepEqual(
+      cImpact.requiredDependents.map((a) => [a.sourcePath, a.status]),
+      [["skills/b1/SKILL.md", "stable"]],
+    );
+    assert.deepEqual(cImpact.optionalDependents, []);
+    assert.deepEqual(
+      resolveDeclaredComposition(
+        { ...catalog, assets: [...catalog.assets].reverse() },
+        "skill.a",
+      ),
+      report,
+    );
+  });
+
+  for (const reference of ["skill.b", "./skills/b2/SKILL.md"]) {
+    test(`inspect ${kind} Skill dependency resolves ${reference} only when unique`, async (t) => {
+      const fixture = await RepositoryFixture.create({ testContext: t });
+      await fixture.skill("a", {
+        metadata: { [`${kind}-skill`]: JSON.stringify([reference]) },
+      });
+      await fixture.skill("b1", {
+        id: "skill.b",
+        metadata: { "requires-context": '["context.c"]' },
+      });
+      await fixture.skill("b2", { id: "skill.b" });
+      await fixture.context("contexts/c.md", { id: "context.c" });
+      const { buildInspectOutline } =
+        await import("../src/commands/inspect.js");
+      const a = await buildInspectOutline(fixture.resolve("skills/a/SKILL.md"));
+      const edge = a.asset!.outboundDependencies[0]!;
+      const unique = reference !== "skill.b";
+      assert.equal(edge.kind, `${kind}_skill`);
+      assert.equal(edge.resolved, unique);
+      assert.equal(edge.targetPath, unique ? "skills/b2/SKILL.md" : undefined);
+      const b1 = await buildInspectOutline(
+        fixture.resolve("skills/b1/SKILL.md"),
+      );
+      const b2 = await buildInspectOutline(
+        fixture.resolve("skills/b2/SKILL.md"),
+      );
+      assert.deepEqual(b1.asset!.inboundDependents, []);
+      assert.equal(b2.asset!.inboundDependents.length, unique ? 1 : 0);
+      assert.deepEqual(b2.asset!.outboundDependencies, []);
+    });
+  }
+}
+
+test("duplicate Skill paths retain separate membership, freshness and cycle identity", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("a", {
+    metadata: {
+      "requires-skill": '["skills/b1/SKILL.md"]',
+      "optional-skill": '["skills/b2/SKILL.md"]',
+    },
+  });
+  await fixture.skill("b1", {
+    id: "skill.b",
+    metadata: { "requires-skill": '["skills/b2/SKILL.md"]' },
+  });
+  await fixture.skill("b2", {
+    id: "skill.b",
+    metadata: { "expires-at": "2020-01-01" },
+  });
+  const { catalog } = await collectRepositorySnapshot(fixture.root);
+  const report = resolveDeclaredComposition(catalog, "skill.a");
+  assert.deepEqual(
+    report.requiredAssets.map((a) => a.sourcePath),
+    ["skills/b1/SKILL.md", "skills/b2/SKILL.md"],
+  );
+  assert.deepEqual(report.optionalAssets, []);
+  assert.equal(
+    report.cycleFree,
+    true,
+    "a path between files sharing an ID is not a self-cycle",
+  );
+  assert.deepEqual(
+    report.freshnessFindings.map((f) => f.sourcePath),
+    ["skills/b2/SKILL.md"],
+  );
+  const impact = resolveDeclaredImpact(catalog, "skills/b2/SKILL.md");
+  assert.deepEqual(
+    impact.requiredDependents.map((a) => a.sourcePath),
+    ["skills/a/SKILL.md", "skills/b1/SKILL.md"],
+  );
+  assert.ok(
+    impact.provenanceEdges.some(
+      (e) => e.from === "skill.a" && e.dependentMembership === "optional",
+    ),
+  );
+});
+
+test("focused graph CLI preserves duplicate Skill file selection in JSON and Mermaid", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("a", {
+    metadata: { "requires-skill": '["skills/b2/SKILL.md"]' },
+  });
+  await fixture.skill("b1", { id: "skill.b", status: "stable" });
+  await fixture.skill("b2", { id: "skill.b", status: "revoked" });
+  const { runGraphCommand } = await import("../src/commands/graph.js");
+  async function output(
+    view: "composition" | "impact",
+    focus: string,
+    format: "json" | "mermaid",
+  ) {
+    const original = process.stdout.write;
+    let stdout = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += chunk.toString();
+      return true;
+    }) as typeof original;
+    try {
+      await runGraphCommand(fixture.root, { view, focus, format });
+      return stdout;
+    } finally {
+      process.stdout.write = original;
+    }
+  }
+  for (const [view, focus, paths] of [
+    ["composition", "skill.a", ["skills/a/SKILL.md", "skills/b2/SKILL.md"]],
+    ["composition", "skills/b2/SKILL.md", ["skills/b2/SKILL.md"]],
+    ["impact", "skills/b1/SKILL.md", ["skills/b1/SKILL.md"]],
+    [
+      "impact",
+      "skills/b2/SKILL.md",
+      ["skills/a/SKILL.md", "skills/b2/SKILL.md"],
+    ],
+  ] as const) {
+    const report = JSON.parse(await output(view, focus, "json"));
+    assert.deepEqual(
+      report.nodes.map((n: { sourcePath: string }) => n.sourcePath),
+      paths,
+    );
+    if (report.edges.length)
+      assert.equal(report.edges[0].targetPath, "skills/b2/SKILL.md");
+    const mermaid = await output(view, focus, "mermaid");
+    assert.equal((mermaid.match(/node_\d+\["/g) ?? []).length, paths.length);
+  }
+});
+
+test("required and optional cycles on separate files with the same Skill ID remain distinct", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("a", {
+    metadata: {
+      "requires-skill": '["skills/b1/SKILL.md"]',
+      "optional-skill": '["skills/b2/SKILL.md"]',
+    },
+  });
+  await fixture.skill("b1", {
+    id: "skill.b",
+    metadata: { "requires-skill": '["skills/b1/SKILL.md"]' },
+  });
+  await fixture.skill("b2", {
+    id: "skill.b",
+    metadata: { "requires-skill": '["skills/b2/SKILL.md"]' },
+  });
+  const { catalog } = await collectRepositorySnapshot(fixture.root);
+  const report = resolveDeclaredComposition(catalog, "skill.a");
+  assert.deepEqual(
+    report.requiredAssets.map((a) => a.sourcePath),
+    ["skills/b1/SKILL.md"],
+  );
+  assert.deepEqual(
+    report.optionalAssets.map((a) => a.sourcePath),
+    ["skills/b2/SKILL.md"],
+  );
+  assert.deepEqual(
+    report.requiredCycles.map((c) => c.edges.map((e) => e.sourcePath)),
+    [["skills/b1/SKILL.md"]],
+  );
+  assert.deepEqual(
+    report.optionalCycles.map((c) => c.edges.map((e) => e.sourcePath)),
+    [["skills/b2/SKILL.md"]],
+  );
+  assert.equal(
+    declaredCompositionFindings(catalog, "2026-09-20").filter((f) =>
+      f.id.includes("CYCLE"),
+    ).length,
+    2,
+  );
+});

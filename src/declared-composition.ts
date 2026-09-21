@@ -160,6 +160,34 @@ export interface DeclaredCompositionIndex {
   sortedDependencies: Dependency[];
 }
 
+/** Internal identity retains the resolved file even when declared IDs collide. */
+export function compositionAssetIdentity(asset: Asset): string {
+  return JSON.stringify([
+    asset.id,
+    normalizeDependencyReference(asset.sourcePath),
+  ]);
+}
+
+function compositionSourceAsset(
+  index: DeclaredCompositionIndex,
+  dependency: Dependency,
+): Asset | undefined {
+  const source = index.assetsById.get(dependency.from);
+  const byPath = index.assetsByPath.get(
+    normalizeDependencyReference(dependency.sourcePath),
+  );
+  return byPath?.id === dependency.from ? byPath : source;
+}
+
+function sourceDependencies(
+  index: DeclaredCompositionIndex,
+  asset: Asset,
+): Dependency[] {
+  return (index.dependenciesBySource.get(asset.id) ?? []).filter(
+    (dependency) => compositionSourceAsset(index, dependency) === asset,
+  );
+}
+
 interface TraversalState {
   asset: Asset;
   membership: CompositionMembership;
@@ -231,6 +259,12 @@ export function resolveDeclaredCompositionFromIndex(
 ): DeclaredCompositionReport {
   const root = resolveRoot(index, rootReference);
   const reached = new Map<string, Set<CompositionMembership>>();
+  const reachedAssets = new Map<string, Asset>();
+  const edgeIdentities = new Map<
+    CompositionProvenanceEdge,
+    { from: string; to: string }
+  >();
+  const directIds = new Set<string>();
   const processed = new Set<string>();
   const queue: TraversalState[] = [{ asset: root, membership: "required" }];
   const provenanceEdges: CompositionProvenanceEdge[] = [];
@@ -238,17 +272,17 @@ export function resolveDeclaredCompositionFromIndex(
   const unresolvedOptional: CompositionResolutionIssue[] = [];
   const kindMismatches: CompositionKindMismatch[] = [];
   const recordedTransitions = new Set<string>();
-  reached.set(root.id, new Set(["required"]));
+  reached.set(compositionAssetIdentity(root), new Set(["required"]));
+  reachedAssets.set(compositionAssetIdentity(root), root);
 
   for (let cursor = 0; cursor < queue.length; cursor += 1) {
     const state = queue[cursor];
     if (!state) continue;
-    const stateKey = `${state.asset.id}\0${state.membership}`;
+    const stateKey = `${compositionAssetIdentity(state.asset)}\0${state.membership}`;
     if (processed.has(stateKey)) continue;
     processed.add(stateKey);
 
-    for (const dependency of index.dependenciesBySource.get(state.asset.id) ??
-      []) {
+    for (const dependency of sourceDependencies(index, state.asset)) {
       const relationship = compositionRelationship(dependency, index);
       if (!relationship) continue;
       const membership = propagatedMembership(
@@ -309,7 +343,7 @@ export function resolveDeclaredCompositionFromIndex(
         continue;
       }
 
-      provenanceEdges.push({
+      const edge: CompositionProvenanceEdge = {
         from: state.asset.id,
         to: target.id,
         declaredTarget: dependency.to,
@@ -319,63 +353,93 @@ export function resolveDeclaredCompositionFromIndex(
           ? { declarationIndex: dependency.declarationIndex }
           : {}),
         membership,
-        direct: state.asset.id === root.id,
+        direct:
+          compositionAssetIdentity(state.asset) ===
+          compositionAssetIdentity(root),
         sourcePath: dependency.sourcePath,
         ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+      };
+      provenanceEdges.push(edge);
+      edgeIdentities.set(edge, {
+        from: compositionAssetIdentity(state.asset),
+        to: compositionAssetIdentity(target),
       });
-
-      const memberships = reached.get(target.id) ?? new Set();
+      if (edge.direct) directIds.add(compositionAssetIdentity(target));
+      reachedAssets.set(compositionAssetIdentity(target), target);
+      const memberships =
+        reached.get(compositionAssetIdentity(target)) ?? new Set();
       if (!memberships.has(membership)) {
         memberships.add(membership);
-        reached.set(target.id, memberships);
+        reached.set(compositionAssetIdentity(target), memberships);
         queue.push({ asset: target, membership });
       }
     }
   }
 
   const stableProvenance = provenanceEdges.sort(compareProvenanceEdges);
-  const directIds = new Set(
-    stableProvenance.filter((edge) => edge.direct).map((edge) => edge.to),
-  );
+
   const requiredAssets = [...reached]
     .filter(
       ([assetId, memberships]) =>
-        assetId !== root.id && memberships.has("required"),
+        assetId !== compositionAssetIdentity(root) &&
+        memberships.has("required"),
     )
     .flatMap(([assetId]) => {
-      const asset = index.assetsById.get(assetId);
-      return asset ? [compositionAsset(asset, directIds.has(asset.id))] : [];
+      const asset = reachedAssets.get(assetId);
+      return asset
+        ? [
+            compositionAsset(
+              asset,
+              directIds.has(compositionAssetIdentity(asset)),
+            ),
+          ]
+        : [];
     })
     .sort(compareCompositionAssets);
   const optionalAssets = [...reached]
     .filter(([assetId, memberships]) => {
       return (
-        assetId !== root.id &&
+        assetId !== compositionAssetIdentity(root) &&
         memberships.has("optional") &&
         !memberships.has("required")
       );
     })
     .flatMap(([assetId]) => {
-      const asset = index.assetsById.get(assetId);
-      return asset ? [compositionAsset(asset, directIds.has(asset.id))] : [];
+      const asset = reachedAssets.get(assetId);
+      return asset
+        ? [
+            compositionAsset(
+              asset,
+              directIds.has(compositionAssetIdentity(asset)),
+            ),
+          ]
+        : [];
     })
     .sort(compareCompositionAssets);
-  const requiredCycles = compositionCycles(stableProvenance, "required");
-  const requiredCycleKeys = new Set(
-    requiredCycles.map((cycle) => cycle.assetIds.join("\0")),
+  const requiredCycles = compositionCycles(
+    stableProvenance,
+    "required",
+    edgeIdentities,
+    reachedAssets,
   );
-  const optionalCycles = compositionCycles(stableProvenance, "optional").filter(
-    (cycle) => !requiredCycleKeys.has(cycle.assetIds.join("\0")),
-  );
+  const requiredCycleKeys = new Set(requiredCycles.map(cycleIdentity));
+  const optionalCycles = compositionCycles(
+    stableProvenance,
+    "optional",
+    edgeIdentities,
+    reachedAssets,
+  ).filter((cycle) => !requiredCycleKeys.has(cycleIdentity(cycle)));
   const conflicts = compositionConflicts(
     index,
     root,
     reached,
     stableProvenance,
+    reachedAssets,
+    edgeIdentities,
   );
   const evaluationDate = evaluationIsoDate(options.evaluationDate);
   const governance = compositionGovernanceFindings(
-    index,
+    reachedAssets,
     root,
     reached,
     evaluationDate,
@@ -439,7 +503,7 @@ export function analyzeDeclaredCompositionFindings(
   let rootsAnalyzed = 0;
 
   for (const root of index.sortedAssets) {
-    const report = resolveDeclaredCompositionFromIndex(index, root.id, {
+    const report = resolveDeclaredCompositionFromIndex(index, root.sourcePath, {
       evaluationDate,
     });
     retainedRootReports += 1;
@@ -475,7 +539,7 @@ export function analyzeDeclaredCompositionFindings(
 function relationshipKindFindings(index: DeclaredCompositionIndex): Finding[] {
   const findings: Finding[] = [];
   for (const dependency of index.sortedDependencies) {
-    const source = index.assetsById.get(dependency.from);
+    const source = compositionSourceAsset(index, dependency);
     if (!source) continue;
     const target = resolveIndexedTarget(dependency, index);
     const relationship = compositionRelationship(dependency, index);
@@ -839,12 +903,27 @@ function cycleFindings(grouped: Map<string, CompositionCycleGroup>): Finding[] {
     });
 }
 
+function cycleIdentity(cycle: CompositionCycle): string {
+  return JSON.stringify(
+    [
+      ...new Set(
+        cycle.edges.map((edge) =>
+          JSON.stringify([
+            edge.from,
+            normalizeDependencyReference(edge.sourcePath),
+          ]),
+        ),
+      ),
+    ].sort(compareUtf16CodeUnits),
+  );
+}
+
 function addCycle(
   grouped: Map<string, CompositionCycleGroup>,
   cycle: CompositionCycle,
   root: string,
 ): void {
-  const key = cycle.assetIds.join("\0");
+  const key = cycleIdentity(cycle);
   const existing = grouped.get(key);
   const group = existing ?? {
     requiredRoots: new Set<string>(),
@@ -987,7 +1066,7 @@ export function resolveCompositionDeclaration(
   index: DeclaredCompositionIndex,
   dependency: Dependency,
 ): ResolvedCompositionDeclaration | undefined {
-  const source = index.assetsById.get(dependency.from);
+  const source = compositionSourceAsset(index, dependency);
   if (!source) return undefined;
   const relationship = compositionRelationship(dependency, index);
   if (!relationship) return undefined;
@@ -1182,24 +1261,39 @@ function compositionAsset(asset: Asset, direct?: boolean): CompositionAsset {
 function compositionCycles(
   provenanceEdges: CompositionProvenanceEdge[],
   membership: CompositionMembership,
+  identities: ReadonlyMap<
+    CompositionProvenanceEdge,
+    { from: string; to: string }
+  >,
+  assets: ReadonlyMap<string, Asset>,
 ): CompositionCycle[] {
   const edges = provenanceEdges.filter(
     (edge) => edge.membership === membership,
   );
-  const components = stronglyConnectedComponents(edges);
+  const internalEdges = edges.map((edge) => ({
+    ...edge,
+    ...identities.get(edge)!,
+  }));
+  const components = stronglyConnectedComponents(internalEdges);
   return components
     .filter((assetIds) => {
       if (assetIds.length > 1) return true;
       const id = assetIds[0];
-      return edges.some((edge) => edge.from === id && edge.to === id);
+      return internalEdges.some((edge) => edge.from === id && edge.to === id);
     })
     .map((assetIds) => {
       const ids = new Set(assetIds);
       return {
         membership,
-        assetIds,
+        assetIds: assetIds
+          .map((id) => assets.get(id)!.id)
+          .sort(compareUtf16CodeUnits),
         edges: edges
-          .filter((edge) => ids.has(edge.from) && ids.has(edge.to))
+          .filter(
+            (edge) =>
+              ids.has(identities.get(edge)!.from) &&
+              ids.has(identities.get(edge)!.to),
+          )
           .sort(compareProvenanceEdges),
       };
     })
@@ -1274,25 +1368,36 @@ function compositionConflicts(
   root: Asset,
   reached: Map<string, Set<CompositionMembership>>,
   provenanceEdges: CompositionProvenanceEdge[],
+  reachedAssets: ReadonlyMap<string, Asset>,
+  edgeIdentities: ReadonlyMap<
+    CompositionProvenanceEdge,
+    { from: string; to: string }
+  >,
 ): { required: CompositionConflict[]; optional: CompositionConflict[] } {
-  const included = new Set<string>([root.id, ...reached.keys()]);
+  const included = new Set<string>([
+    compositionAssetIdentity(root),
+    ...reached.keys(),
+  ]);
   const declarationsByPair = new Map<
     string,
     CompositionConflictDeclaration[]
   >();
 
   for (const sourceId of [...included].sort(compareUtf16CodeUnits)) {
-    for (const dependency of index.dependenciesBySource.get(sourceId) ?? []) {
+    for (const dependency of sourceDependencies(
+      index,
+      reachedAssets.get(sourceId)!,
+    )) {
       if (dependency.kind !== "conflicts") continue;
       const target = resolveIndexedTarget(dependency, index);
       if (
         !target ||
-        !included.has(target.id) ||
-        dependency.from === target.id
+        !included.has(compositionAssetIdentity(target)) ||
+        sourceId === compositionAssetIdentity(target)
       ) {
         continue;
       }
-      const key = normalizedPairKey(dependency.from, target.id);
+      const key = normalizedPairKey(sourceId, compositionAssetIdentity(target));
       declarationsByPair.set(key, [
         ...(declarationsByPair.get(key) ?? []),
         {
@@ -1318,15 +1423,15 @@ function compositionConflicts(
         ? "required"
         : "optional";
     const conflict: CompositionConflict = {
-      left,
-      right,
+      left: reachedAssets.get(left)!.id,
+      right: reachedAssets.get(right)!.id,
       membership,
       declarations: declarations.sort(compareConflictDeclarations),
       leftProvenance: provenanceEdges
-        .filter((edge) => edge.to === left)
+        .filter((edge) => edgeIdentities.get(edge)!.to === left)
         .sort(compareProvenanceEdges),
       rightProvenance: provenanceEdges
-        .filter((edge) => edge.to === right)
+        .filter((edge) => edgeIdentities.get(edge)!.to === right)
         .sort(compareProvenanceEdges),
     };
     (membership === "required" ? required : optional).push(conflict);
@@ -1343,14 +1448,17 @@ function assetMembership(
   root: Asset,
   reached: Map<string, Set<CompositionMembership>>,
 ): CompositionMembership {
-  if (assetId === root.id || reached.get(assetId)?.has("required")) {
+  if (
+    assetId === compositionAssetIdentity(root) ||
+    reached.get(assetId)?.has("required")
+  ) {
     return "required";
   }
   return "optional";
 }
 
 function compositionGovernanceFindings(
-  index: DeclaredCompositionIndex,
+  reachedAssets: ReadonlyMap<string, Asset>,
   root: Asset,
   reached: Map<string, Set<CompositionMembership>>,
   today: string,
@@ -1360,12 +1468,20 @@ function compositionGovernanceFindings(
 } {
   const freshness: CompositionFreshnessFinding[] = [];
   const lifecycle: CompositionLifecycleFinding[] = [];
-  const governedIds = new Set([root.id, ...reached.keys()]);
+  const governedIds = new Set([
+    compositionAssetIdentity(root),
+    ...reached.keys(),
+  ]);
   for (const assetId of [...governedIds].sort(compareUtf16CodeUnits)) {
-    const asset = index.assetsById.get(assetId);
+    const asset = reachedAssets.get(assetId);
     if (!asset) continue;
-    const membership = assetMembership(asset.id, root, reached);
-    const isRoot = asset.id === root.id;
+    const membership = assetMembership(
+      compositionAssetIdentity(asset),
+      root,
+      reached,
+    );
+    const isRoot =
+      compositionAssetIdentity(asset) === compositionAssetIdentity(root);
     const evaluation = evaluateAssetFreshness(asset.metadata, today);
     if (evaluation.expired && evaluation.expiresAt) {
       freshness.push({

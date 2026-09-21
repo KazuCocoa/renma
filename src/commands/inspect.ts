@@ -1,3 +1,4 @@
+import { resolveUniqueDependencyTarget } from "../dependency-resolution.js";
 import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -156,11 +157,29 @@ function inspectRepositoryForTarget(
 
   const resolver = createInspectRelationshipResolver(snapshot.catalog.entries);
   const inboundDependents = snapshot.catalog.dependencies
-    .filter((dependency) => resolver.matches(dependency.to, entry))
+    .filter((dependency) => {
+      if (
+        dependency.declaration === "requires_skill" ||
+        dependency.declaration === "optional_skill"
+      ) {
+        const target = resolver.resolveTarget(dependency);
+        return (
+          target !== undefined &&
+          normalizeReference(target.sourcePath) ===
+            normalizeReference(entry.sourcePath)
+        );
+      }
+      return resolver.matches(dependency.to, entry);
+    })
     .map((dependency) => inspectRelationship(dependency, resolver))
     .sort(compareInspectRelationships);
   const outboundDependencies = snapshot.catalog.dependencies
-    .filter((dependency) => resolver.matches(dependency.from, entry))
+    .filter((dependency) =>
+      entry.kind === "skill"
+        ? normalizeReference(dependency.sourcePath) ===
+          normalizeReference(entry.sourcePath)
+        : resolver.matches(dependency.from, entry),
+    )
     .map((dependency) => inspectRelationship(dependency, resolver))
     .sort(compareInspectRelationships);
 
@@ -202,8 +221,10 @@ function inspectRelationship(
   dependency: Dependency,
   resolver: InspectRelationshipResolver,
 ): InspectRelationship {
-  const source = resolver.resolve(dependency.from);
-  const target = resolver.resolve(dependency.to);
+  const source =
+    resolver.resolve(dependency.sourcePath) ??
+    resolver.resolve(dependency.from);
+  const target = resolver.resolveTarget(dependency);
 
   return {
     from: dependency.from,
@@ -249,6 +270,7 @@ function inspectRelationshipKind(
 interface InspectRelationshipResolver {
   matches(reference: string, entry: CatalogEntry): boolean;
   resolve(reference: string): CatalogEntry | undefined;
+  resolveTarget(dependency: Dependency): CatalogEntry | undefined;
 }
 
 function createInspectRelationshipResolver(
@@ -279,6 +301,16 @@ function createInspectRelationshipResolver(
       return sameCatalogEntry(resolved, entry);
     },
     resolve,
+    resolveTarget(dependency) {
+      if (
+        dependency.declaration === "requires_skill" ||
+        dependency.declaration === "optional_skill"
+      ) {
+        const target = resolveUniqueDependencyTarget(dependency, entries);
+        return entries.find((entry) => entry === target);
+      }
+      return resolve(dependency.to);
+    },
   };
 }
 
