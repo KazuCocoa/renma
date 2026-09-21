@@ -108,6 +108,7 @@ export interface GraphNode {
   contentClassification?: "text" | "binary";
   markdownParserEligible?: boolean;
   ownership: AssetOwnership;
+  writableBy?: string[];
   status?: AssetStatus;
   statusReason?: string;
   statusChangedAt?: string;
@@ -1794,6 +1795,9 @@ function toNode(asset: Asset): GraphNode {
     contentClassification: asset.contentClassification,
     markdownParserEligible: asset.markdownParserEligible,
     ownership: asset.ownership,
+    ...(asset.metadata.writableBy
+      ? { writableBy: asset.metadata.writableBy }
+      : {}),
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     ...(asset.metadata.statusReason
       ? { statusReason: asset.metadata.statusReason }

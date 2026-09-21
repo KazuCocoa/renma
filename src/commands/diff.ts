@@ -1,3 +1,4 @@
+import { formatWritableByEvidence } from "../renderers/writable-by.js";
 import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -217,6 +218,7 @@ export interface AssetDelta {
   path?: string | undefined;
   kind?: string | undefined;
   contentHash?: string | undefined;
+  writableBy?: string[];
   declaredOwner: string | null;
   effectiveOwner: string | null;
   status?: string | undefined;
@@ -229,6 +231,7 @@ const COMPARABLE_ASSET_FIELDS = [
   "kind",
   "declaredOwner",
   "effectiveOwner",
+  "writableBy",
   "status",
   "statusReason",
   "statusChangedAt",
@@ -921,6 +924,25 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     ...(report.summary.contentChangedAssets === undefined
       ? []
       : [`- Content-changed assets: ${report.summary.contentChangedAssets}`]),
+    ...(
+      [
+        ["Added", report.catalog.addedAssets],
+        ["Removed", report.catalog.removedAssets],
+      ] as const
+    ).flatMap(([label, assets]) => {
+      const declared = assets.filter((asset) => asset.writableBy !== undefined);
+      return declared.length === 0
+        ? []
+        : [
+            "",
+            `### ${label} asset evidence`,
+            "",
+            ...declared.flatMap((asset) => [
+              `- ${formatMarkdownInlineCode(asset.id)}`,
+              ...formatWritableByEvidence(asset),
+            ]),
+          ];
+    }),
     ...(report.catalog.changedAssets.length > 0
       ? [
           "",
@@ -936,10 +958,13 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
               : change.contentChanged === false
                 ? [`  - content changed: no`]
                 : []),
-            ...change.changedFields.map(
-              (field) =>
-                `  - ${field}: ${markdownValue(change.from[field])} -> ${markdownValue(change.to[field])}`,
-            ),
+            ...formatWritableByEvidence(change.to, change.from),
+            ...change.changedFields
+              .filter((field) => field !== "writableBy")
+              .map(
+                (field) =>
+                  `  - ${field}: ${markdownValue(change.from[field])} -> ${markdownValue(change.to[field])}`,
+              ),
           ]),
         ]
       : []),
@@ -1886,7 +1911,12 @@ function changedAssets(
       const fromAsset = fromAssets.get(key);
       if (!fromAsset) return [];
       const changedFields = COMPARABLE_ASSET_FIELDS.filter(
-        (field) => fromAsset[field] !== toAsset[field],
+        // Compare normalized sequences by contents: order and duplicates matter.
+        (field) =>
+          field === "writableBy"
+            ? JSON.stringify(fromAsset[field]) !==
+              JSON.stringify(toAsset[field])
+            : fromAsset[field] !== toAsset[field],
       );
       const contentChanged = hasComparableContentHash(fromAsset, toAsset)
         ? fromAsset.contentHash !== toAsset.contentHash
@@ -1954,12 +1984,17 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
   return stableMap(
     nodes.map((node) => {
       const ownership = objectField(node, "ownership");
+      const writableBy = objectField(node, "writableBy");
       const asset: AssetDelta = {
         id: firstString(node, ["id", "path", "sourcePath"]),
         path: firstOptionalString(node, ["sourcePath", "path"]),
         kind: firstOptionalString(node, ["kind"]),
         ...(firstOptionalString(node, ["contentHash"])
           ? { contentHash: firstOptionalString(node, ["contentHash"]) }
+          : {}),
+        ...(Array.isArray(writableBy) &&
+        writableBy.every((value) => typeof value === "string")
+          ? { writableBy: [...writableBy] as string[] }
           : {}),
         declaredOwner:
           optionalNullableStringField(ownership, "declaredOwner") ?? null,

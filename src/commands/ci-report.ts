@@ -1,3 +1,4 @@
+import { formatWritableByEvidence } from "../renderers/writable-by.js";
 import {
   executeDiff,
   formatInspectionCoverageChange,
@@ -1834,6 +1835,7 @@ function formatAssetDetails(asset: AssetDelta): string[] {
     `  - Kind: ${formatPlainValue(asset.kind)}`,
     `  - Status: ${formatPlainValue(asset.status)}`,
     ...lifecycleEvidence,
+    ...formatWritableByEvidence(asset, undefined, MAX_LIST_ITEMS),
     `  - Declared owner: ${formatPlainValue(asset.declaredOwner)}`,
     `  - Effective owner: ${formatPlainValue(asset.effectiveOwner)}`,
   ];
@@ -1865,10 +1867,13 @@ function formatChangedAsset(change: AssetChange): string[] {
   return [
     `- \`${change.id}\` (${formatCodeValue(path)})`,
     ...contentChangeLines,
-    ...change.changedFields.map(
-      (field) =>
-        `  - ${formatComparableAssetField(field)}: ${formatCodeValue(change.from[field])} -> ${formatCodeValue(change.to[field])}`,
-    ),
+    ...formatWritableByEvidence(change.to, change.from, MAX_LIST_ITEMS),
+    ...change.changedFields
+      .filter((field) => field !== "writableBy")
+      .map(
+        (field) =>
+          `  - ${formatComparableAssetField(field)}: ${formatCodeValue(change.from[field])} -> ${formatCodeValue(change.to[field])}`,
+      ),
   ];
 }
 

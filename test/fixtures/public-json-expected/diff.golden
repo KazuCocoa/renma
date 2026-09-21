@@ -222,7 +222,12 @@
           "id": "context.valid",
           "path": "contexts/valid.md",
           "kind": "context",
-          "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+          "contentHash": "sha256:2d591a2b0860ba1f50de4eea507ae9f1b6efa12ed9a0cd556862e6d1aedbdf03",
+          "writableBy": [
+            "team:review",
+            "team:docs",
+            "team:review"
+          ],
           "declaredOwner": "qa-platform",
           "effectiveOwner": "qa-platform",
           "status": "stable"
@@ -231,7 +236,12 @@
           "id": "context.valid",
           "path": "contexts/valid.md",
           "kind": "context",
-          "contentHash": "sha256:52ccac95c44ded24cce48ea3c80f1c8256fb091809ddc70189d0ee4a3450075f",
+          "contentHash": "sha256:fb948b6ad9980eb28bb6de40c4a8a9681f22a44bf02ed8dfcb6931b380347d6c",
+          "writableBy": [
+            "team:review",
+            "team:docs",
+            "team:review"
+          ],
           "declaredOwner": "qa-platform",
           "effectiveOwner": "qa-platform",
           "status": "stable"

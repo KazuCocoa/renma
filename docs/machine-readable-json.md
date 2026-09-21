@@ -155,6 +155,18 @@ Consumers should ignore unknown optional fields, preserve unknown open-enum
 values when forwarding evidence, and fail clearly when they do not support the
 document's top-level `schemaVersion`.
 
+### Declared modification principals in revision evidence
+
+Graph asset nodes and diff asset endpoints optionally include `writableBy`,
+preserving each asset's normalized local declaration. This is an additive v1
+extension to `renma.graph.v1`, `renma.diff.v1`, and the nested diff in
+`renma.ci-report.v1`; existing schema identities remain unchanged. Absent
+declarations omit the property. Added/removed assets retain their respective
+endpoint values. `changedFields` can include `writableBy`; array comparison is
+order- and duplicate-sensitive, by contents rather than object identity.
+Unchanged declarations remain context without entering `changedFields`.
+These fields convey static evidence and do not change ownership or CI policy.
+
 ## Renma 1.0 release-candidate freeze
 
 The stable identifiers in the contract table are the Renma 1.0

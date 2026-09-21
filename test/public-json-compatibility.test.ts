@@ -722,6 +722,14 @@ async function revisionFixture(t: TestContext): Promise<string> {
   );
   t.after(() => rm(root, { recursive: true, force: true }));
   await cp(FIXTURE_ROOT, root, { recursive: true });
+  const declaredContextPath = path.join(root, "contexts/valid.md");
+  await writeFile(
+    declaredContextPath,
+    (await readFile(declaredContextPath, "utf8")).replace(
+      "owner: qa-platform",
+      'owner: qa-platform\nwritable_by: ["team:review", "team:docs", "team:review"]',
+    ),
+  );
   git(root, "init");
   git(root, "config", "user.name", "Renma Contract Test");
   git(root, "config", "user.email", "renma-contract@example.invalid");
