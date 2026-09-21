@@ -6,6 +6,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.39.1] - 2026-09-20
+
+### Added
+
+- Added `writableBy` evidence to CI report, diff, and graph output so consumers
+  can review declared modification principals alongside asset changes.
+
 ## [0.39.0] - 2026-09-20
 
 ### Added
@@ -2806,6 +2813,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.38.1...HEAD
+[0.39.1]: https://github.com/KazuCocoa/renma/compare/v0.39.0...v0.39.1
 [0.39.0]: https://github.com/KazuCocoa/renma/compare/v0.38.1...v0.39.0
 [0.38.1]: https://github.com/KazuCocoa/renma/compare/v0.38.0...v0.38.1
 [0.38.0]: https://github.com/KazuCocoa/renma/compare/v0.37.2...v0.38.0
