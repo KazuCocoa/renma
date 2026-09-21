@@ -6,6 +6,23 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-09-20
+
+### Added
+
+- Added optional modification-principal declarations with Skill metadata
+  `renma.writable-by` and non-Skill `writable_by`. Non-empty declarations appear
+  as `writableBy` arrays in catalog JSON and inspection, and repositories can
+  require them through the existing required-metadata policy. Principals remain
+  opaque identifiers; Renma reports the declarations without enforcing access
+  or changing ownership. Principal lists are exempt from prose budgets.
+
+### Changed
+
+- Example assets now declare `anyone` as their modification principal.
+- Updated runtime dependencies `yaml` and `tldts`, along with development and
+  documentation tooling dependencies.
+
 ## [0.38.1] - 2026-09-05
 
 ### Changed
@@ -2789,6 +2806,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.38.1...HEAD
+[0.39.0]: https://github.com/KazuCocoa/renma/compare/v0.38.1...v0.39.0
 [0.38.1]: https://github.com/KazuCocoa/renma/compare/v0.38.0...v0.38.1
 [0.38.0]: https://github.com/KazuCocoa/renma/compare/v0.37.2...v0.38.0
 [0.37.2]: https://github.com/KazuCocoa/renma/compare/v0.37.1...v0.37.2
