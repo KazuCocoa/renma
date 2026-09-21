@@ -210,3 +210,6 @@ Run `node tools/release-prep.mjs`; use `--check-only` for metadata and maintaine
 - `npm-publish` Environment の承認を待っている publish job は、完了証拠上も保留中のままとし、引き続き必要な権限を持つレビュー担当者の承認を明記します。
 - Completion evidence for a requested release trigger includes matching remote branch and tag commits, a successful GitHub Actions run, verified npm metadata, and the verified title, URL, and body of the separately approved GitHub Release.
 - 要求されたリリース実行の完了証拠に、一致するリモートブランチとタグのコミット、成功した GitHub Actions の実行、検証済みの npm メタデータ、および別途承認された GitHub Release の検証済みタイトル、URL、本文が含まれています。
+
+
+changes
