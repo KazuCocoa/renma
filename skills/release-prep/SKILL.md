@@ -6,6 +6,7 @@ metadata:
   renma.title: Release Prep
   renma.version: "0.2.1"
   renma.owner: maintainers
+  renma.writable-by: '["maintainers"]'
   renma.status: stable
   renma.tags: '["release","maintenance","dogfooding"]'
   renma.requires-context: '["context.release.prep"]'

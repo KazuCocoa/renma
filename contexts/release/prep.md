@@ -4,6 +4,8 @@ title: Release Prep Workflow
 version: 0.2.1
 owner: maintainers
 status: stable
+writable_by:
+  - maintainers
 tags:
   - release
   - maintenance
