@@ -618,3 +618,13 @@ Renma 0.16.0 completes the repository format migration:
 
 This boundary does not add runtime Skill selection, prompt assembly, context
 injection, execution, or telemetry.
+
+## Declared Skill Composition
+
+The optional Skill dependency extensions follow the existing flat
+`metadata` string-map convention and JSON-array encoding. See the authoritative
+[metadata reference](user-manual.md) and [composition contract](declared-composition.md).
+Top-level `requires_skill`/`optional_skill` on Skills are migration input only:
+`suggest-metadata` may propose their canonical equivalents but does not apply
+them. Malformed JSON/string-array values retain canonical metadata diagnostics;
+native YAML metadata arrays violate the Agent Skills string-map contract.

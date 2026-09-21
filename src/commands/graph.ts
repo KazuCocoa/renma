@@ -1162,7 +1162,7 @@ function renderResolutionIssues(
   }
   for (const issue of issues) {
     lines.push(
-      `- ${issue.sourceId} ${issue.relationship} ${issue.declaredTarget} (${evidenceLabel(issue.evidence, issue.sourcePath)}).`,
+      `- ${issue.sourceId} ${issue.relationship} ${issue.declaredTarget}${issue.resolutionReason ? ` [${issue.resolutionReason}${issue.candidatePaths ? `: ${issue.candidatePaths.join(", ")}` : ""}]` : ""} (${evidenceLabel(issue.evidence, issue.sourcePath)}).`,
     );
   }
 }
@@ -1399,7 +1399,7 @@ function formatCompositionMermaid(report: GraphReport): string {
   unresolved.forEach((issue, index) => {
     const missing = `missing_${index}`;
     lines.push(
-      `  ${missing}["${escapeMermaidLabel(`unresolved: ${issue.declaredTarget}`)}"]`,
+      `  ${missing}["${escapeMermaidLabel(`${issue.resolutionReason ?? "unresolved"}: ${issue.declaredTarget}`)}"]`,
     );
     const source = nodeIds.get(issue.sourceId);
     if (source) {
@@ -1672,6 +1672,11 @@ function layeredEdgeLabel(
   edge: GraphEdge,
   nodesById: Map<string, GraphNode>,
 ): string {
+  if (
+    edge.declaration === "requires_skill" ||
+    edge.declaration === "optional_skill"
+  )
+    return edge.declaration;
   const sourceKind = nodesById.get(edge.from)?.kind;
   if (sourceKind !== "skill") return edge.kind;
 

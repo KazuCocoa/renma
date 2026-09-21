@@ -491,9 +491,13 @@ function dependency(
     from,
     to,
     kind:
-      declaration === "requires_context" || declaration === "requires_lens"
+      declaration === "requires_context" ||
+      declaration === "requires_lens" ||
+      declaration === "requires_skill"
         ? "requires"
-        : declaration === "optional_context" || declaration === "optional_lens"
+        : declaration === "optional_context" ||
+            declaration === "optional_lens" ||
+            declaration === "optional_skill"
           ? "optional"
           : declaration,
     declaration,

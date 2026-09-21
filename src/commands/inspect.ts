@@ -223,6 +223,11 @@ function inspectRelationshipKind(
   target: CatalogEntry | undefined,
 ): string {
   if (
+    dependency.declaration === "requires_skill" ||
+    dependency.declaration === "optional_skill"
+  )
+    return dependency.declaration;
+  if (
     source?.kind === "skill" &&
     (target?.kind === "context_lens" || dependency.to.startsWith("lens."))
   ) {

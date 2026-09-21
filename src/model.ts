@@ -60,6 +60,8 @@ export interface AssetMetadata {
   appliesTo?: string[];
   focus?: string[];
   expectedOutputs?: string[];
+  requiresSkill?: string[];
+  optionalSkill?: string[];
   requiresLens?: string[];
   optionalLens?: string[];
 }

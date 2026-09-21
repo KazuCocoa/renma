@@ -218,3 +218,13 @@ necessary. Consumers comparing portable identities should use documented
 content hashes, digests, stable IDs, repository-relative paths, or command
 options such as `--omit-generated-at`, not compare environment-derived fields
 as though they were universal constants.
+
+## Declared Skill Composition
+
+Declared Skill composition adds optional `requiresSkill`/`optionalSkill`
+metadata arrays and normalized `requires_skill`/`optional_skill` relationship
+values to catalog and focused graph evidence. Composition unresolved issues
+may carry `resolutionReason` and `candidatePaths`. Existing graph dependency
+kinds, BOM v3 fields, Trust Graph v2 edge types, and diff/CI edge kinds are reused;
+no public schema identifier or published JSON Schema enum changes. Existing
+goldens remain valid. Consumers of relationship strings must preserve new values.

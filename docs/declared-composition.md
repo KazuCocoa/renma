@@ -5,7 +5,7 @@ optional relationships explicitly authored in a repository.
 
 > Renma models explicit composition, not general natural-language inheritance.
 
-A Declared Composition report answers which Context Lenses and Context Assets
+A Declared Composition report answers which Skills, Context Lenses and Context Assets
 belong to one resolved root's declared closure, which declarations include
 them, and which structural or governance problems need review. It does not
 prove which Context an agent loaded, selected, or used at runtime.
@@ -20,6 +20,8 @@ Renma expands only these normalized declaration forms:
 | `optional_context` | Context Asset | Makes this route and its descendants optional |
 | `requires_lens` | Context Lens | Required unless the route is already optional |
 | `optional_lens` | Context Lens | Makes this route and its descendants optional |
+| `requires_skill` (Skill source only) | Skill | Required unless the route is already optional |
+| `optional_skill` (Skill source only) | Skill | Makes this route and its descendants optional |
 | Lens `applies_to` | Context Asset | Preserves the Lens route's membership |
 
 Renma does not expand `references`, `conflicts`, `covered_by`,
@@ -144,3 +146,50 @@ Existing `MAINT-ASSET-EXPIRED` and `MAINT-ASSET-REVIEW-OVERDUE` freshness
 governance now also applies to Context Lenses. Findings remain deterministic
 repository evidence and do not perform runtime selection, loading, prompt
 assembly, execution, crawling, or automatic rewriting.
+
+## Declared Skill Dependencies
+
+Declared Skill dependency ≠ Discovery continuation ≠ runtime invocation.
+A Skill can statically require another Skill as part of its workflow, or declare
+that another Skill may participate. Neither form selects, loads, invokes, or
+completes the target. Discovery's `continues_with` declarations and projected
+continuation routes remain separate and are never inferred in either direction.
+Prose, links, paths mentioned in prose, directory names, and telemetry do not
+create dependencies. Renma does not rewrite declarations.
+
+Canonical Agent Skills use flat string-valued metadata keys (not a nested
+`metadata.renma` mapping):
+
+```yaml
+metadata:
+  renma.requires-skill: '["skill.security-review"]'
+  renma.optional-skill: '["skill.changelog-authoring"]'
+```
+
+The authoritative serialization reference is the
+[metadata table](user-manual.md). Normalized relationship names are
+`requires_skill` and `optional_skill`; top-level Skill fields are migration
+input only, following existing Context/Lens compatibility behavior. These
+portable extensions are optional. This change adds no completeness policy and
+does not add them to repository-required metadata policy fields.
+
+If A requires B and B requires Context C, A includes B and C as required.
+If A optionally depends on B, B and its required Contexts, Lenses, and Skills
+remain optional. Multiple required/optional routes retain all provenance;
+required membership wins in the final asset list. Skill cycles use the same
+finite state traversal and cycle model, including required-cycle precedence
+when the same component also has optional routes.
+
+Both source and target must be Skills. Wrong kinds and exact duplicate
+values retain existing diagnostics and declaration ranges. Missing targets
+remain unresolved. Ambiguous Skill targets are not selected: unresolved issues
+include `resolutionReason: "ambiguous"` and sorted `candidatePaths`; missing
+Skill targets include `resolutionReason: "missing"`. Ambiguous references do
+not create reverse impact, resolved graph/BOM targets, or Trust Graph edges.
+
+Cross-owner composition is valid and preserves ownership and `writable_by`
+evidence. Suspended/revoked targets retain the existing required-error and
+optional-warning lifecycle diagnostics; required dependencies from usable
+roots make required composition incomplete. Deprecated/archived targets retain
+lifecycle findings and optional inactive-dependency warnings without acquiring
+suspended/revoked completeness semantics.

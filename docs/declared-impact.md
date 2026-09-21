@@ -32,6 +32,8 @@ successful empty report.
 
 Impact traverses incoming forms of exactly these explicit relationships:
 
+- `requires_skill` (Skill source and target);
+- `optional_skill` (Skill source and target);
 - `requires_context`;
 - `optional_context`;
 - `requires_lens`;
@@ -146,3 +148,8 @@ while resolving impact.
 Use impact to prepare a review scope after a Context or Lens changes. Review
 the retained declarations and the actual change before deciding whether any
 dependent is semantically affected.
+
+Reverse Skill dependency closure uses the same required/optional provenance
+and exact declaration ranges as forward [Declared Composition](declared-composition.md).
+Crossing an optional edge keeps the reverse route optional. Discovery
+continuations and runtime invocation are not composition or impact edges.

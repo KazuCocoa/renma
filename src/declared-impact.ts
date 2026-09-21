@@ -237,7 +237,8 @@ function reverseMembership(
   if (
     declaration.dependency.kind === "optional" ||
     declaration.relationship === "optional_context" ||
-    declaration.relationship === "optional_lens"
+    declaration.relationship === "optional_lens" ||
+    declaration.relationship === "optional_skill"
   ) {
     return "optional";
   }

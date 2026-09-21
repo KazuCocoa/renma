@@ -58,6 +58,8 @@ const CANONICAL_LIST_KEYS = new Set<CanonicalSkillOperationalKey>([
   "optional_context",
   "requires_lens",
   "optional_lens",
+  "requires_skill",
+  "optional_skill",
   "conflicts",
   "superseded_by",
 ]);
@@ -562,6 +564,17 @@ export function parseAssetMetadata(document: ParsedDocument): {
     metadata,
     "optionalLens",
     operationalListValue(document, source, "optional_lens", diagnostics),
+  );
+
+  assignOptionalList(
+    metadata,
+    "requiresSkill",
+    operationalListValue(document, source, "requires_skill", diagnostics),
+  );
+  assignOptionalList(
+    metadata,
+    "optionalSkill",
+    operationalListValue(document, source, "optional_skill", diagnostics),
   );
 
   if (source.canonicalSkill) {

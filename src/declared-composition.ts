@@ -1,5 +1,8 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
-import { normalizeDependencyReference } from "./dependency-resolution.js";
+import {
+  normalizeDependencyReference,
+  resolveUniqueDependencyTarget,
+} from "./dependency-resolution.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { evaluateAssetFreshness, todayIsoDate } from "./freshness.js";
 import type {
@@ -24,6 +27,8 @@ export type CompositionRelationship =
   | "optional_context"
   | "requires_lens"
   | "optional_lens"
+  | "requires_skill"
+  | "optional_skill"
   | "applies_to";
 
 export interface CompositionAsset {
@@ -50,6 +55,8 @@ export interface CompositionProvenanceEdge {
 }
 
 export interface CompositionResolutionIssue {
+  resolutionReason?: "missing" | "ambiguous";
+  candidatePaths?: string[];
   sourceId: string;
   sourceKind: AssetKind;
   sourcePath: string;
@@ -272,6 +279,23 @@ export function resolveDeclaredCompositionFromIndex(
           relationship,
           membership,
         );
+        if (
+          relationship === "requires_skill" ||
+          relationship === "optional_skill"
+        ) {
+          const candidates = index.sortedAssets.filter(
+            (asset) =>
+              asset.id === dependency.to ||
+              normalizeDependencyReference(asset.sourcePath) ===
+                normalizeDependencyReference(dependency.to),
+          );
+          issue.resolutionReason =
+            candidates.length > 1 ? "ambiguous" : "missing";
+          if (candidates.length > 1)
+            issue.candidatePaths = [
+              ...new Set(candidates.map((asset) => asset.sourcePath)),
+            ].sort(compareUtf16CodeUnits);
+        }
         (membership === "required"
           ? unresolvedRequired
           : unresolvedOptional
@@ -462,7 +486,16 @@ function relationshipKindFindings(index: DeclaredCompositionIndex): Finding[] {
       expectedTargetKind =
         relationship === "requires_lens" || relationship === "optional_lens"
           ? "context_lens"
-          : "context";
+          : relationship === "requires_skill" ||
+              relationship === "optional_skill"
+            ? "skill"
+            : "context";
+      if (
+        relationship === "requires_skill" ||
+        relationship === "optional_skill"
+      ) {
+        expectedSourceKind = "skill";
+      }
       if (relationship === "applies_to") {
         expectedSourceKind = "context_lens";
       }
@@ -1014,6 +1047,8 @@ function isCompositionRelationship(
     value === "optional_context" ||
     value === "requires_lens" ||
     value === "optional_lens" ||
+    value === "requires_skill" ||
+    value === "optional_skill" ||
     value === "applies_to"
   );
 }
@@ -1027,7 +1062,8 @@ function propagatedMembership(
   if (
     dependency.kind === "optional" ||
     relationship === "optional_context" ||
-    relationship === "optional_lens"
+    relationship === "optional_lens" ||
+    relationship === "optional_skill"
   ) {
     return "optional";
   }
@@ -1061,16 +1097,24 @@ function compositionKindMismatch(
   const expectedTargetKind =
     relationship === "requires_lens" || relationship === "optional_lens"
       ? "context_lens"
-      : "context";
+      : relationship === "requires_skill" || relationship === "optional_skill"
+        ? "skill"
+        : "context";
+  const expectedSourceKind =
+    relationship === "applies_to"
+      ? "context_lens"
+      : relationship === "requires_skill" || relationship === "optional_skill"
+        ? "skill"
+        : undefined;
   const wrongSource =
-    relationship === "applies_to" && source.kind !== "context_lens";
+    expectedSourceKind !== undefined && source.kind !== expectedSourceKind;
   const wrongTarget =
     target !== undefined && target.kind !== expectedTargetKind;
   if (!wrongSource && !wrongTarget) return undefined;
 
   return {
     ...resolutionIssue(source, dependency, relationship, membership),
-    ...(wrongSource ? { expectedSourceKind: "context_lens" as const } : {}),
+    ...(wrongSource ? { expectedSourceKind } : {}),
     actualSourceKind: source.kind,
     ...(wrongTarget
       ? {
@@ -1087,6 +1131,12 @@ function resolveIndexedTarget(
   dependency: Dependency,
   index: DeclaredCompositionIndex,
 ): Asset | undefined {
+  if (
+    dependency.declaration === "requires_skill" ||
+    dependency.declaration === "optional_skill"
+  ) {
+    return resolveUniqueDependencyTarget(dependency, index.sortedAssets);
+  }
   return (
     index.assetsById.get(dependency.to) ??
     index.assetsByPath.get(normalizeDependencyReference(dependency.to))

@@ -10,6 +10,12 @@ export function resolveDependencyTarget(
   dependency: Dependency,
   assets: Asset[],
 ): Asset | undefined {
+  if (
+    dependency.declaration === "requires_skill" ||
+    dependency.declaration === "optional_skill"
+  ) {
+    return resolveUniqueDependencyTarget(dependency, assets);
+  }
   const target = normalizeDependencyReference(dependency.to);
   return assets.find(
     (asset) =>

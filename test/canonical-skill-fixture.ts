@@ -15,6 +15,8 @@ const LIST_FIELDS = new Set([
   "optional_context",
   "requires_lens",
   "optional_lens",
+  "requires_skill",
+  "optional_skill",
   "conflicts",
   "superseded_by",
   "allowed_data",
