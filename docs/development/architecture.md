@@ -247,3 +247,10 @@ candidates and explicit non-commitments belong in [plan.md](plan.md).
 ```text
 LLM proposes. Renma verifies. Human approves.
 ```
+
+## Declared Skill Composition
+
+Declared Skill dependencies use the existing catalog/composition/impact
+pipeline. They do not change Discovery reachability or assert runtime use.
+The [composition contract](../declared-composition.md) defines typed source and
+target validation, propagation, and ambiguity evidence.

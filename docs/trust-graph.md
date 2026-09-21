@@ -62,3 +62,12 @@ Representative complete top-level document:
 Within v2, evolution is additive and backward-compatible. Removing or changing
 an existing field requires a new schema version. Enum additions are
 consumer-visible and must be documented.
+
+## Declared Skill Composition
+
+Declared Skill dependencies project as existing `declares_dependency` edges
+with `dependencyKind: "requires"` or `"optional"`, declared target, Skill asset
+endpoints, and declaration evidence. Ambiguous or missing targets remain
+unresolved elsewhere and produce no fabricated Trust Graph endpoint. The v2
+schema and edge enums are unchanged. This does not assert invocation or
+Discovery reachability; see [Declared Composition](declared-composition.md).

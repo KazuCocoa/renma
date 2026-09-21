@@ -1475,3 +1475,12 @@ For an internal change:
    and each required memoized projection is prepared at most once.
 6. Run targeted tests, type checking, linting, the full test suite, build, and
    package verification before release.
+
+## Declared Skill Composition
+
+Skill composition extends the existing metadata registry, catalog dependencies,
+and Declared Composition resolver; Declared Impact consumes the same typed
+relationship validation. It introduces no command or independent resolver.
+Skill dependency resolution requires a unique ID/path target and retains
+ambiguity evidence. Discovery continues to consume only its explicit routing
+projection. BOM and Trust Graph reuse existing dependency kinds and schemas.

@@ -104,3 +104,18 @@ renma readiness examples/context-lens --json
 ```
 
 Blocking Context Lens diagnostics make that command exit `1`.
+
+## Declared Skill Composition
+
+A composed Skill can also declare another Skill using flat canonical metadata:
+
+```yaml
+metadata:
+  renma.requires-skill: '["skill.security-review"]'
+  renma.optional-skill: '["skill.changelog-authoring"]'
+```
+
+These example targets must exist before those declarations resolve. A required
+Skill brings its declared Context/Lens dependencies into the root closure; an
+optional Skill keeps its descendants optional. This is not a Discovery
+continuation or evidence of runtime invocation.

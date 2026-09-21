@@ -630,6 +630,8 @@ function dependency(
     | "optional_context"
     | "requires_lens"
     | "optional_lens"
+    | "requires_skill"
+    | "optional_skill"
     | "applies_to"
     | "conflicts",
   line: number,
@@ -638,9 +640,13 @@ function dependency(
     from,
     to,
     kind:
-      declaration === "requires_context" || declaration === "requires_lens"
+      declaration === "requires_context" ||
+      declaration === "requires_lens" ||
+      declaration === "requires_skill"
         ? "requires"
-        : declaration === "optional_context" || declaration === "optional_lens"
+        : declaration === "optional_context" ||
+            declaration === "optional_lens" ||
+            declaration === "optional_skill"
           ? "optional"
           : declaration,
     declaration,

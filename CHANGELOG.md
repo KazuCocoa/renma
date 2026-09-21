@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve resolved Skill file identity across composition, lifecycle checks,
+  reverse impact, and focused graph output when declared IDs are duplicated.
+- Apply Skill dependency uniqueness checks in inspect, including inbound
+  dependents; ambiguous IDs remain unresolved while unique paths retain their
+  selected target. Existing public output fields and schema versions are unchanged.
+
+### Added
+
+- Optional declared Skill composition via canonical `renma.requires-skill` and
+  `renma.optional-skill` JSON-array strings, normalized as `requires_skill` and
+  `optional_skill`. Existing composition/impact propagation, cycles, exact
+  provenance, kind validation, lifecycle diagnostics, graph, BOM, Trust Graph,
+  inspect, diff and CI projections apply. Ambiguous Skill targets remain
+  unresolved with explicit candidate evidence.
+- Discovery continuations remain separate from composition and runtime use.
+  No dependency completeness policy, package version bump, or schema version
+  change; published BOM/Trust Graph fields and enums are reused.
+
 ## [0.39.1] - 2026-09-20
 
 ### Added

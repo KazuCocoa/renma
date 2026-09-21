@@ -326,3 +326,11 @@ rewrite files.
 QA and testing remain useful product examples because their expertise is often
 distributed across workflows, tool limits, domain risks, and team policy. They
 are not a required repository hierarchy or a special asset model.
+
+## Declared Skill Composition
+
+Declared Skill dependency ≠ Discovery continuation ≠ runtime invocation.
+Skill-to-Skill composition uses the existing required/optional closure, cycle,
+provenance, lifecycle and reverse-impact rules. Declarations remain optional
+portable metadata; completeness policy and runtime observation are separate
+future work. See [Declared Composition](../declared-composition.md).

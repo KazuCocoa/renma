@@ -310,3 +310,11 @@ External agents, editor integrations, wrappers, or CI tools may produce those
 signals. They remain outside the BOM contract and Renma's role as a static
 repository analyzer; Renma is not a telemetry collector, runtime wrapper,
 dashboard, or provider gateway.
+
+## Declared Skill Composition
+
+Declared Skill dependencies are included using the existing `requires` and
+`optional` dependency kinds with Skill target identity/kind. The BOM remains
+`renma.repository-context-bom.v3`; no fields, enum values, or meanings change.
+These are static declarations, not Discovery continuations or runtime use.
+See [Declared Composition](declared-composition.md) for the metadata contract.

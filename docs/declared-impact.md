@@ -32,6 +32,8 @@ successful empty report.
 
 Impact traverses incoming forms of exactly these explicit relationships:
 
+- `requires_skill` (Skill source and target);
+- `optional_skill` (Skill source and target);
 - `requires_context`;
 - `optional_context`;
 - `requires_lens`;
@@ -58,7 +60,7 @@ route containing any optional declaration
 The focus begins in required traversal state and is reported separately. Once
 a reverse route crosses an optional declaration, upstream dependents on that
 route remain optional. Lens `applies_to` preserves the current route state. If
-the same stable asset ID has both required and optional routes, the asset is
+the same resolved asset (ID and source path) has both required and optional routes, the asset is
 classified once as required while provenance retains both route classes.
 
 Required impact means the focus belongs to the dependent asset's required
@@ -111,8 +113,8 @@ the impact report does not create new scan findings.
 The impact-specific `DeclaredImpactIndex` extends the unchanged forward
 `DeclaredCompositionIndex` and builds incoming resolved declarations once.
 Forward composition and scan do not pay that preparation cost. Reverse
-traversal processes `(stable asset ID, membership)` states, so cycles terminate
-and each stable ID appears once in the final classification. Distinct
+traversal processes `(asset ID, normalized source path, membership)` states, so cycles terminate
+and each resolved asset appears once in the final classification. Distinct
 declarations and declaration indexes retain distinct evidence.
 
 Provenance storage is proportional to reachable declarations, not the number
@@ -146,3 +148,14 @@ while resolving impact.
 Use impact to prepare a review scope after a Context or Lens changes. Review
 the retained declarations and the actual change before deciding whether any
 dependent is semantically affected.
+
+Reverse Skill dependency closure uses the same required/optional provenance
+and exact declaration ranges as forward [Declared Composition](declared-composition.md).
+Crossing an optional edge keeps the reverse route optional. Discovery
+continuations and runtime invocation are not composition or impact edges.
+
+For duplicate Skill IDs, reverse traversal matches the resolved target file.
+A dependency on one Skill path does not make its source a dependent of another
+file with the same ID. Focused graph and inspect preserve that distinction;
+inspect leaves ambiguous Skill ID dependencies unresolved and omits them from
+both candidate files' inbound dependents.

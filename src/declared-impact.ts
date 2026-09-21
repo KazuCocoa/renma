@@ -8,6 +8,7 @@ import type {
   ResolvedCompositionDeclaration,
 } from "./declared-composition.js";
 import {
+  compositionAssetIdentity,
   prepareDeclaredCompositionIndex,
   resolveCompositionDeclaration,
 } from "./declared-composition.js";
@@ -100,6 +101,8 @@ export function resolveDeclaredImpactFromIndex(
 ): DeclaredImpactReport {
   const focus = resolveFocus(index, focusReference);
   const reached = new Map<string, Set<CompositionMembership>>();
+  const reachedAssets = new Map<string, Asset>();
+  const directIds = new Set<string>();
   const processed = new Set<string>();
   const recordedTransitions = new Set<string>();
   const queue: ImpactTraversalState[] = [
@@ -107,17 +110,23 @@ export function resolveDeclaredImpactFromIndex(
   ];
   const provenanceEdges: ImpactProvenanceEdge[] = [];
   const invalidIncomingDeclarations: ImpactInvalidIncomingDeclaration[] = [];
-  reached.set(focus.id, new Set(["required"]));
+  reached.set(compositionAssetIdentity(focus), new Set(["required"]));
+  reachedAssets.set(compositionAssetIdentity(focus), focus);
 
   for (let cursor = 0; cursor < queue.length; cursor += 1) {
     const state = queue[cursor];
     if (!state) continue;
-    const stateKey = `${state.asset.id}\0${state.membership}`;
+    const stateKey = `${compositionAssetIdentity(state.asset)}\0${state.membership}`;
     if (processed.has(stateKey)) continue;
     processed.add(stateKey);
 
     for (const declaration of index.incomingByTargetId.get(state.asset.id) ??
       []) {
+      if (
+        compositionAssetIdentity(declaration.target) !==
+        compositionAssetIdentity(state.asset)
+      )
+        continue;
       const membership = reverseMembership(state.membership, declaration);
       const transitionKey = impactTransitionKey(declaration, membership);
       if (recordedTransitions.has(transitionKey)) continue;
@@ -144,35 +153,42 @@ export function resolveDeclaredImpactFromIndex(
           ? { declarationIndex: declaration.declarationIndex }
           : {}),
         dependentMembership: membership,
-        direct: declaration.target.id === focus.id,
+        direct:
+          compositionAssetIdentity(declaration.target) ===
+          compositionAssetIdentity(focus),
         sourcePath: declaration.sourcePath,
         ...(declaration.evidence ? { evidence: declaration.evidence } : {}),
       });
 
-      const memberships = reached.get(declaration.source.id) ?? new Set();
+      const sourceIdentity = compositionAssetIdentity(declaration.source);
+      reachedAssets.set(sourceIdentity, declaration.source);
+      if (
+        compositionAssetIdentity(declaration.target) ===
+        compositionAssetIdentity(focus)
+      )
+        directIds.add(sourceIdentity);
+      const memberships = reached.get(sourceIdentity) ?? new Set();
       if (!memberships.has(membership)) {
         memberships.add(membership);
-        reached.set(declaration.source.id, memberships);
+        reached.set(sourceIdentity, memberships);
         queue.push({ asset: declaration.source, membership });
       }
     }
   }
 
   const stableProvenance = provenanceEdges.sort(compareImpactEdges);
-  const directIds = new Set(
-    stableProvenance.filter((edge) => edge.direct).map((edge) => edge.from),
-  );
+
   const requiredDependents = impactDependents(
-    index,
+    reachedAssets,
     reached,
-    focus.id,
+    compositionAssetIdentity(focus),
     "required",
     directIds,
   );
   const optionalDependents = impactDependents(
-    index,
+    reachedAssets,
     reached,
-    focus.id,
+    compositionAssetIdentity(focus),
     "optional",
     directIds,
   );
@@ -237,7 +253,8 @@ function reverseMembership(
   if (
     declaration.dependency.kind === "optional" ||
     declaration.relationship === "optional_context" ||
-    declaration.relationship === "optional_lens"
+    declaration.relationship === "optional_lens" ||
+    declaration.relationship === "optional_skill"
   ) {
     return "optional";
   }
@@ -261,7 +278,7 @@ function impactTransitionKey(
 }
 
 function impactDependents(
-  index: DeclaredCompositionIndex,
+  reachedAssets: ReadonlyMap<string, Asset>,
   reached: ReadonlyMap<string, Set<CompositionMembership>>,
   focusId: string,
   membership: CompositionMembership,
@@ -273,8 +290,10 @@ function impactDependents(
       return membership === "required" || !memberships.has("required");
     })
     .flatMap(([assetId]) => {
-      const asset = index.assetsById.get(assetId);
-      return asset ? [impactAsset(asset, directIds.has(asset.id))] : [];
+      const asset = reachedAssets.get(assetId);
+      return asset
+        ? [impactAsset(asset, directIds.has(compositionAssetIdentity(asset)))]
+        : [];
     })
     .sort(compareImpactAssets);
 }

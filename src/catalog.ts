@@ -454,6 +454,8 @@ function operationalMetadataLists(
     ["optional_context", metadata.optionalContext],
     ["requires_lens", metadata.requiresLens ?? []],
     ["optional_lens", metadata.optionalLens ?? []],
+    ["requires_skill", metadata.requiresSkill ?? []],
+    ["optional_skill", metadata.optionalSkill ?? []],
     ["conflicts", metadata.conflicts],
     ["superseded_by", metadata.supersededBy],
     ["continues_with", metadata.continuesWith ?? []],
@@ -534,17 +536,43 @@ function dependencyDiagnostics(
 
     if (!shouldValidateDependencyTarget(dependency)) continue;
 
-    const target = uniqueTarget ?? entriesById.get(dependency.to);
+    const skillDependency =
+      dependency.declaration === "requires_skill" ||
+      dependency.declaration === "optional_skill";
+    const target = skillDependency
+      ? uniqueTarget
+      : (uniqueTarget ?? entriesById.get(dependency.to));
     if (!target) {
       if (dependency.kind === "conflicts") continue;
 
+      const candidates = skillDependency
+        ? entries
+            .filter(
+              (entry) =>
+                entry.id === dependency.to ||
+                entry.sourcePath.replace(/\\/g, "/").replace(/^\.\//, "") ===
+                  dependency.to.replace(/\\/g, "/").replace(/^\.\//, ""),
+            )
+            .map((entry) => entry.sourcePath)
+            .sort(compareUtf16CodeUnits)
+        : [];
       diagnostics.push(
         withDiagnosticId(DIAGNOSTIC_IDS.META_UNKNOWN_DEPENDENCY, {
           severity: "warning",
           path: dependency.sourcePath,
-          message: `Metadata dependency "${dependency.to}" from "${dependency.from}" does not match a catalog entry.`,
+          message: `Metadata dependency "${dependency.to}" from "${dependency.from}" ${candidates.length > 1 ? "does not resolve to a unique catalog entry" : "does not match a catalog entry"}.`,
           ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
           details: {
+            ...(skillDependency
+              ? {
+                  relationship: dependency.declaration,
+                  resolutionReason:
+                    candidates.length > 1 ? "ambiguous" : "missing",
+                  ...(candidates.length > 1
+                    ? { candidatePaths: candidates }
+                    : {}),
+                }
+              : {}),
             source: dependency.from,
             target: dependency.to,
             referenceKind: dependency.kind,
@@ -738,7 +766,10 @@ function suspendedDependencyDiagnostic(
 
 function shouldValidateDependencyTarget(dependency: Dependency): boolean {
   return (
-    dependency.to.startsWith("context.") || dependency.to.startsWith("lens.")
+    dependency.declaration === "requires_skill" ||
+    dependency.declaration === "optional_skill" ||
+    dependency.to.startsWith("context.") ||
+    dependency.to.startsWith("lens.")
   );
 }
 
@@ -1000,6 +1031,18 @@ function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
       "optional",
       entry.metadata.optionalLens ?? [],
       "optional_lens",
+    ),
+    ...metadataDependencies(
+      entry,
+      "requires",
+      entry.metadata.requiresSkill ?? [],
+      "requires_skill",
+    ),
+    ...metadataDependencies(
+      entry,
+      "optional",
+      entry.metadata.optionalSkill ?? [],
+      "optional_skill",
     ),
     ...metadataDependencies(
       entry,

@@ -1,0 +1,417 @@
+{
+  "composition": {
+    "root": {
+      "id": "skill.a",
+      "kind": "skill",
+      "sourcePath": "skills/a/SKILL.md"
+    },
+    "requiredAssets": [
+      {
+        "id": "context.c",
+        "kind": "context",
+        "sourcePath": "contexts/c.md",
+        "direct": false
+      },
+      {
+        "id": "lens.d",
+        "kind": "context_lens",
+        "sourcePath": "lenses/d.md",
+        "direct": false
+      },
+      {
+        "id": "skill.b",
+        "kind": "skill",
+        "sourcePath": "skills/b/SKILL.md",
+        "direct": true
+      }
+    ],
+    "optionalAssets": [],
+    "provenanceEdges": [
+      {
+        "from": "lens.d",
+        "to": "context.c",
+        "declaredTarget": "context.c",
+        "kind": "applies_to",
+        "relationship": "applies_to",
+        "declarationIndex": 0,
+        "membership": "required",
+        "direct": false,
+        "sourcePath": "lenses/d.md",
+        "evidence": {
+          "path": "lenses/d.md",
+          "startLine": 4,
+          "endLine": 4,
+          "snippet": "  - context.c"
+        }
+      },
+      {
+        "from": "skill.a",
+        "to": "skill.b",
+        "declaredTarget": "skill.b",
+        "kind": "requires",
+        "relationship": "requires_skill",
+        "declarationIndex": 0,
+        "membership": "required",
+        "direct": true,
+        "sourcePath": "skills/a/SKILL.md",
+        "evidence": {
+          "path": "skills/a/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-skill: \"[\\\"skill.b\\\"]\""
+        }
+      },
+      {
+        "from": "skill.b",
+        "to": "context.c",
+        "declaredTarget": "context.c",
+        "kind": "requires",
+        "relationship": "requires_context",
+        "declarationIndex": 0,
+        "membership": "required",
+        "direct": false,
+        "sourcePath": "skills/b/SKILL.md",
+        "evidence": {
+          "path": "skills/b/SKILL.md",
+          "startLine": 7,
+          "endLine": 7,
+          "snippet": "  renma.requires-context: \"[\\\"context.c\\\"]\""
+        }
+      },
+      {
+        "from": "skill.b",
+        "to": "lens.d",
+        "declaredTarget": "lens.d",
+        "kind": "requires",
+        "relationship": "requires_lens",
+        "declarationIndex": 0,
+        "membership": "required",
+        "direct": false,
+        "sourcePath": "skills/b/SKILL.md",
+        "evidence": {
+          "path": "skills/b/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-lens: \"[\\\"lens.d\\\"]\""
+        }
+      }
+    ],
+    "unresolvedRequired": [],
+    "unresolvedOptional": [],
+    "kindMismatches": [],
+    "requiredCycles": [],
+    "optionalCycles": [],
+    "requiredConflicts": [],
+    "optionalConflictCandidates": [],
+    "freshnessFindings": [],
+    "lifecycleFindings": [],
+    "requiredComplete": true,
+    "optionalComplete": true,
+    "cycleFree": true
+  },
+  "impact": {
+    "focus": {
+      "id": "context.c",
+      "kind": "context",
+      "sourcePath": "contexts/c.md",
+      "direct": false
+    },
+    "requiredDependents": [
+      {
+        "id": "lens.d",
+        "kind": "context_lens",
+        "sourcePath": "lenses/d.md",
+        "direct": true
+      },
+      {
+        "id": "skill.a",
+        "kind": "skill",
+        "sourcePath": "skills/a/SKILL.md",
+        "direct": false
+      },
+      {
+        "id": "skill.b",
+        "kind": "skill",
+        "sourcePath": "skills/b/SKILL.md",
+        "direct": true
+      }
+    ],
+    "optionalDependents": [],
+    "requiredSkills": [
+      {
+        "id": "skill.a",
+        "kind": "skill",
+        "sourcePath": "skills/a/SKILL.md",
+        "direct": false
+      },
+      {
+        "id": "skill.b",
+        "kind": "skill",
+        "sourcePath": "skills/b/SKILL.md",
+        "direct": true
+      }
+    ],
+    "optionalSkills": [],
+    "provenanceEdges": [
+      {
+        "from": "lens.d",
+        "to": "context.c",
+        "declaredTarget": "context.c",
+        "kind": "applies_to",
+        "relationship": "applies_to",
+        "declarationIndex": 0,
+        "dependentMembership": "required",
+        "direct": true,
+        "sourcePath": "lenses/d.md",
+        "evidence": {
+          "path": "lenses/d.md",
+          "startLine": 4,
+          "endLine": 4,
+          "snippet": "  - context.c"
+        }
+      },
+      {
+        "from": "skill.a",
+        "to": "skill.b",
+        "declaredTarget": "skill.b",
+        "kind": "requires",
+        "relationship": "requires_skill",
+        "declarationIndex": 0,
+        "dependentMembership": "required",
+        "direct": false,
+        "sourcePath": "skills/a/SKILL.md",
+        "evidence": {
+          "path": "skills/a/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-skill: \"[\\\"skill.b\\\"]\""
+        }
+      },
+      {
+        "from": "skill.b",
+        "to": "context.c",
+        "declaredTarget": "context.c",
+        "kind": "requires",
+        "relationship": "requires_context",
+        "declarationIndex": 0,
+        "dependentMembership": "required",
+        "direct": true,
+        "sourcePath": "skills/b/SKILL.md",
+        "evidence": {
+          "path": "skills/b/SKILL.md",
+          "startLine": 7,
+          "endLine": 7,
+          "snippet": "  renma.requires-context: \"[\\\"context.c\\\"]\""
+        }
+      },
+      {
+        "from": "skill.b",
+        "to": "lens.d",
+        "declaredTarget": "lens.d",
+        "kind": "requires",
+        "relationship": "requires_lens",
+        "declarationIndex": 0,
+        "dependentMembership": "required",
+        "direct": false,
+        "sourcePath": "skills/b/SKILL.md",
+        "evidence": {
+          "path": "skills/b/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-lens: \"[\\\"lens.d\\\"]\""
+        }
+      }
+    ],
+    "invalidIncomingDeclarations": []
+  },
+  "graphEdges": [
+    {
+      "from": "lens.d",
+      "to": "context.c",
+      "kind": "applies_to",
+      "declaration": "applies_to",
+      "declarationIndex": 0,
+      "sourcePath": "lenses/d.md",
+      "evidence": {
+        "path": "lenses/d.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "  - context.c"
+      },
+      "resolved": true,
+      "targetId": "context.c",
+      "targetKind": "context",
+      "targetPath": "contexts/c.md"
+    },
+    {
+      "from": "skill.a",
+      "to": "skill.b",
+      "kind": "requires",
+      "declaration": "requires_skill",
+      "declarationIndex": 0,
+      "sourcePath": "skills/a/SKILL.md",
+      "evidence": {
+        "path": "skills/a/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-skill: \"[\\\"skill.b\\\"]\""
+      },
+      "resolved": true,
+      "targetId": "skill.b",
+      "targetKind": "skill",
+      "targetPath": "skills/b/SKILL.md"
+    },
+    {
+      "from": "skill.b",
+      "to": "context.c",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 0,
+      "sourcePath": "skills/b/SKILL.md",
+      "evidence": {
+        "path": "skills/b/SKILL.md",
+        "startLine": 7,
+        "endLine": 7,
+        "snippet": "  renma.requires-context: \"[\\\"context.c\\\"]\""
+      },
+      "resolved": true,
+      "targetId": "context.c",
+      "targetKind": "context",
+      "targetPath": "contexts/c.md"
+    },
+    {
+      "from": "skill.b",
+      "to": "lens.d",
+      "kind": "requires",
+      "declaration": "requires_lens",
+      "declarationIndex": 0,
+      "sourcePath": "skills/b/SKILL.md",
+      "evidence": {
+        "path": "skills/b/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-lens: \"[\\\"lens.d\\\"]\""
+      },
+      "resolved": true,
+      "targetId": "lens.d",
+      "targetKind": "context_lens",
+      "targetPath": "lenses/d.md"
+    }
+  ],
+  "bomDependencies": [
+    {
+      "from": "lens.d",
+      "to": "context.c",
+      "kind": "applies_to",
+      "sourcePath": "lenses/d.md",
+      "resolved": true,
+      "targetId": "context.c",
+      "targetKind": "context",
+      "targetPath": "contexts/c.md"
+    },
+    {
+      "from": "skill.a",
+      "to": "skill.b",
+      "kind": "requires",
+      "sourcePath": "skills/a/SKILL.md",
+      "resolved": true,
+      "targetId": "skill.b",
+      "targetKind": "skill",
+      "targetPath": "skills/b/SKILL.md"
+    },
+    {
+      "from": "skill.b",
+      "to": "context.c",
+      "kind": "requires",
+      "sourcePath": "skills/b/SKILL.md",
+      "resolved": true,
+      "targetId": "context.c",
+      "targetKind": "context",
+      "targetPath": "contexts/c.md"
+    },
+    {
+      "from": "skill.b",
+      "to": "lens.d",
+      "kind": "requires",
+      "sourcePath": "skills/b/SKILL.md",
+      "resolved": true,
+      "targetId": "lens.d",
+      "targetKind": "context_lens",
+      "targetPath": "lenses/d.md"
+    }
+  ],
+  "trustDependencies": [
+    {
+      "id": "edge:925cb9a4f6ce689b",
+      "from": "asset:lens.d",
+      "to": "asset:context.c",
+      "type": "declares_dependency",
+      "properties": {
+        "dependencyKind": "applies_to",
+        "declaredTarget": "context.c"
+      },
+      "evidence": [
+        {
+          "path": "lenses/d.md",
+          "startLine": 4,
+          "endLine": 4,
+          "snippet": "  - context.c"
+        }
+      ]
+    },
+    {
+      "id": "edge:16c9a1af3965de4b",
+      "from": "asset:skill.a",
+      "to": "asset:skill.b",
+      "type": "declares_dependency",
+      "properties": {
+        "dependencyKind": "requires",
+        "declaredTarget": "skill.b"
+      },
+      "evidence": [
+        {
+          "path": "skills/a/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-skill: \"[\\\"skill.b\\\"]\""
+        }
+      ]
+    },
+    {
+      "id": "edge:189343df35ea46d4",
+      "from": "asset:skill.b",
+      "to": "asset:context.c",
+      "type": "declares_dependency",
+      "properties": {
+        "dependencyKind": "requires",
+        "declaredTarget": "context.c"
+      },
+      "evidence": [
+        {
+          "path": "skills/b/SKILL.md",
+          "startLine": 7,
+          "endLine": 7,
+          "snippet": "  renma.requires-context: \"[\\\"context.c\\\"]\""
+        }
+      ]
+    },
+    {
+      "id": "edge:b2c330163e04b4af",
+      "from": "asset:skill.b",
+      "to": "asset:lens.d",
+      "type": "declares_dependency",
+      "properties": {
+        "dependencyKind": "requires",
+        "declaredTarget": "lens.d"
+      },
+      "evidence": [
+        {
+          "path": "skills/b/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-lens: \"[\\\"lens.d\\\"]\""
+        }
+      ]
+    }
+  ]
+}

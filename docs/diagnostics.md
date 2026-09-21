@@ -1503,3 +1503,14 @@ written during scanning.
 2. Fix unresolved references before quality findings. Reference failures can hide or distort later reports.
 3. For scan findings, use the finding ID, evidence path, line number, snippet, and remediation text in the JSON output.
 4. Re-run the same command with `--format json` when a markdown or text report does not contain enough detail.
+
+## Declared Skill Composition
+
+Skill composition reuses existing unknown-dependency, relationship-kind,
+duplicate-declaration, cycle, and dependency-lifecycle diagnostics.
+`requires_skill` and `optional_skill` can appear in relationship detail strings.
+Only Skills can declare them and only Skills are valid targets. Cross-owner
+dependencies remain valid. Suspended/revoked required targets yield errors and
+optional targets warnings; deprecated/archived optional targets retain inactive
+dependency warnings. See [Declared Composition](declared-composition.md) for
+ambiguous-target evidence and propagation.
