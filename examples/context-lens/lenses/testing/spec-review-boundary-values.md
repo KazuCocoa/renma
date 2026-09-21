@@ -2,6 +2,8 @@
 id: lens.testing.spec-review.boundary-values
 type: context_lens
 owner: qa-platform
+writable_by:
+  - anyone
 status: experimental
 version: 1
 scope: context

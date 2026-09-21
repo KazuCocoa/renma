@@ -1,6 +1,8 @@
 ---
 id: context.testing.boundary-value-analysis
 owner: qa-platform
+writable_by:
+  - anyone
 status: stable
 tags:
   - testing

@@ -4,6 +4,7 @@ description: Review a specification through declared Context Assets and Context 
 metadata:
   renma.id: skill.testing.spec-review
   renma.owner: qa-platform
+  renma.writable-by: '["anyone"]'
   renma.status: experimental
   renma.tags: '["testing","spec-review"]'
   renma.requires-context: '["context.testing.boundary-value-analysis"]'

@@ -4,6 +4,7 @@ description: Prepare this example's disposable placeholder file, ask for a const
 metadata:
   renma.id: skill.example.replace-placeholder
   renma.owner: maintainers
+  renma.writable-by: '["anyone"]'
   renma.allowed-data: '["repo-local-files","disclosed-user-provided-data"]'
   renma.network-allowed: "false"
   renma.external-upload-allowed: "false"

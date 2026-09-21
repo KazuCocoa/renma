@@ -3,6 +3,8 @@ id: context.testing.boundary-value-analysis
 title: Boundary Value Analysis
 version: 0.1.0
 owner: qa-platform
+writable_by:
+  - anyone
 status: stable
 tags:
   - testing

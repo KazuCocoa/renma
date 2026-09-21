@@ -4,6 +4,8 @@ type: context_lens
 title: Spec Review Boundary Values Lens
 version: 1
 owner: qa-platform
+writable_by:
+  - anyone
 status: stable
 tags:
   - testing

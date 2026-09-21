@@ -6,6 +6,7 @@ metadata:
   renma.title: Spec Review
   renma.version: "0.1.0"
   renma.owner: qa-platform
+  renma.writable-by: '["anyone"]'
   renma.status: experimental
   renma.tags: '["testing","spec-review"]'
   renma.requires-context: '["contexts/testing/negative-testing.md"]'

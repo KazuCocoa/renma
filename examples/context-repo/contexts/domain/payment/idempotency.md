@@ -3,6 +3,8 @@ id: context.domain.payment.idempotency
 title: Payment Idempotency
 version: 0.1.0
 owner: payments-platform
+writable_by:
+  - anyone
 status: stable
 tags:
   - payment
