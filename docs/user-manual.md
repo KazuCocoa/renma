@@ -314,7 +314,7 @@ implementation-owned registries.
 | —                                     | `type`                          | Trimmed text; `context_lens` is the supported Lens discriminator                                      | Non-Skill assets; only Context/Context Lens for Lens validation                              | Conditional when a file under a Context root must be classified as a Context Lens                              | Classification evidence, catalog kind, inspect, and Context Lens diagnostics                                                                                                                                                                      |
 | `renma.version`                       | `version`                       | Trimmed text; a Context Lens accepts only `1` when present                                            | Skill and cataloged non-Skill assets                                                         | Optional                                                                                                       | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting                                                                                                                                                                            |
 | `renma.owner` | `owner` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; recommended for shared Context; optional elsewhere | Declared/effective ownership, ownership reports, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| `renma.writable-by` | `writable_by` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional unless repository policy requires it | Declared modification principals in catalog JSON and inspection; no authorization enforcement or ownership effects |
+| `renma.writable-by` | `writable_by` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional unless repository policy requires it | Declared modification principals in catalog JSON, inspection, diff, and CI report; no authorization enforcement or ownership effects |
 | `renma.status`                        | `status`                        | `experimental`, `stable`, `suspended`, `revoked`, `deprecated`, or `archived`                         | Skill and cataloged non-Skill assets                                                         | Optional lifecycle declaration; `suspended` and `revoked` are inactive and require reason/date evidence        | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting                                                                                                  |
 | `renma.status-reason`                 | `status_reason`                 | Trimmed non-empty text                                                                                | Skill and cataloged non-Skill assets                                                         | Required when status is `suspended` or `revoked`; optional for other statuses                                  | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                      |
 | `renma.status-changed-at`             | `status_changed_at`             | Real ISO date `YYYY-MM-DD`                                                                            | Skill and cataloged non-Skill assets                                                         | Required and blocking when status is `suspended` or `revoked`; optional for other statuses                    | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting                                                                                         |
@@ -2703,6 +2703,29 @@ content-only edit is therefore a changed asset even when `changedFields` is
 empty. Markdown reports the content-change count and, for bounded changed-asset
 details, the before/after hashes. This remains semantic identity evidence, not
 a generic source-hunk renderer.
+
+Asset endpoints in diff and CI-report JSON retain optional `writableBy` arrays.
+`changedFields` includes `writableBy` only when the normalized declaration
+changes. Comparison uses array contents in order, retaining duplicates: equal
+independently created arrays are unchanged, while reordering or changing duplicate
+counts is a declaration change. Existing metadata normalization trims entries and
+drops empty entries; diff does not sort or deduplicate principals.
+
+Both Markdown reports show **Writable by (declared)** once for an unchanged
+declaration on a changed asset, or previous → new principals for declaration
+changes. A missing endpoint declaration is labeled **Not declared**. Added assets
+show their declaration; removed assets retain their previous declaration. When
+both endpoints omit it, no line appears. CI Markdown bounds principal lists using
+the existing item cap; JSON retains the full evidence.
+
+`owner` remains maintenance responsibility; `writable_by` records declared
+modification principals. Omission means no Renma-specific modification constraint
+is declared, not “everyone allowed” or “access denied.” Principals are opaque
+identifiers, with no identity resolution or authorization enforcement. Each
+asset uses only its own declaration, without inheritance through parent Skills,
+references, or dependencies. Declaration changes introduce no CI warning or
+failure policy; existing required-metadata diagnostics still apply. Dependency
+impact and asset selection are unchanged.
 
 Legacy or partially comparable snapshots do not assert that content stayed
 unchanged. `contentChanged` is omitted for an asset unless both endpoint hashes

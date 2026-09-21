@@ -7,6 +7,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import {
   buildCiReportFromDiff,
+  ciReport,
   formatCiReport,
 } from "../src/commands/ci-report.js";
 import { buildDiffReport, diff, formatDiff } from "../src/commands/diff.js";
@@ -24,6 +25,163 @@ import type { SkillDiscoveryIndex } from "../src/skill-discovery.js";
 import { estimateTokens, markdownBody } from "../src/token-estimator.js";
 
 const execFile = promisify(execFileCallback);
+
+test("writableBy compares normalized sequences by contents and retains endpoint evidence", () => {
+  const base = node("context", "contexts/demo.md", "context", "team", "stable");
+  const cases: Array<[string[] | undefined, string[] | undefined, boolean]> = [
+    [undefined, undefined, false],
+    [["team:a", "team:b"], ["team:a", "team:b"], false],
+    [undefined, ["team:a"], true],
+    [["team:a"], ["team:b"], true],
+    [["team:a"], undefined, true],
+    [["team:a", "team:b"], ["team:b", "team:a"], true],
+    [["team:a"], ["team:a", "team:a"], true],
+  ];
+  for (const [from, to, changed] of cases) {
+    const report = buildDiffReport(
+      "/repo",
+      snapshot("base", {
+        nodes: [{ ...base, writableBy: from, contentHash: "before" }],
+      }),
+      snapshot("head", {
+        nodes: [{ ...base, writableBy: to, contentHash: "after" }],
+      }),
+    );
+    const change = report.catalog.changedAssets[0]!;
+    assert.deepEqual(change.changedFields, changed ? ["writableBy"] : []);
+    assert.deepEqual(change.from.writableBy, from);
+    assert.deepEqual(change.to.writableBy, to);
+    const ci = buildCiReportFromDiff(report);
+    assert.equal(ci.status, "pass");
+    for (const markdown of [
+      formatDiff(report, "markdown"),
+      formatCiReport(ci, "markdown"),
+    ]) {
+      assert.equal(
+        (markdown.match(/Writable by \(declared\):/g) ?? []).length,
+        from || to ? 1 : 0,
+      );
+      if (changed)
+        assert.ok(
+          markdown.includes(
+            `${from ? from.map((v) => `\`${v}\``).join(", ") : "Not declared"} -> ${to ? to.map((v) => `\`${v}\``).join(", ") : "Not declared"}`,
+          ),
+        );
+    }
+    const equalHashes = buildDiffReport(
+      "/repo",
+      snapshot("base", {
+        nodes: [{ ...base, writableBy: from, contentHash: "same" }],
+      }),
+      snapshot("head", {
+        nodes: [{ ...base, writableBy: to, contentHash: "same" }],
+      }),
+    );
+    assert.equal(equalHashes.catalog.changedAssets.length, changed ? 1 : 0);
+    assert.equal(buildCiReportFromDiff(equalHashes).status, "pass");
+  }
+});
+
+test("writableBy reaches diff and CI JSON and Markdown without inheritance", async (t) => {
+  const repo = await createGitRepo();
+  t.after(() => rm(repo, { force: true, recursive: true }));
+  const principal = "team:`review`<ops>|*";
+  const skill = `---\nname: demo\ndescription: Review evidence.\nmetadata:\n  renma.id: skill.demo\n  renma.owner: team\n  renma.writable-by: '${JSON.stringify([principal])}'\n  renma.requires-context: '["context.shared"]'\n---\n# Demo\n\nReview evidence.\n`;
+  await writeFile(join(repo, "skills/demo/SKILL.md"), skill);
+  await mkdir(join(repo, "skills/demo/references"), { recursive: true });
+  await mkdir(join(repo, "contexts"), { recursive: true });
+  const context = (id: string) =>
+    `---\nid: ${id}\nowner: team\nwritable_by: ["team:z", "team:a", "team:z"]\n---\n# Context\n\nReview evidence.\n`;
+  await writeFile(join(repo, "contexts/shared.md"), context("context.shared"));
+  await writeFile(
+    join(repo, "contexts/removed.md"),
+    context("context.removed"),
+  );
+  await writeFile(
+    join(repo, "skills/demo/references/local.md"),
+    "# Local\n\nLocal evidence.\n",
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "declarations"]);
+  await git(repo, ["tag", "declared"]);
+  await writeFile(
+    join(repo, "skills/demo/SKILL.md"),
+    skill + "\nUpdated evidence.\n",
+  );
+  await writeFile(
+    join(repo, "contexts/shared.md"),
+    context("context.shared") + "\nUpdated evidence.\n",
+  );
+  await writeFile(
+    join(repo, "skills/demo/references/local.md"),
+    "# Local\n\nUpdated local evidence.\n",
+  );
+  await rm(join(repo, "contexts/removed.md"));
+  await writeFile(join(repo, "contexts/added.md"), context("context.added"));
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "content changes"]);
+  const options = { fromRef: "declared", toRef: "HEAD" };
+  const report = await diff(repo, options);
+  const ci = await ciReport(repo, options);
+  const diffJson = JSON.parse(formatDiff(report, "json"));
+  const ciJson = JSON.parse(formatCiReport(ci, "json"));
+  for (const catalog of [diffJson.catalog, ciJson.diff.catalog]) {
+    const changes =
+      catalog.changedAssets as typeof report.catalog.changedAssets;
+    assert.deepEqual(
+      changes.find((c) => c.id === "skill.demo")?.to.writableBy,
+      [principal],
+    );
+    assert.deepEqual(
+      changes.find((c) => c.id === "context.shared")?.to.writableBy,
+      ["team:z", "team:a", "team:z"],
+    );
+    assert.ok(changes.every((c) => !c.changedFields.includes("writableBy")));
+    const local = changes.find((c) => c.path?.endsWith("references/local.md"))!;
+    assert.ok(local);
+    assert.equal(local.from.writableBy, undefined);
+    assert.equal(local.to.writableBy, undefined);
+    assert.deepEqual(catalog.addedAssets[0].writableBy, [
+      "team:z",
+      "team:a",
+      "team:z",
+    ]);
+    assert.deepEqual(catalog.removedAssets[0].writableBy, [
+      "team:z",
+      "team:a",
+      "team:z",
+    ]);
+  }
+  for (const markdown of [
+    formatDiff(report, "markdown"),
+    formatCiReport(ci, "markdown"),
+  ]) {
+    assert.ok(
+      markdown.includes("Writable by (declared): ``team:`review`<ops>|*``"),
+    );
+    assert.equal(
+      (markdown.match(/Writable by \(declared\):/g) ?? []).length,
+      4,
+    );
+  }
+  // Removing the Skill's own declaration must not acquire its required Context's principals.
+  await writeFile(
+    join(repo, "skills/demo/SKILL.md"),
+    skill.replace(/^  renma.writable-by:.*\n/m, ""),
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "remove declaration"]);
+  const removed = await diff(repo, { fromRef: "HEAD~1", toRef: "HEAD" });
+  assert.equal(
+    removed.catalog.changedAssets.find((c) => c.id === "skill.demo")?.to
+      .writableBy,
+    undefined,
+  );
+  assert.match(
+    formatCiReport(buildCiReportFromDiff(removed), "markdown"),
+    /``team:`review`<ops>\|\*`` -> Not declared/,
+  );
+});
 
 test("required-metadata details retain field identity for active and suppressed findings", () => {
   const findingId = DIAGNOSTIC_IDS.META_POLICY_REQUIRED_FIELD_MISSING;

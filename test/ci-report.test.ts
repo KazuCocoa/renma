@@ -75,6 +75,44 @@ import {
 
 const execFile = promisify(execFileCallback);
 
+test("writableBy Markdown escapes opaque principals and bounds each endpoint without truncating JSON", () => {
+  const report = sampleReport();
+  const principals = [
+    "team:`review`<ops>|*",
+    "line\nbreak",
+    ...Array.from({ length: 10 }, (_, i) => `team:${i}`),
+  ];
+  const from = {
+    id: "context.demo",
+    declaredOwner: "maintainer",
+    effectiveOwner: "maintainer",
+    writableBy: principals,
+  };
+  const to = { ...from, writableBy: ["next:``team``"] };
+  report.diff.catalog = {
+    addedAssets: [to],
+    removedAssets: [from],
+    changedAssets: [{ id: from.id, changedFields: ["writableBy"], from, to }],
+  };
+  const markdown = formatCiReport(report, "markdown");
+  const codes = markdownInlineCodeValues(markdown);
+  assert.ok(codes.includes(principals[0]!));
+  assert.ok(codes.includes("line\\nbreak"));
+  assert.ok(codes.includes("next:``team``"));
+  assert.ok(!codes.includes("team:9"));
+  assert.equal(
+    (markdown.match(/2 more not shown; see JSON for the full list/g) ?? [])
+      .length,
+    2,
+  );
+  assert.match(markdown, /Declared owner: maintainer/);
+  assert.deepEqual(
+    JSON.parse(formatCiReport(report, "json")).diff.catalog.changedAssets[0]
+      .from.writableBy,
+    principals,
+  );
+});
+
 test("formatCiReport renders compact diagnostic severity policy changes", async (t) => {
   const cases: {
     name: string;
