@@ -1,6 +1,6 @@
 # Versioned Asset Bindings for External Builders
 
-Status: implemented, unreleased. The historical filename is retained for links.
+Status: implemented in Renma 0.40.0. The historical filename is retained for links.
 
 Renma parses declarations and original-source evidence and validates a supplied
 repository snapshot. External builders resolve sources, download historical

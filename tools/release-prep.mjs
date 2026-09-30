@@ -21,6 +21,8 @@ const RELEASE_FILES = [
   "package.json",
   "package-lock.json",
   "CHANGELOG.md",
+  "docs/development/versioned-skill-bindings.md",
+  "tools/release-prep.mjs",
   ...CONSUMER_INSTALLATION_FILES,
 ];
 const REPOSITORY_URL = "https://github.com/KazuCocoa/renma";
