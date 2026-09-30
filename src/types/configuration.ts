@@ -48,6 +48,14 @@ export interface SkillDiscoveryConfig {
   ciPolicy: SkillDiscoveryCiPolicyMode;
 }
 
+export type AgentSkillNameUniquenessPolicy = "optional" | "required";
+
+/** Effective repository governance for Agent Skill runtime-observable names. */
+export interface AgentSkillsConfig {
+  /** Whether repository-wide normalized Skill-name uniqueness is enforced. */
+  nameUniqueness: AgentSkillNameUniquenessPolicy;
+}
+
 export type QualityThresholdSource =
   "renma_default" | "repository_configuration";
 
@@ -114,6 +122,7 @@ export interface ScanConfig {
   metadata: MetadataConfig;
   diagnostics: DiagnosticsConfig;
   security: SecurityConfig;
+  agentSkills: AgentSkillsConfig;
   skillDiscovery: SkillDiscoveryConfig;
 }
 

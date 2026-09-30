@@ -34,6 +34,7 @@ import type {
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
 const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
+const AGENT_SKILL_NAME_UNIQUENESS_POLICIES = ["optional", "required"] as const;
 const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const EXECUTABLE_SURFACE_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
@@ -61,6 +62,7 @@ const SUPPRESSION_CONFIG_KEYS = ["id", "paths", "reason", "expires"] as const;
 const SCAN_BOUNDARY_CONFIG_KEYS = ["ci_policy"] as const;
 const EXECUTABLE_SURFACE_CONFIG_KEYS = ["ci_policy"] as const;
 const SKILL_DISCOVERY_CONFIG_KEYS = ["adopted", "ci_policy"] as const;
+const AGENT_SKILLS_CONFIG_KEYS = ["name_uniqueness"] as const;
 const TOP_LEVEL_CONFIG_KEYS = [
   "fail_on",
   "format",
@@ -76,6 +78,7 @@ const TOP_LEVEL_CONFIG_KEYS = [
   "metadata",
   "diagnostics",
   "security",
+  "agent_skills",
   "skill_discovery",
 ] as const;
 const SECURITY_CONFIG_KEYS = [
@@ -138,6 +141,9 @@ const SECURITY_PROFILE_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
 const SKILL_DISCOVERY_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
   SKILL_DISCOVERY_CONFIG_KEYS,
 );
+const AGENT_SKILLS_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
+  AGENT_SKILLS_CONFIG_KEYS,
+);
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = [
@@ -199,6 +205,9 @@ export const DEFAULT_CONFIG: ScanConfig = {
     disallowedCommands: [],
     profiles: {},
     ciPolicy: "fail",
+  },
+  agentSkills: {
+    nameUniqueness: "optional",
   },
   skillDiscovery: {
     adopted: false,
@@ -503,9 +512,27 @@ function normalizeConfig(
 
   if (value.security !== undefined)
     config.security = securityPolicy(value.security);
+  if (value.agent_skills !== undefined)
+    config.agentSkills = agentSkillsPolicy(value.agent_skills);
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function agentSkillsPolicy(value: unknown): ScanConfig["agentSkills"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("agent_skills must be an object.");
+  }
+  return {
+    nameUniqueness:
+      value.name_uniqueness === undefined
+        ? "optional"
+        : enumValue(
+            "agent_skills.name_uniqueness",
+            value.name_uniqueness,
+            AGENT_SKILL_NAME_UNIQUENESS_POLICIES,
+          ),
+  };
 }
 
 function diagnosticsPolicy(value: unknown): ScanConfig["diagnostics"] {
@@ -949,6 +976,7 @@ type ConfigurationKeyScope =
   | "executable-surface"
   | "security"
   | "security-profile"
+  | "agent-skills"
   | "skill-discovery";
 type ConfigurationKeyIssueKind = "historical" | "removed" | "unknown";
 
@@ -975,7 +1003,8 @@ const CONFIGURATION_KEY_SCOPE_ORDER: Record<ConfigurationKeyScope, number> = {
   "executable-surface": 6,
   security: 7,
   "security-profile": 8,
-  "skill-discovery": 9,
+  "agent-skills": 9,
+  "skill-discovery": 10,
 };
 const CONFIGURATION_KEY_SCOPES_IN_ORDER = (
   Object.keys(CONFIGURATION_KEY_SCOPE_ORDER) as ConfigurationKeyScope[]
@@ -1036,6 +1065,9 @@ function validateConfigurationStructure(config: Record<string, unknown>): void {
         );
       }
     }
+  }
+  if (config.agent_skills !== undefined && !isRecord(config.agent_skills)) {
+    throw new ConfigError("agent_skills must be an object.");
   }
   if (
     config.skill_discovery !== undefined &&
@@ -1124,6 +1156,14 @@ function validateConfigurationKeys(
     if (isRecord(config.security.profiles)) {
       collectSecurityProfileKeyIssues(config.security.profiles, issues);
     }
+  }
+  if (isRecord(config.agent_skills)) {
+    collectUnknownConfigurationKeys(
+      "agent-skills",
+      config.agent_skills,
+      AGENT_SKILLS_CONFIG_KEY_REGISTRY,
+      issues,
+    );
   }
   if (isRecord(config.skill_discovery)) {
     collectUnknownConfigurationKeys(
@@ -1245,6 +1285,8 @@ function configurationKeyIssueGroup(issue: ConfigurationKeyIssue): string {
       return "security";
     case "security-profile":
       return `security.profiles.${issue.profileName}`;
+    case "agent-skills":
+      return "agent_skills";
     case "skill-discovery":
       return "skill_discovery";
   }
@@ -1307,6 +1349,11 @@ function allowedConfigurationKeys(scope: ConfigurationKeyScope): string {
       return allowedConfigurationKeysMessage(
         "security profile",
         SECURITY_PROFILE_CONFIG_KEY_REGISTRY,
+      );
+    case "agent-skills":
+      return allowedConfigurationKeysMessage(
+        "agent_skills",
+        AGENT_SKILLS_CONFIG_KEY_REGISTRY,
       );
     case "skill-discovery":
       return allowedConfigurationKeysMessage(

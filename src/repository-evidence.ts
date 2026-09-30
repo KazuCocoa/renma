@@ -652,7 +652,7 @@ function createRepositoryProjections(
     };
   });
   const agentSkills = memoizeProjection("agent-skills", instrumentation, () =>
-    validateAgentSkills(core.documents),
+    validateAgentSkills(core.documents, core.config.agentSkills),
   );
   const skillDiscovery = memoizeProjection(
     "skill-discovery",

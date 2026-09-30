@@ -31,7 +31,10 @@ import type {
   SuppressedFindingEvidence,
 } from "../types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
-import type { AgentSkillsValidationSummary } from "../agent-skills.js";
+import type {
+  AgentSkillValidationResult,
+  AgentSkillsValidationSummary,
+} from "../agent-skills.js";
 import {
   SKILL_ROUTE_USABILITY_REASONS,
   type SkillDiscoveryAdoptionState,
@@ -291,7 +294,7 @@ export function buildReadinessReport(
    */
   const checks: ReadinessCheck[] = [
     diagnosticsCheck(diagnosticCounts.error, diagnostics),
-    agentSkillsSpecificationCheck(agentSkills),
+    agentSkillsValidationCheck(agentSkills),
     blockingSecurityCheck(findings),
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
     graphEdgesCheck(unresolvedBlockingEdges),
@@ -862,10 +865,20 @@ function skillRouteReasonCounts(
   return counts;
 }
 
-function agentSkillsSpecificationCheck(
+function agentSkillsValidationCheck(
   summary: AgentSkillsValidationSummary | undefined,
 ): ReadinessCheck {
   const invalid = summary?.results.filter((result) => !result.valid) ?? [];
+  const governanceErrorCount = invalid.reduce(
+    (count, result) =>
+      count +
+      result.issues.filter(
+        (issue) =>
+          issue.severity === "error" && issue.category === "renma-authoring",
+      ).length,
+    0,
+  );
+  const includesGovernanceErrors = governanceErrorCount > 0;
   if (invalid.length === 0) {
     return {
       id: "specification.agent_skills",
@@ -878,16 +891,39 @@ function agentSkillsSpecificationCheck(
     };
   }
   return {
+    // Retain the established check identity so diff/CI comparisons match the
+    // same validation check across specification and governance outcomes.
     id: "specification.agent_skills",
-    title: "Agent Skills specification",
+    title: includesGovernanceErrors
+      ? "Agent Skills validation"
+      : "Agent Skills specification",
     status: "fail",
     severity: "error",
     summary: `${invalid.length} Skill entrypoint${invalid.length === 1 ? "" : "s"} fail Agent Skills validation.`,
     evidence: invalid.map((result) => ({
       path: result.path,
-      message: `${result.errorCount} specification error${result.errorCount === 1 ? "" : "s"}.`,
+      message: agentSkillsValidationErrorSummary(result),
     })),
   };
+}
+
+function agentSkillsValidationErrorSummary(
+  result: AgentSkillValidationResult,
+): string {
+  const specificationErrors = result.issues.filter(
+    (issue) => issue.severity === "error" && issue.category === "specification",
+  ).length;
+  const governanceErrors = result.issues.filter(
+    (issue) =>
+      issue.severity === "error" && issue.category === "renma-authoring",
+  ).length;
+  if (governanceErrors === 0) {
+    return `${specificationErrors} specification error${specificationErrors === 1 ? "" : "s"}.`;
+  }
+  if (specificationErrors === 0) {
+    return `${governanceErrors} governance policy error${governanceErrors === 1 ? "" : "s"}.`;
+  }
+  return `${result.errorCount} validation errors (${specificationErrors} specification, ${governanceErrors} governance policy).`;
 }
 
 function blockingSecurityCheck(findings: Finding[]): ReadinessCheck {

@@ -287,7 +287,7 @@ These are specification-owned fields, not `renma.*` extensions:
 <!-- agent-skills-portable-fields:start -->
 | Top-level field | Value format                                                                                                                                                       | Agent Skills requirement                                                   | Renma behavior                                                                               |
 | --- | --- | --- | --- |
-| `name` | Non-empty string; Renma validates 1–64 Unicode code points, lowercase NFKC form, letters/digits/hyphens, no edge or repeated hyphen, and immediate-directory match | Required | Skill identity validation and Discovery presentation |
+| `name` | Non-empty string; Renma validates 1–64 Unicode code points, lowercase NFKC form, letters/digits/hyphens, no edge or repeated hyphen, and immediate-directory match; repository-wide collisions are detected after trim/NFKC normalization | Required | Runtime-observable Skill identity validation and Discovery presentation; repository-wide uniqueness is optional governance and remains separate from canonical `renma.id` |
 | `description`   | Non-empty string, at most 1,024 Unicode code points                                                                                                                | Required; Renma recommends capability and usage boundaries                 | Portable Skill discovery text, quality and authoring diagnostics, and Discovery presentation |
 | `license` | String | Optional | Agent Skills validation; not projected into Renma catalog metadata |
 | `compatibility` | Non-empty string, at most 500 Unicode code points                                                                                                                  | Optional                                                                   | Agent Skills validation; not a Renma lifecycle or dependency declaration                     |
@@ -1364,6 +1364,10 @@ For example:
       "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
     }
   },
+  "agent_skills": {
+    // Require an observed Skill name to identify at most one governed Skill.
+    "name_uniqueness": "required"
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1453,6 +1457,14 @@ The configuration supports the same names used by the implementation, including:
   its own review. Strengthening remains visible as a non-blocking policy
   transition, although a newly effective High or Critical finding still uses
   the ordinary scan and CI finding rules.
+- `agent_skills`: repository-level Agent Skills governance. The supported
+  `name_uniqueness` value is `optional` or `required` and defaults to
+  `optional`. Duplicate normalized names are always detected and reported with
+  every conflicting path. `optional` reports a warning and preserves Skill
+  validity; `required` reports an error and makes every conflicting Skill
+  invalid. This is a governance policy rather than a
+  `diagnostics.severity` override. Skill `name` remains distinct from
+  canonical `renma.id`, and Renma does not perform runtime telemetry.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1794,7 +1806,8 @@ renma scan . --fail-on high --strict
 
 Without `--strict`, `scan` retains its finding-threshold contract: active
 findings at or above `--fail-on` fail the command. Strict scan supplements that
-threshold and also fails for a specification-invalid Agent Skill, any Renma
+threshold and also fails for an Agent Skill that is specification-invalid or
+invalid under a required Renma Agent Skills governance policy, any Renma
 `error` diagnostic, a blocking `inspectionCoverage` issue, or applicable YAML
 frontmatter-comment security analysis that is `not-analyzable` because the
 parser-owned extractor could not complete that analysis safely. It does not

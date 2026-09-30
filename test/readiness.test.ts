@@ -130,6 +130,38 @@ test("Agent Skills specification failures remain blocking", async () => {
   assert.equal(report.level, "not_ready");
   assert.equal(check?.status, "fail");
   assert.equal(check?.evidence?.[0]?.path, "skills/invalid/SKILL.md");
+  assert.equal(check?.evidence?.[0]?.message, "1 specification error.");
+});
+
+test("required Agent Skill name uniqueness is reported as governance validation", async () => {
+  const root = await fixture();
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ agent_skills: { name_uniqueness: "required" } })}\n`,
+  );
+  for (const group of ["alpha", "beta"]) {
+    const directory = path.join(root, "skills", group, "review");
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      path.join(directory, "SKILL.md"),
+      "---\nname: review\ndescription: Review inputs. Use when inputs need review.\n---\n# Review\n",
+    );
+  }
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "specification.agent_skills",
+  );
+  assert.equal(report.level, "not_ready");
+  assert.equal(check?.title, "Agent Skills validation");
+  assert.equal(check?.status, "fail");
+  assert.deepEqual(
+    check?.evidence?.map((evidence) => [evidence.path, evidence.message]),
+    [
+      ["skills/alpha/review/SKILL.md", "1 governance policy error."],
+      ["skills/beta/review/SKILL.md", "1 governance policy error."],
+    ],
+  );
 });
 
 test("high security findings remain blocking", () => {
