@@ -9,6 +9,7 @@ import {
 import { classifyRepositorySkillEntrypointPath } from "./discovery.js";
 import type { CommandInvocation } from "./types/decision.js";
 import type { ParsedDocument } from "./types/metadata.js";
+import type { AgentSkillsConfig } from "./types/configuration.js";
 import { renmaCommand } from "./command-invocation.js";
 import {
   ensureYamlFrontmatterForDocument,
@@ -138,6 +139,7 @@ export interface AgentSkillNameValidation {
 /** Validate every discovered Skill and repository-wide runtime name identity. */
 export function validateAgentSkills(
   documents: ParsedDocument[],
+  policy: AgentSkillsConfig = { nameUniqueness: "optional" },
 ): AgentSkillsValidationSummary {
   const skills = documents
     .filter((document) => document.artifact.kind === "skill")
@@ -161,6 +163,7 @@ export function validateAgentSkills(
   for (const [name, duplicates] of skillsByName) {
     if (duplicates.length < 2) continue;
     const duplicatePaths = duplicates.map(({ result }) => result.path);
+    const required = policy.nameUniqueness === "required";
     for (const { document, result } of duplicates) {
       const field = firstField(
         ensureYamlFrontmatterForDocument(document),
@@ -170,9 +173,9 @@ export function validateAgentSkills(
         ...createIssue(
           document,
           IDS.RN_DUPLICATE_NAME,
-          "error",
+          required ? "error" : "warning",
           "renma-authoring",
-          `Duplicate Skill name ${JSON.stringify(name)}. Skill names must uniquely identify a Skill within the repository so runtime observations can map unambiguously to its canonical Renma identity. Found in: ${duplicatePaths.join(", ")}. Give each distinct Skill a unique name and matching immediate parent directory, update affected path references, and preserve its renma.id.`,
+          duplicateSkillNameMessage(name, duplicatePaths, required),
           field?.startLine ?? 1,
           AGENT_SKILL_TOP_LEVEL_KEYS.name,
           field?.endLine ?? 1,
@@ -184,8 +187,12 @@ export function validateAgentSkills(
           left.startLine - right.startLine ||
           compareUtf16CodeUnits(left.code, right.code),
       );
-      result.errorCount += 1;
-      result.valid = false;
+      if (required) {
+        result.errorCount += 1;
+        result.valid = false;
+      } else {
+        result.warningCount += 1;
+      }
     }
   }
 
@@ -209,6 +216,17 @@ export function validateAgentSkills(
     ),
     results,
   };
+}
+
+function duplicateSkillNameMessage(
+  name: string,
+  duplicatePaths: readonly string[],
+  required: boolean,
+): string {
+  const policyExplanation = required
+    ? "The repository's configured Skill-name uniqueness policy requires distinct names."
+    : "Repository-wide uniqueness can be required when Skill names are used for unambiguous runtime attribution.";
+  return `Duplicate Skill name ${JSON.stringify(name)}. Multiple Skills share this runtime-observable identity. ${policyExplanation} Found in: ${duplicatePaths.join(", ")}. Give each distinct Skill a unique name and matching immediate parent directory, update affected path references, and preserve its renma.id.`;
 }
 
 /** Validate one discovered Skill without changing any operational metadata reader. */

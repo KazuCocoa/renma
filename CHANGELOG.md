@@ -8,10 +8,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Require repository-wide uniqueness of normalized Agent Skill names with
-  `RN-SKILL-DUPLICATE-NAME` errors listing every conflicting path. Duplicate
-  names now make Skills invalid even with distinct canonical `renma.id` values;
-  governance IDs and existing scan Finding exit thresholds remain unchanged.
+- Detect repository-wide normalized Agent Skill name collisions with
+  `RN-SKILL-DUPLICATE-NAME`, and let repositories require unique names as a
+  governance policy for unambiguous runtime identity attribution. Detection is
+  warning-only by default; required mode makes conflicting Skills invalid.
+  Canonical `renma.id` values and existing scan Finding exit thresholds remain
+  unchanged.
 - Shared asset-binding analysis for catalog dependency annotations, declared
   composition and reverse impact. Graph JSON, Markdown and Mermaid expose
   requested releases and local satisfaction separately from target resolution.

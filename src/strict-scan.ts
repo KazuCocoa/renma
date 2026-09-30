@@ -49,7 +49,8 @@ export function evaluateStrictScan(result: ScanResult): StrictScanEvaluation {
     matches.push({
       id: STRICT_SCAN_MATCH_IDS.INVALID_AGENT_SKILL,
       count: result.agentSkills.invalidSkillCount,
-      summary: "One or more Agent Skills are specification-invalid.",
+      summary:
+        "One or more Agent Skills are invalid under Agent Skills validation.",
     });
   }
   if (errorDiagnosticCount > 0) {

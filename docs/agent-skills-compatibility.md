@@ -425,9 +425,19 @@ scalars does not hide body diagnostics.
 
 ## Agent Skills Diagnostic Identifiers
 
-A Skill name is a runtime-observable identity. Repository-wide uniqueness
-allows runtime observations to be mapped unambiguously back to Renma's
-canonical governance identity. Renma deliberately keeps these identities separate:
+A Skill name may serve as a runtime-observable identity. Experiments in
+[`renma-runtime-evidence` PR #28](https://github.com/KazuCocoa/renma-runtime-evidence/pull/28)
+showed that native injection telemetry can distinguish a Skill when its
+effective provider label maps uniquely within the active deployment. Duplicate
+names within one plugin can collapse into an ambiguous metric, while different
+plugins may expose distinct provider-qualified labels. Trusted Hooks can add
+plugin-relative path evidence for some tool-mediated reads, but do not provide
+a universal identity for direct or server-side injection.
+
+Repository-wide name uniqueness is therefore not a universal Agent Skills or
+runtime requirement. Renma offers it as a deliberately stronger static
+governance guarantee for repositories that need an observed Skill name to map
+to at most one governed Skill. Renma keeps these identities separate:
 
 | Identity | Purpose |
 | --- | --- |
@@ -437,14 +447,52 @@ canonical governance identity. Renma deliberately keeps these identities separat
 
 Skill `name` != `renma.id`. Name equality uses the existing YAML-field trim and
 NFKC normalization, with case-sensitive comparison and no case folding; uppercase
-names still fail the existing lowercase validation. Uniqueness also applies to
-discovered Skills that have other validation errors. Missing names remain
-missing-name errors rather than being grouped into a duplicate identity.
+names still fail the existing lowercase validation. Collision detection also
+includes discovered Skills that have other validation errors. Missing names
+remain missing-name errors rather than being grouped into a duplicate identity.
 
-This is a static governance invariant. Renma prepares and governs static
-context/Skill information; runtime systems execute and observe Skills. Runtime
-evidence remains separate, with no telemetry collection or instrumentation in
-Renma.
+Configure the repository policy in `renma.config.jsonc` or
+`renma.config.json`:
+
+```jsonc
+{
+  "agent_skills": {
+    "name_uniqueness": "optional"
+  }
+}
+```
+
+`optional` is the default: duplicate names are detected, reported as warnings,
+and allowed. The affected Skills remain structurally valid. `required` uses the
+same collision evidence but reports errors and makes every conflicting Skill
+invalid:
+
+```jsonc
+{
+  "agent_skills": {
+    "name_uniqueness": "required"
+  }
+}
+```
+
+The required policy provides this repository contract:
+
+```text
+observed Skill name
+        |
+        v
+at most one governed Skill
+        |
+        v
+renma.id / owner / source / dependencies / provenance
+```
+
+This is static governance, not runtime telemetry. Renma prepares and governs
+static context and Skill information; runtimes and agents execute and observe
+Skills. The runtime-specific minimum demonstrated by the experiment was closer
+to a unique effective provider label within the active deployment. Renma's
+opt-in repository-wide guarantee is intentionally stronger and simpler; Renma
+does not collect telemetry or add runtime instrumentation.
 
 Agent Skills diagnostics use stable identifiers in the `agentSkills` portion of
 scan output. Specification errors make the Skill invalid. Renma authoring
@@ -453,19 +501,20 @@ threshold. Renma-owned authoring warnings use the `RN-SKILL-*` namespace and
 remain in the `agentSkills` projection so maintainers get exact source evidence
 without confusing them with Agent Skills specification failures.
 
-### Renma identity errors
+### Renma identity diagnostics
 
 | Identifier | Meaning |
 | --- | --- |
-| `RN-SKILL-DUPLICATE-NAME` | Multiple discovered Skills share a normalized name. Every conflicting Skill is invalid; each error lists all conflicting paths. Give distinct Skills unique names and matching immediate parent directories, update affected path references, and preserve canonical `renma.id` values. |
+| `RN-SKILL-DUPLICATE-NAME` | Multiple discovered Skills share a normalized runtime-observable name. Each diagnostic lists all conflicting paths. Under `optional` it is a warning and the Skills remain valid; under `required` it is an error and every conflicting Skill is invalid. Give distinct Skills unique names and matching immediate parent directories, update affected path references, and preserve canonical `renma.id` values. |
 
-This repository-level error uses the Renma `RN-SKILL-*` namespace because
-repository uniqueness is a Renma governance requirement. It appears in
-`agentSkills`, marks every conflicting Skill invalid, and follows the existing
-separation between Skill validity and scan Finding `--fail-on` thresholds.
-It does not change the existing medium-severity `META-DUPLICATE-ASSET-ID`
-Finding or add a Finding severity override. Repositories with duplicate Skill
-names now have invalid Skills even when their effective asset IDs are unique.
+This repository-level diagnostic uses the Renma `RN-SKILL-*` namespace because
+name uniqueness is a repository governance choice rather than a portable Agent
+Skills rule. It appears in `agentSkills` and follows the existing separation
+between Skill validity and scan Finding `--fail-on` thresholds. It is not a
+`diagnostics.severity` override. The policy does not change the existing
+medium-severity `META-DUPLICATE-ASSET-ID` Finding: different `renma.id`, owner,
+or source values do not avoid a name collision, and duplicate governance IDs
+remain an independent concern.
 
 ### Specification errors
 

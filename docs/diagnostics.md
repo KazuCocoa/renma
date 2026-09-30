@@ -26,10 +26,12 @@ renma uses two severity systems:
 In JSON output, diagnostics usually appear as structured objects with a `severity`, a `message`, and, when available, a `path`.
 
 Repository-wide Skill name collisions produce the `RN-SKILL-DUPLICATE-NAME`
-error in `agentSkills`, making all conflicting Skills invalid. Each error names
-the normalized name and all conflicting paths. This preserves the existing
-separation of Skill validity from scan Finding exit thresholds; canonical
-asset-ID collisions retain their existing classification. See
+diagnostic in `agentSkills`. Each diagnostic names the normalized name and all
+conflicting paths. With the default `agent_skills.name_uniqueness: "optional"`
+policy it is a non-blocking warning and the Skills remain valid. With
+`"required"` it is an error and makes every conflicting Skill invalid. This
+preserves the existing separation of Skill validity from scan Finding exit
+thresholds; canonical asset-ID collisions retain their existing classification. See
 [Skill identity and diagnostics](agent-skills-compatibility.md#agent-skills-diagnostic-identifiers).
 
 Repository configuration can set an effective scan-finding severity by stable
