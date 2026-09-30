@@ -83,8 +83,13 @@ inline Markdown links support angle-delimited destinations and optional titles.
 Only the destination span is offered for rewriting. Renma does not modify files.
 
 Images, reference-style links/definitions, autolinks and HTML attributes using
-the reserved scheme are unsupported and diagnosed. Queries, fragments, encoded
-or escaped aliases and suffixes are unsupported. Fenced/indented code, inline
+the reserved scheme are unsupported and diagnosed. HTML `href` and `src`
+values are checked after HTML attribute character-reference decoding. The
+Unicode hyphen lookalike `renma‐asset:` (including `&hyphen;`) is also diagnosed
+as unsupported; it is not normalized into a valid asset scheme. HTML comments,
+ordinary text, unrelated attributes and raw-text element contents are excluded.
+
+Queries, fragments, encoded or escaped aliases and suffixes are unsupported. Fenced/indented code, inline
 code and plain text are inert. Every reference needs a unique declared alias;
 bindings without body references are allowed. Support-file aliases are not
 implicitly scoped to a parent Skill.

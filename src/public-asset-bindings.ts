@@ -2,6 +2,7 @@
 import { ASSET_BINDING_METADATA_KEYS } from "./metadata-definitions.js";
 import { compareUtf16CodeUnits as order } from "./canonical-json.js";
 import { createHash } from "node:crypto";
+import { decodeHTMLAttribute } from "entities";
 import { parseDocument as parseYaml } from "yaml";
 import { ensureMarkdownSyntaxForDocument } from "./markdown-syntax.js";
 import type { Nodes } from "mdast";
@@ -594,6 +595,7 @@ function inspectReferences(
         1
       : 0;
   const definitions = new Map<string, string>();
+  const inspectHtml = createHtmlAssetReferenceInspector();
   const walk = (
     node: Nodes,
     fn: (node: Nodes, blockquoteDepth: number) => void,
@@ -619,11 +621,7 @@ function inspectReferences(
           ? definitions.get(node.identifier)
           : undefined;
     if (node.type === "html") {
-      if (
-        /\b(?:href|src)\s*=\s*["']?renma-asset:/iu.test(
-          node.value.replace(/<!--[\s\S]*?-->/gu, ""),
-        )
-      )
+      if (inspectHtml(node.value))
         issue(
           "RN-BINDING-UNSUPPORTED-REFERENCE",
           "HTML asset references are unsupported.",
@@ -707,4 +705,67 @@ function skipLinkWhitespace(
     cursor++;
   }
   return cursor;
+}
+
+/** Inspect parser-owned HTML, keeping raw-text state across inline HTML nodes. */
+function createHtmlAssetReferenceInspector(): (html: string) => boolean {
+  let rawTextTag: string | undefined;
+  const rawTextTags = new Set([
+    "script",
+    "style",
+    "textarea",
+    "title",
+    "xmp",
+    "iframe",
+    "noembed",
+    "noframes",
+    "plaintext",
+  ]);
+  return (html) => {
+    // Consume whole tags (including quoted values) and comments. Attribute-like
+    // prose and markup inside another attribute must never become attributes.
+    const tokens =
+      /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\?[\s\S]*?(?:\?>|$)|<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[ \t\r\n\f/>])((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gu;
+    let cursor = 0;
+    let found = false;
+    while (cursor < html.length) {
+      if (rawTextTag) {
+        if (rawTextTag === "plaintext") break;
+        const closing = new RegExp(
+          `</${rawTextTag}(?=[ \\t\\r\\n\\f/>])`,
+          "giu",
+        );
+        closing.lastIndex = cursor;
+        const match = closing.exec(html);
+        if (!match) break;
+        cursor = match.index;
+        rawTextTag = undefined;
+      }
+      tokens.lastIndex = cursor;
+      const token = tokens.exec(html);
+      if (!token) break;
+      cursor = tokens.lastIndex;
+      if (!token[2] || token[1]) continue;
+      const tagName = token[2].toLowerCase();
+      if (rawTextTags.has(tagName)) rawTextTag = tagName;
+      const attributes =
+        /[ \t\r\n\f]+([^ \t\r\n\f"'<>/=]+)(?:[ \t\r\n\f]*=[ \t\r\n\f]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n\f>]+)))?/gu;
+      const seen = new Set<string>();
+      for (const attribute of token[3]!.matchAll(attributes)) {
+        const name = attribute[1]!.toLowerCase();
+        // HTML keeps the first occurrence of a duplicate attribute.
+        if (seen.has(name)) continue;
+        seen.add(name);
+        if (name !== "href" && name !== "src") continue;
+        const value = attribute[2] ?? attribute[3] ?? attribute[4] ?? "";
+        // Attribute mode applies HTML's semicolon and ambiguous-ampersand rules;
+        // Markdown string decoding would also (incorrectly) unescape backslashes.
+        // U+2010 is the HTML &hyphen; lookalike: reject it as unsupported,
+        // without normalizing it into an accepted or rewritable asset scheme.
+        if (/^renma[-\u2010]asset:/iu.test(decodeHTMLAttribute(value)))
+          found = true;
+      }
+    }
+    return found;
+  };
 }

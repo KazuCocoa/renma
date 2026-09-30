@@ -585,3 +585,135 @@ test("blockquote containers do not make unsupported reference forms rewritable",
     6,
   );
 });
+
+test("HTML attribute character references cannot hide reserved asset destinations", () => {
+  const destinations = [
+    "renma&#45;asset:b",
+    "renma-asset&#58;b",
+    "&#x72;enma-asset:b",
+    "renma&hyphen;asset&colon;b",
+    "renma-asset&colon;b",
+    "RENMA&#x2d;ASSET&#x3a;b",
+    "renma&#45asset:b",
+  ];
+  for (const destination of destinations) {
+    for (const html of [
+      `<a href="${destination}">B</a>`,
+      `<img SRC='${destination}' alt="B">`,
+      `<a href="https://example.com" src="${destination}">B</a>`,
+      `<a title="href='ordinary'" HREF = ${destination} data-note="B">B</a>`,
+      `<a\n data-note="unrelated"\n HrEf\t=\n "${destination}">B</a>`,
+    ]) {
+      for (const [prefix, newline] of [
+        ["", "\n"],
+        ["> > ", "\r\n"],
+      ]) {
+        const body =
+          "😀\n\n" +
+          html
+            .split("\n")
+            .map((line) => prefix + line)
+            .join("\n");
+        const original = skill("a", "skill.b", [pin("skill.b")], body);
+        const content =
+          "\uFEFF" +
+          Buffer.from(original.bytes).toString().replaceAll("\n", newline!);
+        const input = file(original.path, content);
+        const report = source([input, skill("b", undefined, [], "", "1.0.0")]);
+        assert.equal(report.bindings[0]!.satisfaction.status, "matched");
+        assert.equal(
+          report.declarationValid,
+          false,
+          JSON.stringify({ html, prefix, newline }),
+        );
+        assert.deepEqual(report.references, []);
+        const diagnostics = report.diagnostics.filter(
+          (d) => d.code === "RN-BINDING-UNSUPPORTED-REFERENCE",
+        );
+        assert.equal(diagnostics.length, 1);
+        const evidence = diagnostics[0]!.evidence;
+        assert.equal(evidence.path, input.path);
+        assert.equal(
+          evidence.start,
+          content.indexOf(html.startsWith("<img") ? "<img" : "<a"),
+        );
+        const openingTag = html
+          .slice(0, html.indexOf(">") + 1)
+          .split("\n")
+          .map((line, index) => (index ? prefix + line : line))
+          .join(newline);
+        assert.equal(evidence.end, evidence.start + openingTag.length);
+        assert.equal(content.slice(evidence.start, evidence.end), evidence.raw);
+        assert.ok(evidence.raw.includes(destination));
+        assert.equal(
+          evidence.startLine,
+          content.slice(0, evidence.start).split("\n").length,
+        );
+        assert.equal(
+          evidence.endLine,
+          content.slice(0, evidence.end - 1).split("\n").length,
+        );
+        assert.equal(
+          evidence.sha256,
+          createHash("sha256").update(input.bytes).digest("hex"),
+        );
+      }
+    }
+  }
+});
+
+test("HTML detection ignores comments, raw text, unrelated attributes and ineffective entities", () => {
+  const bodies = [
+    '<!-- <a href="renma&#45;asset:b">B</a> -->',
+    '<!-- <a href="renma-asset:b">B</a> -->',
+    '<!-- unclosed <a href="renma&#45;asset:b">',
+    '<div>href="renma&#45;asset:b" and renma&hyphen;asset&colon;b</div>',
+    '<div>href="renma-asset:b"</div>',
+    '<a data-href="renma&#45;asset:b" title="href=renma-asset:b" href="https://example.com">B</a>',
+    '<a title="<a href=renma-asset:b>" aria-label="src=renma-asset:b">B</a>',
+    "<script>const example = '<a href=\"renma&#45;asset:b\">B</a>';</script>",
+    "text <script>const example = '<a href=\"renma-asset:b\">B</a>';</script> tail",
+    '<style>/* <img src="renma-asset:b"> */</style>',
+    '<textarea><a href="renma&#45;asset:b">B</a></textarea>',
+    '<a href="renma&amp;hyphen;asset&colon;b">B</a>',
+    '<a href="renma&unknown;asset:b">B</a>',
+    '<a href="renma&ndash;asset:b">B</a>',
+    '<a href="renma-asset&colonb">B</a>',
+    '<a href="renma\\-asset:b">B</a>',
+    '<a href="https://example.com" HREF="renma&#45;asset:b">B</a>',
+
+    '<a href="renma&hyphenasset&colon;b">B</a>',
+    '<a href="renma&notit;asset:b">B</a>',
+    '<a href="renma&#0;asset:b">B</a>',
+    '<a href="https://example.com/renma&#45;asset:b">B</a>',
+    '`<a href="renma&#45;asset:b">B</a>`',
+    '```html\n<a href="renma&#45;asset:b">B</a>\n```',
+  ];
+  for (const body of bodies) {
+    const report = source([
+      skill("a", "skill.b", [pin("skill.b")], body),
+      skill("b", undefined, [], "", "1.0.0"),
+    ]);
+    assert.equal(report.declarationValid, true, body);
+    assert.deepEqual(report.references, [], body);
+    assert.deepEqual(report.diagnostics, [], body);
+  }
+});
+
+test("HTML raw-text handling resumes after closing tags and inspects their own attributes", () => {
+  for (const body of [
+    '<script src="renma&#45;asset:b">const ignored = \'<a href="renma-asset:b">\';</script>',
+    'text <script>const ignored = \'<a href="renma-asset:b">\';</script><a href="renma&hyphen;asset&colon;b">B</a>',
+    '<!-- <a href="renma-asset:b"> --> <a href="renma&#45;asset:b">B</a>',
+  ]) {
+    const report = source([skill("a", "skill.b", [pin("skill.b")], body)]);
+    assert.equal(
+      report.diagnostics.filter(
+        (d) => d.code === "RN-BINDING-UNSUPPORTED-REFERENCE",
+      ).length,
+      1,
+      body,
+    );
+    assert.deepEqual(report.references, []);
+  }
+});

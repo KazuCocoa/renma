@@ -108,6 +108,7 @@
     "vitepress": "^1.6.4"
   },
   "dependencies": {
+    "entities": "^7.0.1",
     "jsonc-parser": "^3.3.1",
     "mdast-util-from-markdown": "^2.0.3",
     "tldts": "^7.4.10",
