@@ -141,12 +141,8 @@ export function summarizeContextLensGovernance(
 
   for (const lens of lensDocuments) {
     diagnostics.push(
-      ...frontmatterDiagnostics(lens.document),
-      ...requiredFieldDiagnostics(lens.document),
-      ...unsupportedValueDiagnostics(lens.document),
-      ...unsupportedLegacyFieldDiagnostics(lens.document),
+      ...inspectContextLensDeclaration(lens.document),
       ...targetDiagnostics(lens.document, resolver),
-      ...definitionBodyDiagnostics(lens.document),
     );
   }
   diagnostics.push(...duplicateIdDiagnostics(lensDocuments));
@@ -206,6 +202,19 @@ export function summarizeContextLensGovernance(
     },
     diagnostics: sortedDiagnostics,
   };
+}
+
+/** Validate a Lens declaration without requiring its targets in this snapshot. */
+export function inspectContextLensDeclaration(
+  document: ParsedDocument,
+): Diagnostic[] {
+  return [
+    ...frontmatterDiagnostics(document),
+    ...requiredFieldDiagnostics(document),
+    ...unsupportedValueDiagnostics(document),
+    ...unsupportedLegacyFieldDiagnostics(document),
+    ...definitionBodyDiagnostics(document),
+  ];
 }
 
 export function zeroContextLensSummary(): ContextLensSummary {

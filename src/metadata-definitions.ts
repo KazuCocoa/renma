@@ -461,3 +461,18 @@ export const NON_SKILL_AUXILIARY_METADATA_DEFINITIONS = [
 
 export const CONTEXT_LENS_SUPPORTED_SCOPES = ["context"] as const;
 export const CONTEXT_LENS_SUPPORTED_VERSIONS = ["1"] as const;
+
+/** Fields interpreted only by the independent asset-binding consumer contract. */
+export const ASSET_BINDING_METADATA_KEYS = {
+  skill: "renma.asset-bindings",
+  nonSkill: "asset_bindings",
+  lensReleaseVersion: "release_version",
+} as const;
+
+export const ASSET_BINDING_METADATA_DEFINITIONS = [
+  {
+    skillKey: ASSET_BINDING_METADATA_KEYS.skill,
+    nonSkillKey: ASSET_BINDING_METADATA_KEYS.nonSkill,
+  },
+  { nonSkillKey: ASSET_BINDING_METADATA_KEYS.lensReleaseVersion },
+] as const;

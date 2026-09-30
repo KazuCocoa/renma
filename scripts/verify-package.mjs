@@ -20,6 +20,11 @@ if (!NPM_CLI_PATH) {
 }
 const REPOSITORY_ONLY_README_PREFIXES = ["docs/development/"];
 const SEMANTIC_PUBLIC_IMPORTS = [
+  [
+    "renma/asset-bindings",
+    "dist/public-asset-bindings.js",
+    "dist/public-asset-bindings.d.ts",
+  ],
   ["renma/types", "dist/public-types.js", "dist/public-types.d.ts"],
   [
     "renma/types/classification",

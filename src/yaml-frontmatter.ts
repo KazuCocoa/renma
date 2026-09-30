@@ -93,13 +93,13 @@ const frontmatterByDocument = new WeakMap<
 export function parseAgentSkillFrontmatter(
   content: string,
 ): ParsedYamlFrontmatter {
-  const lines = content.split(/\r?\n/);
+  const lines = content.split(/\r\n|[\r\n]/);
   return parseFrontmatterEnvelope(lines, agentSkillFrontmatterEnvelope(lines));
 }
 
 /** Parse the exact general Renma frontmatter envelope as YAML 1.2. */
 export function parseRenmaFrontmatter(content: string): ParsedYamlFrontmatter {
-  const lines = content.split(/\r?\n/);
+  const lines = content.split(/\r\n|[\r\n]/);
   return parseFrontmatterEnvelope(lines, renmaFrontmatterEnvelope(lines));
 }
 
@@ -107,7 +107,7 @@ export function parseRenmaFrontmatter(content: string): ParsedYamlFrontmatter {
 export function parseFrontmatterForArtifact(
   artifact: Pick<Artifact, "kind" | "content">,
 ): ParsedYamlFrontmatter {
-  const lines = artifact.content.split(/\r?\n/);
+  const lines = artifact.content.split(/\r\n|[\r\n]/);
   return parseFrontmatterEnvelope(
     lines,
     frontmatterEnvelopeForArtifact(artifact, lines),
@@ -172,7 +172,7 @@ export function recognizedMalformedTopLevelKeys(
     }
   }
 
-  const lines = content.split(/\r?\n/);
+  const lines = content.split(/\r\n|[\r\n]/);
   const endIndex = frontmatter.closed
     ? frontmatter.bodyStartLine - 2
     : lines.length;

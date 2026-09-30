@@ -628,3 +628,14 @@ Top-level `requires_skill`/`optional_skill` on Skills are migration input only:
 `suggest-metadata` may propose their canonical equivalents but does not apply
 them. Malformed JSON/string-array values retain canonical metadata diagnostics;
 native YAML metadata arrays violate the Agent Skills string-map contract.
+
+## Exact release annotations
+
+[Asset bindings](asset-bindings.md) annotate existing relationships with an
+alias and exact release version. Skills use `metadata.renma.asset-bindings` as
+a JSON-array string; Contexts and Lenses use native top-level `asset_bindings`.
+Lens `release_version` is distinct from its existing format `version`.
+`[label](renma-asset:alias)` provides an explicit local binding reference.
+The dedicated builder API reports declaration validity and local version
+satisfaction separately; existing composition, scan and Discovery behavior
+remain unchanged. Acquisition, packaging and rewriting are external.

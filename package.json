@@ -50,6 +50,11 @@
       "types": "./dist/public-discovery.d.ts",
       "import": "./dist/public-discovery.js",
       "default": "./dist/public-discovery.js"
+    },
+    "./asset-bindings": {
+      "types": "./dist/public-asset-bindings.d.ts",
+      "import": "./dist/public-asset-bindings.js",
+      "default": "./dist/public-asset-bindings.js"
     }
   },
   "files": [
@@ -103,8 +108,11 @@
     "vitepress": "^1.6.4"
   },
   "dependencies": {
+    "hast-util-to-html": "^9.0.5",
     "jsonc-parser": "^3.3.1",
     "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-to-hast": "^13.2.1",
+    "parse5": "^8.0.1",
     "tldts": "^7.4.10",
     "yaml": "^2.9.0"
   }

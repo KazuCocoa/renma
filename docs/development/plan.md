@@ -77,6 +77,15 @@ release preparation. It is not a new refactoring phase. The candidates below
 remain unassigned and do not enter 1.0 merely because stabilization is
 complete.
 
+## Implemented Extension: Versioned Asset Bindings
+
+[Asset bindings](../asset-bindings.md) now provide exact-version annotations,
+structural body references and a read-only snapshot API for Skills, Contexts and
+Lenses. The API has its own v1 schema and public export; existing scan and
+composition contracts remain unchanged. Release assignment remains pending.
+Acquisition, transitive selection, lockfiles, bundling, reference rewriting and
+Plugin generation remain external builder responsibilities.
+
 ## Open Core Candidates
 
 These candidates have no assigned release and require independent evidence and

@@ -83,6 +83,7 @@ export default defineConfig({
           },
           { text: "Context Lens", link: "/context-lens" },
           { text: "Declared Composition", link: "/declared-composition" },
+          { text: "Asset Bindings", link: "/asset-bindings" },
           { text: "Declared Impact", link: "/declared-impact" },
           { text: "Skill Discovery", link: "/skill-discovery" },
           {
@@ -121,6 +122,10 @@ export default defineConfig({
           },
           { text: "Product Design", link: "/development/design" },
           { text: "Current Roadmap", link: "/development/plan" },
+          {
+            text: "Versioned Skill Bindings (Design)",
+            link: "/development/versioned-skill-bindings",
+          },
           {
             text: "Skill Discovery Design",
             link: "/development/plan-discovery",

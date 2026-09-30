@@ -334,3 +334,9 @@ Skill-to-Skill composition uses the existing required/optional closure, cycle,
 provenance, lifecycle and reverse-impact rules. Declarations remain optional
 portable metadata; completeness policy and runtime observation are separate
 future work. See [Declared Composition](../declared-composition.md).
+
+[Versioned Asset Bindings](../asset-bindings.md) adds exact release annotations
+and explicit body references for Skills, Contexts and Lenses through a separate
+read-only builder API. Renma validates declarations and local source evidence;
+external builders own acquisition, lockfiles, bundling and rewriting. Lens format
+versions remain separate from release versions. Composition semantics do not change.
