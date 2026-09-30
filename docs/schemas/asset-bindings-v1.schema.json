@@ -151,7 +151,8 @@
             "kind-mismatch",
             "target-version-invalid",
             "version-mismatch"
-          ]
+          ],
+          "description": "Local identity/kind and optional exact-release comparison; declared refs and externally supplied commits are never verified."
         },
         "candidates": {
           "type": "array",
@@ -206,7 +207,7 @@
         },
         "satisfied": {
           "type": "boolean",
-          "description": "Declaration is valid and the local candidate comparison matched. Does not establish transitive release completeness."
+          "description": "Declaration is valid and the local identity/kind/optional-release comparison matched. Ref-only matches do not verify Git refs or commits. Does not establish transitive release completeness."
         },
         "ref": {
           "type": "string",

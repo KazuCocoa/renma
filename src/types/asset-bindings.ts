@@ -53,7 +53,7 @@ export interface AssetBindingDiagnostic {
   phase: "declaration" | "local-satisfaction";
 }
 export interface NormalizedAssetBinding {
-  /** Declaration is valid and the local candidate comparison matched. */
+  /** Declaration is valid and the local identity/kind/optional-release comparison matched; never verifies Git provenance. */
   satisfied?: boolean;
   alias: string;
   target: string;
@@ -70,6 +70,7 @@ export interface NormalizedAssetBinding {
   satisfaction: AssetBindingSatisfaction;
 }
 export interface AssetBindingSatisfaction {
+  /** Local identity/kind and optional release comparison; refs and commits are not verified. */
   status:
     | "matched"
     | "missing"

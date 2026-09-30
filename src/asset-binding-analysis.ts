@@ -62,6 +62,10 @@ export function compareAssetBinding(
   >,
   candidates: readonly AssetBindingIdentity[],
 ): AssetBindingSatisfaction {
+  if (binding.version === undefined && !exactText(binding.ref))
+    throw new Error(
+      "A ref-only binding requires an exact non-empty declared ref.",
+    );
   const matches = candidates
     .filter((candidate) => candidate.id === binding.target)
     .map((candidate) => structuredClone(candidate))
@@ -380,6 +384,7 @@ export function analyzeAssetBindings(
           {
             target,
             ...(typeof version === "string" ? { version } : {}),
+            ...(typeof ref === "string" ? { ref } : {}),
             relationships: boundRelationships,
           },
           identities,

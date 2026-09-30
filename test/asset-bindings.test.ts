@@ -1157,3 +1157,35 @@ test("provenance validation rejects malformed fields in JSON, YAML and wire sche
     );
   assert.equal(source([file(duplicate.path, text)]).declarationValid, false);
 });
+
+test("direct comparison requires an explicit ref for a ref-only binding", () => {
+  const candidate = inspectAssetBindings([skill("b")]).documents[0]!.identity;
+  const binding = { target: "skill.b", relationships: [] };
+  for (const ref of [undefined, "", " main", "main "]) {
+    assert.throws(
+      () =>
+        compareAssetBinding(
+          { ...binding, ...(ref === undefined ? {} : { ref }) },
+          [candidate],
+        ),
+      /requires an exact non-empty declared ref/,
+    );
+  }
+  assert.equal(
+    compareAssetBinding({ ...binding, ref: "main" }, [candidate]).status,
+    "matched",
+  );
+  assert.equal(
+    compareAssetBinding({ ...binding, ref: "main" }, []).status,
+    "missing",
+  );
+  // Existing release-only API calls keep the exact release comparison.
+  assert.equal(
+    compareAssetBinding({ ...binding, version: "1.0.1" }, [candidate]).status,
+    "matched",
+  );
+  assert.equal(
+    compareAssetBinding({ ...binding, version: "2.0.0" }, [candidate]).status,
+    "version-mismatch",
+  );
+});

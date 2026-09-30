@@ -541,6 +541,7 @@ test("resolved provenance survives dependency projections and graph serializatio
       assert.ok(text.includes(commit.slice(0, 12)));
       assert.ok(text.includes(declaration.ref));
       assert.ok(!text.includes("undefined"));
+      assert.equal(text.includes("(unverified)"), !("version" in declaration));
     }
   }
 });

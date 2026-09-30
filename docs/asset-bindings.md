@@ -105,7 +105,8 @@ string. `ref` is an exact non-empty string without surrounding whitespace.
 characters for SHA-1 or 64 for SHA-256. Abbreviations, whitespace, non-string
 values, empty objects and unknown nested fields are invalid. Renma preserves the
 supplied spelling and full SHA; human-readable graph labels may shorten it.
-Existing version-only bindings remain valid and emit no new fields.
+Existing version-only bindings remain valid and emit no new fields. Ref-only
+review labels explicitly mark the declared ref as unverified.
 
 `version` and `ref` are declared/requested dependency information.
 `resolved.commit` is resolution provenance supplied by an external producer,
@@ -193,7 +194,9 @@ optional `satisfied` boolean is emitted by current producers: it is true only
 when `declarationValid` is true and the candidate comparison is `matched`.
 `compareAssetBinding` remains an identity/kind/release comparison; a match alone
 does not validate the caller's declaration or the selected target's own declarations.
-Inspect those documents and their diagnostics as well.
+Inspect those documents and their diagnostics as well. Direct ref-only calls
+to `compareAssetBinding` require an exact non-empty `ref`; absent, empty or
+whitespace-padded refs throw instead of silently making an unconstrained match.
 
 Candidate comparison statuses are:
 
