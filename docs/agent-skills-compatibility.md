@@ -355,8 +355,8 @@ YAML 1.2 mode. It validates:
 - duplicate top-level and `metadata` keys;
 - the allowed Agent Skills top-level fields;
 - required, non-empty string `name` and `description` values;
-- repository-wide uniqueness of normalized Skill names across every discovered
-  Skill root, regardless of ownership, source, or `renma.id`;
+- repository-wide collisions between normalized Skill names across every
+  discovered Skill root, regardless of ownership, source, or `renma.id`;
 - NFKC-normalized name length, Unicode letters/digits, lowercase and hyphen
   rules, and normalized immediate-parent match. The YAML field is trimmed, but
   the filesystem directory name is not; leading or trailing directory
