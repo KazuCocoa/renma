@@ -462,7 +462,7 @@ Configure the repository policy in `renma.config.jsonc` or
 }
 ```
 
-`optional` is the default: duplicate names are detected, reported as warnings,
+`optional` is the default: duplicate names are detected, reported as informational diagnostics,
 and allowed. The affected Skills remain structurally valid. `required` uses the
 same collision evidence but reports errors and makes every conflicting Skill
 invalid:
@@ -505,7 +505,7 @@ without confusing them with Agent Skills specification failures.
 
 | Identifier | Meaning |
 | --- | --- |
-| `RN-SKILL-DUPLICATE-NAME` | Multiple discovered Skills share a normalized runtime-observable name. Each diagnostic lists all conflicting paths. Under `optional` it is a warning and the Skills remain valid; under `required` it is an error and every conflicting Skill is invalid. Give distinct Skills unique names and matching immediate parent directories, update affected path references, and preserve canonical `renma.id` values. |
+| `RN-SKILL-DUPLICATE-NAME` | Multiple discovered Skills share a normalized runtime-observable name. Each diagnostic lists all conflicting paths. Under `optional` it is informational and the Skills remain valid; under `required` it is an error and every conflicting Skill is invalid. Give distinct Skills unique names and matching immediate parent directories, update affected path references, and preserve canonical `renma.id` values. |
 
 This repository-level diagnostic uses the Renma `RN-SKILL-*` namespace because
 name uniqueness is a repository governance choice rather than a portable Agent

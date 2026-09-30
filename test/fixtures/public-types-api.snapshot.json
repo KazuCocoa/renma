@@ -115,7 +115,7 @@
     },
     "agent-skills.d.ts#AgentSkillValidationIssue": {
       "declarations": [
-        "export interface AgentSkillValidationIssue { code: AgentSkillDiagnosticId; severity: \"error\" | \"warning\"; category: \"specification\" | \"renma-authoring\"; path: string; startLine: number; endLine: number; message: string; field?: string; details?: Record<string, unknown>; }"
+        "export interface AgentSkillValidationIssue { code: AgentSkillDiagnosticId; severity: \"error\" | \"warning\" | \"info\"; category: \"specification\" | \"renma-authoring\"; path: string; startLine: number; endLine: number; message: string; field?: string; details?: Record<string, unknown>; }"
       ],
       "references": ["diagnostic-ids.d.ts#AgentSkillDiagnosticId"]
     },
@@ -137,7 +137,7 @@
     },
     "asset-binding-analysis.d.ts#compareAssetBinding": {
       "declarations": [
-        "export declare function compareAssetBinding(binding: Pick<NormalizedAssetBinding, \"target\" | \"version\" | \"relationships\">, candidates: readonly AssetBindingIdentity[]): AssetBindingSatisfaction;"
+        "export declare function compareAssetBinding(binding: Pick<NormalizedAssetBinding, \"target\" | \"version\" | \"ref\" | \"relationships\">, candidates: readonly AssetBindingIdentity[]): AssetBindingSatisfaction;"
       ],
       "references": [
         "types/asset-bindings.d.ts#AssetBindingIdentity",
@@ -767,7 +767,7 @@
     },
     "types/asset-bindings.d.ts#NormalizedAssetBinding": {
       "declarations": [
-        "export interface NormalizedAssetBinding { satisfied?: boolean; alias: string; target: string; version: string; entryIndex: number; evidence: AssetBindingLocation; relationships: AssetBindingRelationship[]; declarationValid: boolean; satisfaction: AssetBindingSatisfaction; }"
+        "export interface NormalizedAssetBinding { satisfied?: boolean; alias: string; target: string; version?: string; ref?: string; resolved?: { commit: string; }; entryIndex: number; evidence: AssetBindingLocation; relationships: AssetBindingRelationship[]; declarationValid: boolean; satisfaction: AssetBindingSatisfaction; }"
       ],
       "references": [
         "types/asset-bindings.d.ts#AssetBindingLocation",

@@ -28,7 +28,7 @@ In JSON output, diagnostics usually appear as structured objects with a `severit
 Repository-wide Skill name collisions produce the `RN-SKILL-DUPLICATE-NAME`
 diagnostic in `agentSkills`. Each diagnostic names the normalized name and all
 conflicting paths. With the default `agent_skills.name_uniqueness: "optional"`
-policy it is a non-blocking warning and the Skills remain valid. With
+policy it is informational and the Skills remain valid. With
 `"required"` it is an error and makes every conflicting Skill invalid. This
 preserves the existing separation of Skill validity from scan Finding exit
 thresholds; canonical asset-ID collisions retain their existing classification. See

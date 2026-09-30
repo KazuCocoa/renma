@@ -505,3 +505,42 @@ test("Mermaid renders exact requested releases containing label delimiters", asy
     await assert.doesNotReject(mermaid.parse(formatGraphMermaid(graph, view)));
   }
 });
+
+test("resolved provenance survives dependency projections and graph serialization", () => {
+  const commit = "7e91d1654d" + "a".repeat(30);
+  for (const declaration of [
+    { ...pin, ref: "v1.0.0", resolved: { commit } },
+    { alias: "b", target: "skill.b", ref: "main", resolved: { commit } },
+  ]) {
+    const { catalog, graph, composition, api } = analyze([
+      a("requires-skill", [declaration]),
+      skill("b"),
+    ]);
+    const binding = catalog.dependencies.find((e) => e.from === "skill.a")!
+      .bindings![0]!;
+    assert.deepEqual(binding.resolved, { commit });
+    assert.equal(binding.ref, declaration.ref);
+    assert.equal(
+      binding.version,
+      "version" in declaration ? declaration.version : undefined,
+    );
+    assert.deepEqual(graph.edges.find((e) => e.from === "skill.a")!.bindings, [
+      binding,
+    ]);
+    assert.deepEqual(composition.provenanceEdges[0]!.bindings, [binding]);
+    assert.deepEqual(
+      resolveDeclaredImpact(catalog, "skill.b").provenanceEdges[0]!.bindings,
+      [binding],
+    );
+    for (const report of [catalog, graph, composition, api])
+      assert.ok(JSON.stringify(report).includes(commit));
+    for (const text of [
+      formatGraphMarkdown(graph, "full"),
+      formatGraphMermaid(graph, "summary"),
+    ]) {
+      assert.ok(text.includes(commit.slice(0, 12)));
+      assert.ok(text.includes(declaration.ref));
+      assert.ok(!text.includes("undefined"));
+    }
+  }
+});

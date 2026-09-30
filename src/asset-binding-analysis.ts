@@ -54,9 +54,12 @@ const stableId = (value: unknown): value is string =>
   value !== "." &&
   value !== "..";
 
-/** Compare a pin with supplied inspected candidates; never acquire or choose a snapshot. */
+/** Compare local identity/kind and an optional release; never verify Git provenance. */
 export function compareAssetBinding(
-  binding: Pick<NormalizedAssetBinding, "target" | "version" | "relationships">,
+  binding: Pick<
+    NormalizedAssetBinding,
+    "target" | "version" | "ref" | "relationships"
+  >,
   candidates: readonly AssetBindingIdentity[],
 ): AssetBindingSatisfaction {
   const matches = candidates
@@ -72,11 +75,13 @@ export function compareAssetBinding(
         : !kinds.has(target!.kind) ||
             binding.relationships.some((r) => r.targetKind !== target!.kind)
           ? "kind-mismatch"
-          : !exactText(target!.version)
-            ? "target-version-invalid"
-            : target!.version !== binding.version
-              ? "version-mismatch"
-              : "matched";
+          : binding.version === undefined
+            ? "matched"
+            : !exactText(target!.version)
+              ? "target-version-invalid"
+              : target!.version !== binding.version
+                ? "version-mismatch"
+                : "matched";
   return { status, candidates: matches };
 }
 
@@ -274,7 +279,7 @@ export function analyzeAssetBindings(
         if (!Array.isArray(values)) {
           issue(
             "RN-BINDING-MALFORMED",
-            "Bindings must be an array of alias, target and version objects.",
+            "Bindings must be an array of alias, target and version and/or ref objects.",
             bindingEvidence,
           );
           values = [];
@@ -303,26 +308,40 @@ export function analyzeAssetBindings(
         !value ||
         typeof value !== "object" ||
         Array.isArray(value) ||
-        Object.keys(value).sort(order).join(",") !== "alias,target,version"
+        Object.keys(value).some(
+          (key) =>
+            !["alias", "target", "version", "ref", "resolved"].includes(key),
+        )
       ) {
         issue(
           "RN-BINDING-MALFORMED",
-          "Each binding needs exactly alias, target and version.",
+          "Each binding needs alias, target and version and/or ref, with optional resolved.commit.",
           bindingEvidence,
           entryIndex,
         );
         continue;
       }
-      const { alias, target, version } = value as Record<string, unknown>;
+      const entry = value as Record<string, unknown>;
+      const { alias, target, version, ref, resolved } = entry;
       if (
         typeof alias !== "string" ||
         !aliasPattern.test(alias) ||
         !stableId(target) ||
-        !exactText(version)
+        (!Object.hasOwn(entry, "version") && !Object.hasOwn(entry, "ref")) ||
+        (Object.hasOwn(entry, "version") && !exactText(version)) ||
+        (Object.hasOwn(entry, "ref") && !exactText(ref)) ||
+        (Object.hasOwn(entry, "resolved") &&
+          (!resolved ||
+            typeof resolved !== "object" ||
+            Array.isArray(resolved) ||
+            Object.keys(resolved).join(",") !== "commit" ||
+            !("commit" in resolved) ||
+            !exactText(resolved.commit) ||
+            !/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/u.test(resolved.commit)))
       ) {
         issue(
           "RN-BINDING-MALFORMED",
-          "Invalid alias, stable target ID or exact release version.",
+          "Invalid alias, stable target ID, exact version/ref or resolved full Git commit (40 or 64 hexadecimal characters).",
           bindingEvidence,
           entryIndex,
         );
@@ -348,13 +367,21 @@ export function analyzeAssetBindings(
       const binding = {
         alias,
         target,
-        version,
+        ...(typeof version === "string" ? { version } : {}),
+        ...(typeof ref === "string" ? { ref } : {}),
+        ...(resolved
+          ? { resolved: { commit: (resolved as { commit: string }).commit } }
+          : {}),
         entryIndex,
         evidence: bindingEvidence,
         relationships: boundRelationships,
         declarationValid: true,
         satisfaction: compareAssetBinding(
-          { target, version, relationships: boundRelationships },
+          {
+            target,
+            ...(typeof version === "string" ? { version } : {}),
+            relationships: boundRelationships,
+          },
           identities,
         ),
       };
@@ -426,7 +453,7 @@ export function analyzeAssetBindings(
       if (binding.satisfaction.status !== "matched")
         item.diagnostics.push({
           code: `RN-BINDING-${binding.satisfaction.status.toUpperCase()}`,
-          message: `Expected ${binding.target} at exact version ${binding.version}; local snapshot: ${binding.satisfaction.status}.`,
+          message: `Expected ${binding.target} at ${binding.version === undefined ? `declared ref ${binding.ref} (not verified)` : `exact version ${binding.version}`}; local snapshot: ${binding.satisfaction.status}.`,
           evidence: binding.evidence,
           entryIndex: binding.entryIndex,
           phase: "local-satisfaction",

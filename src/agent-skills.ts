@@ -83,7 +83,7 @@ export type AgentSkillFormat =
 
 export interface AgentSkillValidationIssue {
   code: AgentSkillDiagnosticId;
-  severity: "error" | "warning";
+  severity: "error" | "warning" | "info";
   category: "specification" | "renma-authoring";
   path: string;
   startLine: number;
@@ -173,7 +173,7 @@ export function validateAgentSkills(
         ...createIssue(
           document,
           IDS.RN_DUPLICATE_NAME,
-          required ? "error" : "warning",
+          required ? "error" : "info",
           "renma-authoring",
           duplicateSkillNameMessage(name, duplicatePaths, required),
           field?.startLine ?? 1,
@@ -190,8 +190,6 @@ export function validateAgentSkills(
       if (required) {
         result.errorCount += 1;
         result.valid = false;
-      } else {
-        result.warningCount += 1;
       }
     }
   }
@@ -997,7 +995,7 @@ function fieldIssue(
 function createIssue(
   document: ParsedDocument,
   code: AgentSkillDiagnosticId,
-  severity: "error" | "warning",
+  severity: "error" | "warning" | "info",
   category: "specification" | "renma-authoring",
   message: string,
   startLine: number,

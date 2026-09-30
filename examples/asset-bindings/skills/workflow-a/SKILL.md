@@ -7,7 +7,7 @@ metadata:
   renma.owner: review-team
   renma.requires-skill: '["skill.b"]'
   renma.optional-lens: '["lens.review"]'
-  renma.asset-bindings: '[{"alias":"b","target":"skill.b","version":"1.0.0"},{"alias":"review","target":"lens.review","version":"2026-09"}]'
+  renma.asset-bindings: '[{"alias":"b","target":"skill.b","version":"1.0.0","ref":"v1.0.0","resolved":{"commit":"7e91d1654daaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},{"alias":"review","target":"lens.review","version":"2026-09"}]'
 ---
 
 # Workflow A

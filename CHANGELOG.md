@@ -6,6 +6,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Default `RN-SKILL-DUPLICATE-NAME` severity is now `info`; required name
+  uniqueness still invalidates collisions with errors. Canonical IDs are unchanged.
+
+### Added
+
+- Asset bindings accept optional declared `ref` and externally supplied
+  `resolved.commit` provenance. Full Git SHAs survive catalog, graph, composition
+  and impact JSON; review labels show shortened supplied commits. Ref-only
+  bindings check local identity/kind without verifying Git evidence. Existing
+  version-only metadata remains valid; Renma performs no dependency acquisition
+  or packaging.
+
 ## [0.40.0] - 2026-09-30
 
 ### Added

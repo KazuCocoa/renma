@@ -56,12 +56,13 @@ surrounding whitespace. No SemVer restriction, range interpretation, tag lookup,
 normalization, ordering or latest fallback applies. `1.0` differs from `1.0.0`;
 build metadata also participates in equality.
 
-Each binding has exactly `alias`, `target` and `version` string fields. Aliases
+Each binding requires `alias` and `target` string fields and at least one of
+`version` or `ref`. Optional `resolved` contains exactly one `commit` string. Aliases
 match `[a-z][a-z0-9-]*`. Aliases and targets are each unique within a document;
-duplicate JSON/YAML keys and additional entry fields are invalid. Targets are
+duplicate JSON/YAML keys and unrecognized entry fields are invalid. Targets are
 explicit stable IDs without whitespace, `/`, `\`, `:`, `#` or `?`, and cannot
-be `.` or `..`. Both source and selected target need explicit identities and
-release versions when participating in a binding.
+be `.` or `..`. Sources need explicit identities and release versions. Selected targets need
+explicit identities; a target release version is required for version comparisons.
 
 | Source | Annotatable existing relationships | Target kind |
 | --- | --- | --- |
@@ -78,6 +79,56 @@ existing unbound composition but cannot be binding targets. Ordinary links,
 Support documents, scripts and assets remain in their parent's distribution;
 a builder pins them using inventories and original file hashes. Shared Contexts
 retain independent governance.
+
+## Resolution provenance
+
+Keep declared selectors and externally supplied evidence separate:
+
+```yaml
+asset_bindings:
+  - alias: rules
+    target: context.rules
+    version: "1.2.0"
+    ref: v1.2.0
+    resolved:
+      commit: "7e91d1654daaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  - alias: workflow
+    target: skill.workflow
+    ref: main
+    resolved:
+      commit: "7e91d1654daaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+```
+
+Use the same object shape inside a Skill's `renma.asset-bindings` JSON-array
+string. `ref` is an exact non-empty string without surrounding whitespace.
+`resolved.commit` is optional and accepts only full Git object IDs: 40 hexadecimal
+characters for SHA-1 or 64 for SHA-256. Abbreviations, whitespace, non-string
+values, empty objects and unknown nested fields are invalid. Renma preserves the
+supplied spelling and full SHA; human-readable graph labels may shorten it.
+Existing version-only bindings remain valid and emit no new fields.
+
+`version` and `ref` are declared/requested dependency information.
+`resolved.commit` is resolution provenance supplied by an external producer,
+such as CI, repository tooling or a future plugin builder. Renma never obtains
+it, resolves refs, checks that the commit exists, or verifies correspondence
+between a ref, release version, commit and supplied snapshot. Do not append the
+SHA to `version` to represent provenance.
+
+With `version`, local satisfaction retains the exact release comparison, even
+when `ref` and `resolved.commit` are supplied. With only `ref`, local comparison
+checks unique target identity and relationship kind; it does not require a target
+release version. `matched` / `satisfied: true` then mean only that those local
+checks passed, **not** that the Git ref or supplied commit was verified. Missing,
+ambiguous and wrong-kind candidates still fail. Declaration validity remains
+independent, including the existing source identity/release requirements.
+
+Graph edge `resolved` remains a boolean indicating local target availability.
+A binding's nested `resolved.commit` records external provenance; it does not
+change that boolean, `satisfaction`, or composition completeness. No resolver,
+installer, fetching, asset download, vendoring, lockfile or packaging behavior is
+introduced. Optional evidence supports plain Git workflows where it is absent
+and future builders that supply it; content digests and packaged inventories
+remain outside this extension.
 
 ## Body references
 
@@ -146,7 +197,8 @@ Inspect those documents and their diagnostics as well.
 
 Candidate comparison statuses are:
 
-- `matched`: exactly one target has the required kind and exact release string.
+- `matched`: exactly one target has the required kind and, when `version` is
+  supplied, the exact release string. A ref-only match does not verify Git evidence.
 - `missing`: no supplied document has that explicit ID.
 - `ambiguous`: multiple documents have the ID; pins never choose between them.
 - `kind-mismatch`: the target is not the kind required by the relationship.
@@ -174,7 +226,8 @@ Candidate identities carry whole-document, ID and version evidence.
 ## Dependency analysis and graph reports
 
 Catalog dependency edges and graph edges carry optional `bindings` arrays.
-Each entry retains the public API's alias, exact requested `version`, authored
+Each entry retains the public API's alias, declared `version` and/or `ref`, optional
+externally supplied `resolved.commit`, authored
 `entryIndex`, declaration validity, `satisfied`, candidate comparison, relationship
 indexes, and original-source evidence, plus relevant `diagnostics`. Arrays retain
 invalid duplicate declarations for review. `bindingDiagnostics` preserves source
@@ -195,7 +248,8 @@ declaration cannot be satisfied even when candidate comparison is `matched`.
 Graph and composition/impact assets expose optional `releaseVersion`: Skill
 `metadata.renma.version`, Context `version`, or Lens `release_version`. Lens format
 `version` is never used as release identity. JSON preserves full evidence;
-Markdown and Mermaid label bound edges with alias, requested release and status.
+Markdown and Mermaid label bound edges with alias, requested release/ref, supplied
+commit (shortened when present), and local status.
 Grouped graph projections retain separate bound declarations and their indexes.
 
 Composition traverses the inspected snapshot. If local B is 2.0.0, traversing
