@@ -783,6 +783,7 @@ test("foreign-content CDATA and HTML integration raw text remain inert", () => {
     '<svg><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></svg>',
     '<math><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></math>',
     '<svg><title><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></title></svg>',
+    '<svg><title><![CDATA[<a>]]><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></title></svg>',
     '<math><annotation-xml encoding="text/html"><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></annotation-xml></math>',
     '<script/><a href="renma&#45;asset:b">B</a></script>',
     "<svg><foreignObject><script>const example = '<a href=\"renma&#45;asset:b\">B</a>';</script></foreignObject></svg>",

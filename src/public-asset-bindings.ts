@@ -2,7 +2,7 @@
 import { ASSET_BINDING_METADATA_KEYS } from "./metadata-definitions.js";
 import { compareUtf16CodeUnits as order } from "./canonical-json.js";
 import { createHash } from "node:crypto";
-import { decodeHTMLAttribute } from "entities";
+import { parseFragment, type DefaultTreeAdapterTypes } from "parse5";
 import { parseDocument as parseYaml } from "yaml";
 import { ensureMarkdownSyntaxForDocument } from "./markdown-syntax.js";
 import type { Nodes } from "mdast";
@@ -595,7 +595,6 @@ function inspectReferences(
         1
       : 0;
   const definitions = new Map<string, string>();
-  const inspectHtml = createHtmlAssetReferenceInspector();
   const walk = (
     node: Nodes,
     fn: (node: Nodes, blockquoteDepth: number) => void,
@@ -610,6 +609,23 @@ function inspectReferences(
     if (node.type === "definition" && !definitions.has(node.identifier))
       definitions.set(node.identifier, node.url);
   });
+  const htmlNodes: Array<{
+    node: Extract<Nodes, { type: "html" }>;
+    start: number;
+    end: number;
+  }> = [];
+  walk(root, (node) => {
+    if (node.type === "html")
+      htmlNodes.push({
+        node,
+        start: originalOffset(node.position?.start),
+        end: originalOffset(node.position?.end),
+      });
+  });
+  const unsupportedHtmlNodes = findHtmlAssetReferenceNodes(
+    document.artifact.content,
+    htmlNodes,
+  );
   walk(root, (node, blockquoteDepth) => {
     const start = originalOffset(node.position?.start),
       end = originalOffset(node.position?.end);
@@ -621,7 +637,7 @@ function inspectReferences(
           ? definitions.get(node.identifier)
           : undefined;
     if (node.type === "html") {
-      if (inspectHtml(node.value))
+      if (unsupportedHtmlNodes.has(node))
         issue(
           "RN-BINDING-UNSUPPORTED-REFERENCE",
           "HTML asset references are unsupported.",
@@ -707,99 +723,82 @@ function skipLinkWhitespace(
   return cursor;
 }
 
-/** Inspect parser-owned HTML, keeping tokenizer state across inline HTML nodes. */
-function createHtmlAssetReferenceInspector(): (html: string) => boolean {
-  let rawTextTag: string | undefined;
-  const elements: Array<{
-    tagName: string;
-    namespace: "html" | "svg" | "mathml";
-    htmlIntegrationPoint: boolean;
-    mathTextIntegrationPoint: boolean;
-  }> = [];
-  const rawTextTags = new Set([
-    "script",
-    "style",
-    "textarea",
-    "title",
-    "xmp",
-    "iframe",
-    "noembed",
-    "noframes",
-    "plaintext",
-  ]);
-  const htmlVoidTags = new Set([
-    "area",
-    "base",
-    "br",
-    "col",
-    "embed",
-    "hr",
-    "img",
-    "input",
-    "link",
-    "meta",
-    "source",
-    "track",
-    "wbr",
-  ]);
-  const svgHtmlIntegrationPoints = new Set(["desc", "foreignobject", "title"]);
-  const mathTextIntegrationPoints = new Set(["mi", "mo", "mn", "ms", "mtext"]);
-  const mathTextForeignExceptions = new Set(["mglyph", "malignmark"]);
-  const foreignBreakoutTags = new Set([
-    "b",
-    "big",
-    "blockquote",
-    "body",
-    "br",
-    "center",
-    "code",
-    "dd",
-    "div",
-    "dl",
-    "dt",
-    "em",
-    "embed",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "head",
-    "hr",
-    "i",
-    "img",
-    "li",
-    "listing",
-    "menu",
-    "meta",
-    "nobr",
-    "ol",
-    "p",
-    "pre",
-    "ruby",
-    "s",
-    "small",
-    "span",
-    "strong",
-    "strike",
-    "sub",
-    "sup",
-    "table",
-    "tt",
-    "u",
-    "ul",
-    "var",
-  ]);
-  type HtmlTagToken = {
-    closing: boolean;
-    tagName: string;
-    attributes: Map<string, string>;
-    selfClosing: boolean;
+/** Parse only mdast-owned HTML while retaining original UTF-16 source offsets. */
+function findHtmlAssetReferenceNodes(
+  content: string,
+  ranges: readonly {
+    node: Extract<Nodes, { type: "html" }>;
+    start: number;
     end: number;
-  };
-  const whitespace = /[ \t\r\n\f]/u;
-  const asciiAlpha = /[A-Za-z]/u;
+  }[],
+): Set<Extract<Nodes, { type: "html" }>> {
+  const ordered = [...ranges].sort((a, b) => a.start - b.start);
+  const mask = (value: string): string => value.replace(/[^\t\n\f\r ]/g, "x");
+  const projectedRanges: Array<{
+    node: Extract<Nodes, { type: "html" }>;
+    start: number;
+    end: number;
+  }> = [];
+  let projection = "";
+  let cursor = 0;
+  for (const range of ordered) {
+    projection += mask(content.slice(cursor, range.start));
+    const start = projection.length;
+    projection += range.node.value;
+    projectedRanges.push({ node: range.node, start, end: projection.length });
+    cursor = range.end;
+  }
+  projection += mask(content.slice(cursor));
+
+  const result = new Set<Extract<Nodes, { type: "html" }>>();
+  let fragment: DefaultTreeAdapterTypes.DocumentFragment;
+  for (;;) {
+    const cdataErrors: number[] = [];
+    fragment = parseFragment(projection, {
+      sourceCodeLocationInfo: true,
+      onParseError: (error) => {
+        if (error.code === "cdata-in-html-content")
+          cdataErrors.push(error.startOffset);
+      },
+    });
+    if (!cdataErrors.length) break;
+    const elements: DefaultTreeAdapterTypes.Element[] = [];
+    const collectElements = (node: DefaultTreeAdapterTypes.Node): void => {
+      if ("attrs" in node) elements.push(node);
+      if ("childNodes" in node)
+        for (const child of node.childNodes) collectElements(child);
+      if ("content" in node) collectElements(node.content);
+    };
+    collectElements(fragment);
+    const protectedSpans = cdataErrors.flatMap((errorOffset) => {
+      const start = projection.lastIndexOf("<![CDATA[", errorOffset);
+      if (start < 0) return [];
+      const current = elements
+        .filter((element) => {
+          const location = element.sourceCodeLocation;
+          return (
+            location?.startTag !== undefined &&
+            location.startTag.endOffset <= start &&
+            start < location.endOffset
+          );
+        })
+        .sort(
+          (a, b) =>
+            b.sourceCodeLocation!.startOffset -
+            a.sourceCodeLocation!.startOffset,
+        )[0];
+      if (!current || current.namespaceURI === "http://www.w3.org/1999/xhtml")
+        return [];
+      const closing = projection.indexOf("]]>", start + 9);
+      return [{ start, end: closing < 0 ? projection.length : closing + 3 }];
+    });
+    for (const span of protectedSpans)
+      projection =
+        projection.slice(0, span.start) +
+        mask(projection.slice(span.start, span.end)) +
+        projection.slice(span.end);
+    if (!protectedSpans.length) break;
+  }
   const asciiCaseInsensitiveEqual = (
     value: string,
     expected: string,
@@ -809,363 +808,37 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
       (character, index) =>
         value[index] === character || value[index] === character.toUpperCase(),
     );
-  const parseTag = (html: string, start: number): HtmlTagToken | undefined => {
-    let cursor = start + 1;
-    const closing = html[cursor] === "/";
-    if (closing) cursor++;
-    if (!asciiAlpha.test(html[cursor] ?? "")) return undefined;
-    const tagNameStart = cursor++;
-    while (
-      cursor < html.length &&
-      !whitespace.test(html[cursor]!) &&
-      html[cursor] !== "/" &&
-      html[cursor] !== ">"
-    )
-      cursor++;
-    const tagName = html.slice(tagNameStart, cursor).toLowerCase();
-    const values = new Map<string, string>();
-    let attributeName: string | undefined;
-    let attributeValue = "";
-    let selfClosing = false;
-    let state:
-      | "before-name"
-      | "name"
-      | "after-name"
-      | "before-value"
-      | "double-value"
-      | "single-value"
-      | "unquoted-value"
-      | "after-quoted-value"
-      | "self-closing" = "before-name";
-    const storeAttribute = (): void => {
-      if (attributeName !== undefined && !values.has(attributeName))
-        values.set(attributeName, attributeValue);
-      attributeName = undefined;
-      attributeValue = "";
-    };
-    const token = (): HtmlTagToken => ({
-      closing,
-      tagName,
-      attributes: values,
-      selfClosing,
-      end: cursor + 1,
-    });
-    while (cursor < html.length) {
-      const character = html[cursor]!;
-      if (state === "before-name") {
-        if (whitespace.test(character)) cursor++;
-        else if (character === "/") {
-          state = "self-closing";
-          cursor++;
-        } else if (character === ">") return token();
-        else {
-          attributeName = character.toLowerCase();
-          state = "name";
-          cursor++;
-        }
-      } else if (state === "name") {
-        if (whitespace.test(character)) {
-          state = "after-name";
-          cursor++;
-        } else if (character === "/" || character === ">") {
-          state = "after-name";
-        } else if (character === "=") {
-          state = "before-value";
-          cursor++;
-        } else {
-          attributeName += character.toLowerCase();
-          cursor++;
-        }
-      } else if (state === "after-name") {
-        if (whitespace.test(character)) cursor++;
-        else if (character === "/") {
-          storeAttribute();
-          state = "self-closing";
-          cursor++;
-        } else if (character === "=") {
-          state = "before-value";
-          cursor++;
-        } else if (character === ">") {
-          storeAttribute();
-          return token();
-        } else {
-          storeAttribute();
-          attributeName = character.toLowerCase();
-          state = "name";
-          cursor++;
-        }
-      } else if (state === "before-value") {
-        if (whitespace.test(character)) cursor++;
-        else if (character === '"') {
-          state = "double-value";
-          cursor++;
-        } else if (character === "'") {
-          state = "single-value";
-          cursor++;
-        } else if (character === ">") {
-          storeAttribute();
-          return token();
-        } else {
-          attributeValue += character;
-          state = "unquoted-value";
-          cursor++;
-        }
-      } else if (state === "double-value" || state === "single-value") {
-        if (
-          (state === "double-value" && character === '"') ||
-          (state === "single-value" && character === "'")
-        ) {
-          state = "after-quoted-value";
-          cursor++;
-        } else {
-          attributeValue += character;
-          cursor++;
-        }
-      } else if (state === "unquoted-value") {
-        if (whitespace.test(character)) {
-          storeAttribute();
-          state = "before-name";
-          cursor++;
-        } else if (character === ">") {
-          storeAttribute();
-          return token();
-        } else {
-          attributeValue += character;
-          cursor++;
-        }
-      } else if (state === "after-quoted-value") {
-        if (whitespace.test(character)) {
-          storeAttribute();
-          state = "before-name";
-          cursor++;
-        } else if (character === "/") {
-          storeAttribute();
-          state = "self-closing";
-          cursor++;
-        } else if (character === ">") {
-          storeAttribute();
-          return token();
-        } else {
-          storeAttribute();
-          attributeName = character.toLowerCase();
-          state = "name";
-          cursor++;
-        }
-      } else if (character === ">") {
-        selfClosing = true;
-        return token();
-      } else {
-        state = "before-name";
-      }
-    }
-    return undefined;
+  const reservedDestination = (value: string): boolean => {
+    const urlInput = value
+      .replace(/[\t\n\r]/gu, "")
+      .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/gu, "");
+    return (
+      asciiCaseInsensitiveEqual(urlInput.slice(0, 12), "renma-asset:") ||
+      asciiCaseInsensitiveEqual(urlInput.slice(0, 12), "renma‐asset:")
+    );
   };
-  const nextTag = (
-    html: string,
-    start: number,
-    foreign: boolean,
-  ): HtmlTagToken | undefined => {
-    let cursor = start;
-    while (cursor < html.length) {
-      const tagStart = html.indexOf("<", cursor);
-      if (tagStart < 0) return undefined;
-      if (html.startsWith("<!--", tagStart)) {
-        const bodyStart = tagStart + 4;
-        if (html[bodyStart] === ">") cursor = bodyStart + 1;
-        else if (html.startsWith("->", bodyStart)) cursor = bodyStart + 2;
-        else {
-          const normalEnd = html.indexOf("-->", bodyStart);
-          const bangEnd = html.indexOf("--!>", bodyStart);
-          const commentEnd =
-            normalEnd < 0
-              ? bangEnd
-              : bangEnd < 0
-                ? normalEnd
-                : Math.min(normalEnd, bangEnd);
-          cursor =
-            commentEnd < 0
-              ? html.length
-              : commentEnd + (commentEnd === bangEnd ? 4 : 3);
-        }
-        continue;
-      }
-      if (foreign && html.startsWith("<![CDATA[", tagStart)) {
-        const end = html.indexOf("]]>", tagStart + 9);
-        cursor = end < 0 ? html.length : end + 3;
-        continue;
-      }
-      if (html.startsWith("<!", tagStart) || html.startsWith("<?", tagStart)) {
-        const end = html.indexOf(">", tagStart + 2);
-        cursor = end < 0 ? html.length : end + 1;
-        continue;
-      }
-      const tag = parseTag(html, tagStart);
-      if (tag) return tag;
-      cursor = tagStart + 1;
-    }
-    return undefined;
-  };
-  const popForeignContent = (): void => {
-    let current = elements.at(-1);
-    while (
-      current &&
-      current.namespace !== "html" &&
-      !current.mathTextIntegrationPoint &&
-      !current.htmlIntegrationPoint
-    ) {
-      elements.pop();
-      current = elements.at(-1);
-    }
-  };
-  const findRawTextClosing = (
-    html: string,
-    start: number,
-    tagName: string,
-  ): number => {
-    let candidate = html.indexOf("</", start);
-    while (candidate >= 0) {
-      const nameStart = candidate + 2;
-      const delimiter = html[nameStart + tagName.length];
-      if (
-        asciiCaseInsensitiveEqual(
-          html.slice(nameStart, nameStart + tagName.length),
-          tagName,
-        ) &&
-        delimiter !== undefined &&
-        (whitespace.test(delimiter) || delimiter === "/" || delimiter === ">")
+  const visit = (node: DefaultTreeAdapterTypes.Node): void => {
+    if (
+      "attrs" in node &&
+      node.attrs.some(
+        (attribute) =>
+          (attribute.name === "href" || attribute.name === "src") &&
+          reservedDestination(attribute.value),
       )
-        return candidate;
-      candidate = html.indexOf("</", nameStart);
+    ) {
+      const offset =
+        node.sourceCodeLocation?.startTag?.startOffset ??
+        node.sourceCodeLocation?.startOffset;
+      if (offset !== undefined) {
+        const owner = projectedRanges.find(
+          (range) => range.start <= offset && offset < range.end,
+        );
+        if (owner) result.add(owner.node);
+      }
     }
-    return -1;
+    if ("childNodes" in node) for (const child of node.childNodes) visit(child);
+    if ("content" in node) visit(node.content);
   };
-  return (html) => {
-    // Consume whole tags (including quoted values) and comments. Attribute-like
-    // prose and markup inside another attribute must never become attributes.
-    let cursor = 0;
-    let found = false;
-    while (cursor < html.length) {
-      if (rawTextTag) {
-        if (rawTextTag === "plaintext") break;
-        const closing = findRawTextClosing(html, cursor, rawTextTag);
-        if (closing < 0) break;
-        cursor = closing;
-        rawTextTag = undefined;
-      }
-      // CDATA recognition belongs to tokenization and depends on the adjusted
-      // current node's actual namespace, before integration-point dispatch.
-      const token = nextTag(
-        html,
-        cursor,
-        elements.length > 0 && elements.at(-1)?.namespace !== "html",
-      );
-      if (!token) break;
-      cursor = token.end;
-      const tagName = token.tagName;
-      if (token.closing) {
-        if (
-          elements.at(-1)?.namespace !== "html" &&
-          (tagName === "br" || tagName === "p")
-        ) {
-          popForeignContent();
-          continue;
-        }
-        const currentIsHtml = elements.at(-1)?.namespace === "html";
-        let elementIndex = -1;
-        let htmlBoundaryIndex = -1;
-        for (let index = elements.length - 1; index >= 0; index--) {
-          const element = elements[index]!;
-          if ((element.namespace === "html") !== currentIsHtml) {
-            if (!currentIsHtml) htmlBoundaryIndex = index;
-            break;
-          }
-          if (element.tagName === tagName) {
-            elementIndex = index;
-            break;
-          }
-        }
-        // A foreign end tag with no foreign match is reprocessed in HTML. The
-        // immediately enclosing HTML element can therefore close with it.
-        if (
-          elementIndex < 0 &&
-          htmlBoundaryIndex >= 0 &&
-          elements[htmlBoundaryIndex]!.tagName === tagName
-        )
-          elementIndex = htmlBoundaryIndex;
-        if (elementIndex >= 0) elements.splice(elementIndex);
-        continue;
-      }
-      const parsedAttributes = token.attributes;
-      let current = elements.at(-1);
-      let processInHtml =
-        !current ||
-        current.namespace === "html" ||
-        (current.mathTextIntegrationPoint &&
-          !mathTextForeignExceptions.has(tagName)) ||
-        (current.namespace === "mathml" &&
-          current.tagName === "annotation-xml" &&
-          tagName === "svg") ||
-        current.htmlIntegrationPoint;
-      const fontBreakout =
-        tagName === "font" &&
-        ["color", "face", "size"].some((name) => parsedAttributes.has(name));
-      if (
-        !processInHtml &&
-        (foreignBreakoutTags.has(tagName) || fontBreakout)
-      ) {
-        popForeignContent();
-        current = elements.at(-1);
-        processInHtml = true;
-      }
-      const namespace = current?.namespace ?? "html";
-      const tokenNamespace = processInHtml
-        ? tagName === "svg"
-          ? "svg"
-          : tagName === "math"
-            ? "mathml"
-            : "html"
-        : namespace;
-      const selfClosing = token.selfClosing;
-      // HTML ignores the self-closing flag on these non-void elements. Foreign
-      // elements honor it and never enter an HTML raw-text tokenizer state.
-      if (tokenNamespace === "html" && rawTextTags.has(tagName))
-        rawTextTag = tagName;
-      for (const [name, value] of parsedAttributes) {
-        if (name !== "href" && name !== "src") continue;
-        // Attribute mode applies HTML's semicolon and ambiguous-ampersand rules;
-        // Markdown string decoding would also (incorrectly) unescape backslashes.
-        // Apply URL input preprocessing only to the interpreted value. Original
-        // source evidence and offsets must retain every character unchanged.
-        const urlInput = decodeHTMLAttribute(value)
-          .replace(/[\t\n\r]/gu, "")
-          .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/gu, "");
-        // U+2010 is the HTML &hyphen; lookalike: reject it as unsupported,
-        // without normalizing it into an accepted or rewritable asset scheme.
-        if (
-          asciiCaseInsensitiveEqual(urlInput.slice(0, 12), "renma-asset:") ||
-          asciiCaseInsensitiveEqual(urlInput.slice(0, 12), "renma‐asset:")
-        )
-          found = true;
-      }
-      const annotationEncoding = decodeHTMLAttribute(
-        parsedAttributes.get("encoding") ?? "",
-      ).toLowerCase();
-      const htmlIntegrationPoint =
-        (tokenNamespace === "svg" && svgHtmlIntegrationPoints.has(tagName)) ||
-        (tokenNamespace === "mathml" &&
-          tagName === "annotation-xml" &&
-          (annotationEncoding === "text/html" ||
-            annotationEncoding === "application/xhtml+xml"));
-      const mathTextIntegrationPoint =
-        tokenNamespace === "mathml" && mathTextIntegrationPoints.has(tagName);
-      if (tokenNamespace === "html" ? !htmlVoidTags.has(tagName) : !selfClosing)
-        elements.push({
-          tagName,
-          namespace: tokenNamespace,
-          htmlIntegrationPoint,
-          mathTextIntegrationPoint,
-        });
-    }
-    return found;
-  };
+  visit(fragment);
+  return result;
 }
