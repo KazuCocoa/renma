@@ -495,3 +495,93 @@ test("multiline labels retain exact destinations after trailing whitespace with 
     }
   }
 });
+
+test("blockquote links preserve original destination spans across container continuations", () => {
+  const forms = [
+    "[B\n](DESTINATION)",
+    "[B](\nDESTINATION\n)",
+    "[B\n ](DESTINATION)",
+    "[B](\n DESTINATION\n )",
+    "[B\n ](\n DESTINATION\n )",
+    '[**B**\n ](\n <DESTINATION> "[title](renma-asset:b)"\n )',
+    '[`[label](renma-asset:b)`\n ](\n DESTINATION "[title](renma-asset:b)"\n )',
+    '[B > renma-asset:b\n ](<DESTINATION> "title > renma-asset:b")',
+  ];
+  for (const prefix of ["> ", "> > ", ">>"]) {
+    for (const newline of ["\n", "\r\n"]) {
+      for (const form of forms) {
+        const quoted = form
+          .split("\n")
+          .map((line) => prefix + line)
+          .join("\n");
+        const inert = [
+          "`[code](renma-asset:b)`",
+          "",
+          "```md",
+          "[fenced](renma-asset:b)",
+          "```",
+        ]
+          .map((line) => prefix + line)
+          .join("\n");
+        const original = skill(
+          "a",
+          "skill.b",
+          [pin("skill.b")],
+          `😀\n\n${quoted}\n\n${inert}\n`,
+        );
+        const template =
+          "\uFEFF" +
+          Buffer.from(original.bytes).toString().replaceAll("\n", newline);
+        const expectedStart = template.indexOf("DESTINATION");
+        const content = template.replace("DESTINATION", "renma-asset:b");
+        const input = file(original.path, content);
+        const report = source([input]);
+        assert.equal(
+          report.declarationValid,
+          true,
+          JSON.stringify({
+            prefix,
+            newline,
+            form,
+            diagnostics: report.diagnostics,
+          }),
+        );
+        assert.equal(report.references.length, 1);
+        const destination = report.references[0]!.destination!;
+        assert.equal(destination.start, expectedStart);
+        assert.equal(destination.end, expectedStart + "renma-asset:b".length);
+        assert.equal(destination.raw, "renma-asset:b");
+        assert.equal(
+          content.slice(destination.start, destination.end),
+          destination.raw,
+        );
+        assert.equal(
+          destination.startLine,
+          content.slice(0, expectedStart).split("\n").length,
+        );
+        assert.equal(destination.endLine, destination.startLine);
+        assert.equal(
+          destination.sha256,
+          createHash("sha256").update(input.bytes).digest("hex"),
+        );
+      }
+    }
+  }
+});
+
+test("blockquote containers do not make unsupported reference forms rewritable", () => {
+  const body =
+    "> ![B](\n> renma-asset:b\n> )\n\n> [B](\n> renma-asset:%62\n> )\n\n> [B](\n> renma-asset:b\\-x\n> )\n\n> <renma-asset:b>\n\n> [B][ref]\n>\n> [ref]: renma-asset:b\n";
+  const report = source([skill("a", "skill.b", [pin("skill.b")], body)]);
+  assert.equal(report.declarationValid, false);
+  assert.equal(report.references.length, 6);
+  assert.ok(
+    report.references.every((reference) => reference.destination === undefined),
+  );
+  assert.equal(
+    report.diagnostics.filter(
+      (d) => d.code === "RN-BINDING-UNSUPPORTED-REFERENCE",
+    ).length,
+    6,
+  );
+});

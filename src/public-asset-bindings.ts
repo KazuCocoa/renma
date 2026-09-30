@@ -594,15 +594,21 @@ function inspectReferences(
         1
       : 0;
   const definitions = new Map<string, string>();
-  const walk = (node: Nodes, fn: (node: Nodes) => void): void => {
-    fn(node);
-    if ("children" in node) for (const child of node.children) walk(child, fn);
+  const walk = (
+    node: Nodes,
+    fn: (node: Nodes, blockquoteDepth: number) => void,
+    blockquoteDepth = 0,
+  ): void => {
+    fn(node, blockquoteDepth);
+    if ("children" in node)
+      for (const child of node.children)
+        walk(child, fn, blockquoteDepth + (node.type === "blockquote" ? 1 : 0));
   };
   walk(root, (node) => {
     if (node.type === "definition" && !definitions.has(node.identifier))
       definitions.set(node.identifier, node.url);
   });
-  walk(root, (node) => {
+  walk(root, (node, blockquoteDepth) => {
     const start = originalOffset(node.position?.start),
       end = originalOffset(node.position?.end);
     const evidence = location(document, start, end);
@@ -629,19 +635,31 @@ function inspectReferences(
     const alias = url.slice("renma-asset:".length);
     const reference: AssetBindingReference = { alias, evidence };
     item.references.push(reference);
-    // The AST establishes a real inline link; this suffix recognizer only locates
-    // a literal destination after the parsed label, never arbitrary prose/code.
-    // mdast may omit trailing multiline label whitespace from its final child;
-    // consume only that whitespace before requiring the closing bracket.
+    // Start after the parser-owned label, so decoys in labels/titles cannot
+    // select a destination. Only whitespace and actual container continuations
+    // may precede the closing bracket and the literal destination.
     const labelEnd =
       node.type === "link" && node.children.length
         ? originalOffset(node.children.at(-1)?.position?.end)
         : start + 1;
-    const suffix = document.artifact.content.slice(labelEnd, end);
-    const match =
-      /^[ \t\r\n]*\]\(\s*(?:<(renma-asset:[a-z][a-z0-9-]*)>|(renma-asset:[a-z][a-z0-9-]*))(?=\s|\))/u.exec(
-        suffix,
-      );
+    const content = document.artifact.content;
+    const closingLabel = skipLinkWhitespace(
+      content,
+      labelEnd,
+      end,
+      blockquoteDepth,
+    );
+    const destinationOffset = skipLinkWhitespace(
+      content,
+      closingLabel + 2,
+      end,
+      blockquoteDepth,
+    );
+    const match = content.startsWith("](", closingLabel)
+      ? /^(?:<(renma-asset:[a-z][a-z0-9-]*)>|(renma-asset:[a-z][a-z0-9-]*))(?=\s|\))/u.exec(
+          content.slice(destinationOffset, end),
+        )
+      : null;
     if (
       node.type !== "link" ||
       !url.startsWith("renma-asset:") ||
@@ -656,7 +674,7 @@ function inspectReferences(
       );
       return;
     }
-    const destinationStart = labelEnd + match[0].lastIndexOf(url);
+    const destinationStart = destinationOffset + match[0].lastIndexOf(url);
     reference.destination = location(
       document,
       destinationStart,
@@ -669,4 +687,24 @@ function inspectReferences(
         evidence,
       );
   });
+}
+
+/** Advance original offsets only; never strip or normalize Markdown source. */
+function skipLinkWhitespace(
+  content: string,
+  start: number,
+  end: number,
+  blockquoteDepth: number,
+): number {
+  let cursor = start;
+  let remainingMarkers = content[cursor - 1] === "\n" ? blockquoteDepth : 0;
+  while (cursor < end) {
+    const character = content[cursor];
+    if (character === "\n") remainingMarkers = blockquoteDepth;
+    else if (character === ">" && remainingMarkers > 0) remainingMarkers--;
+    else if (character !== " " && character !== "\t" && character !== "\r")
+      break;
+    cursor++;
+  }
+  return cursor;
 }
