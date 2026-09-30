@@ -145,6 +145,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "repository collection, normalization, and snapshot projections",
       [
         "agent-skills.ts",
+        "asset-binding-analysis.ts",
         "catalog-conflicts.ts",
         "catalog-lifecycle.ts",
         "catalog.ts",

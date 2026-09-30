@@ -6,6 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Shared asset-binding analysis for catalog dependency annotations, declared
+  composition and reverse impact. Graph JSON, Markdown and Mermaid expose
+  requested releases and local satisfaction separately from target resolution.
+- Optional release identities and required/optional binding-satisfaction summaries;
+  snapshot completeness, membership and traversal keep their existing meanings.
+  Asset-binding v1 adds optional `satisfied`; existing v1 schema identifiers remain.
+  Source acquisition, Git revision resolution, lockfiles, bundling and plugin
+  generation remain external builder responsibilities.
+
+### Fixed
+
+- Avoid repeated full-source scans during catalog binding analysis. Reuse each
+  document's original line offsets and hash, and generate reference evidence
+  only for reserved asset destinations. Unbound documents retain their existing
+  validation and report behavior without quadratic location-processing cost.
+
 ## [0.39.2] - 2026-09-20
 
 ### Fixed

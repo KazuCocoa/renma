@@ -209,3 +209,21 @@ Lens `release_version` is distinct from its existing format `version`.
 The dedicated builder API reports declaration validity and local version
 satisfaction separately; existing composition, scan and Discovery behavior
 remain unchanged. Acquisition, packaging and rewriting are external.
+
+## Release bindings and snapshot completeness
+
+[Asset bindings](asset-bindings.md#dependency-analysis-and-graph-reports) annotate
+existing provenance edges, unresolved declarations and kind mismatches. Asset
+`releaseVersion` identifies the inspected release, while each binding's `version`
+is the requested release. Target resolution and release satisfaction are separate.
+
+`requiredComplete` retains its existing unresolved-target, kind-mismatch and
+required unavailable-asset checks. `optionalComplete` retains its existing
+unresolved-target and kind-mismatch checks. Neither includes release satisfaction;
+cycles and conflicts retain their independent fields. Optional
+`bindingSatisfaction` reports required and optional satisfaction separately.
+
+Traversal follows local snapshot assets even when a binding is unsatisfied.
+Following B 2.0.0 does not establish the dependencies of requested B 1.0.0.
+External builders supply and inspect selected releases; Renma does not acquire
+sources, resolve Git revisions, write lockfiles, bundle assets or generate plugins.

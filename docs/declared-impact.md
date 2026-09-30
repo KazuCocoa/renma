@@ -159,3 +159,16 @@ A dependency on one Skill path does not make its source a dependent of another
 file with the same ID. Focused graph and inspect preserve that distinction;
 inspect leaves ambiguous Skill ID dependencies unresolved and omits them from
 both candidate files' inbound dependents.
+
+## Release bindings
+
+Incoming composition relationships preserve the same
+[binding annotations](asset-bindings.md#dependency-analysis-and-graph-reports)
+as forward composition, including invalid incoming declarations and unsatisfied
+releases. Assets expose their inspected `releaseVersion`. Optional
+`bindingSatisfaction` summarizes encountered required and optional routes
+separately; an unsatisfied optional route does not invalidate required membership.
+Impact has no release-closure completeness claim. Its relationships describe the
+inspected snapshot, even when A requests B 1.0.0 and the focused local B is 2.0.0.
+Acquiring the requested release and analyzing its own declarations remain external
+builder responsibilities.

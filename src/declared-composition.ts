@@ -1,3 +1,4 @@
+import type { AssetBindingDiagnostic } from "./types/asset-bindings.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import {
   normalizeDependencyReference,
@@ -12,6 +13,7 @@ import type {
   Catalog,
   Dependency,
   DependencyKind,
+  DependencyBinding,
 } from "./model.js";
 import type { Evidence, Finding } from "./types/diagnostics.js";
 import {
@@ -32,6 +34,7 @@ export type CompositionRelationship =
   | "applies_to";
 
 export interface CompositionAsset {
+  releaseVersion?: string;
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -42,6 +45,8 @@ export interface CompositionAsset {
 }
 
 export interface CompositionProvenanceEdge {
+  bindings?: DependencyBinding[];
+  bindingDiagnostics?: AssetBindingDiagnostic[];
   from: string;
   to: string;
   declaredTarget: string;
@@ -55,6 +60,8 @@ export interface CompositionProvenanceEdge {
 }
 
 export interface CompositionResolutionIssue {
+  bindings?: DependencyBinding[];
+  bindingDiagnostics?: AssetBindingDiagnostic[];
   resolutionReason?: "missing" | "ambiguous";
   candidatePaths?: string[];
   sourceId: string;
@@ -120,6 +127,11 @@ export interface CompositionLifecycleFinding {
 }
 
 export interface DeclaredCompositionReport {
+  /** Satisfaction of encountered pins in this snapshot, separate from closure completeness. */
+  bindingSatisfaction?: {
+    requiredSatisfied: boolean;
+    optionalSatisfied: boolean;
+  };
   root: CompositionAsset;
   requiredAssets: CompositionAsset[];
   optionalAssets: CompositionAsset[];
@@ -344,6 +356,10 @@ export function resolveDeclaredCompositionFromIndex(
       }
 
       const edge: CompositionProvenanceEdge = {
+        ...(dependency.bindings ? { bindings: dependency.bindings } : {}),
+        ...(dependency.bindingDiagnostics
+          ? { bindingDiagnostics: dependency.bindingDiagnostics }
+          : {}),
         from: state.asset.id,
         to: target.id,
         declaredTarget: dependency.to,
@@ -459,7 +475,33 @@ export function resolveDeclaredCompositionFromIndex(
       isLifecycleUsable(root.metadata.status),
   );
 
+  const boundRelationships = [
+    ...stableProvenance,
+    ...unresolvedRequired,
+    ...unresolvedOptional,
+    ...kindMismatches,
+  ].filter((edge) => edge.bindings?.length || edge.bindingDiagnostics?.length);
   return {
+    ...(boundRelationships.length
+      ? {
+          bindingSatisfaction: {
+            requiredSatisfied: boundRelationships
+              .filter((edge) => edge.membership === "required")
+              .every(
+                (edge) =>
+                  !edge.bindingDiagnostics?.length &&
+                  (edge.bindings ?? []).every((binding) => binding.satisfied),
+              ),
+            optionalSatisfied: boundRelationships
+              .filter((edge) => edge.membership === "optional")
+              .every(
+                (edge) =>
+                  !edge.bindingDiagnostics?.length &&
+                  (edge.bindings ?? []).every((binding) => binding.satisfied),
+              ),
+          },
+        }
+      : {}),
     root: compositionAsset(root),
     requiredAssets,
     optionalAssets,
@@ -1229,6 +1271,10 @@ function resolutionIssue(
   membership: CompositionMembership,
 ): CompositionResolutionIssue {
   return {
+    ...(dependency.bindings ? { bindings: dependency.bindings } : {}),
+    ...(dependency.bindingDiagnostics
+      ? { bindingDiagnostics: dependency.bindingDiagnostics }
+      : {}),
     sourceId: source.id,
     sourceKind: source.kind,
     sourcePath: source.sourcePath,
@@ -1244,6 +1290,7 @@ function resolutionIssue(
 
 function compositionAsset(asset: Asset, direct?: boolean): CompositionAsset {
   return {
+    ...(asset.releaseVersion ? { releaseVersion: asset.releaseVersion } : {}),
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,

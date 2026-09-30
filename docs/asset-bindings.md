@@ -2,8 +2,11 @@
 
 Asset bindings let an external builder validate an exact release dependency
 without changing Renma's declared composition graph. Validation is available
-through the read-only `renma/asset-bindings` library API. It is not included in
-`scan` output, composition completeness, Discovery, policy or CLI exit thresholds.
+through the read-only `renma/asset-bindings` library API and as annotations on
+existing catalog and graph dependency edges. Composition and reverse impact
+consume the same normalized declarations and validation results. Bindings do
+not add edges or change Discovery, policy, executable relationships, Trust Graph
+relationships, or CLI exit thresholds.
 
 The [complete example repository](https://github.com/KazuCocoa/renma/tree/main/examples/asset-bindings)
 shows both Skill dependency chains and Context-to-Context pins.
@@ -134,7 +137,14 @@ index, catalog relationship order and reference source offset.
 shape. Public TypeScript interfaces are exported from the same module. Each
 document includes identity/version, relationships, bindings, references,
 diagnostics and `declarationValid`. Each binding has separate local
-`satisfaction`, with original target identities and version evidence:
+`satisfaction`, with original target identities and version evidence. The additive
+optional `satisfied` boolean is emitted by current producers: it is true only
+when `declarationValid` is true and the candidate comparison is `matched`.
+`compareAssetBinding` remains an identity/kind/release comparison; a match alone
+does not validate the caller's declaration or the selected target's own declarations.
+Inspect those documents and their diagnostics as well.
+
+Candidate comparison statuses are:
 
 - `matched`: exactly one target has the required kind and exact release string.
 - `missing`: no supplied document has that explicit ID.
@@ -160,6 +170,56 @@ offsets. Check the original byte
 digest before applying any rewrite and reject stale evidence. Metadata entry
 locations cover the containing YAML field; `entryIndex` distinguishes entries.
 Candidate identities carry whole-document, ID and version evidence.
+
+## Dependency analysis and graph reports
+
+Catalog dependency edges and graph edges carry optional `bindings` arrays.
+Each entry retains the public API's alias, exact requested `version`, authored
+`entryIndex`, declaration validity, `satisfied`, candidate comparison, relationship
+indexes, and original-source evidence, plus relevant `diagnostics`. Arrays retain
+invalid duplicate declarations for review. `bindingDiagnostics` preserves source
+declaration errors even when malformed metadata cannot yield a normalized entry.
+Only existing eligible composition declarations receive annotations. Unbound edges
+keep their existing fields and presentation.
+
+Graph `resolved` answers whether the existing dependency resolver found a target.
+It does **not** answer whether the requested release is satisfied. For example,
+A 1.0.1 requesting B 1.0.0 can resolve to local B 2.0.0 while its binding reports
+`version-mismatch` and `satisfied: false`. Existing Context/Lens target resolution
+can retain a local target even when the strict binding comparison is `ambiguous`;
+Skill dependency resolution already requires a unique target. Bindings do not
+change either resolution rule. Missing, ambiguous, wrong-kind, invalid target
+release and mismatched release results remain distinct. An invalid source
+declaration cannot be satisfied even when candidate comparison is `matched`.
+
+Graph and composition/impact assets expose optional `releaseVersion`: Skill
+`metadata.renma.version`, Context `version`, or Lens `release_version`. Lens format
+`version` is never used as release identity. JSON preserves full evidence;
+Markdown and Mermaid label bound edges with alias, requested release and status.
+Grouped graph projections retain separate bound declarations and their indexes.
+
+Composition traverses the inspected snapshot. If local B is 2.0.0, traversing
+its declarations establishes the local B 2.0.0 closure, **not** the dependencies
+of requested B 1.0.0. Reverse impact likewise describes incoming relationships
+in the inspected snapshot, including unsatisfied pins. It does not predict impact
+on a historical or acquired release. Existing `requiredComplete` and
+`optionalComplete` retain their target-resolution, kind and existing lifecycle
+semantics; `cycleFree` remains independent. They do not establish release
+satisfaction or a complete historical release closure.
+
+When encountered declarations contain bindings or binding declaration errors,
+composition and impact add `bindingSatisfaction.requiredSatisfied` and
+`bindingSatisfaction.optionalSatisfied`. Each summarizes its propagated membership
+routes within that report; an empty membership set is satisfied. Optional failures
+do not invalidate required membership or its satisfaction summary. These summaries
+cover encountered pins only: they neither require every dependency to be pinned
+nor establish the transitive closure of a requested release absent from the snapshot.
+
+These are optional additive fields under the existing graph/catalog v1 contracts.
+The dedicated API retains `renma.asset-bindings.v1` and its closed status vocabulary;
+its published schema adds the optional `satisfied` property. Executable and Trust
+Graphs keep their relationship semantics because execution and trust evidence are
+not release-pinned composition declarations.
 
 ## Responsibility boundary
 

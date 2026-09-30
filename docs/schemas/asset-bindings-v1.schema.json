@@ -202,6 +202,10 @@
         },
         "satisfaction": {
           "$ref": "#/$defs/satisfaction"
+        },
+        "satisfied": {
+          "type": "boolean",
+          "description": "Declaration is valid and the local candidate comparison matched. Does not establish transitive release completeness."
         }
       }
     },

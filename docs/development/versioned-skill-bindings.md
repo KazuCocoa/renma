@@ -15,7 +15,10 @@ Context and Lens relationships. Only Skills can bind required/optional Skill
 relationships; only Lenses can bind `applies_to` (a Context target).
 Ordinary links, `references`, Discovery continuation and `extends` are not
 binding relationships. Existing required/optional membership, cycles, policy
-and composition completeness remain unchanged.
+and snapshot composition completeness remain unchanged. Catalog, composition,
+reverse impact and graph projections now share binding annotations and expose
+separate local binding-satisfaction summaries; see
+[the binding report contract](../asset-bindings.md#dependency-analysis-and-graph-reports).
 
 Skills use a flat metadata string containing a strict JSON array:
 
