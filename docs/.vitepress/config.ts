@@ -122,6 +122,10 @@ export default defineConfig({
           { text: "Product Design", link: "/development/design" },
           { text: "Current Roadmap", link: "/development/plan" },
           {
+            text: "Versioned Skill Bindings (Design)",
+            link: "/development/versioned-skill-bindings",
+          },
+          {
             text: "Skill Discovery Design",
             link: "/development/plan-discovery",
           },

@@ -77,6 +77,20 @@ release preparation. It is not a new refactoring phase. The candidates below
 remain unassigned and do not enter 1.0 merely because stabilization is
 complete.
 
+## Designed Extension: Versioned Skill Bindings
+
+The [Versioned Skill Bindings design](versioned-skill-bindings.md) specifies
+an opt-in extension for a separate plugin builder for Renma. It reuses current
+Skill IDs, versions, and required/optional declarations, adding exact-version
+bindings and machine-identifiable body references. Renma's scope is static
+validation and a reviewed read-only consumer contract. Source acquisition,
+lockfiles, packaging, and host-specific rewriting remain external.
+
+Design is recorded; implementation and release assignment remain pending.
+This does not enter the completed 1.0 stabilization baseline or change shipped
+metadata/API contracts. The design lists implementation stages, compatibility
+requirements, and acceptance scenarios.
+
 ## Open Core Candidates
 
 These candidates have no assigned release and require independent evidence and
