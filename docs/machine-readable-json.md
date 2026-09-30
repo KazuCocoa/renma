@@ -236,3 +236,10 @@ contract. It is not a CLI report family and does not alter the frozen command
 schema registry above. See the [builder API](asset-bindings.md) and its
 [JSON Schema](schemas/asset-bindings-v1.schema.json). Public API snapshots,
 package import checks and schema validation cover this additive export.
+
+Graph/catalog v1 add optional dependency `bindings` and `bindingDiagnostics`,
+asset/node `releaseVersion`, and composition/impact `bindingSatisfaction` fields.
+The [binding contract](asset-bindings.md#dependency-analysis-and-graph-reports)
+defines their snapshot scope. Existing `resolved` and composition completeness
+fields keep their meanings. The dedicated asset-binding v1 schema adds optional
+`satisfied` without changing its closed candidate-comparison status enum.

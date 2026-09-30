@@ -989,6 +989,16 @@ render CLI output, fetch external sources, or build a second repository model.
 Graph command orchestration collects repository evidence once and passes that
 catalog to the resolver.
 
+`src/asset-binding-analysis.ts` owns normalized binding declarations, reference
+validation, release identities and local candidate comparison over parser-owned
+documents and catalog declarations. Catalog construction calls it once and
+annotates existing eligible dependency edges; the `renma/asset-bindings` wrapper
+only decodes caller-supplied files and returns the same analysis. Shared types
+live in `src/types/asset-bindings.ts`. Composition and impact copy those annotations
+without parsing metadata or calling the public wrapper. Snapshot target resolution
+and traversal retain their existing rules. Optional binding-satisfaction summaries
+are separate from snapshot completeness and never prove a requested release closure.
+
 The public one-off wrapper prepares a `DeclaredCompositionIndex` and resolves
 one root. Scan prepares that forward-only index once and reuses its asset-ID,
 normalized-path, sorted-asset, and dependency-by-source lookups for every root.
