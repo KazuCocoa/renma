@@ -1,3 +1,4 @@
+import type { AssetBindingDiagnostic } from "./types/asset-bindings.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { normalizeDependencyReference } from "./dependency-resolution.js";
 import type {
@@ -18,10 +19,12 @@ import type {
   AssetStatus,
   Catalog,
   DependencyKind,
+  DependencyBinding,
 } from "./model.js";
 import type { Evidence } from "./types/diagnostics.js";
 
 export interface ImpactAsset {
+  releaseVersion?: string;
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -32,6 +35,8 @@ export interface ImpactAsset {
 }
 
 export interface ImpactProvenanceEdge {
+  bindings?: DependencyBinding[];
+  bindingDiagnostics?: AssetBindingDiagnostic[];
   from: string;
   to: string;
   declaredTarget: string;
@@ -45,6 +50,10 @@ export interface ImpactProvenanceEdge {
 }
 
 export interface DeclaredImpactReport {
+  bindingSatisfaction?: {
+    requiredSatisfied: boolean;
+    optionalSatisfied: boolean;
+  };
   focus: ImpactAsset;
   requiredDependents: ImpactAsset[];
   optionalDependents: ImpactAsset[];
@@ -144,6 +153,12 @@ export function resolveDeclaredImpactFromIndex(
       }
 
       provenanceEdges.push({
+        ...(declaration.dependency.bindings
+          ? { bindings: declaration.dependency.bindings }
+          : {}),
+        ...(declaration.dependency.bindingDiagnostics
+          ? { bindingDiagnostics: declaration.dependency.bindingDiagnostics }
+          : {}),
         from: declaration.source.id,
         to: declaration.target.id,
         declaredTarget: declaration.dependency.to,
@@ -193,7 +208,31 @@ export function resolveDeclaredImpactFromIndex(
     directIds,
   );
 
+  const boundRelationships = [
+    ...stableProvenance,
+    ...invalidIncomingDeclarations,
+  ].filter((edge) => edge.bindings?.length || edge.bindingDiagnostics?.length);
   return {
+    ...(boundRelationships.length
+      ? {
+          bindingSatisfaction: {
+            requiredSatisfied: boundRelationships
+              .filter((edge) => edge.dependentMembership === "required")
+              .every(
+                (edge) =>
+                  !edge.bindingDiagnostics?.length &&
+                  (edge.bindings ?? []).every((binding) => binding.satisfied),
+              ),
+            optionalSatisfied: boundRelationships
+              .filter((edge) => edge.dependentMembership === "optional")
+              .every(
+                (edge) =>
+                  !edge.bindingDiagnostics?.length &&
+                  (edge.bindings ?? []).every((binding) => binding.satisfied),
+              ),
+          },
+        }
+      : {}),
     focus: impactAsset(focus, false),
     requiredDependents,
     optionalDependents,
@@ -300,6 +339,7 @@ function impactDependents(
 
 function impactAsset(asset: Asset, direct: boolean): ImpactAsset {
   return {
+    ...(asset.releaseVersion ? { releaseVersion: asset.releaseVersion } : {}),
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,

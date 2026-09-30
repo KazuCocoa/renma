@@ -2,19 +2,19 @@
   "version": 2,
   "entrypoints": {
     "renma/asset-bindings": {
-      "AssetBindingDiagnostic": "public-asset-bindings.d.ts#AssetBindingDiagnostic",
-      "AssetBindingDocument": "public-asset-bindings.d.ts#AssetBindingDocument",
-      "AssetBindingFile": "public-asset-bindings.d.ts#AssetBindingFile",
-      "AssetBindingIdentity": "public-asset-bindings.d.ts#AssetBindingIdentity",
-      "AssetBindingLocation": "public-asset-bindings.d.ts#AssetBindingLocation",
-      "AssetBindingReference": "public-asset-bindings.d.ts#AssetBindingReference",
-      "AssetBindingRelationship": "public-asset-bindings.d.ts#AssetBindingRelationship",
-      "AssetBindingReport": "public-asset-bindings.d.ts#AssetBindingReport",
-      "AssetBindingSatisfaction": "public-asset-bindings.d.ts#AssetBindingSatisfaction",
-      "BindingAssetKind": "public-asset-bindings.d.ts#BindingAssetKind",
-      "BindingRelationshipKind": "public-asset-bindings.d.ts#BindingRelationshipKind",
-      "NormalizedAssetBinding": "public-asset-bindings.d.ts#NormalizedAssetBinding",
-      "compareAssetBinding": "public-asset-bindings.d.ts#compareAssetBinding",
+      "AssetBindingDiagnostic": "types/asset-bindings.d.ts#AssetBindingDiagnostic",
+      "AssetBindingDocument": "types/asset-bindings.d.ts#AssetBindingDocument",
+      "AssetBindingFile": "types/asset-bindings.d.ts#AssetBindingFile",
+      "AssetBindingIdentity": "types/asset-bindings.d.ts#AssetBindingIdentity",
+      "AssetBindingLocation": "types/asset-bindings.d.ts#AssetBindingLocation",
+      "AssetBindingReference": "types/asset-bindings.d.ts#AssetBindingReference",
+      "AssetBindingRelationship": "types/asset-bindings.d.ts#AssetBindingRelationship",
+      "AssetBindingReport": "types/asset-bindings.d.ts#AssetBindingReport",
+      "AssetBindingSatisfaction": "types/asset-bindings.d.ts#AssetBindingSatisfaction",
+      "BindingAssetKind": "types/asset-bindings.d.ts#BindingAssetKind",
+      "BindingRelationshipKind": "types/asset-bindings.d.ts#BindingRelationshipKind",
+      "NormalizedAssetBinding": "types/asset-bindings.d.ts#NormalizedAssetBinding",
+      "compareAssetBinding": "asset-binding-analysis.d.ts#compareAssetBinding",
       "inspectAssetBindings": "public-asset-bindings.d.ts#inspectAssetBindings"
     },
     "renma/types": {
@@ -134,6 +134,16 @@
         "export interface AgentSkillsValidationSummary { specification: string; profile: string; totalSkillCount: number; validSkillCount: number; invalidSkillCount: number; canonicalSkillCount: number; legacySkillCount: number; hybridSkillCount: number; warningCount: number; results: AgentSkillValidationResult[]; }"
       ],
       "references": ["agent-skills.d.ts#AgentSkillValidationResult"]
+    },
+    "asset-binding-analysis.d.ts#compareAssetBinding": {
+      "declarations": [
+        "export declare function compareAssetBinding(binding: Pick<NormalizedAssetBinding, \"target\" | \"version\" | \"relationships\">, candidates: readonly AssetBindingIdentity[]): AssetBindingSatisfaction;"
+      ],
+      "references": [
+        "types/asset-bindings.d.ts#AssetBindingIdentity",
+        "types/asset-bindings.d.ts#AssetBindingSatisfaction",
+        "types/asset-bindings.d.ts#NormalizedAssetBinding"
+      ]
     },
     "context-lens.d.ts#ContextLensDiagnosticCounts": {
       "declarations": [
@@ -443,109 +453,13 @@
       ],
       "references": []
     },
-    "public-asset-bindings.d.ts#AssetBindingDiagnostic": {
-      "declarations": [
-        "export interface AssetBindingDiagnostic { code: string; message: string; evidence: AssetBindingLocation; entryIndex?: number; phase: \"declaration\" | \"local-satisfaction\"; }"
-      ],
-      "references": ["public-asset-bindings.d.ts#AssetBindingLocation"]
-    },
-    "public-asset-bindings.d.ts#AssetBindingDocument": {
-      "declarations": [
-        "export interface AssetBindingDocument { identity: AssetBindingIdentity; relationships: AssetBindingRelationship[]; bindings: NormalizedAssetBinding[]; references: AssetBindingReference[]; diagnostics: AssetBindingDiagnostic[]; declarationValid: boolean; }"
-      ],
-      "references": [
-        "public-asset-bindings.d.ts#AssetBindingDiagnostic",
-        "public-asset-bindings.d.ts#AssetBindingIdentity",
-        "public-asset-bindings.d.ts#AssetBindingReference",
-        "public-asset-bindings.d.ts#AssetBindingRelationship",
-        "public-asset-bindings.d.ts#NormalizedAssetBinding"
-      ]
-    },
-    "public-asset-bindings.d.ts#AssetBindingFile": {
-      "declarations": [
-        "export interface AssetBindingFile { readonly path: string; readonly bytes: Uint8Array; }"
-      ],
-      "references": []
-    },
-    "public-asset-bindings.d.ts#AssetBindingIdentity": {
-      "declarations": [
-        "export interface AssetBindingIdentity { path: string; kind: string; id: string | null; version: string | null; evidence: AssetBindingLocation; idEvidence: AssetBindingLocation; versionEvidence: AssetBindingLocation; }"
-      ],
-      "references": ["public-asset-bindings.d.ts#AssetBindingLocation"]
-    },
-    "public-asset-bindings.d.ts#AssetBindingLocation": {
-      "declarations": [
-        "export interface AssetBindingLocation { path: string; sha256: string; start: number; end: number; startLine: number; endLine: number; raw: string; }"
-      ],
-      "references": []
-    },
-    "public-asset-bindings.d.ts#AssetBindingReference": {
-      "declarations": [
-        "export interface AssetBindingReference { alias: string; evidence: AssetBindingLocation; destination?: AssetBindingLocation; }"
-      ],
-      "references": ["public-asset-bindings.d.ts#AssetBindingLocation"]
-    },
-    "public-asset-bindings.d.ts#AssetBindingRelationship": {
-      "declarations": [
-        "export interface AssetBindingRelationship { relationship: BindingRelationshipKind; target: string; declarationIndex: number; targetKind: BindingAssetKind; sourceValid: boolean; evidence: AssetBindingLocation; }"
-      ],
-      "references": [
-        "public-asset-bindings.d.ts#AssetBindingLocation",
-        "public-asset-bindings.d.ts#BindingAssetKind",
-        "public-asset-bindings.d.ts#BindingRelationshipKind"
-      ]
-    },
-    "public-asset-bindings.d.ts#AssetBindingReport": {
-      "declarations": [
-        "export interface AssetBindingReport { schemaVersion: \"renma.asset-bindings.v1\"; offsetUnit: \"utf16-code-unit\"; documents: AssetBindingDocument[]; }"
-      ],
-      "references": ["public-asset-bindings.d.ts#AssetBindingDocument"]
-    },
-    "public-asset-bindings.d.ts#AssetBindingSatisfaction": {
-      "declarations": [
-        "export interface AssetBindingSatisfaction { status: \"matched\" | \"missing\" | \"ambiguous\" | \"kind-mismatch\" | \"target-version-invalid\" | \"version-mismatch\"; candidates: AssetBindingIdentity[]; }"
-      ],
-      "references": ["public-asset-bindings.d.ts#AssetBindingIdentity"]
-    },
-    "public-asset-bindings.d.ts#BindingAssetKind": {
-      "declarations": [
-        "export type BindingAssetKind = \"skill\" | \"context\" | \"context_lens\";"
-      ],
-      "references": []
-    },
-    "public-asset-bindings.d.ts#BindingRelationshipKind": {
-      "declarations": [
-        "export type BindingRelationshipKind = \"requires_context\" | \"optional_context\" | \"requires_lens\" | \"optional_lens\" | \"requires_skill\" | \"optional_skill\" | \"applies_to\";"
-      ],
-      "references": []
-    },
-    "public-asset-bindings.d.ts#NormalizedAssetBinding": {
-      "declarations": [
-        "export interface NormalizedAssetBinding { alias: string; target: string; version: string; entryIndex: number; evidence: AssetBindingLocation; relationships: AssetBindingRelationship[]; declarationValid: boolean; satisfaction: AssetBindingSatisfaction; }"
-      ],
-      "references": [
-        "public-asset-bindings.d.ts#AssetBindingLocation",
-        "public-asset-bindings.d.ts#AssetBindingRelationship",
-        "public-asset-bindings.d.ts#AssetBindingSatisfaction"
-      ]
-    },
-    "public-asset-bindings.d.ts#compareAssetBinding": {
-      "declarations": [
-        "export declare function compareAssetBinding(binding: Pick<NormalizedAssetBinding, \"target\" | \"version\" | \"relationships\">, candidates: readonly AssetBindingIdentity[]): AssetBindingSatisfaction;"
-      ],
-      "references": [
-        "public-asset-bindings.d.ts#AssetBindingIdentity",
-        "public-asset-bindings.d.ts#AssetBindingSatisfaction",
-        "public-asset-bindings.d.ts#NormalizedAssetBinding"
-      ]
-    },
     "public-asset-bindings.d.ts#inspectAssetBindings": {
       "declarations": [
         "export declare function inspectAssetBindings(files: readonly AssetBindingFile[]): AssetBindingReport;"
       ],
       "references": [
-        "public-asset-bindings.d.ts#AssetBindingFile",
-        "public-asset-bindings.d.ts#AssetBindingReport"
+        "types/asset-bindings.d.ts#AssetBindingFile",
+        "types/asset-bindings.d.ts#AssetBindingReport"
       ]
     },
     "public-discovery.d.ts#classifyAssetPath": {
@@ -774,6 +688,92 @@
         "export type ArtifactKind = \"skill\" | \"agent\" | \"context\" | \"context_lens\" | \"profile\" | \"reference\" | \"example\" | \"script\" | \"asset\" | \"config\" | \"unknown\";"
       ],
       "references": []
+    },
+    "types/asset-bindings.d.ts#AssetBindingDiagnostic": {
+      "declarations": [
+        "export interface AssetBindingDiagnostic { code: string; message: string; evidence: AssetBindingLocation; entryIndex?: number; phase: \"declaration\" | \"local-satisfaction\"; }"
+      ],
+      "references": ["types/asset-bindings.d.ts#AssetBindingLocation"]
+    },
+    "types/asset-bindings.d.ts#AssetBindingDocument": {
+      "declarations": [
+        "export interface AssetBindingDocument { identity: AssetBindingIdentity; relationships: AssetBindingRelationship[]; bindings: NormalizedAssetBinding[]; references: AssetBindingReference[]; diagnostics: AssetBindingDiagnostic[]; declarationValid: boolean; }"
+      ],
+      "references": [
+        "types/asset-bindings.d.ts#AssetBindingDiagnostic",
+        "types/asset-bindings.d.ts#AssetBindingIdentity",
+        "types/asset-bindings.d.ts#AssetBindingReference",
+        "types/asset-bindings.d.ts#AssetBindingRelationship",
+        "types/asset-bindings.d.ts#NormalizedAssetBinding"
+      ]
+    },
+    "types/asset-bindings.d.ts#AssetBindingFile": {
+      "declarations": [
+        "export interface AssetBindingFile { readonly path: string; readonly bytes: Uint8Array; }"
+      ],
+      "references": []
+    },
+    "types/asset-bindings.d.ts#AssetBindingIdentity": {
+      "declarations": [
+        "export interface AssetBindingIdentity { path: string; kind: string; id: string | null; version: string | null; evidence: AssetBindingLocation; idEvidence: AssetBindingLocation; versionEvidence: AssetBindingLocation; }"
+      ],
+      "references": ["types/asset-bindings.d.ts#AssetBindingLocation"]
+    },
+    "types/asset-bindings.d.ts#AssetBindingLocation": {
+      "declarations": [
+        "export interface AssetBindingLocation { path: string; sha256: string; start: number; end: number; startLine: number; endLine: number; raw: string; }"
+      ],
+      "references": []
+    },
+    "types/asset-bindings.d.ts#AssetBindingReference": {
+      "declarations": [
+        "export interface AssetBindingReference { alias: string; evidence: AssetBindingLocation; destination?: AssetBindingLocation; }"
+      ],
+      "references": ["types/asset-bindings.d.ts#AssetBindingLocation"]
+    },
+    "types/asset-bindings.d.ts#AssetBindingRelationship": {
+      "declarations": [
+        "export interface AssetBindingRelationship { relationship: BindingRelationshipKind; target: string; declarationIndex: number; targetKind: BindingAssetKind; sourceValid: boolean; evidence: AssetBindingLocation; }"
+      ],
+      "references": [
+        "types/asset-bindings.d.ts#AssetBindingLocation",
+        "types/asset-bindings.d.ts#BindingAssetKind",
+        "types/asset-bindings.d.ts#BindingRelationshipKind"
+      ]
+    },
+    "types/asset-bindings.d.ts#AssetBindingReport": {
+      "declarations": [
+        "export interface AssetBindingReport { schemaVersion: \"renma.asset-bindings.v1\"; offsetUnit: \"utf16-code-unit\"; documents: AssetBindingDocument[]; }"
+      ],
+      "references": ["types/asset-bindings.d.ts#AssetBindingDocument"]
+    },
+    "types/asset-bindings.d.ts#AssetBindingSatisfaction": {
+      "declarations": [
+        "export interface AssetBindingSatisfaction { status: \"matched\" | \"missing\" | \"ambiguous\" | \"kind-mismatch\" | \"target-version-invalid\" | \"version-mismatch\"; candidates: AssetBindingIdentity[]; }"
+      ],
+      "references": ["types/asset-bindings.d.ts#AssetBindingIdentity"]
+    },
+    "types/asset-bindings.d.ts#BindingAssetKind": {
+      "declarations": [
+        "export type BindingAssetKind = \"skill\" | \"context\" | \"context_lens\";"
+      ],
+      "references": []
+    },
+    "types/asset-bindings.d.ts#BindingRelationshipKind": {
+      "declarations": [
+        "export type BindingRelationshipKind = \"requires_context\" | \"optional_context\" | \"requires_lens\" | \"optional_lens\" | \"requires_skill\" | \"optional_skill\" | \"applies_to\";"
+      ],
+      "references": []
+    },
+    "types/asset-bindings.d.ts#NormalizedAssetBinding": {
+      "declarations": [
+        "export interface NormalizedAssetBinding { satisfied?: boolean; alias: string; target: string; version: string; entryIndex: number; evidence: AssetBindingLocation; relationships: AssetBindingRelationship[]; declarationValid: boolean; satisfaction: AssetBindingSatisfaction; }"
+      ],
+      "references": [
+        "types/asset-bindings.d.ts#AssetBindingLocation",
+        "types/asset-bindings.d.ts#AssetBindingRelationship",
+        "types/asset-bindings.d.ts#AssetBindingSatisfaction"
+      ]
     },
     "types/classification.d.ts#ASSET_CLASSIFICATION_REASON_CODES": {
       "declarations": [

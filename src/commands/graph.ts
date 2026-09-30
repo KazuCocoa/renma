@@ -1,3 +1,4 @@
+import type { AssetBindingDiagnostic } from "../types/asset-bindings.js";
 import { compareUtf16CodeUnits } from "../canonical-json.js";
 import path from "node:path";
 
@@ -33,6 +34,7 @@ import type {
   AssetStatus,
   Dependency,
   DependencyKind,
+  DependencyBinding,
 } from "../model.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatVersionedJsonDocument } from "../report.js";
@@ -100,6 +102,7 @@ export interface GraphReport {
 }
 
 export interface GraphNode {
+  releaseVersion?: string;
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -121,6 +124,8 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
+  bindings?: DependencyBinding[];
+  bindingDiagnostics?: AssetBindingDiagnostic[];
   from: string;
   to: string;
   kind: GraphEdgeKind;
@@ -357,6 +362,10 @@ function compositionGraphReport(
   const edges = composition.provenanceEdges.map((edge): GraphEdge => {
     const target = focusedProvenanceTarget(edge, nodes);
     return {
+      ...(edge.bindings ? { bindings: edge.bindings } : {}),
+      ...(edge.bindingDiagnostics
+        ? { bindingDiagnostics: edge.bindingDiagnostics }
+        : {}),
       from: edge.from,
       to: edge.declaredTarget,
       kind: edge.kind,
@@ -398,6 +407,10 @@ function impactGraphReport(
   const edges = impact.provenanceEdges.map((edge): GraphEdge => {
     const target = focusedProvenanceTarget(edge, nodes);
     return {
+      ...(edge.bindings ? { bindings: edge.bindings } : {}),
+      ...(edge.bindingDiagnostics
+        ? { bindingDiagnostics: edge.bindingDiagnostics }
+        : {}),
       from: edge.from,
       to: edge.declaredTarget,
       kind: edge.kind,
@@ -477,7 +490,7 @@ export function formatGraphMermaid(
       const target = nodeIds.get(edge.targetId);
       if (target) {
         lines.push(
-          `  ${source} -->|${escapeMermaidLabel(edge.kind)}| ${target}`,
+          `  ${source} -->|${escapeMermaidEdgeLabel(edge.kind + bindingLabel(edge))}| ${target}`,
         );
       }
       continue;
@@ -486,7 +499,7 @@ export function formatGraphMermaid(
     const missing = missingIds.get(edge.to);
     if (missing) {
       lines.push(
-        `  ${source} -.->|${escapeMermaidLabel(`${edge.kind} unresolved`)}| ${missing}`,
+        `  ${source} -.->|${escapeMermaidEdgeLabel(`${edge.kind} unresolved${bindingLabel(edge)}`)}| ${missing}`,
       );
     }
   }
@@ -546,7 +559,7 @@ function formatLayeredGraphMermaid(report: GraphReport): string {
       const target = nodeIds.get(edge.targetId);
       if (target) {
         lines.push(
-          `  ${source} -->|${escapeMermaidLabel(layeredEdgeLabel(edge, nodesById))}| ${target}`,
+          `  ${source} -->|${escapeMermaidEdgeLabel(layeredEdgeLabel(edge, nodesById) + bindingLabel(edge))}| ${target}`,
         );
       }
       continue;
@@ -555,7 +568,7 @@ function formatLayeredGraphMermaid(report: GraphReport): string {
     const missing = missingIds.get(edge.to);
     if (missing) {
       lines.push(
-        `  ${source} -.->|${escapeMermaidLabel(`${layeredEdgeLabel(edge, nodesById)} unresolved`)}| ${missing}`,
+        `  ${source} -.->|${escapeMermaidEdgeLabel(`${layeredEdgeLabel(edge, nodesById)} unresolved${bindingLabel(edge)}`)}| ${missing}`,
       );
     }
   }
@@ -603,7 +616,7 @@ export function formatGraphMarkdown(
   } else {
     for (const node of report.nodes) {
       lines.push(
-        `| ${node.id} | ${node.kind} | ${node.sourcePath} | ${formatOwnership(node.ownership)} | ${node.status ?? ""} | ${node.tags.join(", ")} |`,
+        `| ${tableText(node.id + (node.releaseVersion ? ` @${node.releaseVersion}` : ""))} | ${node.kind} | ${node.sourcePath} | ${formatOwnership(node.ownership)} | ${node.status ?? ""} | ${node.tags.join(", ")} |`,
       );
     }
   }
@@ -621,7 +634,7 @@ export function formatGraphMarkdown(
   } else {
     for (const edge of report.edges) {
       lines.push(
-        `| ${edge.from} | ${edge.kind} | ${edge.to} | ${edge.resolved ? "yes" : "no"} | ${edgeTarget(edge)} |`,
+        `| ${edge.from} | ${tableText(edge.kind + bindingLabel(edge))} | ${edge.to} | ${edge.resolved ? "yes" : "no"} | ${edgeTarget(edge)} |`,
       );
     }
   }
@@ -1014,6 +1027,12 @@ function formatCompositionMarkdown(report: GraphReport): string {
     `- Optional assets: ${composition.optionalAssets.length}`,
     `- Required complete: ${yesNo(composition.requiredComplete)}`,
     `- Optional complete: ${yesNo(composition.optionalComplete)}`,
+    ...(composition.bindingSatisfaction
+      ? [
+          `- Required bindings satisfied: ${yesNo(composition.bindingSatisfaction.requiredSatisfied)}`,
+          `- Optional bindings satisfied: ${yesNo(composition.bindingSatisfaction.optionalSatisfied)}`,
+        ]
+      : []),
     `- Cycle free: ${yesNo(composition.cycleFree)}`,
     "",
     "Declaration order does not define precedence or overriding. Optional membership records declared optional composition; Renma does not make a runtime selection.",
@@ -1044,7 +1063,7 @@ function formatCompositionMarkdown(report: GraphReport): string {
   } else {
     for (const edge of composition.provenanceEdges) {
       lines.push(
-        `| ${tableText(edge.from)} | ${edge.relationship} | ${edge.membership} | ${tableText(edge.to)} | ${tableText(edge.declaredTarget)} | ${tableText(evidenceLabel(edge.evidence, edge.sourcePath))} |`,
+        `| ${tableText(edge.from)} | ${tableText(edge.relationship + bindingLabel(edge))} | ${edge.membership} | ${tableText(edge.to)} | ${tableText(edge.declaredTarget)} | ${tableText(evidenceLabel(edge.evidence, edge.sourcePath))} |`,
       );
     }
   }
@@ -1102,7 +1121,7 @@ function formatCompositionMarkdown(report: GraphReport): string {
           : []),
       ];
       lines.push(
-        `- ${mismatch.membership}: ${mismatch.sourceId} ${mismatch.relationship} ${mismatch.declaredTarget}; ${kindProblems.join("; ")} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
+        `- ${mismatch.membership}: ${mismatch.sourceId} ${mismatch.relationship} ${mismatch.declaredTarget}${bindingLabel(mismatch)}; ${kindProblems.join("; ")} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
       );
     }
   }
@@ -1165,7 +1184,7 @@ function renderCompositionAssetTable(
           `${edge.from} (${edge.relationship}, ${edge.membership}, ${evidenceLabel(edge.evidence, edge.sourcePath)})`,
       );
     lines.push(
-      `| ${tableText(asset.id)} | ${asset.kind} | ${tableText(asset.sourcePath)} | ${yesNo(asset.direct === true)} | ${tableText(parents.join("; "))} |`,
+      `| ${tableText(asset.id + (asset.releaseVersion ? ` @${asset.releaseVersion}` : ""))} | ${asset.kind} | ${tableText(asset.sourcePath)} | ${yesNo(asset.direct === true)} | ${tableText(parents.join("; "))} |`,
     );
   }
 }
@@ -1182,7 +1201,7 @@ function renderResolutionIssues(
   }
   for (const issue of issues) {
     lines.push(
-      `- ${issue.sourceId} ${issue.relationship} ${issue.declaredTarget}${issue.resolutionReason ? ` [${issue.resolutionReason}${issue.candidatePaths ? `: ${issue.candidatePaths.join(", ")}` : ""}]` : ""} (${evidenceLabel(issue.evidence, issue.sourcePath)}).`,
+      `- ${issue.sourceId} ${issue.relationship} ${issue.declaredTarget}${bindingLabel(issue)}${issue.resolutionReason ? ` [${issue.resolutionReason}${issue.candidatePaths ? `: ${issue.candidatePaths.join(", ")}` : ""}]` : ""} (${evidenceLabel(issue.evidence, issue.sourcePath)}).`,
     );
   }
 }
@@ -1236,6 +1255,12 @@ function formatImpactMarkdown(report: GraphReport): string {
     `- Focus: ${impact.focus.id} (${impact.focus.kind}, ${impact.focus.sourcePath})`,
     `- Required declared dependents: ${impact.requiredDependents.length}`,
     `- Optional declared dependents: ${impact.optionalDependents.length}`,
+    ...(impact.bindingSatisfaction
+      ? [
+          `- Required bindings satisfied: ${yesNo(impact.bindingSatisfaction.requiredSatisfied)}`,
+          `- Optional bindings satisfied: ${yesNo(impact.bindingSatisfaction.optionalSatisfied)}`,
+        ]
+      : []),
     "",
     "This is declared repository impact, not runtime usage or breakage prediction.",
   ];
@@ -1269,7 +1294,7 @@ function formatImpactMarkdown(report: GraphReport): string {
   } else {
     for (const edge of impact.provenanceEdges) {
       lines.push(
-        `| ${tableText(edge.from)} | ${edge.relationship} | ${edge.dependentMembership} | ${tableText(edge.to)} | ${yesNo(edge.direct)} | ${tableText(edge.declaredTarget)} | ${tableText(evidenceLabel(edge.evidence, edge.sourcePath))} |`,
+        `| ${tableText(edge.from)} | ${tableText(edge.relationship + bindingLabel(edge))} | ${edge.dependentMembership} | ${tableText(edge.to)} | ${yesNo(edge.direct)} | ${tableText(edge.declaredTarget)} | ${tableText(evidenceLabel(edge.evidence, edge.sourcePath))} |`,
       );
     }
   }
@@ -1292,7 +1317,7 @@ function formatImpactMarkdown(report: GraphReport): string {
           : []),
       ];
       lines.push(
-        `- Invalid ${mismatch.relationship}: ${mismatch.sourceId} -> ${mismatch.resolvedTargetId}; ${kindProblems.join("; ")} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
+        `- Invalid ${mismatch.relationship}: ${mismatch.sourceId} -> ${mismatch.resolvedTargetId}${bindingLabel(mismatch)}; ${kindProblems.join("; ")} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
       );
     }
   }
@@ -1332,7 +1357,7 @@ function renderImpactAssetTable(
           `${edge.relationship} ${edge.to} (${edge.dependentMembership}; ${evidenceLabel(edge.evidence, edge.sourcePath)})`,
       );
     lines.push(
-      `| ${tableText(asset.id)} | ${asset.kind} | ${tableText(asset.sourcePath)} | ${yesNo(asset.direct)} | ${tableText(declarations.join("; "))} |`,
+      `| ${tableText(asset.id + (asset.releaseVersion ? ` @${asset.releaseVersion}` : ""))} | ${asset.kind} | ${tableText(asset.sourcePath)} | ${yesNo(asset.direct)} | ${tableText(declarations.join("; "))} |`,
     );
   }
 }
@@ -1347,7 +1372,7 @@ function formatImpactMermaid(report: GraphReport): string {
     nodeIds.set(node.sourcePath, id);
     const focus = node.sourcePath === impact.focus.sourcePath ? "focus " : "";
     lines.push(
-      `  ${id}["${escapeMermaidLabel(`${focus}${node.kind}: ${node.id}`)}"]`,
+      `  ${id}["${escapeMermaidLabel(`${focus}${node.kind}: ${node.id}${node.releaseVersion ? ` @${node.releaseVersion}` : ""}`)}"]`,
     );
   });
 
@@ -1359,7 +1384,7 @@ function formatImpactMermaid(report: GraphReport): string {
     if (!source || !target) continue;
     const arrow = edge.dependentMembership === "required" ? "-->" : "-.->";
     lines.push(
-      `  ${source} ${arrow}|${escapeMermaidLabel(`${edge.relationship} ${edge.dependentMembership}`)}| ${target}`,
+      `  ${source} ${arrow}|${escapeMermaidEdgeLabel(`${edge.relationship} ${edge.dependentMembership}${bindingLabel(edge)}`)}| ${target}`,
     );
   }
 
@@ -1375,7 +1400,7 @@ function formatImpactMermaid(report: GraphReport): string {
     const target = nodeIds.get(mismatch.resolvedTargetPath);
     if (target) {
       lines.push(
-        `  ${source} -.->|${escapeMermaidLabel(`${mismatch.relationship} invalid kind`)}| ${target}`,
+        `  ${source} -.->|${escapeMermaidEdgeLabel(`${mismatch.relationship} invalid kind${bindingLabel(mismatch)}`)}| ${target}`,
       );
     }
   });
@@ -1401,7 +1426,7 @@ function formatCompositionMermaid(report: GraphReport): string {
     nodeIds.set(node.sourcePath, id);
     const root = node.sourcePath === composition.root.sourcePath ? "root " : "";
     lines.push(
-      `  ${id}["${escapeMermaidLabel(`${root}${node.kind}: ${node.id}`)}"]`,
+      `  ${id}["${escapeMermaidLabel(`${root}${node.kind}: ${node.id}${node.releaseVersion ? ` @${node.releaseVersion}` : ""}`)}"]`,
     );
   });
 
@@ -1419,7 +1444,7 @@ function formatCompositionMermaid(report: GraphReport): string {
     const arrow = edge.membership === "required" ? "-->" : "-.->";
     const cycle = cycleEdges.has(compositionEdgeKey(edge)) ? " cycle" : "";
     lines.push(
-      `  ${source} ${arrow}|${escapeMermaidLabel(`${edge.relationship} ${edge.membership}${cycle}`)}| ${target}`,
+      `  ${source} ${arrow}|${escapeMermaidEdgeLabel(`${edge.relationship} ${edge.membership}${cycle}${bindingLabel(edge)}`)}| ${target}`,
     );
   }
 
@@ -1436,7 +1461,7 @@ function formatCompositionMermaid(report: GraphReport): string {
     if (source) {
       const arrow = issue.membership === "required" ? "-->" : "-.->";
       lines.push(
-        `  ${source} ${arrow}|${escapeMermaidLabel(`${issue.relationship} ${issue.membership} unresolved`)}| ${missing}`,
+        `  ${source} ${arrow}|${escapeMermaidEdgeLabel(`${issue.relationship} ${issue.membership} unresolved${bindingLabel(issue)}`)}| ${missing}`,
       );
     }
   });
@@ -1452,7 +1477,7 @@ function formatCompositionMermaid(report: GraphReport): string {
     if (source) {
       const arrow = mismatch.membership === "required" ? "-->" : "-.->";
       lines.push(
-        `  ${source} ${arrow}|${escapeMermaidLabel(`${mismatch.relationship} invalid kind`)}| ${wrong}`,
+        `  ${source} ${arrow}|${escapeMermaidEdgeLabel(`${mismatch.relationship} invalid kind${bindingLabel(mismatch)}`)}| ${wrong}`,
       );
     }
   });
@@ -1556,7 +1581,7 @@ function nodeLabel(node: GraphNode): string {
     return `${node.id} (${node.groupedCount})`;
   }
   const status = node.status ? ` (${node.status})` : "";
-  return `${node.kind}: ${node.id}${status}`;
+  return `${node.kind}: ${node.id}${node.releaseVersion ? ` @${node.releaseVersion}` : ""}${status}`;
 }
 
 function defaultGraphView(format: GraphFormat): GraphView {
@@ -1625,10 +1650,19 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
       });
     }
 
-    if (from === to) continue;
-    const key = `${from}\0${edge.kind}\0${to}\0${edge.resolved ? "1" : "0"}`;
+    if (
+      from === to &&
+      !edge.bindings?.length &&
+      !edge.bindingDiagnostics?.length
+    )
+      continue;
+    const key = `${from}\0${edge.kind}\0${to}\0${edge.resolved ? "1" : "0"}${edge.bindings?.length || edge.bindingDiagnostics?.length ? JSON.stringify([edge.sourcePath, edge.declaration, edge.declarationIndex, edge.to]) : ""}`;
     if (!edgeMap.has(key)) {
       edgeMap.set(key, {
+        ...(edge.bindings ? { bindings: edge.bindings } : {}),
+        ...(edge.bindingDiagnostics
+          ? { bindingDiagnostics: edge.bindingDiagnostics }
+          : {}),
         from,
         to,
         kind: edge.kind,
@@ -1703,7 +1737,7 @@ function layeredNodeLabel(node: GraphNode): string {
         ? "context"
         : node.kind;
   const status = node.status ? ` (${node.status})` : "";
-  return `${kind}: ${node.id}${status}`;
+  return `${kind}: ${node.id}${node.releaseVersion ? ` @${node.releaseVersion}` : ""}${status}`;
 }
 
 function layeredEdgeLabel(
@@ -1824,12 +1858,19 @@ function escapeMermaidLabel(label: string): string {
   return singleLine(label).replace(/"/g, '\\"');
 }
 
+/** Bound edge labels need quotes because annotations contain square brackets. */
+function escapeMermaidEdgeLabel(label: string): string {
+  if (!label.includes("[")) return escapeMermaidLabel(label);
+  return `"${singleLine(label).replace(/"/g, "#quot;").replace(/\|/g, "#124;")}"`;
+}
+
 function singleLine(value: string): string {
   return value.replace(/\r?\n/g, " ");
 }
 
 function toNode(asset: Asset): GraphNode {
   return {
+    ...(asset.releaseVersion ? { releaseVersion: asset.releaseVersion } : {}),
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
@@ -1872,6 +1913,10 @@ function formatOwnership(ownership: AssetOwnership): string {
 function toEdge(dependency: Dependency, assets: Asset[]): GraphEdge {
   const target = resolveDependencyTarget(dependency, assets);
   return {
+    ...(dependency.bindings ? { bindings: dependency.bindings } : {}),
+    ...(dependency.bindingDiagnostics
+      ? { bindingDiagnostics: dependency.bindingDiagnostics }
+      : {}),
     from: dependency.from,
     to: dependency.to,
     kind: dependency.kind,
@@ -1921,4 +1966,22 @@ function stableDependencies(dependencies: Dependency[]): Dependency[] {
     if (byPath !== 0) return byPath;
     return (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1);
   });
+}
+
+/** Compact review label; unbound declarations retain their existing presentation. */
+function bindingLabel(edge: {
+  bindings?: DependencyBinding[];
+  bindingDiagnostics?: AssetBindingDiagnostic[];
+}): string {
+  return (
+    (edge.bindings
+      ?.map(
+        (binding) =>
+          ` [${binding.alias} @${binding.version}: ${binding.satisfied ? "matched" : `${binding.declarationValid ? "" : "invalid declaration; "}${binding.satisfaction.status}`}]`,
+      )
+      .join("") ?? "") +
+    (!edge.bindings?.length && edge.bindingDiagnostics?.length
+      ? " [invalid binding declaration]"
+      : "")
+  );
 }

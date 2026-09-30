@@ -1,3 +1,7 @@
+import type {
+  NormalizedAssetBinding,
+  AssetBindingDiagnostic,
+} from "./types/asset-bindings.js";
 import type { ArtifactKind } from "./types/artifact.js";
 import type { AssetOwnership } from "./types/governance.js";
 import type { Evidence } from "./types/diagnostics.js";
@@ -68,6 +72,8 @@ export interface AssetMetadata {
 
 /** Repository object Renma can catalog, validate, reference, or report on. */
 export interface Asset {
+  /** Explicit release identity; Lens format version is excluded. */
+  releaseVersion?: string;
   id: string;
   kind: AssetKind;
   sourcePath: string;
@@ -103,7 +109,16 @@ export interface SupportAsset extends Asset {
 /** Backwards-compatible catalog entry name for callers already using catalog output. */
 export type CatalogEntry = Skill | SupportAsset;
 
+/** Binding annotations never introduce dependency edges. */
+export interface DependencyBinding extends NormalizedAssetBinding {
+  satisfied: boolean;
+  diagnostics: AssetBindingDiagnostic[];
+}
+
 export interface Dependency {
+  bindings?: DependencyBinding[];
+  /** Declaration failures, including fields that cannot yield normalized entries. */
+  bindingDiagnostics?: AssetBindingDiagnostic[];
   /** Asset ID declaring the relationship. */
   from: string;
   /** Asset ID or declared target named by the relationship. */

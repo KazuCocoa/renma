@@ -1,3 +1,5 @@
+import { analyzeAssetBindings } from "./asset-binding-analysis.js";
+import type { AssetBindingReport } from "./types/asset-bindings.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import { conflictDiagnostics } from "./catalog-conflicts.js";
@@ -153,6 +155,7 @@ export function buildCatalog(
   incompleteSupportDirectories: ReadonlySet<string> = new Set(),
 ): {
   catalog: Catalog;
+  assetBindings: AssetBindingReport;
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
@@ -266,14 +269,9 @@ export function buildCatalog(
   diagnostics.push(...lifecycleDiagnostics(entries));
   diagnostics.push(...conflictDiagnostics(entries));
 
-  return {
-    catalog: {
-      entries,
-      assets: entries,
-      dependencies,
-    },
-    diagnostics,
-  };
+  const catalog: Catalog = { entries, assets: entries, dependencies };
+  const assetBindings = analyzeAssetBindings(documents, catalog);
+  return { catalog, assetBindings, diagnostics };
 }
 
 function resolveAssetOwnership(
