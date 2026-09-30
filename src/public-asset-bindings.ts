@@ -760,10 +760,14 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
         const value = attribute[2] ?? attribute[3] ?? attribute[4] ?? "";
         // Attribute mode applies HTML's semicolon and ambiguous-ampersand rules;
         // Markdown string decoding would also (incorrectly) unescape backslashes.
+        // Apply URL input preprocessing only to the interpreted value. Original
+        // source evidence and offsets must retain every character unchanged.
+        const urlInput = decodeHTMLAttribute(value)
+          .replace(/[\t\n\r]/gu, "")
+          .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/gu, "");
         // U+2010 is the HTML &hyphen; lookalike: reject it as unsupported,
         // without normalizing it into an accepted or rewritable asset scheme.
-        if (/^renma[-\u2010]asset:/iu.test(decodeHTMLAttribute(value)))
-          found = true;
+        if (/^renma[-\u2010]asset:/iu.test(urlInput)) found = true;
       }
     }
     return found;

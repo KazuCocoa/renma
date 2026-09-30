@@ -84,7 +84,10 @@ Only the destination span is offered for rewriting. Renma does not modify files.
 
 Images, reference-style links/definitions, autolinks and HTML attributes using
 the reserved scheme are unsupported and diagnosed. HTML `href` and `src`
-values are checked after HTML attribute character-reference decoding. The
+values are checked after HTML attribute character-reference decoding and URL
+input preprocessing: ASCII tab, LF and CR are removed wherever they occur, and
+leading/trailing C0 controls (U+0000–U+001F) and spaces (U+0020) are trimmed.
+This interpretation never changes the original-source evidence or offsets. The
 Unicode hyphen lookalike `renma‐asset:` (including `&hyphen;`) is also diagnosed
 as unsupported; it is not normalized into a valid asset scheme. HTML comments,
 ordinary text, unrelated attributes and raw-text element contents are excluded.
