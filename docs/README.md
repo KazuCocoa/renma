@@ -108,7 +108,8 @@ source-repository-only and intentionally excluded from the npm package.
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
   [Skill Discovery](skill-discovery.md).
-- [Versioned Skill Bindings Design](development/versioned-skill-bindings.md)
+- [Version-pinned Asset References and Builder API](asset-bindings.md)
+- [Versioned Asset Bindings Design](development/versioned-skill-bindings.md)
   specifies proposed metadata and reference contracts for external plugin
   builders; it is not implemented or part of the current public API.
 - [Release Publication Security](development/release-security.md) documents the

@@ -77,19 +77,14 @@ release preparation. It is not a new refactoring phase. The candidates below
 remain unassigned and do not enter 1.0 merely because stabilization is
 complete.
 
-## Designed Extension: Versioned Skill Bindings
+## Implemented Extension: Versioned Asset Bindings
 
-The [Versioned Skill Bindings design](versioned-skill-bindings.md) specifies
-an opt-in extension for a separate plugin builder for Renma. It reuses current
-Skill IDs, versions, and required/optional declarations, adding exact-version
-bindings and machine-identifiable body references. Renma's scope is static
-validation and a reviewed read-only consumer contract. Source acquisition,
-lockfiles, packaging, and host-specific rewriting remain external.
-
-Design is recorded; implementation and release assignment remain pending.
-This does not enter the completed 1.0 stabilization baseline or change shipped
-metadata/API contracts. The design lists implementation stages, compatibility
-requirements, and acceptance scenarios.
+[Asset bindings](../asset-bindings.md) now provide exact-version annotations,
+structural body references and a read-only snapshot API for Skills, Contexts and
+Lenses. The API has its own v1 schema and public export; existing scan and
+composition contracts remain unchanged. Release assignment remains pending.
+Acquisition, transitive selection, lockfiles, bundling, reference rewriting and
+Plugin generation remain external builder responsibilities.
 
 ## Open Core Candidates
 

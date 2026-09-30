@@ -1514,3 +1514,32 @@ dependencies remain valid. Suspended/revoked required targets yield errors and
 optional targets warnings; deprecated/archived optional targets retain inactive
 dependency warnings. See [Declared Composition](declared-composition.md) for
 ambiguous-target evidence and propagation.
+
+## Asset-binding API diagnostics
+
+The separate [asset-binding report](asset-bindings.md) contains diagnostics with
+original source evidence and an optional binding `entryIndex`. These are not
+scan Findings and do not alter existing severities or exit thresholds.
+`phase: declaration` contributes to `declarationValid`; `local-satisfaction`
+reports availability in this supplied snapshot independently.
+
+| Code | Meaning |
+| --- | --- |
+| `RN-BINDING-MALFORMED` | Invalid JSON/YAML, duplicate keys, field shape or entry values |
+| `RN-BINDING-SOURCE-IDENTITY` | Source lacks an explicit stable ID or release version |
+| `RN-BINDING-DUPLICATE` | Alias or target occurs in multiple bindings |
+| `RN-BINDING-UNDECLARED-TARGET` | Target is not named by an existing composition declaration |
+| `RN-BINDING-SOURCE-KIND` | Relationship is invalid for the source kind |
+| `RN-BINDING-UNDECLARED-ALIAS` | Body link has no unique declared binding |
+| `RN-BINDING-UNSUPPORTED-REFERENCE` | Reserved scheme occurs in an unsupported Markdown/HTML link form |
+| `RN-BINDING-METADATA` | Existing operational metadata or Agent Skills validation failed |
+| `RN-BINDING-MISSING` | No target identity exists in the supplied snapshot |
+| `RN-BINDING-AMBIGUOUS` | Multiple target identities exist; version cannot select one |
+| `RN-BINDING-KIND-MISMATCH` | Candidate kind differs from the declaration's target kind |
+| `RN-BINDING-TARGET-VERSION-INVALID` | Candidate lacks a usable release version |
+| `RN-BINDING-VERSION-MISMATCH` | Candidate release differs from the exact pin |
+
+Inspect candidate identity/version evidence in the binding's `satisfaction`
+record. Fix declaration errors in the original source. To satisfy a historical
+pin, the external builder supplies a separately acquired snapshot to the public
+comparison helper; this does not clear local mismatches in the original report.

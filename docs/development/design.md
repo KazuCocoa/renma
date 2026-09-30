@@ -335,9 +335,8 @@ provenance, lifecycle and reverse-impact rules. Declarations remain optional
 portable metadata; completeness policy and runtime observation are separate
 future work. See [Declared Composition](../declared-composition.md).
 
-The [Versioned Skill Bindings design](versioned-skill-bindings.md) extends this
-boundary with proposed exact-version annotations and explicit body references
-for external builders. Renma would validate declarations and local evidence;
-an external plugin builder would own acquisition, lockfiles, bundling, and
-reference transformation. This extension is not implemented and does not make
-Renma a package resolver or change current composition semantics.
+[Versioned Asset Bindings](../asset-bindings.md) adds exact release annotations
+and explicit body references for Skills, Contexts and Lenses through a separate
+read-only builder API. Renma validates declarations and local source evidence;
+external builders own acquisition, lockfiles, bundling and rewriting. Lens format
+versions remain separate from release versions. Composition semantics do not change.

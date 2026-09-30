@@ -455,6 +455,7 @@ prompt assembly, injection, execution, telemetry, or a trust score.
 - [Security Policy Guide](docs/security-policy.md)
 - [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
 - [Declared Composition](docs/declared-composition.md)
+- [Version-pinned Asset References and Builder API](docs/asset-bindings.md)
 - [Declared Impact](docs/declared-impact.md)
 - [Skill Discovery](docs/skill-discovery.md)
 - [Repository Context BOM v3](docs/repository-context-bom.md)

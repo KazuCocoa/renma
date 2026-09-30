@@ -50,6 +50,11 @@
       "types": "./dist/public-discovery.d.ts",
       "import": "./dist/public-discovery.js",
       "default": "./dist/public-discovery.js"
+    },
+    "./asset-bindings": {
+      "types": "./dist/public-asset-bindings.d.ts",
+      "import": "./dist/public-asset-bindings.js",
+      "default": "./dist/public-asset-bindings.js"
     }
   },
   "files": [

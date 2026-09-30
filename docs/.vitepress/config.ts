@@ -83,6 +83,7 @@ export default defineConfig({
           },
           { text: "Context Lens", link: "/context-lens" },
           { text: "Declared Composition", link: "/declared-composition" },
+          { text: "Asset Bindings", link: "/asset-bindings" },
           { text: "Declared Impact", link: "/declared-impact" },
           { text: "Skill Discovery", link: "/skill-discovery" },
           {

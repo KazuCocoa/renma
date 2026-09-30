@@ -6,6 +6,7 @@ import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import {
   AGENT_SKILLS_TOP_LEVEL_FIELDS,
+  ASSET_BINDING_METADATA_DEFINITIONS,
   CANONICAL_SKILL_METADATA_KEYS,
   CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
   NON_SKILL_AUXILIARY_METADATA_DEFINITIONS,
@@ -155,6 +156,7 @@ test("authoritative metadata table exactly covers operational registries", () =>
     documentedNonSkillKeys,
     sorted([
       ...Object.values(NON_SKILL_CATALOG_METADATA_KEYS),
+      ...ASSET_BINDING_METADATA_DEFINITIONS.map((d) => d.nonSkillKey),
       ...SECURITY_METADATA_FIELD_DEFINITIONS.map(
         (definition) => definition.nonSkillKey,
       ),
@@ -356,6 +358,7 @@ function assertPortableAgentSkillsTable(markdown: string): void {
 
 function expectedOperationalMappings(): ExpectedMetadataMapping[] {
   return [
+    ...ASSET_BINDING_METADATA_DEFINITIONS,
     ...RENMA_CATALOG_METADATA_DEFINITIONS.map((definition) => ({
       ...("skillKey" in definition ? { skillKey: definition.skillKey } : {}),
       ...("nonSkillKey" in definition

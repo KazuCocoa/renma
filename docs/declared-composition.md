@@ -198,3 +198,14 @@ A uniquely resolved Skill path retains that file throughout traversal, membershi
 cycle detection, freshness, and lifecycle checks, even when another Skill has the
 same declared ID. Declarations from the other file are not traversed. Public IDs
 remain unchanged; existing source paths and declaration evidence identify files.
+
+## Exact release annotations
+
+[Asset bindings](asset-bindings.md) annotate existing relationships with an
+alias and exact release version. Skills use `metadata.renma.asset-bindings` as
+a JSON-array string; Contexts and Lenses use native top-level `asset_bindings`.
+Lens `release_version` is distinct from its existing format `version`.
+`[label](renma-asset:alias)` provides an explicit local binding reference.
+The dedicated builder API reports declaration validity and local version
+satisfaction separately; existing composition, scan and Discovery behavior
+remain unchanged. Acquisition, packaging and rewriting are external.

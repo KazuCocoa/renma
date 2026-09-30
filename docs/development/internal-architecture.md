@@ -1370,7 +1370,7 @@ parsing-stage context language diagnostics. `src/security-command/index.ts` and
 
 The package publishes the compiled `dist` tree for the executable, but its
 explicit `exports` allowlist exposes only `renma/types`, the focused
-`renma/types/*` modules, and `renma/discovery` (plus `package.json`). Commands,
+`renma/types/*` modules, `renma/discovery`, and `renma/asset-bindings` (plus `package.json`). Commands,
 renderers, guide builders, and migration helpers remain CLI implementation
 details: their workflows and result DTOs are not stable v1 library contracts.
 Every `renma/dist/...` package specifier and every removed semantic command,

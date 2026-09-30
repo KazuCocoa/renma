@@ -228,3 +228,11 @@ may carry `resolutionReason` and `candidatePaths`. Existing graph dependency
 kinds, BOM v3 fields, Trust Graph v2 edge types, and diff/CI edge kinds are reused;
 no public schema identifier or published JSON Schema enum changes. Existing
 goldens remain valid. Consumers of relationship strings must preserve new values.
+
+## Library-only asset-binding snapshot report
+
+`renma/asset-bindings` exports the independent `renma.asset-bindings.v1`
+contract. It is not a CLI report family and does not alter the frozen command
+schema registry above. See the [builder API](asset-bindings.md) and its
+[JSON Schema](schemas/asset-bindings-v1.schema.json). Public API snapshots,
+package import checks and schema validation cover this additive export.

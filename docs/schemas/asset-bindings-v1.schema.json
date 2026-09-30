@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kazucocoa.github.io/renma/schemas/asset-bindings-v1.schema.json",
+  "title": "Renma Asset Bindings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "offsetUnit", "documents"],
+  "properties": {
+    "schemaVersion": {
+      "const": "renma.asset-bindings.v1"
+    },
+    "offsetUnit": {
+      "const": "utf16-code-unit"
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/document"
+      }
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "start",
+        "end",
+        "startLine",
+        "endLine",
+        "raw"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "raw": {
+          "type": "string"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "kind",
+        "id",
+        "version",
+        "evidence",
+        "idEvidence",
+        "versionEvidence"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "id": {
+          "type": ["string", "null"]
+        },
+        "version": {
+          "type": ["string", "null"]
+        },
+        "evidence": {
+          "$ref": "#/$defs/location"
+        },
+        "idEvidence": {
+          "$ref": "#/$defs/location"
+        },
+        "versionEvidence": {
+          "$ref": "#/$defs/location"
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationship",
+        "target",
+        "declarationIndex",
+        "targetKind",
+        "sourceValid",
+        "evidence"
+      ],
+      "properties": {
+        "relationship": {
+          "enum": [
+            "requires_context",
+            "optional_context",
+            "requires_lens",
+            "optional_lens",
+            "requires_skill",
+            "optional_skill",
+            "applies_to"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "declarationIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "targetKind": {
+          "enum": ["skill", "context", "context_lens"]
+        },
+        "sourceValid": {
+          "type": "boolean"
+        },
+        "evidence": {
+          "$ref": "#/$defs/location"
+        }
+      }
+    },
+    "satisfaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "candidates"],
+      "properties": {
+        "status": {
+          "enum": [
+            "matched",
+            "missing",
+            "ambiguous",
+            "kind-mismatch",
+            "target-version-invalid",
+            "version-mismatch"
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identity"
+          }
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alias",
+        "target",
+        "version",
+        "entryIndex",
+        "evidence",
+        "relationships",
+        "declarationValid",
+        "satisfaction"
+      ],
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "entryIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence": {
+          "$ref": "#/$defs/location"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          }
+        },
+        "declarationValid": {
+          "type": "boolean"
+        },
+        "satisfaction": {
+          "$ref": "#/$defs/satisfaction"
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "evidence"],
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/location"
+        },
+        "destination": {
+          "$ref": "#/$defs/location"
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "evidence", "phase"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/location"
+        },
+        "entryIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase": {
+          "enum": ["declaration", "local-satisfaction"]
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "relationships",
+        "bindings",
+        "references",
+        "diagnostics",
+        "declarationValid"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        },
+        "declarationValid": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

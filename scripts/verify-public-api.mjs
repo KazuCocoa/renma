@@ -18,6 +18,7 @@ import {
 
 const SNAPSHOT_PATH = "test/fixtures/public-types-api.snapshot.json";
 const SUPPORTED_ENTRYPOINTS = new Map([
+  ["renma/asset-bindings", "dist/public-asset-bindings.d.ts"],
   ["renma/types", "dist/public-types.d.ts"],
   ["renma/types/classification", "dist/types/classification.d.ts"],
   ["renma/types/diagnostics", "dist/types/diagnostics.d.ts"],
