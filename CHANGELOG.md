@@ -17,6 +17,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Source acquisition, Git revision resolution, lockfiles, bundling and plugin
   generation remain external builder responsibilities.
 
+### Fixed
+
+- Avoid repeated full-source scans during catalog binding analysis. Reuse each
+  document's original line offsets and hash, and generate reference evidence
+  only for reserved asset destinations. Unbound documents retain their existing
+  validation and report behavior without quadratic location-processing cost.
+
 ## [0.39.2] - 2026-09-20
 
 ### Fixed

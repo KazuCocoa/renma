@@ -999,6 +999,14 @@ without parsing metadata or calling the public wrapper. Snapshot target resoluti
 and traversal retain their existing rules. Optional binding-satisfaction summaries
 are separate from snapshot completeness and never prove a requested release closure.
 
+Binding evidence builds original line offsets once per document and analysis,
+reuses the supplied byte hash (or computes one fallback hash), and locates lines
+by binary search. Ordinary Markdown nodes do not allocate reference evidence;
+HTML projection runs only when the parser-owned tree contains HTML nodes.
+This preserves original offsets and existing HTML validation while avoiding
+full-source rescans for each node. The source indexes expire after the analysis,
+so another snapshot cannot reuse stale cached offsets or hashes.
+
 The public one-off wrapper prepares a `DeclaredCompositionIndex` and resolves
 one root. Scan prepares that forward-only index once and reuses its asset-ID,
 normalized-path, sorted-asset, and dependency-by-source lookups for every root.

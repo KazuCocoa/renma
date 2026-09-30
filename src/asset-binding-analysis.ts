@@ -95,7 +95,9 @@ export function analyzeAssetBindings(
     declarations.push(dependency);
     declarationsByPath.set(dependency.sourcePath, declarations);
   }
-  const identities = documents.map((document) => {
+  const sourceLocations = documents.map(createBindingLocations);
+  const identities = documents.map((document, index) => {
+    const locations = sourceLocations[index]!;
     const entry = assetsByPath.get(document.artifact.path);
     const fm = ensureYamlFrontmatterForDocument(document);
     const skill = document.artifact.kind === "skill";
@@ -129,9 +131,9 @@ export function analyzeAssetBindings(
       kind: document.artifact.kind,
       id,
       version,
-      evidence: location(document, 0, document.artifact.content.length),
-      idEvidence: fieldLocation(document, idFields[0]),
-      versionEvidence: fieldLocation(document, versionFields[0]),
+      evidence: locations.location(0, document.artifact.content.length),
+      idEvidence: locations.fieldLocation(idFields[0]),
+      versionEvidence: locations.fieldLocation(versionFields[0]),
     } satisfies AssetBindingIdentity;
   });
   const result: AssetBindingReport = {
@@ -141,6 +143,7 @@ export function analyzeAssetBindings(
   };
   for (const [index, document] of documents.entries()) {
     const identity = identities[index]!;
+    const locations = sourceLocations[index]!;
     const fm = ensureYamlFrontmatterForDocument(document);
     const skill = identity.kind === "skill";
     const fieldKey = skill
@@ -168,8 +171,7 @@ export function analyzeAssetBindings(
             : relationship === "applies_to"
               ? identity.kind === "context_lens"
               : true),
-        evidence: lineLocation(
-          document,
+        evidence: locations.lineLocation(
           edge.evidence?.startLine ?? 1,
           edge.evidence?.endLine ?? 1,
         ),
@@ -207,9 +209,9 @@ export function analyzeAssetBindings(
       issue(
         "RN-BINDING-MALFORMED",
         `Use ${fieldKey} in the document's canonical metadata location.`,
-        fieldLocation(document, misplaced),
+        locations.fieldLocation(misplaced),
       );
-    const bindingEvidence = fieldLocation(document, fields[0]);
+    const bindingEvidence = locations.fieldLocation(fields[0]);
     if (
       document.artifact.markdownParserEligible &&
       fm.present &&
@@ -372,15 +374,14 @@ export function analyzeAssetBindings(
           binding.entryIndex,
         );
     }
-    inspectReferences(document, item, issue);
+    inspectReferences(document, item, issue, locations);
     // A target may be inspected alone in an acquired snapshot. Retain its
     // declaration diagnostics even without bindings or incoming local edges.
     for (const diagnostic of parseAssetMetadata(document).diagnostics)
       issue(
         "RN-BINDING-METADATA",
         diagnostic.message,
-        lineLocation(
-          document,
+        locations.lineLocation(
           diagnostic.evidence?.startLine ?? 1,
           diagnostic.evidence?.endLine ?? 1,
         ),
@@ -392,8 +393,7 @@ export function analyzeAssetBindings(
         issue(
           "RN-BINDING-METADATA",
           diagnostic.message,
-          lineLocation(
-            document,
+          locations.lineLocation(
             diagnostic.startLine ?? 1,
             diagnostic.endLine ?? 1,
           ),
@@ -405,8 +405,7 @@ export function analyzeAssetBindings(
         issue(
           "RN-BINDING-METADATA",
           diagnostic.message,
-          lineLocation(
-            document,
+          locations.lineLocation(
             diagnostic.evidence?.startLine ?? 1,
             diagnostic.evidence?.endLine ?? 1,
           ),
@@ -494,44 +493,37 @@ function lineStarts(content: string): number[] {
   }
   return starts;
 }
-function location(
-  document: ParsedDocument,
-  start: number,
-  end: number,
-): AssetBindingLocation {
+/** One source index per document and analysis; offsets always address original text. */
+function createBindingLocations(document: ParsedDocument) {
   const content = document.artifact.content;
   const starts = lineStarts(content);
-  const line = (offset: number) =>
-    starts.filter((start) => start <= offset).length;
-  return {
+  let sha256 = document.artifact.contentHash;
+  const line = (offset: number): number => {
+    let low = 0;
+    let high = starts.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (starts[middle]! <= offset) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  };
+  const location = (start: number, end: number): AssetBindingLocation => ({
     path: document.artifact.path,
-    sha256:
-      document.artifact.contentHash ??
-      createHash("sha256").update(document.artifact.content).digest("hex"),
+    sha256: (sha256 ??= createHash("sha256").update(content).digest("hex")),
     start,
     end,
     startLine: line(start),
     endLine: line(Math.max(start, end - 1)),
     raw: content.slice(start, end),
-  };
-}
-function lineLocation(
-  document: ParsedDocument,
-  start: number,
-  end: number,
-): AssetBindingLocation {
-  const starts = lineStarts(document.artifact.content);
-  return location(
-    document,
-    starts[start - 1] ?? 0,
-    starts[end] ?? document.artifact.content.length,
-  );
-}
-function fieldLocation(
-  document: ParsedDocument,
-  field: YamlFrontmatterField | undefined,
-): AssetBindingLocation {
-  return lineLocation(document, field?.startLine ?? 1, field?.endLine ?? 1);
+  });
+  const lineLocation = (start: number, end: number): AssetBindingLocation =>
+    location(starts[start - 1] ?? 0, starts[end] ?? content.length);
+  const fieldLocation = (
+    field: YamlFrontmatterField | undefined,
+  ): AssetBindingLocation =>
+    lineLocation(field?.startLine ?? 1, field?.endLine ?? 1);
+  return { location, lineLocation, fieldLocation, starts };
 }
 function inspectReferences(
   document: ParsedDocument,
@@ -541,6 +533,7 @@ function inspectReferences(
     message: string,
     evidence: AssetBindingLocation,
   ) => void,
+  locations: ReturnType<typeof createBindingLocations>,
 ): void {
   if (!document.artifact.markdownParserEligible) return;
   // Reuse the parser-owned tree. Its body normalizes line endings, so map
@@ -548,7 +541,7 @@ function inspectReferences(
   const syntax = ensureMarkdownSyntaxForDocument(document);
   if (!syntax) return;
   const root = syntax.root;
-  const starts = lineStarts(document.artifact.content);
+  const starts = locations.starts;
   // fromMarkdown consumes an initial BOM in its body input, even when that
   // body follows frontmatter. Restore its original first-line column offset.
   const bodyBom = syntax.sourceLines[syntax.bodyStartLine - 1]?.startsWith(
@@ -567,6 +560,7 @@ function inspectReferences(
         (point.line === 1 ? bodyBom : 0)
       : 0;
   const definitions = new Map<string, string>();
+  let hasHtml = false;
   const walk = (
     node: Nodes,
     fn: (node: Nodes, blockquoteDepth: number) => void,
@@ -578,17 +572,14 @@ function inspectReferences(
         walk(child, fn, blockquoteDepth + (node.type === "blockquote" ? 1 : 0));
   };
   walk(root, (node) => {
+    if (node.type === "html") hasHtml = true;
     if (node.type === "definition" && !definitions.has(node.identifier))
       definitions.set(node.identifier, node.url);
   });
-  const unsupportedHtmlNodes = findHtmlAssetReferenceNodes(
-    document.artifact.content,
-    root,
-  );
+  const unsupportedHtmlNodes = hasHtml
+    ? findHtmlAssetReferenceNodes(document.artifact.content, root)
+    : new Set<Nodes>();
   walk(root, (node, blockquoteDepth) => {
-    const start = originalOffset(node.position?.start),
-      end = originalOffset(node.position?.end);
-    const evidence = location(document, start, end);
     const url =
       "url" in node
         ? node.url
@@ -600,11 +591,17 @@ function inspectReferences(
         issue(
           "RN-BINDING-UNSUPPORTED-REFERENCE",
           "HTML asset references are unsupported.",
-          evidence,
+          locations.location(
+            originalOffset(node.position?.start),
+            originalOffset(node.position?.end),
+          ),
         );
       return;
     }
     if (!url || !/^renma-asset:/iu.test(url)) return;
+    const start = originalOffset(node.position?.start),
+      end = originalOffset(node.position?.end);
+    const evidence = locations.location(start, end);
     const alias = url.slice("renma-asset:".length);
     const reference: AssetBindingReference = { alias, evidence };
     item.references.push(reference);
@@ -648,8 +645,7 @@ function inspectReferences(
       return;
     }
     const destinationStart = destinationOffset + match[0].lastIndexOf(url);
-    reference.destination = location(
-      document,
+    reference.destination = locations.location(
       destinationStart,
       destinationStart + url.length,
     );
