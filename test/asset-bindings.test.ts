@@ -148,8 +148,18 @@ test("missing, ambiguous, kind and version failures never select by pin", () => 
   );
   const b = skill("b", undefined, [], "", "1.0.0");
   const duplicate = context("skill.b", "2.0.0");
-  const ambiguous = source([a, b, duplicate]).bindings[0]!.satisfaction;
+  const ambiguousReport = source([a, b, duplicate]);
+  const ambiguousBinding = ambiguousReport.bindings[0]!;
+  const ambiguous = ambiguousBinding.satisfaction;
   assert.equal(ambiguous.status, "ambiguous");
+  assert.equal(ambiguousReport.declarationValid, true);
+  const diagnostic = ambiguousReport.diagnostics.find(
+    (item) => item.code === "RN-BINDING-AMBIGUOUS",
+  );
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.phase, "local-satisfaction");
+  assert.equal(diagnostic.entryIndex, ambiguousBinding.entryIndex);
+  assert.deepEqual(diagnostic.evidence, ambiguousBinding.evidence);
   assert.deepEqual(
     ambiguous.candidates.map((c) => c.path),
     ["contexts/skill.b.md", "skills/b/SKILL.md"],
