@@ -93,7 +93,9 @@ as unsupported; it is not normalized into a valid asset scheme. HTML comments,
 foreign-content CDATA, ordinary text, unrelated attributes and raw-text element
 contents are excluded. Bogus-comment recovery, HTML/SVG/MathML integration
 points and foreign-content self-closing rules apply when deciding whether an
-attribute is effective.
+attribute is effective. HTML inspection includes the container tags generated
+by CommonMark paragraphs, headings, lists and blockquotes; evidence still points
+to the original authored HTML.
 
 Queries, fragments, encoded or escaped aliases and suffixes are unsupported. Fenced/indented code, inline
 code and plain text are inert. Every reference needs a unique declared alias;
@@ -141,6 +143,9 @@ diagnostics and `declarationValid`. Each binding has separate local
 - `target-version-invalid`: the target lacks a usable release version.
 - `version-mismatch`: the target has a different release string.
 
+Declaration errors include existing Lens declaration errors (such as unsupported
+format versions or scopes and missing required fields), without requiring a
+Lens's targets to be present in the inspected snapshot.
 Declaration errors are separate from local satisfaction diagnostics. A valid
 A 1.0.1 pin for B 1.0.0 remains valid when local B is 2.0.0, but is not locally
 satisfied. Comparing acquired B 1.0.0 from a separate snapshot can match without
@@ -150,7 +155,8 @@ Builders inspect the selected files and recursively validate their own bindings.
 
 Every location includes a path, original-byte SHA-256 digest, raw source slice,
 one-based inclusive lines and **half-open UTF-16 code-unit offsets**. Decode
-UTF-8 preserving the BOM and CRLF before using offsets. Check the original byte
+UTF-8 preserving the BOM and original LF, CRLF or CR line endings before using
+offsets. Check the original byte
 digest before applying any rewrite and reject stale evidence. Metadata entry
 locations cover the containing YAML field; `entryIndex` distinguishes entries.
 Candidate identities carry whole-document, ID and version evidence.

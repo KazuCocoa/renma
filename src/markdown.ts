@@ -28,7 +28,7 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
       lines:
         artifact.contentClassification === "binary"
           ? []
-          : artifact.content.split(/\r?\n/),
+          : artifact.content.split(/\r\n|[\r\n]/),
       headings: [],
       codeFences: [],
       links: [],

@@ -41,6 +41,157 @@ const source = (files: AssetBindingFile[]) =>
     (d) => d.identity.path === "skills/a/SKILL.md",
   )!;
 
+test("Lens declaration errors survive standalone inspection without requiring local targets", () => {
+  const content =
+    "---\nid: lens.review\ntype: context_lens\nversion: '1'\nrelease_version: 'release-A'\nowner: qa\npurpose: Review\napplies_to: [ctx]\nasset_bindings:\n - {alias: rules, target: ctx, version: '1'}\n---\n[rules](renma-asset:rules)\n";
+  const inspect = (text: string) =>
+    inspectAssetBindings([file("contexts/review.lens.md", text)]).documents[0]!;
+  const valid = inspect(content);
+  assert.equal(valid.declarationValid, true);
+  assert.equal(valid.bindings[0]!.satisfaction.status, "missing");
+  assert.ok(valid.diagnostics.every((d) => d.phase === "local-satisfaction"));
+
+  for (const [from, to, message] of [
+    ["version: '1'", "version: '99'", 'unsupported version "99"'],
+    [
+      "type: context_lens",
+      "type: context_lens\nscope: skill",
+      'unsupported scope "skill"',
+    ],
+    ["owner: qa\n", "", 'missing required field "owner"'],
+    ["purpose: Review\n", "", 'missing required field "purpose"'],
+    ["applies_to: [ctx]\n", "", 'missing required field "applies_to"'],
+  ] as const) {
+    const original = content.replace(from, to);
+    const report = inspect(original);
+    assert.equal(report.declarationValid, false, message);
+    assert.equal(report.bindings[0]!.declarationValid, false);
+    const diagnostic = report.diagnostics.find((d) =>
+      d.message.includes(message),
+    );
+    assert.ok(diagnostic, message);
+    assert.equal(diagnostic.phase, "declaration");
+    assert.equal(diagnostic.code, "RN-BINDING-METADATA");
+    assert.equal(
+      original.slice(diagnostic.evidence.start, diagnostic.evidence.end),
+      diagnostic.evidence.raw,
+    );
+  }
+  // An unbound acquired target must retain the same format validation.
+  const target = inspect(
+    content
+      .replace(/asset_bindings:\n.*\n/u, "")
+      .replace("[rules](renma-asset:rules)", "Review")
+      .replace("version: '1'", "version: '99'"),
+  );
+  assert.deepEqual(target.bindings, []);
+  assert.equal(target.declarationValid, false);
+});
+
+test("CR, CRLF and mixed newlines retain reference, metadata and hash evidence", () => {
+  const body =
+    "😀\n\n> [B\n> ](\n> <renma-asset:b>\n> )\n\n[B](renma-asset:b)\n";
+  const original = Buffer.from(
+    skill("a", "skill.b", [pin("skill.b")], body).bytes,
+  ).toString();
+  for (const endings of [["\r"], ["\r\n"], ["\n", "\r", "\r\n"]]) {
+    let index = 0;
+    const content =
+      "\uFEFF" +
+      original.replace(/\n/gu, () => endings[index++ % endings.length]!);
+    const input = file("skills/a/SKILL.md", content);
+    const report = source([input]);
+    assert.equal(
+      report.declarationValid,
+      true,
+      JSON.stringify(report.diagnostics),
+    );
+    assert.equal(report.references.length, 2);
+    for (const evidence of [
+      report.identity.idEvidence,
+      report.identity.versionEvidence,
+      report.bindings[0]!.evidence,
+      report.relationships[0]!.evidence,
+      ...report.references.flatMap((r) => [r.evidence, r.destination!]),
+    ]) {
+      assert.ok(evidence.start >= 0 && evidence.end <= content.length);
+      assert.equal(content.slice(evidence.start, evidence.end), evidence.raw);
+      assert.equal(
+        evidence.startLine,
+        content.slice(0, evidence.start).split(/\r\n|[\r\n]/u).length,
+      );
+      assert.equal(
+        evidence.sha256,
+        createHash("sha256").update(input.bytes).digest("hex"),
+      );
+    }
+    for (const reference of report.references)
+      assert.equal(reference.destination!.raw, "renma-asset:b");
+    assert.match(report.identity.idEvidence.raw, /renma.id: skill.a/u);
+    assert.match(report.identity.versionEvidence.raw, /renma.version:/u);
+    assert.match(report.bindings[0]!.evidence.raw, /renma.asset-bindings:/u);
+  }
+});
+
+test("a BOM at the Markdown body start does not shift destination evidence", () => {
+  const original = skill(
+    "a",
+    "skill.b",
+    [pin("skill.b")],
+    "\uFEFF[B](renma-asset:b)",
+  );
+  const content = Buffer.from(original.bytes).toString();
+  const report = source([original]);
+  assert.equal(report.declarationValid, true);
+  assert.equal(report.references[0]!.evidence.raw, "[B](renma-asset:b)");
+  const destination = report.references[0]!.destination!;
+  assert.equal(destination.start, content.indexOf("renma-asset:b"));
+  assert.equal(
+    content.slice(destination.start, destination.end),
+    destination.raw,
+  );
+});
+
+test("Markdown-generated containers participate in HTML namespace and raw-text parsing", () => {
+  for (const tag of ["svg", "math"]) {
+    for (const markdown of ["text", "# Heading", "> text", "- text"]) {
+      const html = '<![CDATA[foo > <a href="renma-asset:b">B</a>]]>';
+      const body = `<${tag}>\n\n${markdown}\n\n${html}`;
+      const input = skill("a", "skill.b", [pin("skill.b")], body);
+      const report = source([input]);
+      const diagnostics = report.diagnostics.filter(
+        (d) => d.code === "RN-BINDING-UNSUPPORTED-REFERENCE",
+      );
+      assert.equal(report.declarationValid, false, body);
+      assert.equal(diagnostics.length, 1, body);
+      const evidence = diagnostics[0]!.evidence;
+      const content = Buffer.from(input.bytes).toString();
+      assert.equal(evidence.start, content.indexOf(html));
+      assert.equal(evidence.raw, html);
+      assert.equal(content.slice(evidence.start, evidence.end), html);
+      assert.equal(
+        evidence.sha256,
+        createHash("sha256").update(input.bytes).digest("hex"),
+      );
+    }
+    // A generated paragraph exits foreign content: this becomes HTML script
+    // data rather than inspectable SVG/MathML children.
+    const inert = source([
+      skill(
+        "a",
+        "skill.b",
+        [pin("skill.b")],
+        `<${tag}>\n\ntext\n\n<script/><a href="renma-asset:b">B</a>`,
+      ),
+    ]);
+    assert.equal(inert.declarationValid, true);
+    assert.deepEqual(
+      inert.diagnostics.filter((d) => d.phase === "declaration"),
+      [],
+    );
+  }
+});
+
 test("local mismatch is distinct from declaration validity and historical satisfaction", () => {
   const a = skill(
     "a",

@@ -129,7 +129,7 @@ export function parseMarkdownSyntax(
   content: string,
   bodyStartLine?: number,
 ): MarkdownSyntax {
-  const sourceLines = content.split(/\r?\n/);
+  const sourceLines = content.split(/\r\n|[\r\n]/);
   const resolvedBodyStartLine =
     bodyStartLine ?? markdownBodyStartLine(sourceLines);
   const body = sourceLines.slice(resolvedBodyStartLine - 1).join("\n");
@@ -326,7 +326,7 @@ export function ensureMarkdownSyntaxForDocument(
   ) {
     return undefined;
   }
-  const sourceLines = document.artifact.content.split(/\r?\n/);
+  const sourceLines = document.artifact.content.split(/\r\n|[\r\n]/);
   const syntax = parseMarkdownSyntax(
     document.artifact.content,
     markdownBodyStartLineForArtifact(document.artifact, sourceLines),

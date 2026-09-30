@@ -108,8 +108,10 @@
     "vitepress": "^1.6.4"
   },
   "dependencies": {
+    "hast-util-to-html": "^9.0.5",
     "jsonc-parser": "^3.3.1",
     "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-to-hast": "^13.2.1",
     "parse5": "^8.0.1",
     "tldts": "^7.4.10",
     "yaml": "^2.9.0"

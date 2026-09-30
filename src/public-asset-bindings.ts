@@ -3,9 +3,11 @@ import { ASSET_BINDING_METADATA_KEYS } from "./metadata-definitions.js";
 import { compareUtf16CodeUnits as order } from "./canonical-json.js";
 import { createHash } from "node:crypto";
 import { parseFragment, type DefaultTreeAdapterTypes } from "parse5";
+import { toHast } from "mdast-util-to-hast";
+import { toHtml } from "hast-util-to-html";
 import { parseDocument as parseYaml } from "yaml";
 import { ensureMarkdownSyntaxForDocument } from "./markdown-syntax.js";
-import type { Nodes } from "mdast";
+import type { Nodes, Root } from "mdast";
 import {
   parseTree,
   type Node as JsonNode,
@@ -13,6 +15,7 @@ import {
 } from "jsonc-parser";
 import { parseAssetMetadata } from "./metadata.js";
 import { inspectAgentSkill } from "./agent-skills.js";
+import { inspectContextLensDeclaration } from "./context-lens.js";
 import { buildCatalog } from "./catalog.js";
 import {
   classifyAssetPath,
@@ -497,6 +500,19 @@ export function inspectAssetBindings(
             diagnostic.endLine ?? 1,
           ),
         );
+    if (identity.kind === "context_lens")
+      for (const diagnostic of inspectContextLensDeclaration(document).filter(
+        (d) => d.severity === "error",
+      ))
+        issue(
+          "RN-BINDING-METADATA",
+          diagnostic.message,
+          lineLocation(
+            document,
+            diagnostic.evidence?.startLine ?? 1,
+            diagnostic.evidence?.endLine ?? 1,
+          ),
+        );
     if (fm.errors.length)
       issue(
         "RN-BINDING-MALFORMED",
@@ -530,8 +546,12 @@ function duplicateJsonKeys(node: JsonNode): boolean {
 }
 function lineStarts(content: string): number[] {
   const starts = [0];
-  for (let i = 0; i < content.length; i++)
-    if (content[i] === "\n") starts.push(i + 1);
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "\r") {
+      if (content[i + 1] === "\n") i++;
+      starts.push(i + 1);
+    } else if (content[i] === "\n") starts.push(i + 1);
+  }
   return starts;
 }
 function location(
@@ -540,7 +560,9 @@ function location(
   end: number,
 ): AssetBindingLocation {
   const content = document.artifact.content;
-  const line = (offset: number) => content.slice(0, offset).split("\n").length;
+  const starts = lineStarts(content);
+  const line = (offset: number) =>
+    starts.filter((start) => start <= offset).length;
   return {
     path: document.artifact.path,
     sha256: document.artifact.contentHash!,
@@ -585,6 +607,13 @@ function inspectReferences(
   if (!syntax) return;
   const root = syntax.root;
   const starts = lineStarts(document.artifact.content);
+  // fromMarkdown consumes an initial BOM in its body input, even when that
+  // body follows frontmatter. Restore its original first-line column offset.
+  const bodyBom = syntax.sourceLines[syntax.bodyStartLine - 1]?.startsWith(
+    "\uFEFF",
+  )
+    ? 1
+    : 0;
   const originalOffset = (
     point: { line: number; column: number } | undefined,
   ): number =>
@@ -592,7 +621,8 @@ function inspectReferences(
       ? (starts[point.line + syntax.bodyStartLine - 2] ??
           document.artifact.content.length) +
         point.column -
-        1
+        1 +
+        (point.line === 1 ? bodyBom : 0)
       : 0;
   const definitions = new Map<string, string>();
   const walk = (
@@ -609,22 +639,9 @@ function inspectReferences(
     if (node.type === "definition" && !definitions.has(node.identifier))
       definitions.set(node.identifier, node.url);
   });
-  const htmlNodes: Array<{
-    node: Extract<Nodes, { type: "html" }>;
-    start: number;
-    end: number;
-  }> = [];
-  walk(root, (node) => {
-    if (node.type === "html")
-      htmlNodes.push({
-        node,
-        start: originalOffset(node.position?.start),
-        end: originalOffset(node.position?.end),
-      });
-  });
   const unsupportedHtmlNodes = findHtmlAssetReferenceNodes(
     document.artifact.content,
-    htmlNodes,
+    root,
   );
   walk(root, (node, blockquoteDepth) => {
     const start = originalOffset(node.position?.start),
@@ -711,10 +728,13 @@ function skipLinkWhitespace(
   blockquoteDepth: number,
 ): number {
   let cursor = start;
-  let remainingMarkers = content[cursor - 1] === "\n" ? blockquoteDepth : 0;
+  let remainingMarkers = /[\r\n]/u.test(content[cursor - 1] ?? "")
+    ? blockquoteDepth
+    : 0;
   while (cursor < end) {
     const character = content[cursor];
-    if (character === "\n") remainingMarkers = blockquoteDepth;
+    if (character === "\n" || character === "\r")
+      remainingMarkers = blockquoteDepth;
     else if (character === ">" && remainingMarkers > 0) remainingMarkers--;
     else if (character !== " " && character !== "\t" && character !== "\r")
       break;
@@ -723,34 +743,44 @@ function skipLinkWhitespace(
   return cursor;
 }
 
-/** Parse only mdast-owned HTML while retaining original UTF-16 source offsets. */
+/** Parse rendered Markdown, attributing HTML diagnostics to original mdast nodes. */
 function findHtmlAssetReferenceNodes(
   content: string,
-  ranges: readonly {
-    node: Extract<Nodes, { type: "html" }>;
-    start: number;
-    end: number;
-  }[],
+  root: Root,
 ): Set<Extract<Nodes, { type: "html" }>> {
-  const ordered = [...ranges].sort((a, b) => a.start - b.start);
+  // Substitute raw HTML only during serialization, then restore it before
+  // parsing. This preserves Markdown-generated container tags and gives exact
+  // rendered ranges without inserting markers into the HTML parser's input.
+  let marker = "\u0000renma-html:";
+  while (content.includes(marker)) marker = "\u0000" + marker;
+  const htmlNodes: Extract<Nodes, { type: "html" }>[] = [];
+  const tree = toHast(root, {
+    handlers: {
+      html(_state, node) {
+        const index = htmlNodes.push(node) - 1;
+        return { type: "raw", value: `${marker}${index}\u0000` };
+      },
+    },
+  });
+  const result = new Set<Extract<Nodes, { type: "html" }>>();
+  if (!htmlNodes.length) return result;
   const mask = (value: string): string => value.replace(/[^\t\n\f\r ]/g, "x");
   const projectedRanges: Array<{
     node: Extract<Nodes, { type: "html" }>;
     start: number;
     end: number;
   }> = [];
-  let projection = "";
-  let cursor = 0;
-  for (const range of ordered) {
-    projection += mask(content.slice(cursor, range.start));
-    const start = projection.length;
-    projection += range.node.value;
-    projectedRanges.push({ node: range.node, start, end: projection.length });
-    cursor = range.end;
-  }
-  projection += mask(content.slice(cursor));
-
-  const result = new Set<Extract<Nodes, { type: "html" }>>();
+  let adjustment = 0;
+  let projection = toHtml(tree, { allowDangerousHtml: true }).replace(
+    new RegExp(`${marker}(\\d+)\u0000`, "gu"),
+    (token: string, index: string, offset: number) => {
+      const node = htmlNodes[Number(index)]!;
+      const start = offset + adjustment;
+      projectedRanges.push({ node, start, end: start + node.value.length });
+      adjustment += node.value.length - token.length;
+      return node.value;
+    },
+  );
   let fragment: DefaultTreeAdapterTypes.DocumentFragment;
   for (;;) {
     const cdataErrors: number[] = [];
