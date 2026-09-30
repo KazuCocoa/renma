@@ -355,6 +355,8 @@ YAML 1.2 mode. It validates:
 - duplicate top-level and `metadata` keys;
 - the allowed Agent Skills top-level fields;
 - required, non-empty string `name` and `description` values;
+- repository-wide uniqueness of normalized Skill names across every discovered
+  Skill root, regardless of ownership, source, or `renma.id`;
 - NFKC-normalized name length, Unicode letters/digits, lowercase and hyphen
   rules, and normalized immediate-parent match. The YAML field is trimmed, but
   the filesystem directory name is not; leading or trailing directory
@@ -423,12 +425,47 @@ scalars does not hide body diagnostics.
 
 ## Agent Skills Diagnostic Identifiers
 
+A Skill name is a runtime-observable identity. Repository-wide uniqueness
+allows runtime observations to be mapped unambiguously back to Renma's
+canonical governance identity. Renma deliberately keeps these identities separate:
+
+| Identity | Purpose |
+| --- | --- |
+| Skill `name` | Runtime-observable identity |
+| `renma.id` / effective asset ID | Governance/canonical identity |
+| Content digest | Content identity |
+
+Skill `name` != `renma.id`. Name equality uses the existing YAML-field trim and
+NFKC normalization, with case-sensitive comparison and no case folding; uppercase
+names still fail the existing lowercase validation. Uniqueness also applies to
+discovered Skills that have other validation errors. Missing names remain
+missing-name errors rather than being grouped into a duplicate identity.
+
+This is a static governance invariant. Renma prepares and governs static
+context/Skill information; runtime systems execute and observe Skills. Runtime
+evidence remains separate, with no telemetry collection or instrumentation in
+Renma.
+
 Agent Skills diagnostics use stable identifiers in the `agentSkills` portion of
 scan output. Specification errors make the Skill invalid. Renma authoring
 warnings do not affect structural validity or the existing `--fail-on`
 threshold. Renma-owned authoring warnings use the `RN-SKILL-*` namespace and
 remain in the `agentSkills` projection so maintainers get exact source evidence
 without confusing them with Agent Skills specification failures.
+
+### Renma identity errors
+
+| Identifier | Meaning |
+| --- | --- |
+| `RN-SKILL-DUPLICATE-NAME` | Multiple discovered Skills share a normalized name. Every conflicting Skill is invalid; each error lists all conflicting paths. Give distinct Skills unique names and matching immediate parent directories, update affected path references, and preserve canonical `renma.id` values. |
+
+This repository-level error uses the Renma `RN-SKILL-*` namespace because
+repository uniqueness is a Renma governance requirement. It appears in
+`agentSkills`, marks every conflicting Skill invalid, and follows the existing
+separation between Skill validity and scan Finding `--fail-on` thresholds.
+It does not change the existing medium-severity `META-DUPLICATE-ASSET-ID`
+Finding or add a Finding severity override. Repositories with duplicate Skill
+names now have invalid Skills even when their effective asset IDs are unique.
 
 ### Specification errors
 

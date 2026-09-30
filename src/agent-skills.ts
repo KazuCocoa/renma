@@ -135,14 +135,59 @@ export interface AgentSkillNameValidation {
   problems: string[];
 }
 
-/** Validate every discovered Skill using one locally versioned Agent Skills profile. */
+/** Validate every discovered Skill and repository-wide runtime name identity. */
 export function validateAgentSkills(
   documents: ParsedDocument[],
 ): AgentSkillsValidationSummary {
-  const results = documents
+  const skills = documents
     .filter((document) => document.artifact.kind === "skill")
-    .map(validateAgentSkill)
-    .sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
+    .sort((left, right) =>
+      compareUtf16CodeUnits(left.artifact.path, right.artifact.path),
+    );
+  const results = skills.map(validateAgentSkill);
+  const skillsByName = new Map<
+    string,
+    { document: ParsedDocument; result: AgentSkillValidationResult }[]
+  >();
+  for (const [index, document] of skills.entries()) {
+    const result = results[index]!;
+    // Use the same normalization as name/directory validation, without case folding.
+    const name = normalizeAgentSkillNameField(result.name).normalized;
+    if (!name) continue;
+    const group = skillsByName.get(name) ?? [];
+    group.push({ document, result });
+    skillsByName.set(name, group);
+  }
+  for (const [name, duplicates] of skillsByName) {
+    if (duplicates.length < 2) continue;
+    const duplicatePaths = duplicates.map(({ result }) => result.path);
+    for (const { document, result } of duplicates) {
+      const field = firstField(
+        ensureYamlFrontmatterForDocument(document),
+        AGENT_SKILL_TOP_LEVEL_KEYS.name,
+      );
+      result.issues.push({
+        ...createIssue(
+          document,
+          IDS.RN_DUPLICATE_NAME,
+          "error",
+          "renma-authoring",
+          `Duplicate Skill name ${JSON.stringify(name)}. Skill names must uniquely identify a Skill within the repository so runtime observations can map unambiguously to its canonical Renma identity. Found in: ${duplicatePaths.join(", ")}. Give each distinct Skill a unique name and matching immediate parent directory, update affected path references, and preserve its renma.id.`,
+          field?.startLine ?? 1,
+          AGENT_SKILL_TOP_LEVEL_KEYS.name,
+          field?.endLine ?? 1,
+        ),
+        details: { name, duplicatePaths },
+      });
+      result.issues.sort(
+        (left, right) =>
+          left.startLine - right.startLine ||
+          compareUtf16CodeUnits(left.code, right.code),
+      );
+      result.errorCount += 1;
+      result.valid = false;
+    }
+  }
 
   return {
     specification: AGENT_SKILLS_SPECIFICATION,

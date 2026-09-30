@@ -801,6 +801,161 @@ test("repository-wide summary is deterministic", () => {
     summary.results.map((result) => result.path),
     ["skills/alpha/SKILL.md", "skills/zeta/SKILL.md"],
   );
+  assert.equal(summary.validSkillCount, 2);
+  assert.equal(summary.invalidSkillCount, 0);
+});
+
+test("repository-wide names conflict across roots, owners, sources and unique governance IDs", async () => {
+  const root = await fixture();
+  const paths = [
+    "skills/security/security-review/SKILL.md",
+    "skills/platform/security-review/SKILL.md",
+    ".agents/skills/unrelated/security-review/SKILL.md",
+  ].sort();
+  for (const [index, file] of paths.entries()) {
+    await mkdir(path.dirname(path.join(root, file)), { recursive: true });
+    await writeFile(
+      path.join(root, file),
+      canonical("security-review").replace(
+        "\n---\n#",
+        `\nmetadata:\n  renma.id: skill.review.${index}\n  renma.owner: team-${index}\n  renma.source-kind: authored\n  renma.source-ref: https://example.com/source-${index}\n---\n#`,
+      ),
+    );
+  }
+  const result = await scan(root, { failOn: "critical" });
+  assert.equal(result.agentSkills.invalidSkillCount, 3);
+  assert.equal(result.agentSkills.validSkillCount, 0);
+  assert.equal(
+    result.findings.some((finding) => finding.id === "META-DUPLICATE-ASSET-ID"),
+    false,
+  );
+  for (const skill of result.agentSkills.results) {
+    const issues = skill.issues.filter(
+      (issue) => issue.code === "RN-SKILL-DUPLICATE-NAME",
+    );
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0]?.severity, "error");
+    assert.equal(issues[0]?.startLine, 2);
+    assert.deepEqual(issues[0]?.details, {
+      name: "security-review",
+      duplicatePaths: paths,
+    });
+    assert.match(issues[0]!.message, /runtime observations/);
+    assert.match(issues[0]!.message, /preserve its renma.id/);
+    for (const file of paths) assert.ok(issues[0]!.message.includes(file));
+  }
+  assert.match(formatText(result), /RN-SKILL-DUPLICATE-NAME/);
+});
+
+test("duplicate names use existing trimming and NFKC normalization deterministically", () => {
+  const documents = [
+    skill("skills/z/demo/SKILL.md", canonical('" demo "')),
+    skill("skills/a/ｄｅｍｏ/SKILL.md", canonical("ｄｅｍｏ")),
+  ];
+  const summary = validateAgentSkills(documents);
+  assert.equal(summary.invalidSkillCount, 2);
+  assert.deepEqual(summary, validateAgentSkills([...documents].reverse()));
+  for (const result of summary.results) {
+    assert.equal(result.errorCount, 1);
+    assert.deepEqual(result.issues[0]?.details, {
+      name: "demo",
+      duplicatePaths: ["skills/a/ｄｅｍｏ/SKILL.md", "skills/z/demo/SKILL.md"],
+    });
+  }
+});
+
+test("two identical Skill names conflict even with different canonical IDs", () => {
+  const summary = validateAgentSkills(
+    ["alpha", "beta"].map((group) =>
+      skill(
+        `skills/${group}/review/SKILL.md`,
+        canonical("review").replace(
+          "\n---\n#",
+          `\nmetadata:\n  renma.id: skill.${group}.review\n---\n#`,
+        ),
+      ),
+    ),
+  );
+  assert.equal(summary.invalidSkillCount, 2);
+  assert.ok(summary.results.every((result) => result.errorCount === 1));
+  assert.ok(
+    summary.results.every((result) =>
+      result.issues.some((issue) => issue.code === "RN-SKILL-DUPLICATE-NAME"),
+    ),
+  );
+});
+
+test("name uniqueness excludes non-Skills and does not group missing names", () => {
+  const context = skill("contexts/review.md", canonical("review"));
+  context.artifact.kind = "context";
+  const summary = validateAgentSkills([
+    context,
+    skill("skills/review/SKILL.md", canonical("review")),
+    skill(
+      "skills/alpha/SKILL.md",
+      "---\ndescription: Use when reviewing inputs.\n---\n",
+    ),
+    skill(
+      "skills/beta/SKILL.md",
+      "---\ndescription: Use when reviewing inputs.\n---\n",
+    ),
+  ]);
+  assert.equal(summary.totalSkillCount, 3);
+  assert.equal(summary.validSkillCount, 1);
+  assert.equal(summary.invalidSkillCount, 2);
+  assert.equal(
+    summary.results
+      .flatMap((result) => result.issues)
+      .some((issue) => issue.code === "RN-SKILL-DUPLICATE-NAME"),
+    false,
+  );
+});
+
+test("name equality stays case-sensitive and directory errors remain independent", () => {
+  const summary = validateAgentSkills([
+    skill("skills/a/demo/SKILL.md", canonical("demo")),
+    skill("skills/b/Demo/SKILL.md", canonical("Demo")),
+    skill("skills/c/other/SKILL.md", canonical("demo")),
+  ]);
+  const upper = summary.results[1]!;
+  assert.ok(
+    upper.issues.some((issue) => issue.code === "AS-SKILL-INVALID-NAME"),
+  );
+  assert.equal(
+    upper.issues.some((issue) => issue.code === "RN-SKILL-DUPLICATE-NAME"),
+    false,
+  );
+  const mismatch = summary.results[2]!;
+  assert.ok(
+    mismatch.issues.some(
+      (issue) => issue.code === "AS-SKILL-NAME-DIRECTORY-MISMATCH",
+    ),
+  );
+  assert.ok(
+    mismatch.issues.some((issue) => issue.code === "RN-SKILL-DUPLICATE-NAME"),
+  );
+  assert.equal(mismatch.errorCount, 2);
+});
+
+test("duplicate governance IDs remain medium findings independently of Skill names", async () => {
+  const root = await fixture();
+  for (const name of ["alpha", "beta"]) {
+    await writeSkill(
+      root,
+      name,
+      canonical(name).replace(
+        "\n---\n#",
+        "\nmetadata:\n  renma.id: skill.shared\n---\n#",
+      ),
+    );
+  }
+  const result = await scan(root);
+  assert.equal(result.agentSkills.validSkillCount, 2);
+  const duplicates = result.findings.filter(
+    (finding) => finding.id === "META-DUPLICATE-ASSET-ID",
+  );
+  assert.equal(duplicates.length, 2);
+  assert.ok(duplicates.every((finding) => finding.severity === "medium"));
 });
 
 function canonical(name: string): string {

@@ -6,6 +6,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Require repository-wide uniqueness of normalized Agent Skill names with
+  `RN-SKILL-DUPLICATE-NAME` errors listing every conflicting path. Duplicate
+  names now make Skills invalid even with distinct canonical `renma.id` values;
+  governance IDs and existing scan Finding exit thresholds remain unchanged.
+
 ## [0.39.2] - 2026-09-20
 
 ### Fixed
