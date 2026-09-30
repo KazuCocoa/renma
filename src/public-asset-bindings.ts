@@ -710,9 +710,11 @@ function skipLinkWhitespace(
 /** Inspect parser-owned HTML, keeping tokenizer state across inline HTML nodes. */
 function createHtmlAssetReferenceInspector(): (html: string) => boolean {
   let rawTextTag: string | undefined;
-  const foreignElements: Array<{
+  const elements: Array<{
     tagName: string;
-    namespace: "svg" | "mathml";
+    namespace: "html" | "svg" | "mathml";
+    htmlIntegrationPoint: boolean;
+    mathTextIntegrationPoint: boolean;
   }> = [];
   const rawTextTags = new Set([
     "script",
@@ -725,21 +727,318 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
     "noframes",
     "plaintext",
   ]);
+  const htmlVoidTags = new Set([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "source",
+    "track",
+    "wbr",
+  ]);
   const svgHtmlIntegrationPoints = new Set(["desc", "foreignobject", "title"]);
-  const contentNamespace = (): "html" | "svg" | "mathml" => {
-    const current = foreignElements.at(-1);
-    if (!current) return "html";
-    if (
-      current.namespace === "svg" &&
-      svgHtmlIntegrationPoints.has(current.tagName)
-    )
-      return "html";
-    return current.namespace;
+  const mathTextIntegrationPoints = new Set(["mi", "mo", "mn", "ms", "mtext"]);
+  const mathTextForeignExceptions = new Set(["mglyph", "malignmark"]);
+  const foreignBreakoutTags = new Set([
+    "b",
+    "big",
+    "blockquote",
+    "body",
+    "br",
+    "center",
+    "code",
+    "dd",
+    "div",
+    "dl",
+    "dt",
+    "em",
+    "embed",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "head",
+    "hr",
+    "i",
+    "img",
+    "li",
+    "listing",
+    "menu",
+    "meta",
+    "nobr",
+    "ol",
+    "p",
+    "pre",
+    "ruby",
+    "s",
+    "small",
+    "span",
+    "strong",
+    "strike",
+    "sub",
+    "sup",
+    "table",
+    "tt",
+    "u",
+    "ul",
+    "var",
+  ]);
+  type HtmlTagToken = {
+    closing: boolean;
+    tagName: string;
+    attributes: Map<string, string>;
+    selfClosing: boolean;
+    end: number;
   };
-  const htmlTokens =
-    /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\?[^>]*(?:>|$)|<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[ \t\r\n\f/>])((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gu;
-  const foreignTokens =
-    /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)|<![^>]*>|<\?[^>]*(?:>|$)|<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[ \t\r\n\f/>])((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gu;
+  const whitespace = /[ \t\r\n\f]/u;
+  const asciiAlpha = /[A-Za-z]/u;
+  const asciiCaseInsensitiveEqual = (
+    value: string,
+    expected: string,
+  ): boolean =>
+    value.length === expected.length &&
+    [...expected].every(
+      (character, index) =>
+        value[index] === character || value[index] === character.toUpperCase(),
+    );
+  const parseTag = (html: string, start: number): HtmlTagToken | undefined => {
+    let cursor = start + 1;
+    const closing = html[cursor] === "/";
+    if (closing) cursor++;
+    if (!asciiAlpha.test(html[cursor] ?? "")) return undefined;
+    const tagNameStart = cursor++;
+    while (
+      cursor < html.length &&
+      !whitespace.test(html[cursor]!) &&
+      html[cursor] !== "/" &&
+      html[cursor] !== ">"
+    )
+      cursor++;
+    const tagName = html.slice(tagNameStart, cursor).toLowerCase();
+    const values = new Map<string, string>();
+    let attributeName: string | undefined;
+    let attributeValue = "";
+    let selfClosing = false;
+    let state:
+      | "before-name"
+      | "name"
+      | "after-name"
+      | "before-value"
+      | "double-value"
+      | "single-value"
+      | "unquoted-value"
+      | "after-quoted-value"
+      | "self-closing" = "before-name";
+    const storeAttribute = (): void => {
+      if (attributeName !== undefined && !values.has(attributeName))
+        values.set(attributeName, attributeValue);
+      attributeName = undefined;
+      attributeValue = "";
+    };
+    const token = (): HtmlTagToken => ({
+      closing,
+      tagName,
+      attributes: values,
+      selfClosing,
+      end: cursor + 1,
+    });
+    while (cursor < html.length) {
+      const character = html[cursor]!;
+      if (state === "before-name") {
+        if (whitespace.test(character)) cursor++;
+        else if (character === "/") {
+          state = "self-closing";
+          cursor++;
+        } else if (character === ">") return token();
+        else {
+          attributeName = character.toLowerCase();
+          state = "name";
+          cursor++;
+        }
+      } else if (state === "name") {
+        if (whitespace.test(character)) {
+          state = "after-name";
+          cursor++;
+        } else if (character === "/" || character === ">") {
+          state = "after-name";
+        } else if (character === "=") {
+          state = "before-value";
+          cursor++;
+        } else {
+          attributeName += character.toLowerCase();
+          cursor++;
+        }
+      } else if (state === "after-name") {
+        if (whitespace.test(character)) cursor++;
+        else if (character === "/") {
+          storeAttribute();
+          state = "self-closing";
+          cursor++;
+        } else if (character === "=") {
+          state = "before-value";
+          cursor++;
+        } else if (character === ">") {
+          storeAttribute();
+          return token();
+        } else {
+          storeAttribute();
+          attributeName = character.toLowerCase();
+          state = "name";
+          cursor++;
+        }
+      } else if (state === "before-value") {
+        if (whitespace.test(character)) cursor++;
+        else if (character === '"') {
+          state = "double-value";
+          cursor++;
+        } else if (character === "'") {
+          state = "single-value";
+          cursor++;
+        } else if (character === ">") {
+          storeAttribute();
+          return token();
+        } else {
+          attributeValue += character;
+          state = "unquoted-value";
+          cursor++;
+        }
+      } else if (state === "double-value" || state === "single-value") {
+        if (
+          (state === "double-value" && character === '"') ||
+          (state === "single-value" && character === "'")
+        ) {
+          state = "after-quoted-value";
+          cursor++;
+        } else {
+          attributeValue += character;
+          cursor++;
+        }
+      } else if (state === "unquoted-value") {
+        if (whitespace.test(character)) {
+          storeAttribute();
+          state = "before-name";
+          cursor++;
+        } else if (character === ">") {
+          storeAttribute();
+          return token();
+        } else {
+          attributeValue += character;
+          cursor++;
+        }
+      } else if (state === "after-quoted-value") {
+        if (whitespace.test(character)) {
+          storeAttribute();
+          state = "before-name";
+          cursor++;
+        } else if (character === "/") {
+          storeAttribute();
+          state = "self-closing";
+          cursor++;
+        } else if (character === ">") {
+          storeAttribute();
+          return token();
+        } else {
+          storeAttribute();
+          attributeName = character.toLowerCase();
+          state = "name";
+          cursor++;
+        }
+      } else if (character === ">") {
+        selfClosing = true;
+        return token();
+      } else {
+        state = "before-name";
+      }
+    }
+    return undefined;
+  };
+  const nextTag = (
+    html: string,
+    start: number,
+    foreign: boolean,
+  ): HtmlTagToken | undefined => {
+    let cursor = start;
+    while (cursor < html.length) {
+      const tagStart = html.indexOf("<", cursor);
+      if (tagStart < 0) return undefined;
+      if (html.startsWith("<!--", tagStart)) {
+        const bodyStart = tagStart + 4;
+        if (html[bodyStart] === ">") cursor = bodyStart + 1;
+        else if (html.startsWith("->", bodyStart)) cursor = bodyStart + 2;
+        else {
+          const normalEnd = html.indexOf("-->", bodyStart);
+          const bangEnd = html.indexOf("--!>", bodyStart);
+          const commentEnd =
+            normalEnd < 0
+              ? bangEnd
+              : bangEnd < 0
+                ? normalEnd
+                : Math.min(normalEnd, bangEnd);
+          cursor =
+            commentEnd < 0
+              ? html.length
+              : commentEnd + (commentEnd === bangEnd ? 4 : 3);
+        }
+        continue;
+      }
+      if (foreign && html.startsWith("<![CDATA[", tagStart)) {
+        const end = html.indexOf("]]>", tagStart + 9);
+        cursor = end < 0 ? html.length : end + 3;
+        continue;
+      }
+      if (html.startsWith("<!", tagStart) || html.startsWith("<?", tagStart)) {
+        const end = html.indexOf(">", tagStart + 2);
+        cursor = end < 0 ? html.length : end + 1;
+        continue;
+      }
+      const tag = parseTag(html, tagStart);
+      if (tag) return tag;
+      cursor = tagStart + 1;
+    }
+    return undefined;
+  };
+  const popForeignContent = (): void => {
+    let current = elements.at(-1);
+    while (
+      current &&
+      current.namespace !== "html" &&
+      !current.mathTextIntegrationPoint &&
+      !current.htmlIntegrationPoint
+    ) {
+      elements.pop();
+      current = elements.at(-1);
+    }
+  };
+  const findRawTextClosing = (
+    html: string,
+    start: number,
+    tagName: string,
+  ): number => {
+    let candidate = html.indexOf("</", start);
+    while (candidate >= 0) {
+      const nameStart = candidate + 2;
+      const delimiter = html[nameStart + tagName.length];
+      if (
+        asciiCaseInsensitiveEqual(
+          html.slice(nameStart, nameStart + tagName.length),
+          tagName,
+        ) &&
+        delimiter !== undefined &&
+        (whitespace.test(delimiter) || delimiter === "/" || delimiter === ">")
+      )
+        return candidate;
+      candidate = html.indexOf("</", nameStart);
+    }
+    return -1;
+  };
   return (html) => {
     // Consume whole tags (including quoted values) and comments. Attribute-like
     // prose and markup inside another attribute must never become attributes.
@@ -748,54 +1047,91 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
     while (cursor < html.length) {
       if (rawTextTag) {
         if (rawTextTag === "plaintext") break;
-        const closing = new RegExp(
-          `</${rawTextTag}(?=[ \\t\\r\\n\\f/>])`,
-          "giu",
-        );
-        closing.lastIndex = cursor;
-        const match = closing.exec(html);
-        if (!match) break;
-        cursor = match.index;
+        const closing = findRawTextClosing(html, cursor, rawTextTag);
+        if (closing < 0) break;
+        cursor = closing;
         rawTextTag = undefined;
       }
-      const tokens = contentNamespace() === "html" ? htmlTokens : foreignTokens;
-      tokens.lastIndex = cursor;
-      const token = tokens.exec(html);
+      // CDATA recognition belongs to tokenization and depends on the adjusted
+      // current node's actual namespace, before integration-point dispatch.
+      const token = nextTag(
+        html,
+        cursor,
+        elements.length > 0 && elements.at(-1)?.namespace !== "html",
+      );
       if (!token) break;
-      cursor = tokens.lastIndex;
-      if (!token[2]) continue;
-      const tagName = token[2].toLowerCase();
-      if (token[1]) {
-        const foreignIndex = foreignElements.findLastIndex(
-          (element) => element.tagName === tagName,
-        );
-        if (foreignIndex >= 0) foreignElements.splice(foreignIndex);
+      cursor = token.end;
+      const tagName = token.tagName;
+      if (token.closing) {
+        if (
+          elements.at(-1)?.namespace !== "html" &&
+          (tagName === "br" || tagName === "p")
+        ) {
+          popForeignContent();
+          continue;
+        }
+        const currentIsHtml = elements.at(-1)?.namespace === "html";
+        let elementIndex = -1;
+        let htmlBoundaryIndex = -1;
+        for (let index = elements.length - 1; index >= 0; index--) {
+          const element = elements[index]!;
+          if ((element.namespace === "html") !== currentIsHtml) {
+            if (!currentIsHtml) htmlBoundaryIndex = index;
+            break;
+          }
+          if (element.tagName === tagName) {
+            elementIndex = index;
+            break;
+          }
+        }
+        // A foreign end tag with no foreign match is reprocessed in HTML. The
+        // immediately enclosing HTML element can therefore close with it.
+        if (
+          elementIndex < 0 &&
+          htmlBoundaryIndex >= 0 &&
+          elements[htmlBoundaryIndex]!.tagName === tagName
+        )
+          elementIndex = htmlBoundaryIndex;
+        if (elementIndex >= 0) elements.splice(elementIndex);
         continue;
       }
-      const namespace = contentNamespace();
-      const tokenNamespace =
-        namespace === "html"
-          ? tagName === "svg"
-            ? "svg"
-            : tagName === "math"
-              ? "mathml"
-              : "html"
-          : namespace;
-      const selfClosing = /(?:^|[ \t\r\n\f])\/$/u.test(token[3]!);
+      const parsedAttributes = token.attributes;
+      let current = elements.at(-1);
+      let processInHtml =
+        !current ||
+        current.namespace === "html" ||
+        (current.mathTextIntegrationPoint &&
+          !mathTextForeignExceptions.has(tagName)) ||
+        (current.namespace === "mathml" &&
+          current.tagName === "annotation-xml" &&
+          tagName === "svg") ||
+        current.htmlIntegrationPoint;
+      const fontBreakout =
+        tagName === "font" &&
+        ["color", "face", "size"].some((name) => parsedAttributes.has(name));
+      if (
+        !processInHtml &&
+        (foreignBreakoutTags.has(tagName) || fontBreakout)
+      ) {
+        popForeignContent();
+        current = elements.at(-1);
+        processInHtml = true;
+      }
+      const namespace = current?.namespace ?? "html";
+      const tokenNamespace = processInHtml
+        ? tagName === "svg"
+          ? "svg"
+          : tagName === "math"
+            ? "mathml"
+            : "html"
+        : namespace;
+      const selfClosing = token.selfClosing;
       // HTML ignores the self-closing flag on these non-void elements. Foreign
       // elements honor it and never enter an HTML raw-text tokenizer state.
       if (tokenNamespace === "html" && rawTextTags.has(tagName))
         rawTextTag = tagName;
-      const attributes =
-        /[ \t\r\n\f]+([^ \t\r\n\f"'<>/=]+)(?:[ \t\r\n\f]*=[ \t\r\n\f]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n\f>]+)))?/gu;
-      const seen = new Set<string>();
-      for (const attribute of token[3]!.matchAll(attributes)) {
-        const name = attribute[1]!.toLowerCase();
-        // HTML keeps the first occurrence of a duplicate attribute.
-        if (seen.has(name)) continue;
-        seen.add(name);
+      for (const [name, value] of parsedAttributes) {
         if (name !== "href" && name !== "src") continue;
-        const value = attribute[2] ?? attribute[3] ?? attribute[4] ?? "";
         // Attribute mode applies HTML's semicolon and ambiguous-ampersand rules;
         // Markdown string decoding would also (incorrectly) unescape backslashes.
         // Apply URL input preprocessing only to the interpreted value. Original
@@ -805,10 +1141,30 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
           .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/gu, "");
         // U+2010 is the HTML &hyphen; lookalike: reject it as unsupported,
         // without normalizing it into an accepted or rewritable asset scheme.
-        if (/^renma[-\u2010]asset:/iu.test(urlInput)) found = true;
+        if (
+          asciiCaseInsensitiveEqual(urlInput.slice(0, 12), "renma-asset:") ||
+          asciiCaseInsensitiveEqual(urlInput.slice(0, 12), "renma‐asset:")
+        )
+          found = true;
       }
-      if (tokenNamespace !== "html" && !selfClosing)
-        foreignElements.push({ tagName, namespace: tokenNamespace });
+      const annotationEncoding = decodeHTMLAttribute(
+        parsedAttributes.get("encoding") ?? "",
+      ).toLowerCase();
+      const htmlIntegrationPoint =
+        (tokenNamespace === "svg" && svgHtmlIntegrationPoints.has(tagName)) ||
+        (tokenNamespace === "mathml" &&
+          tagName === "annotation-xml" &&
+          (annotationEncoding === "text/html" ||
+            annotationEncoding === "application/xhtml+xml"));
+      const mathTextIntegrationPoint =
+        tokenNamespace === "mathml" && mathTextIntegrationPoints.has(tagName);
+      if (tokenNamespace === "html" ? !htmlVoidTags.has(tagName) : !selfClosing)
+        elements.push({
+          tagName,
+          namespace: tokenNamespace,
+          htmlIntegrationPoint,
+          mathTextIntegrationPoint,
+        });
     }
     return found;
   };

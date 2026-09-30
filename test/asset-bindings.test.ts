@@ -686,6 +686,7 @@ test("HTML detection ignores comments, raw text, unrelated attributes and ineffe
     '<a href="renma&amp;hyphen;asset&colon;b">B</a>',
     '<a href="renma&unknown;asset:b">B</a>',
     '<a href="renma&ndash;asset:b">B</a>',
+    '<a href="renma-aſſet:b">B</a>',
     '<a href="renma-asset&colonb">B</a>',
     '<a href="renma\\-asset:b">B</a>',
     '<a href="https://example.com" HREF="renma&#45;asset:b">B</a>',
@@ -705,6 +706,9 @@ test("HTML detection ignores comments, raw text, unrelated attributes and ineffe
     '<a data-href="renma&#9;-asset:b" href="https://example.com">B</a>',
     '<a href="https://example.com" HREF="&#x01;renma-asset:b">B</a>',
     "<script>const example = '<a href=\"renma&#9;-asset:b\">B</a>';</script>",
+    '<script></ſcript><a href="renma&#45;asset:b">B</a>',
+    '<div><svg></div><script><a href="renma&#45;asset:b">B</a></div>',
+    '<div><math></div><script/><a href="renma&#45;asset:b">B</a></div>',
 
     '<a href="https://example.com/renma&#45;asset:b">B</a>',
     '`<a href="renma&#45;asset:b">B</a>`',
@@ -742,8 +746,20 @@ test("HTML raw-text handling resumes after closing tags and inspects their own a
 test("HTML recovery and foreign-content states cannot hide reserved destinations", () => {
   for (const body of [
     '<?bogus><a href="renma&#45;asset:b">B</a>?>',
+    '<div><!--><a href="renma&#45;asset:b">B</a></div>',
+    '<div><!---><a href="renma&#45;asset:b">B</a></div>',
+    '<div><!-- comment --!><a href="renma&#45;asset:b">B</a></div>',
+    '<div><!-- nested <!--><a href="renma&#45;asset:b">B</a></div>',
+    '<div><a_b href="renma&#45;asset:b">B</a_b></div>',
+    '<div><aé href="renma&#45;asset:b">B</aé></div>',
+    '<div><a/href="renma&#45;asset:b">B</a></div>',
+    '<div><a title="example"/href="renma&#45;asset:b">B</a></div>',
+    '<div><a title="example"href="renma&#45;asset:b">B</a></div>',
+    '<div><a " href="renma&#45;asset:b">B</a></div>',
+    '<div><a broken"name href="renma&#45;asset:b">B</a></div>',
     '<svg><script /></svg><a href="renma&#45;asset:b">B</a>',
     '<svg><title><a href="renma&#45;asset:b">B</a></title></svg>',
+    '<svg><foreignObject><div></svg></div></foreignObject><g><script/><a href="renma&#45;asset:b">B</a></g></svg>',
   ]) {
     const report = source([
       skill("a", "skill.b", [pin("skill.b")], body),
@@ -763,12 +779,25 @@ test("HTML recovery and foreign-content states cannot hide reserved destinations
 });
 
 test("foreign-content CDATA and HTML integration raw text remain inert", () => {
-  for (const body of [
+  const bodies = [
     '<svg><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></svg>',
     '<math><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></math>',
+    '<svg><title><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></title></svg>',
+    '<math><annotation-xml encoding="text/html"><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></annotation-xml></math>',
     '<script/><a href="renma&#45;asset:b">B</a></script>',
     "<svg><foreignObject><script>const example = '<a href=\"renma&#45;asset:b\">B</a>';</script></foreignObject></svg>",
-  ]) {
+    '<math><annotation-xml encoding="text&#47;html"><script><a href="renma&#45;asset:b">B</a></script></annotation-xml></math>',
+    '<math><annotation-xml encoding="APPLICATION/XHTML+XML"><script><a href="renma&#45;asset:b">B</a></script></annotation-xml></math>',
+    '<svg><p><script><a href="renma&#45;asset:b">B</a></script>',
+    '<svg><font color="red"><script><a href="renma&#45;asset:b">B</a></script>',
+    '<svg></p><script><a href="renma&#45;asset:b">B</a></script>',
+    '<math><mrow></br><script><a href="renma&#45;asset:b">B</a></script>',
+  ];
+  for (const point of ["mi", "mo", "mn", "ms", "mtext"])
+    bodies.push(
+      `<math><${point}><script><a href="renma&#45;asset:b">B</a></script></${point}></math>`,
+    );
+  for (const body of bodies) {
     const report = source([
       skill("a", "skill.b", [pin("skill.b")], body),
       skill("b", undefined, [], "", "1.0.0"),
@@ -776,5 +805,28 @@ test("foreign-content CDATA and HTML integration raw text remain inert", () => {
     assert.equal(report.declarationValid, true, body);
     assert.deepEqual(report.references, [], body);
     assert.deepEqual(report.diagnostics, [], body);
+  }
+});
+
+test("MathML integration exceptions and non-HTML annotations remain inspectable", () => {
+  for (const body of [
+    '<math><mtext><mglyph><script><a href="renma&#45;asset:b">B</a></script></mglyph></mtext></math>',
+    '<math><mtext><malignmark><script><a href="renma&#45;asset:b">B</a></script></malignmark></mtext></math>',
+    '<math><annotation-xml><script><a href="renma&#45;asset:b">B</a></script></annotation-xml></math>',
+    '<math><annotation-xml encoding="text/plain"><script><a href="renma&#45;asset:b">B</a></script></annotation-xml></math>',
+    '<svg><font><script><a href="renma&#45;asset:b">B</a></script></font></svg>',
+  ]) {
+    const report = source([
+      skill("a", "skill.b", [pin("skill.b")], body),
+      skill("b", undefined, [], "", "1.0.0"),
+    ]);
+    assert.equal(report.declarationValid, false, body);
+    assert.equal(
+      report.diagnostics.filter(
+        (diagnostic) => diagnostic.code === "RN-BINDING-UNSUPPORTED-REFERENCE",
+      ).length,
+      1,
+      body,
+    );
   }
 });
