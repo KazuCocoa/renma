@@ -90,7 +90,9 @@ leading/trailing C0 controls (U+0000–U+001F) and spaces (U+0020) are trimmed.
 This interpretation never changes the original-source evidence or offsets. The
 Unicode hyphen lookalike `renma‐asset:` (including `&hyphen;`) is also diagnosed
 as unsupported; it is not normalized into a valid asset scheme. HTML comments,
-ordinary text, unrelated attributes and raw-text element contents are excluded.
+foreign-content CDATA, ordinary text, unrelated attributes and raw-text element
+contents are excluded. Bogus-comment recovery and foreign-content self-closing
+rules apply when deciding whether an attribute is effective.
 
 Queries, fragments, encoded or escaped aliases and suffixes are unsupported. Fenced/indented code, inline
 code and plain text are inert. Every reference needs a unique declared alias;

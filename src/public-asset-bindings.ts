@@ -707,9 +707,13 @@ function skipLinkWhitespace(
   return cursor;
 }
 
-/** Inspect parser-owned HTML, keeping raw-text state across inline HTML nodes. */
+/** Inspect parser-owned HTML, keeping tokenizer state across inline HTML nodes. */
 function createHtmlAssetReferenceInspector(): (html: string) => boolean {
   let rawTextTag: string | undefined;
+  const foreignElements: Array<{
+    tagName: string;
+    namespace: "svg" | "mathml";
+  }> = [];
   const rawTextTags = new Set([
     "script",
     "style",
@@ -721,11 +725,24 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
     "noframes",
     "plaintext",
   ]);
+  const svgHtmlIntegrationPoints = new Set(["desc", "foreignobject", "title"]);
+  const contentNamespace = (): "html" | "svg" | "mathml" => {
+    const current = foreignElements.at(-1);
+    if (!current) return "html";
+    if (
+      current.namespace === "svg" &&
+      svgHtmlIntegrationPoints.has(current.tagName)
+    )
+      return "html";
+    return current.namespace;
+  };
+  const htmlTokens =
+    /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\?[^>]*(?:>|$)|<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[ \t\r\n\f/>])((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gu;
+  const foreignTokens =
+    /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)|<![^>]*>|<\?[^>]*(?:>|$)|<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[ \t\r\n\f/>])((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gu;
   return (html) => {
     // Consume whole tags (including quoted values) and comments. Attribute-like
     // prose and markup inside another attribute must never become attributes.
-    const tokens =
-      /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<\?[\s\S]*?(?:\?>|$)|<(\/?)([A-Za-z][A-Za-z0-9:-]*)(?=[ \t\r\n\f/>])((?:[^"'<>]|"[^"]*"|'[^']*')*)>/gu;
     let cursor = 0;
     let found = false;
     while (cursor < html.length) {
@@ -741,13 +758,34 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
         cursor = match.index;
         rawTextTag = undefined;
       }
+      const tokens = contentNamespace() === "html" ? htmlTokens : foreignTokens;
       tokens.lastIndex = cursor;
       const token = tokens.exec(html);
       if (!token) break;
       cursor = tokens.lastIndex;
-      if (!token[2] || token[1]) continue;
+      if (!token[2]) continue;
       const tagName = token[2].toLowerCase();
-      if (rawTextTags.has(tagName)) rawTextTag = tagName;
+      if (token[1]) {
+        const foreignIndex = foreignElements.findLastIndex(
+          (element) => element.tagName === tagName,
+        );
+        if (foreignIndex >= 0) foreignElements.splice(foreignIndex);
+        continue;
+      }
+      const namespace = contentNamespace();
+      const tokenNamespace =
+        namespace === "html"
+          ? tagName === "svg"
+            ? "svg"
+            : tagName === "math"
+              ? "mathml"
+              : "html"
+          : namespace;
+      const selfClosing = /(?:^|[ \t\r\n\f])\/$/u.test(token[3]!);
+      // HTML ignores the self-closing flag on these non-void elements. Foreign
+      // elements honor it and never enter an HTML raw-text tokenizer state.
+      if (tokenNamespace === "html" && rawTextTags.has(tagName))
+        rawTextTag = tagName;
       const attributes =
         /[ \t\r\n\f]+([^ \t\r\n\f"'<>/=]+)(?:[ \t\r\n\f]*=[ \t\r\n\f]*(?:"([^"]*)"|'([^']*)'|([^ \t\r\n\f>]+)))?/gu;
       const seen = new Set<string>();
@@ -769,6 +807,8 @@ function createHtmlAssetReferenceInspector(): (html: string) => boolean {
         // without normalizing it into an accepted or rewritable asset scheme.
         if (/^renma[-\u2010]asset:/iu.test(urlInput)) found = true;
       }
+      if (tokenNamespace !== "html" && !selfClosing)
+        foreignElements.push({ tagName, namespace: tokenNamespace });
     }
     return found;
   };

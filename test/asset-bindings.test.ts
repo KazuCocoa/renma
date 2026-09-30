@@ -738,3 +738,43 @@ test("HTML raw-text handling resumes after closing tags and inspects their own a
     assert.deepEqual(report.references, []);
   }
 });
+
+test("HTML recovery and foreign-content states cannot hide reserved destinations", () => {
+  for (const body of [
+    '<?bogus><a href="renma&#45;asset:b">B</a>?>',
+    '<svg><script /></svg><a href="renma&#45;asset:b">B</a>',
+    '<svg><title><a href="renma&#45;asset:b">B</a></title></svg>',
+  ]) {
+    const report = source([
+      skill("a", "skill.b", [pin("skill.b")], body),
+      skill("b", undefined, [], "", "1.0.0"),
+    ]);
+    assert.equal(report.bindings[0]!.satisfaction.status, "matched");
+    assert.equal(report.declarationValid, false, body);
+    assert.deepEqual(report.references, [], body);
+    assert.equal(
+      report.diagnostics.filter(
+        (diagnostic) => diagnostic.code === "RN-BINDING-UNSUPPORTED-REFERENCE",
+      ).length,
+      1,
+      body,
+    );
+  }
+});
+
+test("foreign-content CDATA and HTML integration raw text remain inert", () => {
+  for (const body of [
+    '<svg><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></svg>',
+    '<math><![CDATA[foo > <a href="renma&#45;asset:b">B</a>]]></math>',
+    '<script/><a href="renma&#45;asset:b">B</a></script>',
+    "<svg><foreignObject><script>const example = '<a href=\"renma&#45;asset:b\">B</a>';</script></foreignObject></svg>",
+  ]) {
+    const report = source([
+      skill("a", "skill.b", [pin("skill.b")], body),
+      skill("b", undefined, [], "", "1.0.0"),
+    ]);
+    assert.equal(report.declarationValid, true, body);
+    assert.deepEqual(report.references, [], body);
+    assert.deepEqual(report.diagnostics, [], body);
+  }
+});
