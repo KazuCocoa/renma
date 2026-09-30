@@ -471,37 +471,37 @@ export function inspectAssetBindings(
         );
     }
     inspectReferences(document, item, issue);
-    if (fields.length || item.references.length || item.diagnostics.length) {
-      for (const diagnostic of parseAssetMetadata(document).diagnostics)
+    // A target may be inspected alone in an acquired snapshot. Retain its
+    // declaration diagnostics even without bindings or incoming local edges.
+    for (const diagnostic of parseAssetMetadata(document).diagnostics)
+      issue(
+        "RN-BINDING-METADATA",
+        diagnostic.message,
+        lineLocation(
+          document,
+          diagnostic.evidence?.startLine ?? 1,
+          diagnostic.evidence?.endLine ?? 1,
+        ),
+      );
+    if (skill)
+      for (const diagnostic of inspectAgentSkill(
+        document,
+      ).validation.issues.filter((d) => d.severity === "error"))
         issue(
           "RN-BINDING-METADATA",
           diagnostic.message,
           lineLocation(
             document,
-            diagnostic.evidence?.startLine ?? 1,
-            diagnostic.evidence?.endLine ?? 1,
+            diagnostic.startLine ?? 1,
+            diagnostic.endLine ?? 1,
           ),
         );
-      if (skill)
-        for (const diagnostic of inspectAgentSkill(
-          document,
-        ).validation.issues.filter((d) => d.severity === "error"))
-          issue(
-            "RN-BINDING-METADATA",
-            diagnostic.message,
-            lineLocation(
-              document,
-              diagnostic.startLine ?? 1,
-              diagnostic.endLine ?? 1,
-            ),
-          );
-      if (fm.errors.length)
-        issue(
-          "RN-BINDING-MALFORMED",
-          "Invalid YAML prevents binding validation.",
-          bindingEvidence,
-        );
-    }
+    if (fm.errors.length)
+      issue(
+        "RN-BINDING-MALFORMED",
+        "Invalid YAML prevents binding validation.",
+        bindingEvidence,
+      );
     item.declarationValid = item.diagnostics.length === 0;
     for (const binding of item.bindings)
       binding.declarationValid = item.declarationValid;
@@ -631,13 +631,15 @@ function inspectReferences(
     item.references.push(reference);
     // The AST establishes a real inline link; this suffix recognizer only locates
     // a literal destination after the parsed label, never arbitrary prose/code.
+    // mdast may omit trailing multiline label whitespace from its final child;
+    // consume only that whitespace before requiring the closing bracket.
     const labelEnd =
       node.type === "link" && node.children.length
         ? originalOffset(node.children.at(-1)?.position?.end)
         : start + 1;
     const suffix = document.artifact.content.slice(labelEnd, end);
     const match =
-      /^\]\(\s*(?:<(renma-asset:[a-z][a-z0-9-]*)>|(renma-asset:[a-z][a-z0-9-]*))(?=\s|\))/u.exec(
+      /^[ \t\r\n]*\]\(\s*(?:<(renma-asset:[a-z][a-z0-9-]*)>|(renma-asset:[a-z][a-z0-9-]*))(?=\s|\))/u.exec(
         suffix,
       );
     if (

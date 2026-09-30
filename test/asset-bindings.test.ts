@@ -382,3 +382,106 @@ test("repeated required/optional declarations retain their original indexes and 
     binding.relationships.every((r) => r.evidence.raw.includes("skill.b")),
   );
 });
+
+test("unbound dependency targets retain metadata errors locally and in historical snapshots", () => {
+  const a = skill("a", "ctx", [pin("ctx", "1")], "", "1", "requires-context");
+  const ctx = context(
+    "ctx",
+    "1",
+    "requires_context: [leaf]\nrequires_context: [other]\n",
+  );
+  const report = inspectAssetBindings([a, ctx]);
+  const caller = report.documents.find((d) => d.identity.id === "skill.a")!;
+  const target = report.documents.find((d) => d.identity.id === "ctx")!;
+  assert.equal(caller.declarationValid, true);
+  assert.equal(caller.bindings[0]!.satisfaction.status, "matched");
+  assert.deepEqual(target.bindings, []);
+  assert.deepEqual(target.references, []);
+  assert.deepEqual(target.relationships, []);
+  assert.equal(target.declarationValid, false);
+  const diagnostic = target.diagnostics.find(
+    (d) =>
+      d.code === "RN-BINDING-METADATA" &&
+      d.message.includes("requires_context"),
+  );
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.phase, "declaration");
+  assert.equal(diagnostic.evidence.path, ctx.path);
+  const content = Buffer.from(ctx.bytes).toString();
+  assert.match(diagnostic.evidence.raw, /requires_context:/u);
+  assert.equal(
+    content.slice(diagnostic.evidence.start, diagnostic.evidence.end),
+    diagnostic.evidence.raw,
+  );
+  assert.equal(
+    diagnostic.evidence.sha256,
+    createHash("sha256").update(ctx.bytes).digest("hex"),
+  );
+
+  const historical = inspectAssetBindings([ctx]).documents[0]!;
+  assert.deepEqual(historical, target);
+  assert.equal(
+    compareAssetBinding(caller.bindings[0]!, [historical.identity]).status,
+    "matched",
+  );
+  assert.equal(historical.declarationValid, false);
+  const repaired = inspectAssetBindings([
+    context("ctx", "1", "requires_context: [leaf]\n"),
+  ]).documents[0]!;
+  assert.equal(repaired.declarationValid, true);
+  assert.deepEqual(repaired.diagnostics, []);
+  assert.equal(repaired.relationships[0]!.target, "leaf");
+});
+
+test("multiline labels retain exact destinations after trailing whitespace with LF and CRLF", () => {
+  const forms = [
+    "[B\n ](renma-asset:b)",
+    "[B\n \t ](renma-asset:b)",
+    '[**B**\n ](<renma-asset:b> "[fake](renma-asset:b)")',
+    '[`[fake](renma-asset:b)`\n ](renma-asset:b "[title](renma-asset:b)")',
+    '[B\\]\\(renma-asset:b\\)\n ](<renma-asset:b> "title")',
+  ];
+  for (const newline of ["\n", "\r\n"]) {
+    for (const form of forms) {
+      const original = skill(
+        "a",
+        "skill.b",
+        [pin("skill.b")],
+        `😀 ${form}\n\n\`[code](renma-asset:b)\`\n\n\`\`\`md\n[fenced](renma-asset:b)\n\`\`\`\n`,
+      );
+      const content =
+        "\uFEFF" +
+        Buffer.from(original.bytes).toString().replaceAll("\n", newline);
+      const input = file(original.path, content);
+      const report = source([input]);
+      assert.equal(
+        report.declarationValid,
+        true,
+        JSON.stringify({ form, newline, diagnostics: report.diagnostics }),
+      );
+      assert.equal(report.references.length, 1);
+      const destination = report.references[0]!.destination!;
+      // The actual closing label follows its newline indentation, unlike decoys.
+      const expectedStart = content.indexOf(
+        "renma-asset:b",
+        content.indexOf(newline, content.indexOf("😀")) + newline.length,
+      );
+      assert.equal(destination.start, expectedStart);
+      assert.equal(destination.end, expectedStart + "renma-asset:b".length);
+      assert.equal(
+        content.slice(destination.start, destination.end),
+        "renma-asset:b",
+      );
+      assert.equal(destination.raw, "renma-asset:b");
+      assert.equal(
+        destination.startLine,
+        content.slice(0, expectedStart).split("\n").length,
+      );
+      assert.equal(destination.endLine, destination.startLine);
+      assert.equal(
+        destination.sha256,
+        createHash("sha256").update(input.bytes).digest("hex"),
+      );
+    }
+  }
+});
