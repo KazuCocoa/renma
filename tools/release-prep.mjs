@@ -22,6 +22,7 @@ const RELEASE_FILES = [
   "package-lock.json",
   "CHANGELOG.md",
   "docs/development/versioned-skill-bindings.md",
+  "test/cli.test.ts",
   "tools/release-prep.mjs",
   ...CONSUMER_INSTALLATION_FILES,
 ];

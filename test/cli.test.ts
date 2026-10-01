@@ -935,7 +935,7 @@ test("scan output keeps suppressed findings separate and visible as evidence", a
           id: "SEC-LITERAL-SECRET",
           paths: ["skills/demo/**"],
           reason: "Fixture intentionally includes a fake secret.",
-          expires: "2026-09-30",
+          expires: "2999-12-31",
         },
       ],
     }),
