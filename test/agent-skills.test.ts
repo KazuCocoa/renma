@@ -805,7 +805,7 @@ test("repository-wide summary is deterministic", () => {
   assert.equal(summary.invalidSkillCount, 0);
 });
 
-test("duplicate repository-wide names warn by default across roots, owners, sources and governance IDs", async () => {
+test("duplicate repository-wide names are informational by default across roots, owners, sources and governance IDs", async () => {
   const root = await fixture();
   const paths = [
     "skills/security/security-review/SKILL.md",
@@ -825,7 +825,7 @@ test("duplicate repository-wide names warn by default across roots, owners, sour
   const result = await scan(root, { failOn: "critical" });
   assert.equal(result.agentSkills.invalidSkillCount, 0);
   assert.equal(result.agentSkills.validSkillCount, 3);
-  assert.equal(result.agentSkills.warningCount, 3);
+  assert.equal(result.agentSkills.warningCount, 0);
   assert.equal(
     result.findings.some((finding) => finding.id === "META-DUPLICATE-ASSET-ID"),
     false,
@@ -835,7 +835,7 @@ test("duplicate repository-wide names warn by default across roots, owners, sour
       (issue) => issue.code === "RN-SKILL-DUPLICATE-NAME",
     );
     assert.equal(issues.length, 1);
-    assert.equal(issues[0]?.severity, "warning");
+    assert.equal(issues[0]?.severity, "info");
     assert.equal(issues[0]?.startLine, 2);
     assert.deepEqual(issues[0]?.details, {
       name: "security-review",
@@ -931,7 +931,7 @@ test("duplicate names use existing trimming and NFKC normalization deterministic
   assert.deepEqual(summary, validateAgentSkills([...documents].reverse()));
   for (const result of summary.results) {
     assert.equal(result.errorCount, 0);
-    assert.equal(result.warningCount, 1);
+    assert.equal(result.warningCount, 0);
     assert.deepEqual(result.issues[0]?.details, {
       name: "demo",
       duplicatePaths: ["skills/a/ｄｅｍｏ/SKILL.md", "skills/z/demo/SKILL.md"],
@@ -939,7 +939,7 @@ test("duplicate names use existing trimming and NFKC normalization deterministic
   }
 });
 
-test("two identical Skill names warn even with different canonical IDs", () => {
+test("two identical Skill names are informational even with different canonical IDs", () => {
   const summary = validateAgentSkills(
     ["alpha", "beta"].map((group) =>
       skill(
@@ -953,7 +953,7 @@ test("two identical Skill names warn even with different canonical IDs", () => {
   );
   assert.equal(summary.invalidSkillCount, 0);
   assert.equal(summary.validSkillCount, 2);
-  assert.ok(summary.results.every((result) => result.warningCount === 1));
+  assert.ok(summary.results.every((result) => result.warningCount === 0));
   assert.ok(
     summary.results.every((result) =>
       result.issues.some((issue) => issue.code === "RN-SKILL-DUPLICATE-NAME"),
@@ -1011,7 +1011,7 @@ test("name equality stays case-sensitive and directory errors remain independent
     mismatch.issues.some((issue) => issue.code === "RN-SKILL-DUPLICATE-NAME"),
   );
   assert.equal(mismatch.errorCount, 1);
-  assert.equal(mismatch.warningCount, 1);
+  assert.equal(mismatch.warningCount, 0);
 });
 
 test("duplicate governance IDs remain medium findings independently of Skill names", async () => {

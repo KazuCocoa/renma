@@ -53,11 +53,16 @@ export interface AssetBindingDiagnostic {
   phase: "declaration" | "local-satisfaction";
 }
 export interface NormalizedAssetBinding {
-  /** Declaration is valid and the local candidate comparison matched. */
+  /** Declaration is valid and the local identity/kind/optional-release comparison matched; never verifies Git provenance. */
   satisfied?: boolean;
   alias: string;
   target: string;
-  version: string;
+  /** Exact declared release, when supplied. At least version or ref is required. */
+  version?: string;
+  /** Declared Git ref; never looked up or compared with a local release. */
+  ref?: string;
+  /** Externally supplied resolution evidence; Renma does not verify the revision. */
+  resolved?: { commit: string };
   entryIndex: number;
   evidence: AssetBindingLocation;
   relationships: AssetBindingRelationship[];
@@ -65,6 +70,7 @@ export interface NormalizedAssetBinding {
   satisfaction: AssetBindingSatisfaction;
 }
 export interface AssetBindingSatisfaction {
+  /** Local identity/kind and optional release comparison; refs and commits are not verified. */
   status:
     | "matched"
     | "missing"

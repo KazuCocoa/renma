@@ -16,3 +16,9 @@ use `compareAssetBinding` to validate B 1.0.0 separately.
 The optional Lens has a body reference. A builder that omits it must reject the
 dangling reference. No Plugin, lockfile, download or rewritten output is produced
 by Renma.
+
+Workflow A illustrates a declared release/ref plus optional `resolved.commit`.
+The example SHA is illustrative external provenance, not a revision looked up or
+verified by Renma. Version-only bindings elsewhere remain valid. A ref-only entry
+can use `{"alias":"b","target":"skill.b","ref":"main","resolved":{"commit":"7e91d1654daaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}`;
+its local match checks identity/kind, not the Git revision.

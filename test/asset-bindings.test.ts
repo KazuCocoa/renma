@@ -982,3 +982,210 @@ test("MathML integration exceptions and non-HTML annotations remain inspectable"
     );
   }
 });
+
+test("optional externally supplied commit preserves declarations and legacy output", async () => {
+  const schema = JSON.parse(
+    await readFile("docs/schemas/asset-bindings-v1.schema.json", "utf8"),
+  ) as AnySchemaObject;
+  const validate = new Ajv2020({ strict: true }).compile(schema);
+  const commit = "7e91d1654d" + "a".repeat(30);
+  for (const declaration of [
+    pin("skill.b"),
+    { ...pin("skill.b"), ref: "v1.0.0", resolved: { commit } },
+    { alias: "b", target: "skill.b", ref: "main", resolved: { commit } },
+    { alias: "b", target: "skill.b", ref: "main" },
+    { ...pin("skill.b"), resolved: { commit: "A".repeat(64) } },
+  ]) {
+    const input = skill("a", "skill.b", [declaration]);
+    const before = input.bytes.slice();
+    const report = inspectAssetBindings([
+      input,
+      skill("b", undefined, [], "", "1.0.0"),
+    ]);
+    assert.ok(validate(report), JSON.stringify(validate.errors));
+    const binding = report.documents.find((d) => d.identity.id === "skill.a")!
+      .bindings[0]!;
+    assert.equal(binding.declarationValid, true);
+    assert.equal(binding.satisfied, true);
+    const {
+      entryIndex,
+      evidence,
+      relationships,
+      declarationValid,
+      satisfaction,
+      satisfied,
+      ...metadata
+    } = binding;
+    assert.deepEqual(metadata, declaration);
+    assert.deepEqual(JSON.parse(JSON.stringify(binding)), binding);
+    assert.deepEqual(input.bytes, before);
+    assert.equal(evidence.raw.includes("resolved"), "resolved" in declaration);
+    // Returned provenance is detached and never replaces the declared release.
+    if (binding.resolved) binding.resolved.commit = "b".repeat(40);
+    assert.deepEqual(
+      inspectAssetBindings([
+        input,
+        skill("b", undefined, [], "", "1.0.0"),
+      ]).documents.find((d) => d.identity.id === "skill.a")!.bindings[0]!
+        .resolved,
+      "resolved" in declaration ? declaration.resolved : undefined,
+    );
+  }
+});
+
+test("ref-only satisfaction checks identity/kind without claiming Git verification", () => {
+  const declaration = {
+    alias: "b",
+    target: "skill.b",
+    ref: "main",
+    resolved: { commit: "a".repeat(40) },
+  };
+  const a = skill("a", "skill.b", [declaration]);
+  const noVersion = file(
+    "skills/b/SKILL.md",
+    "---\nname: b\ndescription: Review workflows.\nmetadata:\n  renma.id: skill.b\n---\n",
+  );
+  assert.equal(
+    source([a, noVersion]).bindings[0]!.satisfaction.status,
+    "matched",
+  );
+  assert.equal(source([a]).bindings[0]!.satisfaction.status, "missing");
+  assert.equal(
+    source([a, context("skill.b")]).bindings[0]!.satisfaction.status,
+    "kind-mismatch",
+  );
+  assert.equal(
+    source([a, noVersion, context("skill.b")]).bindings[0]!.satisfaction.status,
+    "ambiguous",
+  );
+  const versioned = skill("a", "skill.b", [
+    { ...declaration, version: "2.0.0" },
+  ]);
+  assert.equal(
+    source([versioned, skill("b", undefined, [], "", "1.0.0")]).bindings[0]!
+      .satisfaction.status,
+    "version-mismatch",
+  );
+});
+
+test("provenance validation rejects malformed fields in JSON, YAML and wire schema", async () => {
+  const schema = JSON.parse(
+    await readFile("docs/schemas/asset-bindings-v1.schema.json", "utf8"),
+  ) as AnySchemaObject;
+  const validate = new Ajv2020({ strict: true }).compile(schema);
+  const valid = inspectAssetBindings([skill("a", "skill.b"), skill("b")]);
+  for (const extra of [
+    { resolved: null },
+    { resolved: [] },
+    { resolved: {} },
+    { resolved: { commit: "7e91d16" } },
+    { resolved: { commit: "g".repeat(40) } },
+    { resolved: { commit: "a".repeat(39) } },
+    { resolved: { commit: "a".repeat(41) } },
+    { resolved: { commit: "a".repeat(40) + " " } },
+    { resolved: { commit: "a".repeat(40) + "\n" } },
+    { resolved: { commit: 1 } },
+    { resolved: { commit: "a".repeat(40), extra: true } },
+    { ref: " main" },
+    { ref: "" },
+    { ref: null },
+    { version: null },
+  ]) {
+    const binding = { ...pin("skill.b"), ...extra };
+    const report = source([skill("a", "skill.b", [binding])]);
+    assert.equal(report.declarationValid, false, JSON.stringify(extra));
+    assert.ok(
+      report.diagnostics.some((d) => d.code === "RN-BINDING-MALFORMED"),
+    );
+    const bad = structuredClone(valid);
+    Object.assign(
+      bad.documents.find((d) => d.identity.id === "skill.a")!.bindings[0]!,
+      extra,
+    );
+    assert.equal(validate(bad), false, JSON.stringify(extra));
+  }
+  const noSelector = {
+    alias: "b",
+    target: "skill.b",
+    resolved: { commit: "a".repeat(40) },
+  };
+  assert.equal(
+    source([skill("a", "skill.b", [noSelector])]).declarationValid,
+    false,
+  );
+  const bad = structuredClone(valid);
+  delete bad.documents.find((d) => d.identity.id === "skill.a")!.bindings[0]!
+    .version;
+  assert.equal(validate(bad), false);
+  for (const metadata of [
+    " - {alias: b, target: ctx, ref: main, resolved: {commit: '" +
+      "a".repeat(40) +
+      "'}}",
+    " - {alias: b, target: ctx, version: '1', ref: v1, resolved: {commit: '" +
+      "a".repeat(40) +
+      "'}}",
+    " - {alias: b, target: ctx, ref: main, resolved: {commit: short}}",
+    " - {alias: b, target: ctx, ref: main, resolved: {commit: '" +
+      "a".repeat(40) +
+      "', commit: '" +
+      "b".repeat(40) +
+      "'}}",
+  ]) {
+    const report = inspectAssetBindings([
+      context(
+        "parent",
+        "1",
+        "requires_context: [ctx]\nasset_bindings:\n" + metadata + "\n",
+      ),
+      context("ctx", "1"),
+    ]);
+    const parent = report.documents.find((d) => d.identity.id === "parent")!;
+    assert.equal(
+      parent.declarationValid,
+      !metadata.includes("short") && !metadata.includes("b".repeat(40)),
+    );
+    assert.ok(validate(report), JSON.stringify(validate.errors));
+  }
+  const duplicate = skill("a", "skill.b", [
+    { ...pin("skill.b"), resolved: { commit: "a".repeat(40) } },
+  ]);
+  const text = Buffer.from(duplicate.bytes)
+    .toString()
+    .replace(
+      '"commit":"' + "a".repeat(40) + '"',
+      '"commit":"' + "a".repeat(40) + '","commit":"' + "b".repeat(40) + '"',
+    );
+  assert.equal(source([file(duplicate.path, text)]).declarationValid, false);
+});
+
+test("direct comparison requires an explicit ref for a ref-only binding", () => {
+  const candidate = inspectAssetBindings([skill("b")]).documents[0]!.identity;
+  const binding = { target: "skill.b", relationships: [] };
+  for (const ref of [undefined, "", " main", "main "]) {
+    assert.throws(
+      () =>
+        compareAssetBinding(
+          { ...binding, ...(ref === undefined ? {} : { ref }) },
+          [candidate],
+        ),
+      /requires an exact non-empty declared ref/,
+    );
+  }
+  assert.equal(
+    compareAssetBinding({ ...binding, ref: "main" }, [candidate]).status,
+    "matched",
+  );
+  assert.equal(
+    compareAssetBinding({ ...binding, ref: "main" }, []).status,
+    "missing",
+  );
+  // Existing release-only API calls keep the exact release comparison.
+  assert.equal(
+    compareAssetBinding({ ...binding, version: "1.0.1" }, [candidate]).status,
+    "matched",
+  );
+  assert.equal(
+    compareAssetBinding({ ...binding, version: "2.0.0" }, [candidate]).status,
+    "version-mismatch",
+  );
+});

@@ -44,11 +44,13 @@ asset_bindings:
     version: "2.0"
 ```
 
-Each entry has exactly three string fields: `alias`, `target`, `version`.
+Each entry requires string `alias` and `target`, plus `version` and/or `ref`.
+Optional `resolved.commit` carries a full externally supplied Git SHA; see
+[resolution provenance](../asset-bindings.md#resolution-provenance).
 Aliases match `[a-z][a-z0-9-]*`. Aliases and targets must each be unique.
 Targets must be explicit stable IDs already named by a supported declaration,
-not paths or URLs. Duplicate object keys, extra keys and malformed entries are
-errors. Values are never silently trimmed or coerced. Empty arrays are valid.
+not paths or URLs. Duplicate object keys, unrecognized keys and malformed
+entries are errors. Values are never silently trimmed or coerced. Empty arrays are valid.
 
 Release versions are non-empty strings without surrounding whitespace, compared
 by exact equality; no SemVer syntax or precedence is imposed. A literal range,
@@ -56,7 +58,8 @@ tag or URL is never resolved: it could match only an identical authored release
 identifier. Skill `renma.version` and Context `version` retain their existing
 text semantics. Lens `version` remains the format version (currently `"1"`);
 only Lens `release_version` identifies a distribution release. Binding sources
-and selected targets need explicit IDs and release versions. Supporting files
+need explicit IDs and release versions. Selected targets need explicit IDs and,
+for a version comparison, release versions. Supporting files
 without independent governance are pinned by the builder's parent inventory
 and hashes, not made independently versioned by this extension.
 
@@ -92,7 +95,9 @@ relationships retain catalog order, references retain source order. The API
 reuses the existing classification, operational metadata and catalog edges.
 All returned data is detached from inputs; no private-module imports are needed.
 
-Declaration validity is separate from local satisfaction: matched, missing,
+Declared/requested selectors and external `resolved.commit` provenance are separate
+from local `satisfaction` / `satisfied`; ref-only bindings check identity/kind and
+never verify a Git revision. Declaration validity is separate from local satisfaction: matched, missing,
 ambiguous, kind-mismatch, target-version-invalid or version-mismatch. A version
 never disambiguates duplicate IDs. Candidate identities include original-source
 evidence. Invalid source identity/version, duplicate aliases/targets, undeclared

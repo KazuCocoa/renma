@@ -243,3 +243,11 @@ The [binding contract](asset-bindings.md#dependency-analysis-and-graph-reports)
 defines their snapshot scope. Existing `resolved` and composition completeness
 fields keep their meanings. The dedicated asset-binding v1 schema adds optional
 `satisfied` without changing its closed candidate-comparison status enum.
+
+Asset-binding annotations optionally carry declared `ref` and externally supplied
+`resolved.commit` (a full 40- or 64-character Git object ID). `version` remains
+separate and may be omitted when `ref` is declared. Existing version-only output
+is unchanged. These fields propagate through catalog, graph, composition and
+impact serialization. A nested commit is not the graph's boolean `resolved` and
+is not verified by local `satisfaction` / `satisfied`; see
+[resolution provenance](asset-bindings.md#resolution-provenance).

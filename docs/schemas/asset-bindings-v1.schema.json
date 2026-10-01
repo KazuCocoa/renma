@@ -151,7 +151,8 @@
             "kind-mismatch",
             "target-version-invalid",
             "version-mismatch"
-          ]
+          ],
+          "description": "Local identity/kind and optional exact-release comparison; declared refs and externally supplied commits are never verified."
         },
         "candidates": {
           "type": "array",
@@ -167,7 +168,6 @@
       "required": [
         "alias",
         "target",
-        "version",
         "entryIndex",
         "evidence",
         "relationships",
@@ -182,7 +182,9 @@
           "type": "string"
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$(?![\\s\\S])"
         },
         "entryIndex": {
           "type": "integer",
@@ -205,9 +207,40 @@
         },
         "satisfied": {
           "type": "boolean",
-          "description": "Declaration is valid and the local candidate comparison matched. Does not establish transitive release completeness."
+          "description": "Declaration is valid and the local identity/kind/optional-release comparison matched. Ref-only matches do not verify Git refs or commits. Does not establish transitive release completeness."
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$(?![\\s\\S])"
+        },
+        "resolved": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit"],
+          "description": "Externally supplied resolution provenance; not obtained or verified by Renma.",
+          "properties": {
+            "commit": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$(?![\\s\\S])"
+            }
+          }
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": ["version"],
+          "properties": {
+            "version": {}
+          }
+        },
+        {
+          "required": ["ref"],
+          "properties": {
+            "ref": {}
+          }
+        }
+      ]
     },
     "reference": {
       "type": "object",

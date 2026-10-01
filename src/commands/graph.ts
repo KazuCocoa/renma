@@ -1977,7 +1977,7 @@ function bindingLabel(edge: {
     (edge.bindings
       ?.map(
         (binding) =>
-          ` [${binding.alias} @${binding.version}: ${binding.satisfied ? "matched" : `${binding.declarationValid ? "" : "invalid declaration; "}${binding.satisfaction.status}`}]`,
+          ` [${binding.alias} @${binding.version ?? `ref ${binding.ref} (unverified)`}${binding.version !== undefined && binding.ref !== undefined ? ` ref ${binding.ref}` : ""}${binding.resolved ? ` commit ${binding.resolved.commit.slice(0, 12)} (supplied)` : ""}: ${binding.satisfied ? "matched" : `${binding.declarationValid ? "" : "invalid declaration; "}${binding.satisfaction.status}`}]`,
       )
       .join("") ?? "") +
     (!edge.bindings?.length && edge.bindingDiagnostics?.length
