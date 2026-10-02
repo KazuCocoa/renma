@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-02
+
 ### Added
 
 - Focused `graph --view dependencies` and `graph --view asset-impact` combine
@@ -2884,7 +2886,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.40.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.41.0...HEAD
+[0.41.0]: https://github.com/KazuCocoa/renma/compare/v0.40.1...v0.41.0
 [0.40.1]: https://github.com/KazuCocoa/renma/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/KazuCocoa/renma/compare/v0.39.2...v0.40.0
 [0.39.1]: https://github.com/KazuCocoa/renma/compare/v0.39.0...v0.39.1
