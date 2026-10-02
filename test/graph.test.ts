@@ -374,6 +374,57 @@ test("asset dependency focus rejects duplicate IDs and path focus does not trave
   assert.equal(report.edgeCount, 0);
 });
 
+test("Mermaid keeps asset IDs separate from source paths when their strings collide", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    id: "contexts/testing/policy.md",
+    requiresContext: ["testing.policy"],
+  });
+  await mkdir(path.join(root, "skills/demo/scripts"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills/demo/scripts/run.mjs"),
+    "// helper\n",
+  );
+  await writeContext(root, "testing", "policy", {});
+  await appendFile(
+    path.join(root, "contexts/testing/policy.md"),
+    "Use `skills/demo/scripts/run.mjs`.\n",
+  );
+  const report = await graph(root);
+  const mermaid = formatGraphMermaid(report, "full");
+  const context = mermaidNodeId(mermaid, "context: testing.policy");
+  const skill = mermaidNodeId(mermaid, "skill: contexts/testing/policy.md");
+  const script = mermaidNodeId(mermaid, "script: skills/demo/scripts/run.mjs");
+  assert.ok(mermaid.includes(`${skill} -->|requires| ${context}`));
+  assert.ok(
+    mermaid.includes(`${context} -->|statically_references| ${script}`),
+  );
+  assert.ok(!mermaid.includes(`${skill} -->|statically_references| ${script}`));
+});
+
+test("cross-distribution references reject bracket globs even if an exact filename exists", async () => {
+  const root = await fixture();
+  await writeSkill(root, "helper", {});
+  await mkdir(path.join(root, "skills/helper/scripts"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills/helper/scripts/[ab].mjs"),
+    "// fixture\n",
+  );
+  await writeContext(root, "testing", "policy", {});
+  await appendFile(
+    path.join(root, "contexts/testing/policy.md"),
+    "Use `skills/helper/scripts/[ab].mjs`.\n",
+  );
+  const report = await graph(root);
+  assert.equal(
+    report.edges.some(
+      (edge) =>
+        edge.from === "testing.policy" && edge.kind === "statically_references",
+    ),
+    false,
+  );
+});
+
 test("graph composition view resolves required and optional closure with provenance", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {

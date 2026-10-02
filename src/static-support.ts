@@ -780,7 +780,7 @@ function repositorySupportReferences(
         cleaned.startsWith("#") ||
         path.posix.isAbsolute(cleaned) ||
         /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(cleaned) ||
-        /[\\\0$*?{}]/u.test(cleaned) ||
+        /[\\\0$*?{}\[\]]/u.test(cleaned) ||
         cleaned.endsWith("/")
       )
         continue;
@@ -819,7 +819,12 @@ function repositorySupportReferences(
       raw: command.snippet,
     });
   }
-  return references;
+  return references.sort(
+    (left, right) =>
+      left.line - right.line ||
+      compareUtf16CodeUnits(left.targetPath, right.targetPath) ||
+      compareUtf16CodeUnits(left.raw, right.raw),
+  );
 }
 
 function normalizeStaticSupportReference(

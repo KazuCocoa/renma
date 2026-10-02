@@ -578,13 +578,14 @@ export function formatGraphMermaid(
   if (view === "layered") return formatLayeredGraphMermaid(report);
 
   const nodeIds = new Map<string, string>();
+  const nodeIdsByPath = new Map<string, string>();
   const missingIds = new Map<string, string>();
   const lines = ["graph TD"];
 
   report.nodes.forEach((node, index) => {
     const id = `node_${index}`;
     nodeIds.set(node.id, id);
-    nodeIds.set(node.sourcePath, id);
+    nodeIdsByPath.set(node.sourcePath, id);
     lines.push(`  ${id}["${escapeMermaidLabel(nodeLabel(node))}"]`);
   });
 
@@ -598,11 +599,13 @@ export function formatGraphMermaid(
   }
 
   for (const edge of report.edges) {
-    const source = nodeIds.get(edge.sourcePath) ?? nodeIds.get(edge.from);
+    const source = nodeIdsByPath.get(edge.sourcePath) ?? nodeIds.get(edge.from);
     if (!source) continue;
 
     if (edge.resolved && edge.targetId) {
-      const target = nodeIds.get(edge.targetPath ?? edge.targetId);
+      const target =
+        (edge.targetPath ? nodeIdsByPath.get(edge.targetPath) : undefined) ??
+        nodeIds.get(edge.targetId);
       if (target) {
         lines.push(
           `  ${source} -->|${escapeMermaidEdgeLabel(edge.kind + bindingLabel(edge))}| ${target}`,

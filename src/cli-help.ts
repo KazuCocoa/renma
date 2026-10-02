@@ -306,7 +306,7 @@ export const COMMAND_HELP = [
     interpretation: [
       "Edges represent declared relationships Renma can resolve or report as unresolved.",
       "Unexpected isolation is evidence to review, not automatic permission to delete an asset.",
-      "Focused output filters to the matched asset and directly connected neighbors.",
+      "Focused summary, workflow, full, and layered output filters to the matched asset and directly connected neighbors.",
       "The composition view resolves the complete explicit required and optional closure and requires --focus.",
       "The impact view resolves reverse explicit composition to required and optional declared dependents; it reports neither runtime usage nor breakage and requires --focus.",
       "The dependencies and asset-impact views traverse explicit composition plus static support references forward or backward; both require --focus and exclude ownership and runtime usage.",

@@ -8,12 +8,20 @@ renma graph . --view dependencies --focus skill.release --format mermaid
 renma graph . --view asset-impact --focus skills/git/scripts/create-tag.mjs --format markdown
 ```
 
+These views expose file-reference topology for downstream selection and export
+consumers; they do not implement export. The existing `full` graph separately
+exposes `owns_local_resource` for cataloged Skill-local distribution contents.
+A consumer can combine that inventory with reference closure when it needs all
+supported files belonging to a selected Skill.
+
 Both views require `--focus`. JSON, Markdown, and Mermaid use the same finite,
 cycle-safe closure. Focus accepts an exact asset ID or source path; an ambiguous
 ID requires an exact path. JSON retains `renma.graph.v1` and adds
 `dependencyTraversal.focusPath` and `dependencyTraversal.direction` only for
 these views. Nodes retain content hashes and ownership evidence. Edges retain
 kind, source path, declaration/binding evidence, and static reference location.
+When the same source refers to a support target more than once, the shared
+catalog retains the earliest detected reference as representative evidence.
 
 ## Relationships
 
@@ -94,6 +102,8 @@ resolved, kind-correct targets are expanded. Missing support references do not
 create speculative nodes. A closure is not a complete inventory or an assurance
 that every runtime dependency was captured.
 
-This feature does not introduce a language import resolver. Use
+A script's own packages, imports, and portable environment are the responsibility
+of its language and packaging tools (for example, Python tooling), rather than
+Renma. This feature does not introduce a language import resolver. Use
 [`graph --view executable`](user-manual.md#inspect-executable-relationships)
 for the existing canonical script invocation and script dependency topology.

@@ -28,7 +28,7 @@ test("Context helper commands share static dependency evidence across catalog, B
   );
   await writeFile(
     path.join(root, "contexts/release.md"),
-    "---\nid: context.release\nowner: release-team\n---\n# Release\n\nRun `node skills/helper/scripts/tag.mjs`.\n",
+    "---\nid: context.release\nowner: release-team\n---\n# Release\n\nRun `node skills/helper/scripts/tag.mjs`.\n\n[Later mention](../skills/helper/scripts/tag.mjs)\n",
   );
   const result = await catalog(root);
   const edge = result.catalog.dependencies.find(
