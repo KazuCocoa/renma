@@ -33,7 +33,9 @@ asset-specific transition evidence.
 These optional properties do not change `renma.trustGraph.v2`, do not encode
 history or runtime use, and do not alter security `riskClass` semantics.
 Static support uses `owns_local_resource`, `statically_references`,
-`inherits_owner`, and `inherits_policy`. Every `owned_by` edge declares
+`inherits_owner`, and `inherits_policy`. Resolved Context and cross-distribution
+support references also use `statically_references`; these edges do not imply
+ownership or policy inheritance. See [Static Asset Dependencies](static-asset-dependencies.md). Every `owned_by` edge declares
 `ownershipSource`; when its value is `inherited`, the edge also retains an
 `inheritedFrom` object with the owning asset ID and source path. Every
 `has_effective_policy` edge has a non-empty, duplicate-free `policySources`

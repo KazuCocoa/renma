@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -65,6 +65,363 @@ test("graph JSON includes nodes and metadata dependency edges", async () => {
         "contexts/testing/boundary.md",
       ],
     ],
+  );
+});
+
+test("asset dependency views traverse composition and referenced support, excluding unused inventory", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    requiresContext: ["testing.policy"],
+    optionalContext: ["testing.optional"],
+  });
+  await writeSkill(root, "helper", {});
+  await mkdir(path.join(root, "skills/helper/references"), { recursive: true });
+  await mkdir(path.join(root, "skills/helper/scripts"), { recursive: true });
+  await writeContext(root, "testing", "policy", {});
+  await writeContext(root, "testing", "optional", {});
+  await appendFile(
+    path.join(root, "contexts/testing/policy.md"),
+    "\nRead [the helper](../../skills/helper/references/run.md#usage).\n",
+  );
+  await writeFile(
+    path.join(root, "skills/helper/references/run.md"),
+    "# Helper\nRun `scripts/run.mjs`.\n",
+  );
+  await writeFile(
+    path.join(root, "skills/helper/scripts/run.mjs"),
+    "console.log('ok');\n",
+  );
+  await writeFile(
+    path.join(root, "skills/helper/scripts/unused.mjs"),
+    "console.log('unused');\n",
+  );
+  const forward = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "dependencies",
+      "--focus",
+      "demo",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(forward.code, 0, forward.stderr);
+  const dependencyReport = JSON.parse(forward.stdout);
+  assert.equal(dependencyReport.schemaVersion, "renma.graph.v1");
+  assert.deepEqual(dependencyReport.dependencyTraversal, {
+    focusPath: "skills/demo/SKILL.md",
+    direction: "forward",
+  });
+  assert.deepEqual(
+    dependencyReport.nodes
+      .map((node: { sourcePath: string }) => node.sourcePath)
+      .sort(),
+    [
+      "contexts/testing/optional.md",
+      "contexts/testing/policy.md",
+      "skills/demo/SKILL.md",
+      "skills/helper/references/run.md",
+      "skills/helper/scripts/run.mjs",
+    ],
+  );
+  assert.deepEqual(
+    dependencyReport.edges.map((edge: { kind: string }) => edge.kind).sort(),
+    ["optional", "requires", "statically_references", "statically_references"],
+  );
+  const reference = dependencyReport.edges.find(
+    (edge: { sourcePath: string }) =>
+      edge.sourcePath === "contexts/testing/policy.md",
+  );
+  assert.equal(reference.targetPath, "skills/helper/references/run.md");
+  assert.match(reference.evidence.snippet, /the helper/);
+  assert.ok(reference.evidence.startLine > 1);
+
+  const reverse = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "asset-impact",
+      "--focus",
+      "skills/helper/scripts/run.mjs",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(reverse.code, 0, reverse.stderr);
+  const impact = JSON.parse(reverse.stdout);
+  assert.deepEqual(
+    impact.nodes.map((node: { sourcePath: string }) => node.sourcePath).sort(),
+    [
+      "contexts/testing/policy.md",
+      "skills/demo/SKILL.md",
+      "skills/helper/references/run.md",
+      "skills/helper/scripts/run.mjs",
+    ],
+  );
+  assert.equal(impact.dependencyTraversal.direction, "reverse");
+  // Distribution ownership is not evidence that the helper Skill uses run.mjs.
+  assert.equal(
+    impact.nodes.some((node: { id: string }) => node.id === "helper"),
+    false,
+  );
+
+  for (const format of ["markdown", "mermaid"]) {
+    const rendered = await withCapturedConsole(() =>
+      main([
+        "graph",
+        root,
+        "--view",
+        "dependencies",
+        "--focus",
+        "demo",
+        "--format",
+        format,
+      ]),
+    );
+    assert.equal(rendered.code, 0, rendered.stderr);
+    assert.match(rendered.stdout, /statically_references/);
+    assert.match(rendered.stdout, /run\.mjs/);
+    assert.doesNotMatch(
+      rendered.stdout,
+      /unused\.mjs|inherits_policy|owns_local_resource/,
+    );
+  }
+  const declared = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "impact",
+      "--focus",
+      "skills/helper/scripts/run.mjs",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.deepEqual(JSON.parse(declared.stdout).impact.requiredDependents, []);
+});
+
+test("asset dependency closures stop on cycles and retain unresolved composition", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", { requiresContext: ["missing.context"] });
+  await mkdir(path.join(root, "skills/demo/references"), { recursive: true });
+  await appendFile(
+    path.join(root, "skills/demo/SKILL.md"),
+    "Read references/a.md.\n",
+  );
+  await writeFile(
+    path.join(root, "skills/demo/references/a.md"),
+    "Read references/b.md.\n",
+  );
+  await writeFile(
+    path.join(root, "skills/demo/references/b.md"),
+    "Read references/a.md.\n",
+  );
+  const result = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "dependencies",
+      "--focus",
+      "demo",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(result.code, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.nodeCount, 3);
+  assert.equal(report.edgeCount, 4);
+  assert.equal(
+    report.edges.find((edge: { to: string }) => edge.to === "missing.context")
+      .resolved,
+    false,
+  );
+  for (const view of ["dependencies", "asset-impact"]) {
+    const missingFocus = await withCapturedConsole(() =>
+      main(["graph", root, "--view", view]),
+    );
+    assert.equal(missingFocus.code, 2);
+    assert.match(missingFocus.stderr, /requires --focus/);
+  }
+});
+
+test("declared Skill dependencies reach helper assets without requiring file metadata", async () => {
+  const root = await fixture();
+  await writeSkill(root, "release", {});
+  await writeSkill(root, "helper", {});
+  await writeFile(
+    path.join(root, "skills/release/SKILL.md"),
+    "---\nname: release\ndescription: Prepare a release.\nmetadata:\n  renma.id: release\n  renma.requires-skill: '[\"helper\"]'\n---\n# Release\n",
+  );
+  await mkdir(path.join(root, "skills/helper/scripts"), { recursive: true });
+  await appendFile(
+    path.join(root, "skills/helper/SKILL.md"),
+    "Run `scripts/run.mjs`.\n",
+  );
+  await writeFile(
+    path.join(root, "skills/helper/scripts/run.mjs"),
+    "// helper\n",
+  );
+  const result = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "dependencies",
+      "--focus",
+      "release",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(result.code, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.nodeCount, 3);
+  assert.equal(
+    report.edges.find((edge: { from: string }) => edge.from === "release")
+      .declaration,
+    "requires_skill",
+  );
+  assert.equal(
+    report.edges.find((edge: { from: string }) => edge.from === "helper")
+      .targetPath,
+    "skills/helper/scripts/run.mjs",
+  );
+});
+
+test("repository support references use exact paths and reject external, escaping and basename guesses", async () => {
+  const root = await fixture();
+  await writeSkill(root, "helper", {});
+  await mkdir(path.join(root, "skills/helper/scripts"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills/helper/scripts/run.mjs"),
+    "// helper\n",
+  );
+  await writeContext(root, "testing", "policy", {});
+  await appendFile(
+    path.join(root, "contexts/testing/policy.md"),
+    [
+      "",
+      "Use `run.mjs`.",
+      "[External](https://example.com/skills/helper/scripts/run.mjs)",
+      "[Escape](../../../skills/helper/scripts/run.mjs)",
+      "[Absolute](/skills/helper/scripts/run.mjs)",
+      "[Directory](../../skills/helper/scripts/)",
+      "Use `skills/helper/scripts/*.mjs`.",
+      "Use `skills/helper/scripts/run.mjs`.",
+      "[Duplicate](../../skills/helper/scripts/run.mjs)",
+      "",
+    ].join("\n"),
+  );
+  const report = await graph(root);
+  const refs = report.edges.filter(
+    (edge) =>
+      edge.from === "testing.policy" && edge.kind === "statically_references",
+  );
+  assert.equal(refs.length, 1);
+  assert.equal(refs[0]?.targetPath, "skills/helper/scripts/run.mjs");
+  const script = report.nodes.find(
+    (node) => node.sourcePath === "skills/helper/scripts/run.mjs",
+  );
+  assert.equal(script?.ownership.effectiveOwner, null);
+});
+
+test("asset dependency focus rejects duplicate IDs and path focus does not traverse the other source", async () => {
+  const root = await fixture();
+  await writeContext(root, "testing", "one", {});
+  await mkdir(path.join(root, "contexts/other"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts/other/two.md"),
+    markdown({
+      id: "testing.one",
+      requiresContext: ["missing.from-other"],
+      title: "# Other",
+    }),
+  );
+  const ambiguous = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "dependencies",
+      "--focus",
+      "testing.one",
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(ambiguous.code, 2);
+  assert.match(ambiguous.stderr, /ambiguous/);
+  const exact = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "dependencies",
+      "--focus",
+      "contexts/testing/one.md",
+      "--format",
+      "json",
+    ]),
+  );
+  const report = JSON.parse(exact.stdout);
+  assert.equal(report.nodeCount, 1);
+  assert.equal(report.edgeCount, 0);
+});
+
+test("Mermaid keeps asset IDs separate from source paths when their strings collide", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    id: "contexts/testing/policy.md",
+    requiresContext: ["testing.policy"],
+  });
+  await mkdir(path.join(root, "skills/demo/scripts"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills/demo/scripts/run.mjs"),
+    "// helper\n",
+  );
+  await writeContext(root, "testing", "policy", {});
+  await appendFile(
+    path.join(root, "contexts/testing/policy.md"),
+    "Use `skills/demo/scripts/run.mjs`.\n",
+  );
+  const report = await graph(root);
+  const mermaid = formatGraphMermaid(report, "full");
+  const context = mermaidNodeId(mermaid, "context: testing.policy");
+  const skill = mermaidNodeId(mermaid, "skill: contexts/testing/policy.md");
+  const script = mermaidNodeId(mermaid, "script: skills/demo/scripts/run.mjs");
+  assert.ok(mermaid.includes(`${skill} -->|requires| ${context}`));
+  assert.ok(
+    mermaid.includes(`${context} -->|statically_references| ${script}`),
+  );
+  assert.ok(!mermaid.includes(`${skill} -->|statically_references| ${script}`));
+});
+
+test("cross-distribution references reject bracket globs even if an exact filename exists", async () => {
+  const root = await fixture();
+  await writeSkill(root, "helper", {});
+  await mkdir(path.join(root, "skills/helper/scripts"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills/helper/scripts/[ab].mjs"),
+    "// fixture\n",
+  );
+  await writeContext(root, "testing", "policy", {});
+  await appendFile(
+    path.join(root, "contexts/testing/policy.md"),
+    "Use `skills/helper/scripts/[ab].mjs`.\n",
+  );
+  const report = await graph(root);
+  assert.equal(
+    report.edges.some(
+      (edge) =>
+        edge.from === "testing.policy" && edge.kind === "statically_references",
+    ),
+    false,
   );
 });
 
@@ -879,7 +1236,7 @@ test("graph CLI rejects unsupported view", async () => {
   assert.equal(result.stdout, "");
   assert.match(
     result.stderr,
-    /--view must be one of: summary, workflow, full, layered, lens, composition, impact, discovery, executable\./,
+    /--view must be one of: summary, workflow, full, layered, lens, composition, impact, dependencies, asset-impact, discovery, executable\./,
   );
 });
 

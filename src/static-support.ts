@@ -590,8 +590,8 @@ function maskRawMatches(line: string, matches: string[]): string {
 }
 
 /**
- * Derive only repository-proven Skill ownership and static-reference edges.
- * Ambiguous Skill parents and unresolved or external paths never produce edges.
+ * Derive Skill ownership separately from resolved static support references.
+ * Cross-distribution references never imply ownership or policy inheritance.
  */
 export function buildStaticSupportDependencies(
   documents: ParsedDocument[],
@@ -698,7 +698,133 @@ export function buildStaticSupportDependencies(
     }
   }
 
+  // Contexts and other Markdown assets can reference support in another
+  // distribution. This supplies dependency evidence only: it never transfers
+  // Skill ownership or changes the security inspection boundary.
+  for (const source of documents) {
+    const sourceEntry = entriesByPath.get(source.artifact.path);
+    if (!sourceEntry || !source.artifact.markdownParserEligible) continue;
+    for (const reference of repositorySupportReferences(source)) {
+      const target = entriesByPath.get(reference.targetPath);
+      if (
+        !target ||
+        target.sourcePath === sourceEntry.sourcePath ||
+        !["script", "asset", "reference", "profile", "example"].includes(
+          target.kind,
+        )
+      )
+        continue;
+      // Preserve the existing Skill-local resolver and its basename semantics.
+      const sourceSkill = classifyRepositorySkillPath(source.artifact.path);
+      if (
+        sourceSkill &&
+        "skillDirectory" in sourceSkill &&
+        isWithinSkillPackage(target.sourcePath, sourceSkill.skillDirectory)
+      )
+        continue;
+      result.push({
+        from: sourceEntry.id,
+        to: target.sourcePath,
+        kind: "statically_references",
+        sourcePath: sourceEntry.sourcePath,
+        evidence: {
+          path: sourceEntry.sourcePath,
+          startLine: reference.line,
+          endLine: reference.line,
+          snippet: reference.raw,
+        },
+      });
+    }
+  }
+
   return dedupeDependencies(result);
+}
+
+/** Exact Markdown destinations and quoted paths; no repository-wide basename guessing. */
+function repositorySupportReferences(
+  document: ParsedDocument,
+): StaticSupportReference[] {
+  const syntax = ensureMarkdownSyntaxForDocument(document);
+  const bodyStart = markdownBodyStartLineForArtifact(
+    document.artifact,
+    document.lines,
+  );
+  const references: StaticSupportReference[] = [];
+  for (let index = bodyStart - 1; index < document.lines.length; index += 1) {
+    const values = (syntax?.linkTargets ?? [])
+      .filter((target) => target.startLine === index + 1)
+      .map((target) => ({ value: target.target, raw: target.source }));
+    const line = maskMarkdownStructuralEvidence(
+      document.lines[index] ?? "",
+      index + 1,
+      [...(syntax?.linkSyntax ?? []), ...(syntax?.definitions ?? [])],
+    );
+    for (const match of line.matchAll(/([`'"])([^`'"\r\n]+)\1/g)) {
+      const value = match[2]!;
+      if (
+        /\s/u.test(value) &&
+        !value.startsWith("./") &&
+        !value.startsWith("../")
+      )
+        continue;
+      if (!value.includes("/")) continue;
+      values.push({ value, raw: match[0] });
+    }
+    for (const { value, raw } of values) {
+      const cleaned = decodePath(stripUriSuffix(value.trim())).replace(
+        /^<|>$/g,
+        "",
+      );
+      if (
+        !cleaned ||
+        cleaned.startsWith("#") ||
+        path.posix.isAbsolute(cleaned) ||
+        /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(cleaned) ||
+        /[\\\0$*?{}\[\]]/u.test(cleaned) ||
+        cleaned.endsWith("/")
+      )
+        continue;
+      const targetPath = path.posix.normalize(
+        /^(?:skills\/|\.agents\/skills\/|contexts\/|lenses\/)/u.test(cleaned)
+          ? cleaned
+          : path.posix.join(
+              path.posix.dirname(document.artifact.path),
+              cleaned,
+            ),
+      );
+      if (targetPath === ".." || targetPath.startsWith("../")) continue;
+      references.push({
+        sourcePath: document.artifact.path,
+        targetPath,
+        relativePath: path.posix.relative(
+          path.posix.dirname(document.artifact.path),
+          targetPath,
+        ),
+        line: index + 1,
+        raw,
+      });
+    }
+  }
+  for (const command of collectHelperCommandEvidence([document])) {
+    if (command.line < bodyStart || command.pathResolution.kind !== "candidate")
+      continue;
+    references.push({
+      sourcePath: document.artifact.path,
+      targetPath: command.pathResolution.path,
+      relativePath: path.posix.relative(
+        path.posix.dirname(document.artifact.path),
+        command.pathResolution.path,
+      ),
+      line: command.line,
+      raw: command.snippet,
+    });
+  }
+  return references.sort(
+    (left, right) =>
+      left.line - right.line ||
+      compareUtf16CodeUnits(left.targetPath, right.targetPath) ||
+      compareUtf16CodeUnits(left.raw, right.raw),
+  );
 }
 
 function normalizeStaticSupportReference(

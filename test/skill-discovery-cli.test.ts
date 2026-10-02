@@ -1563,7 +1563,7 @@ test("existing graph views remain route-free and invalid view help lists discove
   assert.equal(invalid.code, 2);
   assert.match(
     invalid.stderr,
-    /summary, workflow, full, layered, lens, composition, impact, discovery/,
+    /summary, workflow, full, layered, lens, composition, impact, dependencies, asset-impact, discovery/,
   );
   assert.equal(help.code, 0);
   assert.match(help.stdout, /--view discovery --format markdown/);
