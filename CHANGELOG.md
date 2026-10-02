@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Focused `graph --view dependencies` and `graph --view asset-impact` combine
+  explicit composition with static support references for forward dependency
+  closure and reverse change-review scope. Exact Context and cross-distribution
+  support references also appear in the shared catalog, BOM, and Trust Graph;
+  distribution ownership and runtime behavior remain separate.
+
 ## [0.40.1] - 2026-09-30
 
 ### Changed

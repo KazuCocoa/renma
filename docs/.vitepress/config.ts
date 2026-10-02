@@ -85,6 +85,10 @@ export default defineConfig({
           { text: "Declared Composition", link: "/declared-composition" },
           { text: "Asset Bindings", link: "/asset-bindings" },
           { text: "Declared Impact", link: "/declared-impact" },
+          {
+            text: "Static Asset Dependencies",
+            link: "/static-asset-dependencies",
+          },
           { text: "Skill Discovery", link: "/skill-discovery" },
           {
             text: "Machine-Readable JSON",

@@ -7,6 +7,7 @@ import type { ConfigOverrides } from "../config.js";
 import {
   prepareDeclaredCompositionIndex,
   resolveDeclaredCompositionFromIndex,
+  resolveCompositionDeclaration,
   type CompositionConflict,
   type CompositionProvenanceEdge,
   type CompositionResolutionIssue,
@@ -22,6 +23,7 @@ import {
 import {
   normalizeDependencyReference,
   resolveDependencyTarget,
+  resolveUniqueDependencyTarget,
 } from "../dependency-resolution.js";
 import type { ExecutableSurfaceDependency } from "../executable-dependency-resolution.js";
 import type {
@@ -35,6 +37,7 @@ import type {
   Dependency,
   DependencyKind,
   DependencyBinding,
+  Catalog,
 } from "../model.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatVersionedJsonDocument } from "../report.js";
@@ -69,6 +72,8 @@ export type GraphView =
   | "layered"
   | "composition"
   | "impact"
+  | "dependencies"
+  | "asset-impact"
   | "discovery"
   | "executable";
 
@@ -98,6 +103,11 @@ export interface GraphReport {
   impact?: DeclaredImpactReport;
   discovery?: SkillDiscoveryIndex;
   executable?: ExecutableGraphProjection;
+  /** Static closure; edge kinds preserve optional declarations without runtime claims. */
+  dependencyTraversal?: {
+    focusPath: string;
+    direction: "forward" | "reverse";
+  };
   diagnostics?: Diagnostic[];
 }
 
@@ -170,6 +180,18 @@ export async function runGraphCommand(
       ? focusSkillDiscoveryIndex(snapshot.skillDiscovery, options.focus)
       : snapshot.skillDiscovery;
     report = discoveryGraphReport(fullReport, discovery);
+  } else if (view === "dependencies" || view === "asset-impact") {
+    if (!options.focus) {
+      throw new CliUserError(
+        `graph --view ${view} requires --focus <asset-id-or-path>.`,
+      );
+    }
+    report = staticDependencyGraphReport(
+      fullReport,
+      snapshot.catalog,
+      options.focus,
+      view,
+    );
   } else if (view === "composition" || view === "impact") {
     if (!options.focus) {
       throw new CliUserError(
@@ -291,6 +313,98 @@ function resolveFocusNode(report: GraphReport, focus: string): GraphNode {
     );
   }
   return node;
+}
+
+/** Traverse composition plus exact support references, excluding containment and governance. */
+function staticDependencyGraphReport(
+  report: GraphReport,
+  catalog: Catalog,
+  focus: string,
+  view: "dependencies" | "asset-impact",
+): GraphReport {
+  const pathMatches = report.nodes.filter(
+    (node) =>
+      normalizePath(node.sourcePath) === normalizePath(focus) ||
+      normalizePath(path.resolve(report.root, node.sourcePath)) ===
+        normalizePath(focus),
+  );
+  const focusMatches = pathMatches.length
+    ? pathMatches
+    : report.nodes.filter((node) => node.id === focus);
+  if (focusMatches.length !== 1) {
+    if (focusMatches.length === 0) resolveFocusNode(report, focus);
+    throw new CliUserError(
+      `graph --focus is ambiguous; use an exact source path: ${focus}`,
+    );
+  }
+  const focusNode = focusMatches[0]!;
+  const index = prepareDeclaredCompositionIndex(catalog);
+  const arcs = catalog.dependencies.flatMap((dependency) => {
+    const source = index.assetsByPath.get(
+      normalizeDependencyReference(dependency.sourcePath),
+    );
+    if (!source || source.id !== dependency.from) return [];
+    let target: Asset | undefined;
+    if (dependency.kind === "statically_references") {
+      target = resolveUniqueDependencyTarget(dependency, catalog.assets);
+    } else if (
+      ["requires", "optional", "applies_to"].includes(dependency.kind)
+    ) {
+      const declaration = resolveCompositionDeclaration(index, dependency);
+      if (declaration?.kindMismatch) return [];
+      target = declaration?.target;
+    } else {
+      return [];
+    }
+    return [
+      { source, target, edge: toEdge(dependency, target ? [target] : []) },
+    ];
+  });
+  const adjacency = new Map<string, typeof arcs>();
+  for (const arc of arcs) {
+    const key =
+      view === "dependencies" ? arc.source.sourcePath : arc.target?.sourcePath;
+    if (!key) continue;
+    const adjacent = adjacency.get(key) ?? [];
+    adjacent.push(arc);
+    adjacency.set(key, adjacent);
+  }
+  const paths = new Set([focusNode.sourcePath]);
+  const queue = [focusNode.sourcePath];
+  const edges: GraphEdge[] = [];
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    for (const arc of adjacency.get(queue[cursor]!) ?? []) {
+      edges.push(arc.edge);
+      const next =
+        view === "dependencies"
+          ? arc.target?.sourcePath
+          : arc.source.sourcePath;
+      if (next && !paths.has(next)) {
+        paths.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  const nodes = report.nodes.filter((node) => paths.has(node.sourcePath));
+  return {
+    ...report,
+    view,
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    nodes,
+    edges: edges.sort(
+      (left, right) =>
+        compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
+        compareUtf16CodeUnits(left.kind, right.kind) ||
+        compareUtf16CodeUnits(left.to, right.to) ||
+        (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
+        (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1),
+    ),
+    dependencyTraversal: {
+      focusPath: focusNode.sourcePath,
+      direction: view === "dependencies" ? "forward" : "reverse",
+    },
+  };
 }
 
 function discoveryGraphReport(
@@ -470,6 +584,7 @@ export function formatGraphMermaid(
   report.nodes.forEach((node, index) => {
     const id = `node_${index}`;
     nodeIds.set(node.id, id);
+    nodeIds.set(node.sourcePath, id);
     lines.push(`  ${id}["${escapeMermaidLabel(nodeLabel(node))}"]`);
   });
 
@@ -483,11 +598,11 @@ export function formatGraphMermaid(
   }
 
   for (const edge of report.edges) {
-    const source = nodeIds.get(edge.from);
+    const source = nodeIds.get(edge.sourcePath) ?? nodeIds.get(edge.from);
     if (!source) continue;
 
     if (edge.resolved && edge.targetId) {
-      const target = nodeIds.get(edge.targetId);
+      const target = nodeIds.get(edge.targetPath ?? edge.targetId);
       if (target) {
         lines.push(
           `  ${source} -->|${escapeMermaidEdgeLabel(edge.kind + bindingLabel(edge))}| ${target}`,
@@ -604,6 +719,12 @@ export function formatGraphMarkdown(
     `- Scanned files: ${report.scannedFileCount}`,
     `- Nodes: ${report.nodeCount}`,
     `- Edges: ${report.edgeCount}`,
+    ...(report.dependencyTraversal
+      ? [
+          `- Static ${report.dependencyTraversal.direction} closure from: ${report.dependencyTraversal.focusPath}`,
+          "- Includes optional composition and resolved support references; no runtime use or completeness claim.",
+        ]
+      : []),
     "",
     "## Nodes",
     "",
@@ -1593,11 +1714,13 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
   if (
     view === "composition" ||
     view === "impact" ||
+    view === "dependencies" ||
+    view === "asset-impact" ||
     view === "discovery" ||
     view === "executable"
   ) {
     throw new Error(
-      `${view === "composition" ? "Composition" : view === "impact" ? "Impact" : view === "discovery" ? "Discovery" : "Executable"} graph formatting requires a resolved ${view === "composition" ? "composition" : view === "impact" ? "declared impact" : view === "discovery" ? "Skill Discovery" : "executable"} report.`,
+      `${view} graph formatting requires a resolved ${view} report.`,
     );
   }
   if (view === "full" || view === "layered") return { ...report, view };

@@ -14,6 +14,67 @@ import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import { collectRepositoryPathStates } from "../src/repository-paths.js";
 import { scan } from "../src/scanner.js";
 
+test("Context helper commands share static dependency evidence across catalog, BOM and Trust Graph", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-context-support-"));
+  await mkdir(path.join(root, "skills/helper/scripts"), { recursive: true });
+  await mkdir(path.join(root, "contexts"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills/helper/SKILL.md"),
+    "---\nname: helper\ndescription: Provide tagging support.\nmetadata:\n  renma.id: skill.helper\n  renma.owner: helper-team\n---\n# Helper\n",
+  );
+  await writeFile(
+    path.join(root, "skills/helper/scripts/tag.mjs"),
+    "console.log('tag');\n",
+  );
+  await writeFile(
+    path.join(root, "contexts/release.md"),
+    "---\nid: context.release\nowner: release-team\n---\n# Release\n\nRun `node skills/helper/scripts/tag.mjs`.\n",
+  );
+  const result = await catalog(root);
+  const edge = result.catalog.dependencies.find(
+    (dependency) =>
+      dependency.from === "context.release" &&
+      dependency.kind === "statically_references",
+  );
+  assert.equal(edge?.to, "skills/helper/scripts/tag.mjs");
+  assert.equal(edge?.evidence?.startLine, 7);
+  const manifest = await bom(root, {}, { omitGeneratedAt: true });
+  const context = manifest.assets.find(
+    (asset) => asset.id === "context.release",
+  );
+  assert.equal(
+    context?.dependencies.find(
+      (dependency) => dependency.kind === "statically_references",
+    )?.targetPath,
+    "skills/helper/scripts/tag.mjs",
+  );
+  const script = manifest.assets.find(
+    (asset) => asset.sourcePath === "skills/helper/scripts/tag.mjs",
+  );
+  assert.equal(script?.ownership?.effectiveOwner, "helper-team");
+  assert.ok(
+    script?.dependents.some(
+      (dependent) =>
+        dependent.from === "context.release" &&
+        dependent.kind === "statically_references",
+    ),
+  );
+  assert.equal(
+    script?.contentHash,
+    `sha256:${createHash("sha256").update("console.log('tag');\n").digest("hex")}`,
+  );
+  const scanResult = await scan(root);
+  const staticEdge = scanResult.trustGraph?.edges.find(
+    (edge) =>
+      edge.type === "statically_references" &&
+      edge.evidence?.some(
+        (evidence) => evidence.path === "contexts/release.md",
+      ),
+  );
+  assert.ok(staticEdge);
+  assert.equal(staticEdge.evidence?.[0]?.startLine, 7);
+});
+
 test("scripts and opaque assets are first-class and binary-safe under both Skill roots", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-support-kinds-"));
   const binary = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0x10]);

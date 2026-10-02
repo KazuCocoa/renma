@@ -2377,6 +2377,10 @@ Views are:
 - `impact`: the focused asset's complete reverse explicit required and optional
   Context/Lens closure, including declared dependent Skills. This view requires
   `--focus`.
+- `dependencies`: transitive explicit composition plus static support references
+  from a focused asset. Requires `--focus`.
+- `asset-impact`: reverse traversal of the same composition and support edges
+  from a focused asset. Requires `--focus`.
 - `discovery`: exact declared Skill-to-Skill continuations, route
   eligibility/usability, declaration evidence, diagnostics, structural roots,
   and standalone Skills. Focus is optional and exact.
@@ -2386,6 +2390,11 @@ Views are:
   executable path.
 
 Layered Mermaid output groups skills, context lenses, contexts, support assets, and unresolved targets into separate subgraphs. JSON and Markdown keep the same node and edge detail while reporting the selected view.
+
+See [Static Asset Dependencies](static-asset-dependencies.md) for exact Context
+and cross-distribution support references, traversal boundaries, and examples.
+These views provide static review evidence without changing declared
+composition, ownership, policy, or runtime behavior.
 
 #### Inspect executable relationships
 
@@ -2491,6 +2500,8 @@ The graph forms answer distinct questions:
 | `full` without focus      | What is in the whole catalog graph?                                                                                                                               |
 | `full` with focus         | What is the direct incoming and outgoing neighborhood?                                                                                                            |
 | `composition` with focus  | What is in the transitive outgoing composition closure?                                                                                                           |
+| `dependencies` with focus | What composition and referenced support files are reachable from this asset? |
+| `asset-impact` with focus | What assets transitively depend on this asset through composition or support references? |
 | `impact` with focus       | What is in the transitive incoming composition closure?                                                                                                           |
 | `discovery` without focus | Which eligible Skills are reachable from explicit published entrypoints through usable declared continuations, and is that evidence descriptive or authoritative? |
 | `discovery` with focus    | What global reachability state and direct incoming/outgoing declarations touch this exact Skill while repository adoption and coverage stay repository-scoped?    |
