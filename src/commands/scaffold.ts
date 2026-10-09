@@ -179,10 +179,6 @@ export function buildScaffoldBundle(
     prompt: renderPrompt({
       kind: options.kind,
       targetPath: options.targetPath,
-      id,
-      title,
-      owner,
-      tags,
       resources,
       content,
       ...(handoff ? { handoff } : {}),
@@ -410,10 +406,6 @@ ${renderAuthoringValidation()}
 function renderPrompt(input: {
   kind: ScaffoldKind;
   targetPath: string;
-  id: string;
-  title: string;
-  owner: string;
-  tags: string[];
   resources: ScaffoldResource[];
   content: string;
   handoff?: SkillAuthoringHandoff;
@@ -422,12 +414,11 @@ function renderPrompt(input: {
     input.kind === "skill"
       ? [
           "- Keep the Skill in Agent Skills format with Renma extensions under `metadata.renma.*`.",
-          `- ${CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE}`,
           "- Use `metadata.renma.requires-context` for context the skill normally depends on, encoded as a JSON-array string.",
           "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
           "- State exactly when each local resource should be read or executed. Keep Skill-specific detail in references/, deterministic implementation in scripts/, and output material in assets/.",
-          "- Use contexts/ only for knowledge with an independent maintenance or governance reason, such as cross-Skill reuse, independent ownership or lifecycle, separate maintenance, or source authority. Correctness importance alone is not sufficient.",
+          "- Use contexts/ only for knowledge with an independent maintenance or governance reason, as described in the scaffold. Correctness importance alone is not sufficient.",
           "- For an external source, decide whether execution accesses it or expects approved supplied content. A Markdown URL does not grant network permission.",
           "- When runtime access is intended, review the supported effective security policy and derive approved destinations only from the reviewed URL or repository policy. Do not infer permissive values.",
         ]
@@ -448,15 +439,9 @@ function renderPrompt(input: {
     : "";
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
 
-${handoffSection}Use this metadata exactly:
+${handoffSection}Preserve the scaffold's id, title, owner, tags, version, and status values.
 
-- id: \`${input.id}\`
-- title: \`${input.title}\`
-- owner: \`${input.owner}\`
-- tags: \`${input.tags.join(",")}\`
-- local resource directories: \`${input.resources.join(",") || "none"}\`
-- version: \`0.1.0\`
-- status: \`experimental\`
+Local resource directories: \`${input.resources.join(",") || "none"}\`
 
 Start from this deterministic scaffold and replace placeholder prose with repository-grounded content:
 
@@ -465,13 +450,12 @@ ${input.content}\`\`\`
 
 ${
   input.kind === "skill"
-    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native Skill authoring guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
+    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native Skill authoring guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior. Do not invent source-of-truth claims. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
     : ""
 }Constraints:
 
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, suspended, revoked, deprecated, archived. Suspended and revoked require a reviewed non-blank reason and real YYYY-MM-DD status-changed date; revoked means trust or authorization was explicitly withdrawn because of a known problem.
-- Move knowledge into a Context Asset under \`contexts/\` only when it has an independent maintenance or governance reason. Keep task-specific knowledge in the Skill or justified Skill-local support.
 ${skillGuidance.join("\n")}
 ${contextLensGuidance.join("\n")}
 - For context lens assets, use \`applies_to\` for context assets the lens interprets.

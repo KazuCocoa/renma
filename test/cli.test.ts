@@ -2843,7 +2843,7 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
 
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Create a Renma skill asset/);
-  assert.match(result.stdout, /id: `testing.spec-review`/);
+  assert.match(result.stdout, /renma.id: 'testing.spec-review'/);
   assert.match(result.stdout, /Move knowledge into a Context Asset/);
   assert.match(result.stdout, /Do not choose runtime task context/);
   assert.match(result.stdout, /Do not assemble prompts for live model calls/);
