@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.41.1] - 2026-10-08
+
+### Changed
+
+- Refined Skill authoring guidance and scaffold prompts to state metadata
+  preservation and asset-placement rules more clearly, with shorter guidance
+  that retains the existing authoring boundaries.
+- Updated runtime and development dependencies.
+
 ## [0.41.0] - 2026-10-02
 
 ### Added
@@ -2888,6 +2897,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.41.0...HEAD
 [0.41.0]: https://github.com/KazuCocoa/renma/compare/v0.40.1...v0.41.0
+[0.41.1]: https://github.com/KazuCocoa/renma/compare/v0.41.0...v0.41.1
 [0.40.1]: https://github.com/KazuCocoa/renma/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/KazuCocoa/renma/compare/v0.39.2...v0.40.0
 [0.39.1]: https://github.com/KazuCocoa/renma/compare/v0.39.0...v0.39.1
