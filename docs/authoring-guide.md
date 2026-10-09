@@ -41,6 +41,39 @@ security, or creation-gate requirements.
 These are conditional references, not a checklist requiring every section to be
 loaded. Illustrations remain optional and non-normative.
 
+## Shared Rules And Skill-Specific Decisions
+
+Renma defines how an asset is represented and which repository constraints can
+be checked. The author establishes what a particular Skill should do from
+applicable evidence and authorized decisions. Keep those responsibilities
+explicit when creating, reviewing, or simplifying an existing Skill:
+
+| Area | Shared Renma requirement | What must be established for this Skill |
+| --- | --- | --- |
+| Identity and ownership | Canonical `SKILL.md` path, supported metadata, explicit owner for file creation | The task's owner, intended identity, and selection/exclusion boundaries |
+| Asset structure | Each asset has a justified responsibility; dependencies use supported relationships | Which knowledge is independently maintained, which dependencies are required, and which support files are actually needed |
+| Data and authority | Skill instructions, Context, and effective security policy agree; claims retain their evidence boundaries | Authoritative sources, permitted data and actions, approval conditions, and access-failure behavior |
+| Workflow | Keep the focused execution contract in the Skill and avoid duplicating owned Context knowledge | Required inputs, meaningful steps and decisions, expected outputs, and what happens when information or an action fails |
+| Exchange formats | Commands and handoffs follow the installed syntax, field types, and identity constraints | The actual evidence-backed values; examples do not supply ownership, permissions, or domain facts |
+| Completion and validation | Run relevant checks and required repository checks; structural success does not prove semantic correctness | Observable completion evidence, partial or blocked outcomes, and any needed runtime evaluation or human review |
+
+For each material step or decision, a reader should be able to identify its
+condition, required input or evidence, permitted action, observable result,
+and missing-input or failure behavior. Keep an approval condition beside the
+action it governs, including in summaries and translations. This is a way to
+review clarity, not a requirement for fixed headings, additional files, or a
+questionnaire. Reuse established answers; ask only when a material unresolved
+decision still needs human truth.
+
+An evaluation finding becomes a shared rule only when the installed contract
+or independently applicable evidence supports that generalization. For example,
+the canonical scaffold filename and handoff object types apply across Skills
+because they are CLI and format requirements. A particular task's domain
+choices, question count, command sequence, or model response do not establish
+universal requirements. Report runtime findings within the tested task, model,
+tools, and environment. Prompt length alone does not establish end-to-end token
+savings or successful task completion.
+
 ## Responsibility Boundary
 
 For a new Skill, or when intentionally redesigning asset boundaries, start with

@@ -8,6 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Authoring guidance distinguishes shared Renma representation and validation
+  rules from each Skill's evidence-backed execution contract, with general
+  clarity criteria and explicit limits on generalizing evaluation results.
+
 - Skill authoring guidance now spells out the canonical `SKILL.md` scaffold
   target and required direct owner, and provides typed object examples for
   handoff arrays. Conditional reference guidance favors only the fields needed
