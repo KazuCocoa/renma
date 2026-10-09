@@ -38,7 +38,7 @@ export function renderSkillGuidePrompt(
     ...renderBullets(guidance.verification),
     "",
     "Complete reference",
-    "Use `renma guide skill --format json` for the deterministic complete structured reference, including adaptive activities, disposition and platform-handoff reference tables, conditional external-traversal guidance, the handoff template, and non-normative illustrations. The prompt preserves their required outcomes in the applicable contract sections without repeating the reference tables; they do not add a reasoning sequence or mandatory progress format.",
+    "Use `renma guide skill --format json` for the complete structured reference: adaptive activities, disposition and platform-handoff tables, conditional external-traversal guidance, the handoff template, and non-normative illustrations. Their required outcomes are included above; the reference adds no reasoning sequence or mandatory progress format.",
     "",
     "Boundary: the external LLM investigates, reasons, clarifies only when needed, proposes, and edits; Renma validates supplied structure and deterministic repository evidence; and a human reviews meaningful decisions. Renma does not certify that the handoff's authoring or domain claims are true.",
   ].join("\n");

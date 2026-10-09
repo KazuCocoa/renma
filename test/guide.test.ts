@@ -60,11 +60,11 @@ test("guide skill defaults to deterministic prompt output for the installed vers
   assert.match(defaultResult.stdout, /Source-of-truth status alone justifies/);
   assert.match(
     defaultResult.stdout,
-    /important to Skill correctness does not by itself require a Context Asset/,
+    /Correctness importance alone does not require a Context Asset/,
   );
   assert.match(
     defaultResult.stdout,
-    /Do not create a script merely because the output is JSON/,
+    /Structured output alone.*does not justify a script/,
   );
   assert.match(
     defaultResult.stdout,

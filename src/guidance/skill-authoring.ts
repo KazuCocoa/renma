@@ -328,8 +328,8 @@ export function buildSkillAuthoringGuidance(
     placementRules: [
       "Skill: keep the focused task contract in `SKILL.md`: positive and negative selection boundaries, required inputs and evidence, ordered steps and decisions, constraints and failure behavior, expected output, completion criteria, and verification.",
       "Do not repeat knowledge in `SKILL.md` when a Context Asset owns it.",
-      "Context Asset: create or reuse one only when knowledge has an independent maintenance or governance reason, such as cross-Skill reuse, independent ownership or lifecycle, maintenance separate from the Skill, an authoritative source-of-truth role, or another explicit reason for independent review and governance.",
-      "Information being important to Skill correctness does not by itself require a Context Asset when it is task-specific and has no independent maintenance or governance boundary; keep it in `SKILL.md` or justified Skill-local support.",
+      "Context Asset: create or reuse one only when knowledge has an independent maintenance or governance reason, such as cross-Skill reuse, independent ownership or lifecycle, separate maintenance, or source authority.",
+      "Correctness importance alone does not require a Context Asset; keep task-specific knowledge without an independent maintenance or governance boundary in `SKILL.md` or justified Skill-local support.",
       "Source-of-truth status alone justifies a Context Asset because it establishes an independent authority and maintenance boundary; cross-Skill reuse is not required.",
       "Represent an external authoritative URL that the Skill depends on with a small Context Asset that records what the source governs, the URL, when it must be consulted, and necessary scope or fallback behavior.",
       "Do not copy the full external document unless an intentional reviewed snapshot is required, and do not repeat the URL and its explanation across the Skill and support files.",
@@ -342,7 +342,7 @@ export function buildSkillAuthoringGuidance(
     artifactRules: [
       CANONICAL_SKILL_DESCRIPTION_AUTHORING_RULE,
       "Create a script only when deterministic implementation is materially safer than model judgment, an exact repeated transformation or validation is required, ordering or behavior is safety-critical, the implementation is meaningfully tested, or the user explicitly requests executable implementation.",
-      "Do not create a script merely because the output is JSON, YAML, XML, or another structured format; straightforward JSON construction from a documented schema does not justify a script by itself.",
+      "Structured output alone, including straightforward JSON construction from a documented schema, does not justify a script.",
       "Add an example only when it resolves a real ambiguity.",
       "Do not add a README that restates the Skill, a paraphrased usage guide, an empty support file, a speculative future-extension document, or a resource directory without a current responsibility.",
       "Every file must have one distinct, reviewable responsibility.",
@@ -352,7 +352,7 @@ export function buildSkillAuthoringGuidance(
       "A Markdown URL records a source reference; it does not grant network permission. Derive an approved destination only from the actual reviewed URL or repository policy.",
       "Ensure the Skill body, Context instructions, and effective security policy agree. Preserve unresolved access intent or policy as a human decision instead of silently allowing or denying network access.",
       "Scaffold generation performs no network operations. A finished Skill may access a reviewed external source only when its authored workflow and effective security policy explicitly permit it.",
-      "The guide command does not conduct a conversation, retain session state or history, accept task text, ask the user questions directly, call an LLM, interpret answers, design a Skill automatically, select a runtime Skill or Context, create or edit files, fetch URLs, infer facts or governance, or automatically repair or semantically rewrite assets.",
+      "The guide command emits static guidance. It does not accept task text, conduct or retain conversations, call an LLM, design Skills, select runtime Skills or Context, create or edit files, fetch URLs, infer facts or governance, or repair assets.",
     ],
     concisenessRules: [
       "Write only information that changes execution, interpretation, validation, or review, using direct operational language.",
