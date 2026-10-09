@@ -40,76 +40,31 @@ test("guide skill defaults to deterministic prompt output for the installed vers
       `Renma ${escapeRegExp(packageJson.version)} Skill Authoring Guide`,
     ),
   );
-  assert.match(
-    defaultResult.stdout,
+  for (const boundary of [
     /smallest non-redundant Renma asset graph/,
-  );
-  assert.match(
-    defaultResult.stdout,
     /Before creating files, evaluate the creation gate/,
-  );
-  assert.match(defaultResult.stdout, /clarification is not required/i);
-  assert.match(
-    defaultResult.stdout,
-    /question count, batching, and turn structure are adaptive strategies/,
-  );
-  assert.match(
-    defaultResult.stdout,
+    /clarification is not required/,
     /Confirmed:[\s\S]*Proposed:[\s\S]*Unresolved:/,
-  );
-  assert.match(defaultResult.stdout, /Source-of-truth status alone justifies/);
-  assert.match(
-    defaultResult.stdout,
-    /important to Skill correctness does not by itself require a Context Asset/,
-  );
-  assert.match(
-    defaultResult.stdout,
-    /Do not create a script merely because the output is JSON/,
-  );
-  assert.match(
-    defaultResult.stdout,
+    /Source-of-truth status alone justifies Context/,
+    /importance to Skill correctness alone does not/,
+    /structured output alone does not justify/,
     /description is a discovery and routing surface, not an execution surface/,
-  );
-  assert.match(defaultResult.stdout, /even when quoted as request examples/);
-  assert.match(defaultResult.stdout, /clearly non-operational unsafe-example/);
-  assert.match(defaultResult.stdout, /State each requirement once/);
-  assert.match(defaultResult.stdout, /Do not copy the full external document/);
-  assert.match(
-    defaultResult.stdout,
+    /even when quoted as request examples/,
+    /clearly non-operational unsafe-example/,
+    /State each requirement once/,
+    /Do not copy the full document/,
     /Markdown URL.*does not grant network permission/,
-  );
-  assert.match(
-    defaultResult.stdout,
     /allowed data, network allowance, approved network destinations, external upload, secrets, and human approval/,
-  );
-  assert.match(
-    defaultResult.stdout,
-    /do not manufacture permissive policy values/,
-  );
-  assert.match(
-    defaultResult.stdout,
+    /Do not manufacture permissive values/,
     /Skill body, Context instructions, and effective security policy agree/,
-  );
-  assert.match(
-    defaultResult.stdout,
-    /Scaffold generation performs no network operations/,
-  );
-  assert.match(
-    defaultResult.stdout,
-    /name change.*canonical Skill directory\/name relationship.*intentional path and identity change/i,
-  );
-  assert.doesNotMatch(
-    defaultResult.stdout,
-    /not a Renma asset node or graph edge/,
-  );
-  assert.match(
-    defaultResult.stdout,
+    /directory\/name change requires intentional path and identity review/,
     /Clean deterministic output does not prove semantic correctness/,
-  );
-  assert.match(defaultResult.stdout, /renma scan/);
-  assert.match(defaultResult.stdout, /renma catalog/);
-  assert.match(defaultResult.stdout, /renma graph/);
-  assert.match(defaultResult.stdout, /human review/i);
+    /renma scan/,
+    /renma catalog/,
+    /renma graph/,
+    /human review/i,
+  ])
+    assert.match(defaultResult.stdout, boundary);
 });
 
 test("guide skill JSON and --json are equivalent complete deterministic projections", async () => {
@@ -127,6 +82,7 @@ test("guide skill JSON and --json are equivalent complete deterministic projecti
     "topic",
     "renmaVersion",
     "principle",
+    "coreContract",
     "handoff",
     "interaction",
     "workflow",
@@ -264,42 +220,34 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
 
   assert.deepEqual(json, guidance);
   assert.ok(prompt.length < renderSkillGuideJson(guidance).length);
+  // Bound the default context cost independently of the growing complete reference.
+  assert.ok(
+    prompt.length < 12000,
+    `Default prompt is ${prompt.length} characters`,
+  );
   for (const heading of [
     "Core authoring contract",
-    "Evidence and epistemic state",
-    "Adaptive clarification guidance",
-    "Creation gate",
     "Asset boundary rules",
     "Artifact rules",
-    "Conciseness rules",
-    "Metadata rules",
-    "Conditional reference guidance",
+    "Metadata and conciseness rules",
     "Durable handoff boundary",
-    "Verification",
-    "Complete reference",
-  ]) {
-    assert.match(prompt, new RegExp(escapeRegExp(heading)));
-  }
-  for (const value of collectStrings({
-    principle: guidance.principle,
-    truthSources: guidance.interaction.truthSources,
-    decisionClasses: guidance.interaction.decisionClasses,
-    unknownScopes: guidance.interaction.unknownScopes,
-    progressionClasses: guidance.interaction.progressionClasses,
-    questionRules: guidance.interaction.questionRules,
-    creationGate: guidance.interaction.creationGate,
-    postValidationActions: guidance.interaction.postValidationActions,
-    persistenceRules: guidance.interaction.persistenceRules,
-    humanReviewRules: guidance.interaction.humanReviewRules,
-    placementRules: guidance.placementRules,
-    artifactRules: guidance.artifactRules,
-    concisenessRules: guidance.concisenessRules,
-    metadataRules: guidance.metadataRules,
-    externalTraversalApplicabilityRule:
-      guidance.externalTraversalApplicabilityRule,
-    verification: guidance.verification,
-  })) {
+    "Verification and human review",
+    "Conditional reference guidance",
+  ])
+    assert.ok(prompt.includes(heading));
+  for (const value of collectStrings(guidance.coreContract)) {
     assert.ok(prompt.includes(value), value);
+  }
+  // Every conditional pointer names an existing complete-reference field.
+  for (const reference of guidance.coreContract.references) {
+    for (const [, field] of reference.matchAll(/`([^`]+)`/g)) {
+      if (field!.startsWith("renma ")) continue;
+      let target: unknown = guidance;
+      for (const segment of field!.split(".")) {
+        target = (target as Record<string, unknown>)[segment];
+        assert.notEqual(target, undefined, `Missing reference: ${field}`);
+      }
+    }
   }
   const sourceBacked = getIllustration(guidance, "source-backed-boundary");
   assert.ok(sourceBacked.initialStructure);
@@ -332,51 +280,39 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
   // Required handoff outcomes remain in the prompt even without the duplicate table.
   assert.match(
     prompt,
-    /Do not create files while any blocking decision remains unresolved/,
+    /Do not create files while any Blocking authoring decision remains/,
   );
-  assert.match(prompt, /Platform-native Skill authoring guidance may refine/);
-  assert.match(prompt, /only within the established boundaries/);
-  assert.match(prompt, /re-enter this gate before changing those boundaries/);
+  assert.match(prompt, /platform-native guidance to refine semantics/);
+  assert.match(prompt, /within established boundaries/);
   assert.match(
     prompt,
-    /Do not create a second target file through another generator/,
+    /re-enter the creation gate for affected decisions only/,
+  );
+  assert.match(
+    prompt,
+    /Do not create a second target through another generator/,
   );
   assert.match(prompt, /renma scaffold skill <path> --handoff <handoff\.json>/);
-  assert.match(prompt, /human reviews meaningful decisions/);
+  assert.match(prompt, /human review of semantic correctness/);
 });
 
-test("authoring aids and pending questions do not add gates or broaden authorization", () => {
-  const guidance = buildSkillAuthoringGuidance("test-version");
-  for (const output of [
-    renderSkillGuidePrompt(guidance),
-    renderSkillGuideJson(guidance),
-  ]) {
-    assert.match(
-      output,
-      /Decision tables, question themes, and progress-summary formats are optional working aids/,
-    );
-    assert.match(output, /preserve the distinctions they explain/);
-    assert.match(
-      output,
-      /same scope and action; preserve any requirement for separate or immediate approval/,
-    );
-    assert.match(
-      output,
-      /cannot be resolved through applicable evidence or an authorized reversible choice/,
-    );
-    assert.match(
-      output,
-      /Continue independent investigation and preparation while a question is pending/,
-    );
-    assert.match(
-      output,
-      /creation gate still blocks file creation until every requirement is established/,
-    );
-    assert.match(
-      output,
-      /do not infer product behavior, source authority, ownership, security permission/,
-    );
-  }
+test("short contract preserves authorization and progression boundaries", () => {
+  const prompt = renderSkillGuidePrompt(
+    buildSkillAuthoringGuidance("test-version"),
+  );
+  for (const boundary of [
+    /optional working aids/,
+    /retain the distinctions they explain/,
+    /same scope and action; preserve any requirement for separate or immediate approval/,
+    /cannot be resolved through applicable evidence or an authorized reversible choice/,
+    /Continue independent investigation and preparation while a question is pending/,
+    /file creation still waits for the gate/,
+    /not invented product behavior, source authority, ownership, or security permission/,
+    /never hide blockers as deferred items or silently confirm a proposal/,
+    /Runtime task unknowns are not automatically authoring blockers/,
+    /Only an unresolved authoring decision about that handling policy blocks creation/,
+  ])
+    assert.match(prompt, boundary);
 });
 
 test("guide and every scaffold share scoped validation without weakening required checks", () => {
@@ -555,7 +491,10 @@ test("conditional external traversal guidance defines finite authored behavior w
     /visited-source registry|provider-specific immutable resource ID|normalized URL without fragments|page-count and depth safety caps/,
   );
   assert.match(prompt, /Conditional reference guidance/);
-  assert.ok(prompt.includes(guidance.externalTraversalApplicabilityRule));
+  assert.match(
+    prompt,
+    /consult and apply `externalTraversalRules` before passing the creation gate/,
+  );
   assert.deepEqual(
     json.externalTraversalRules,
     guidance.externalTraversalRules,
@@ -576,7 +515,7 @@ test("core contract is the prompt entrypoint before asset and artifact rules", (
   );
   const placementIndex = prompt.indexOf("Asset boundary rules");
   const artifactIndex = prompt.indexOf("Artifact rules");
-  const metadataIndex = prompt.indexOf("Metadata rules");
+  const metadataIndex = prompt.indexOf("Metadata and conciseness rules");
   const handoffIndex = prompt.indexOf("Durable handoff boundary");
   const verificationIndex = prompt.indexOf("Verification", handoffIndex);
 
@@ -888,7 +827,14 @@ test("creation gate cannot pass before the smallest justified asset structure is
     gate.join("\n"),
     /Once the gate passes, present the smallest proposed asset structure/,
   );
-  assert.ok(prompt.includes(passRule));
+  assert.match(
+    prompt,
+    /Before creating files[\s\S]*establish[\s\S]*smallest justified asset structure/,
+  );
+  assert.match(
+    prompt,
+    /Do not create files while any Blocking authoring decision remains/,
+  );
   assert.match(
     guidance.handoff.purpose,
     /only after every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking authoring decision remains/,
@@ -914,7 +860,7 @@ test("clarification is unnecessary when no Blocking authoring decision remains",
     interaction.questionRules.join("\n"),
     /If no Blocking decision remains, clarification is not required/,
   );
-  assert.match(prompt, /proceed without mandatory clarification/);
+  assert.match(prompt, /If none remain, clarification is not required/);
 });
 
 test("questioning is prerequisite-aware without prescribing a decision algorithm", () => {
@@ -1322,14 +1268,14 @@ test("human-review rendering is independent of adaptive activity order", () => {
     ...reversedActivities,
     "Last adaptive activity must not become human-review guidance.",
   ];
-  guidance.interaction.humanReviewRules = [
+  guidance.coreContract.verification = [
     "Explicit human-review ownership sentinel.",
   ];
 
   const prompt = renderSkillGuidePrompt(guidance);
   assert.match(
     prompt,
-    /Human review:\n- Explicit human-review ownership sentinel/,
+    /Verification and human review\n- Explicit human-review ownership sentinel/,
   );
   assert.doesNotMatch(
     prompt,
@@ -1347,12 +1293,11 @@ test("workflow summary cross-references interaction rules without duplicating th
     /without treating the interaction phases as a mandatory reasoning algorithm/,
   );
   for (const rule of [
-    "A finding is not a deterministic repair merely because its detection is deterministic.",
-    "When authoring-time access is unavailable",
-    "Boundary-change re-entry:",
-  ]) {
+    "A deterministic finding is not necessarily a deterministic repair",
+    "A designated URL does not prove its contents",
+    "re-enter the creation gate for affected decisions only",
+  ])
     assert.equal(countOccurrences(prompt, rule), 1, rule);
-  }
 });
 
 test("guide rejects missing and unknown topics, unsupported options, and extra arguments", async () => {
@@ -1528,3 +1473,34 @@ function getIllustration(
 function countOccurrences(value: string, search: string): number {
   return value.split(search).length - 1;
 }
+
+test("direct and handoff authoring preserve the same gate and scoped re-entry", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const prompt = renderSkillGuidePrompt(guidance);
+  assert.match(
+    prompt,
+    /direct scaffolding with `renma scaffold skill <path> --owner <explicit-owner>`/,
+  );
+  assert.match(
+    prompt,
+    /Both routes require the same gate; a repository may require a handoff/,
+  );
+  assert.match(prompt, /optional `renma.skill-authoring-handoff.v1`/);
+  assert.match(
+    prompt,
+    /re-enter the creation gate for affected decisions only/,
+  );
+  assert.match(
+    prompt,
+    /Retain other decisions while their evidence remains applicable/,
+  );
+  assert.match(
+    guidance.interaction.postValidationActions.join("\n"),
+    /Reassess only affected decisions/,
+  );
+  assert.match(
+    prompt,
+    /expected use, nearby exclusions, missing inputs or unavailable sources, and completion without redundant questions/,
+  );
+  assert.match(prompt, /Keep expected answers out of evaluation inputs/);
+});

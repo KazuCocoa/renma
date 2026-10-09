@@ -650,13 +650,13 @@ test("guide prompt and JSON expose the v1 handoff construction contract", async 
   assert.doesNotMatch(promptResult.stdout, /"currentUnderstanding"/);
   assert.match(
     promptResult.stdout,
-    /Record caller-declared authoring decisions only after every creation-gate requirement is established[\s\S]*no Blocking authoring decision remains/,
+    /record caller-declared authoring decisions only after every creation-gate requirement is established[\s\S]*no Blocking authoring decision remains/,
   );
   assert.match(
     promptResult.stdout,
     /renma scaffold skill <path> --handoff <handoff\.json>/,
   );
-  assert.match(promptResult.stdout, /does not certify.*claims are true/i);
+  assert.match(promptResult.stdout, /does not.*certify.*claims are true/i);
 });
 
 test("guide and scaffold help make the caller-declared handoff workflow discoverable", async () => {

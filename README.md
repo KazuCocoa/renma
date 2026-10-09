@@ -139,7 +139,8 @@ fields. See
 for the exact current and compatibility forms.
 
 Run `renma guide skill` before generating a new Skill. It prints a deterministic
-creation-gate contract with adaptive clarification guidance for the consuming LLM. Renma remains
+short creation-gate contract with conditional references for the consuming LLM.
+`--format json` retains the complete detailed reference. Renma remains
 non-interactive: the LLM investigates and proposes, Renma validates supplied
 structure and the resulting repository evidence it can determine, and a human
 reviews meaningful decisions. Renma does not certify caller-declared human or
@@ -153,6 +154,10 @@ is declared passed, the external LLM can write
 ```bash
 renma scaffold skill skills/example/SKILL.md --handoff /tmp/example-handoff.json
 ```
+
+For simple in-session work, the agent may instead scaffold with an explicit
+`--owner` after the same gate passes. Use the handoff when structured transfer
+or review is useful, or when repository policy requires it.
 
 The handoff remains an external exchange artifact. Renma validates its shape,
 target agreement, canonical identity, declared relationships, and zero blocker
@@ -212,18 +217,17 @@ The normal sequence is:
 npx renma guide skill
 # The LLM investigates and clarifies only if needed, establishes every gate
 # requirement including the smallest justified asset structure, then declares
-# the gate passed and writes renma.skill-authoring-handoff.v1 to:
-# /tmp/spec-review-handoff.json
-npx renma scaffold skill skills/testing/spec-review/SKILL.md --handoff /tmp/spec-review-handoff.json
+# the gate passed. The owner below must be explicitly established.
+npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 # Use platform-native Skill authoring guidance within the agreed boundaries.
 npx renma scan . --fail-on high
-npx renma catalog . --format markdown
-npx renma graph . --format markdown
+# Use catalog or graph only for a current structural question.
 ```
 
-This coding-agent authoring flow uses the structured handoff. Direct or manual
-scaffold usage that does not use the agent authoring handoff may continue to use
-`--owner`.
+For structured transfer or review, use `--handoff /tmp/spec-review-handoff.json`
+instead of `--owner`, after constructing a gate-ready
+`renma.skill-authoring-handoff.v1`. Both routes have the same authoring
+requirements.
 
 For an existing Skill:
 

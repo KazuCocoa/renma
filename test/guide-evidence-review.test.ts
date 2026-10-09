@@ -53,7 +53,7 @@ test("generated artifacts remain qualified evidence", () => {
   assert.match(truth, /recency, detail, or model confidence/);
   assert.match(truth, /authorized human's explicit decision/);
   assert.match(truth, /explicit user statement regardless of medium/);
-  for (const projection of [prompt, json]) {
+  for (const projection of [json]) {
     assert.match(
       projection,
       /bounded observations made by an identified producer/,
@@ -69,6 +69,17 @@ test("generated artifacts remain qualified evidence", () => {
     );
     assert.match(projection, /authorized human's explicit decision/);
   }
+  assert.match(prompt, /bounded producer-scoped observations/);
+  assert.match(
+    prompt,
+    /not governing authority for domain behavior, policy, completeness, or safety/,
+  );
+  assert.match(prompt, /regardless of delivery or storage/);
+  assert.match(
+    prompt,
+    /authorized human decision remains a user statement regardless of medium/,
+  );
+  assert.match(prompt, /`interaction.truthSources`/);
 });
 
 test("human review exposes material decisions", () => {
@@ -89,7 +100,10 @@ test("human review exposes material decisions", () => {
   assert.match(rules, /Do not claim that the reviewer understood/);
   assert.match(rules, /approved, or independently verified the proposal/);
   for (const projection of [prompt, json]) {
-    assert.match(projection, /evidence-backed consequence of changing it/);
+    assert.match(
+      projection,
+      /evidence-backed consequence(?:s)? of changing (?:it|them)/,
+    );
     assert.match(
       projection,
       /potential impact explicitly labeled Proposed or Unresolved/,
@@ -112,8 +126,13 @@ test("handoff evidence remains qualified", () => {
   assert.match(rules, /Skill contract, source authority, security decisions/);
   assert.match(rules, /runtime-unknown handling, or asset boundaries/);
   assert.doesNotMatch(rules, /since clarification|pending authoring decisions/);
-  for (const projection of [prompt, json]) {
+  for (const projection of [json]) {
     assert.match(projection, /current applicability cannot be established/);
     assert.match(projection, /evidence supporting material handoff decisions/);
   }
+  assert.match(
+    prompt,
+    /recheck material supporting evidence if applicability is unknown/,
+  );
+  assert.match(prompt, /Consult `handoff` in the complete JSON reference/);
 });

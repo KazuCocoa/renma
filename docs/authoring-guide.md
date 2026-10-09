@@ -7,6 +7,40 @@ gate, asset responsibilities, and handoff contract. Its interaction strategies
 are guidance for satisfying those invariants, not an authoritative description
 of the consuming LLM's internal reasoning algorithm.
 
+## Quick Authoring Contract
+
+`renma guide skill` prints the short execution contract. Its complete structured
+reference remains available with `--format json`, including the additive
+`coreContract` projection and all existing detailed fields. Use the short contract
+for ordinary work and consult the named reference sections when an applicable
+decision needs their detail. A shorter prompt does not weaken evidence, ownership,
+security, or creation-gate requirements.
+
+1. Establish the recurring task, inputs, usage boundaries, result, completion and
+   failure behavior, explicit owner, and smallest justified asset structure.
+2. Investigate applicable evidence. Clarify only Blocking authoring decisions;
+   use visible safe reversible defaults and defer non-blocking details. Future
+   task-instance unknowns need a handling policy rather than upfront answers.
+3. Pass the gate before creation. Use direct scaffolding for simple in-session
+   work, or a structured handoff when transfer, review, or repository policy
+   calls for it. Both routes satisfy the same authoring contract.
+4. Author, validate, repair only what evidence supports, and present material
+   decisions for human review. If boundaries change, reassess affected decisions
+   while preserving still-applicable evidence for the others.
+
+| When detail is needed | Complete JSON reference |
+| --- | --- |
+| Conflicting evidence, generated reports, or source authority | `interaction.truthSources`, `interaction.decisionClasses`, `interaction.questionRules` |
+| Complex blockers or runtime unknown handling | `interaction.unknownScopes`, `interaction.progressionClasses`, `interaction.unresolvedItemDispositions`, `interaction.creationGate` |
+| Context, support, metadata, or security design | `placementRules`, `artifactRules`, `metadataRules`, installed metadata and security documentation |
+| Semantic diagnostics or boundary changes | `interaction.postValidationActions` |
+| Structured handoff | `handoff`, `interaction.handoffRules` |
+| Recursive external reference traversal | `externalTraversalRules`, before passing the gate |
+| Validation and meaningful review | `verification`, `interaction.humanReviewRules` |
+
+These are conditional references, not a checklist requiring every section to be
+loaded. Illustrations remain optional and non-normative.
+
 ## Responsibility Boundary
 
 For a new Skill, or when intentionally redesigning asset boundaries, start with
@@ -76,7 +110,7 @@ understand and investigate applicable evidence
   -> if needed, ask only about unresolved Blocking authoring decisions
   -> establish the smallest justified asset structure
   -> pass the gate when every gate requirement is established and no blocker remains
-  -> write a renma.skill-authoring-handoff.v1 exchange artifact
+  -> choose direct scaffolding or a structured authoring handoff
   -> scaffold and author
   -> validate
   -> repair, investigate, ask again, or justify no change
@@ -396,6 +430,13 @@ Never add a suppression automatically, weaken security policy, manufacture
 metadata, rewrite semantics merely to clear a finding, or turn a human decision
 into a model assumption.
 
+Re-entering the gate reassesses only decisions affected by the proposed change.
+Keep other decisions and evidence while they remain applicable to the current
+content, environment, and scope. Adding a justified local example must not
+restart unrelated ownership or source-authority discussions. Ask only when the
+changed decision still requires human truth; this does not waive any affected
+gate requirement or separately required review.
+
 ### Reviewed-decision persistence
 
 Persist durable reviewed workflow, boundary, input, output, completion,
@@ -462,8 +503,7 @@ renma guide skill
   -> investigate applicable evidence and clarify human truth only if needed
   -> establish the smallest intended asset structure as a gate requirement
   -> pass the creation gate when every requirement is established and no blocker remains
-  -> external LLM writes renma.skill-authoring-handoff.v1
-  -> renma scaffold skill <agreed-path> --handoff <handoff.json>
+  -> direct scaffold with explicit owner, or structured handoff when useful or required
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
   -> renma scan . --fail-on high
@@ -564,11 +604,22 @@ inputs, exceptions, failure behavior, safety constraints, completion criteria,
 and unresolved uncertainty, and remove generic introductions, conclusions, and
 boilerplate. Concise does not mean omitting important decisions.
 
-### 2. Record the structured authoring handoff
+### 2. Choose Direct Scaffolding Or A Structured Handoff
 
-After every creation-gate requirement is established, including the smallest
-justified asset structure, and no Blocking authoring decision remains, the
-external LLM or coding agent records the current decisions in
+After every creation-gate requirement is established and no Blocking authoring
+decision remains, simple in-session work may use direct scaffolding:
+
+```bash
+renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+```
+
+The owner must already be explicit and evidence-backed. Direct scaffolding does
+not bypass the creation gate, authorize unresolved decisions, or infer a domain
+contract. Use a structured handoff when transferring decisions between tools or
+sessions, when structured review is useful, or when repository policy requires
+it. Otherwise no exchange file is required solely because an LLM is authoring.
+
+When using a handoff, the external LLM or coding agent records current decisions in
 `renma.skill-authoring-handoff.v1`. The guide's JSON output exposes construction
 rules and a template; the default prompt gives a concise version. Renma does
 not create or fill the exchange file.
@@ -607,7 +658,8 @@ or asset boundaries.
 
 ### 3. Generate one repository-compatible starting point
 
-Run the Renma generator once:
+Run the Renma generator once using the route chosen above. For the structured
+handoff route:
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md \
@@ -718,9 +770,21 @@ Use external runtime evaluation for complex Skill behavior when the change,
 unresolved execution evidence, or repository requirements call for it. Use
 representative raw user prompts, outputs, and execution logs without leaking
 expected answers, diagnoses, or intended fixes to evaluation agents. Renma
-remains deterministic; runtime evaluation stays external.
+remains deterministic; runtime evaluation stays external. Choose a small
+representative set appropriate to the change:
 
-### 4. Validate, fix, and rerun
+| Case | Observe |
+| --- | --- |
+| Typical request with available inputs | Expected work reaches a checkable result |
+| Nearby request outside the selection boundary | Skill avoids inappropriate selection or continuation |
+| Missing input or unavailable required source | Authored finding, ask, or stop behavior preserves uncertainty |
+| Inputs and authorization already supplied | Work completes without redundant clarification |
+
+These cases are a selection aid, not four mandatory executions for every edit.
+Use raw requests and record actual outputs or logs; deterministic wording checks
+do not establish runtime task success.
+
+### 5. Validate, fix, and rerun
 
 After authoring or changes, run the relevant validation and all
 repository-required checks for the current change and stage. The usual release
@@ -1340,8 +1404,8 @@ run renma guide skill
   -> evaluate the Renma creation gate and clarify only if needed
   -> establish the smallest justified asset structure
   -> pass the creation gate
-  -> write renma.skill-authoring-handoff.v1
-  -> create the Renma scaffold with --handoff
+  -> choose direct scaffolding or a structured handoff
+  -> create the Renma scaffold
   -> use skill-creator only for semantic refinement
 ```
 
@@ -1374,7 +1438,9 @@ creation gate before changing structure. After the reviewed edits, run
 ```
 
 Do not ask `skill-creator` to design a generic Skill first for later Renma
-enrichment. The Renma scaffold and graph are the starting point.
+enrichment. The Renma scaffold and graph are the starting point. The handoff
+example above is one supported route, not a requirement for every coding-agent
+session.
 
 ## Review Checklist
 

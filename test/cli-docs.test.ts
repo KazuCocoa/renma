@@ -279,7 +279,7 @@ test("README and User Manual distinguish repository init from asset scaffold", a
   }
 });
 
-test("README coding-agent Quick Start requires the structured authoring handoff", async () => {
+test("README coding-agent Quick Start supports direct and handoff authoring", async () => {
   const readme = await readRepoFile("README.md");
   const start = readme.indexOf("### Create a Skill interactively");
   const end = readme.indexOf("For an existing Skill:", start);
@@ -289,15 +289,12 @@ test("README coding-agent Quick Start requires the structured authoring handoff"
 
   assert.match(
     quickStart,
-    /npx renma guide skill[\s\S]*investigates and clarifies only if needed[\s\S]*establishes every gate[\s\S]*smallest justified asset structure[\s\S]*declares[\s\S]*the gate passed and writes renma\.skill-authoring-handoff\.v1[\s\S]*npx renma scaffold skill skills\/testing\/spec-review\/SKILL\.md --handoff \/tmp\/spec-review-handoff\.json/,
+    /npx renma guide skill[\s\S]*investigates and clarifies only if needed[\s\S]*establishes every gate[\s\S]*smallest justified asset structure[\s\S]*declares[\s\S]*the gate passed[\s\S]*npx renma scaffold skill skills\/testing\/spec-review\/SKILL\.md --owner qa-platform/,
   );
-  assert.doesNotMatch(
-    quickStart,
-    /npx renma guide skill[\s\S]*npx renma scaffold skill[^\n]*--owner/,
-  );
+  assert.match(quickStart, /For structured transfer or review, use `--handoff/);
   assert.match(
     quickStart,
-    /Direct or manual\s+scaffold usage that does not use the agent authoring handoff may continue to use\s+`--owner`/,
+    /Both routes have the same authoring\s+requirements/,
   );
 });
 
@@ -365,7 +362,7 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     manual,
-    /Structure\["Establish the smallest justified asset structure"\][\s\S]*Ready\{"Every gate requirement established and no blockers\?"\}[\s\S]*Pass\["Declare the creation gate passed"\][\s\S]*Handoff\["Write renma\.skill-authoring-handoff\.v1"\]/,
+    /Structure\["Establish the smallest justified asset structure"\][\s\S]*Ready\{"Every gate requirement established and no blockers\?"\}[\s\S]*Pass\["Declare the creation gate passed"\][\s\S]*Scaffold\["Scaffold once with owner or structured handoff"\]/,
   );
   assert.match(
     manual,
@@ -377,7 +374,7 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
   );
   assert.match(
     earlyManual,
-    /reviews applicable evidence and clarifies only if needed\s+-> establish every creation-gate requirement, including the smallest justified asset structure\s+-> no declared Blocking authoring decision remains\s+-> declare the creation gate passed\s+-> external LLM writes renma\.skill-authoring-handoff\.v1 JSON/,
+    /reviews applicable evidence and clarifies only if needed\s+-> establish every creation-gate requirement, including the smallest justified asset structure\s+-> no declared Blocking authoring decision remains\s+-> declare the creation gate passed\s+-> direct scaffold with explicit owner, or optional structured handoff/,
   );
   assert.match(
     earlyManual,

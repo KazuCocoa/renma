@@ -6,6 +6,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- `guide skill` now prints a short core contract with conditional pointers to
+  the complete JSON reference. The additive `coreContract` projection retains
+  the v2 schema and existing detailed fields. Simple in-session authoring may
+  use direct scaffolding after the same creation gate; structured handoffs
+  remain available or repository-required. Boundary changes reassess affected
+  decisions, and runtime evaluation guidance identifies representative cases
+  without making them mandatory for every edit.
+
 ## [0.41.0] - 2026-10-02
 
 ### Added

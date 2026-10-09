@@ -53,12 +53,14 @@ criteria, and ambiguity-resolving examples within the agreed Renma boundaries.
 It is not the authority for Renma metadata, Context placement, file count,
 source-of-truth representation, or support files and scripts.
 
-For agent workflows, the consuming LLM records the result in the versioned
+When structured transfer or review is useful or repository policy requires it,
+the consuming LLM records the result in the versioned
 `renma.skill-authoring-handoff.v1` exchange contract only after every
 creation-gate requirement is established, including the smallest justified
 asset structure, no Blocking decision remains, and the gate is declared passed.
 The handoff is caller-declared authoring evidence, not a Renma asset or
-conversation file:
+conversation file. Simple in-session authoring may instead use direct scaffolding
+with an explicit `--owner` after the same creation gate passes:
 
 ```text
 renma guide skill
@@ -66,10 +68,10 @@ renma guide skill
   -> establish every creation-gate requirement, including the smallest justified asset structure
   -> no declared Blocking authoring decision remains
   -> declare the creation gate passed
-  -> external LLM writes renma.skill-authoring-handoff.v1 JSON
-  -> renma scaffold skill <agreed-path> --handoff <handoff.json>
+  -> direct scaffold with explicit owner, or optional structured handoff
   -> external LLM authors within the scaffold
-  -> renma scan / catalog / graph / readiness
+  -> renma scan and repository-required checks
+  -> optional reports only for current questions
   -> human review
 ```
 
@@ -841,9 +843,9 @@ When creating a Skill, run `renma guide skill`; let the consuming LLM inspect
 relevant evidence, clarify unresolved Blocking human truth only when needed,
 establish the smallest intended asset graph as a creation-gate requirement,
 and pass the gate only after every requirement is established and no Blocking
-decision remains; then record a
-`renma.skill-authoring-handoff.v1` exchange artifact, run
-`scaffold skill <path> --handoff <handoff.json>` once, create or reuse only
+decision remains; then use direct scaffolding with an explicit owner, or record a
+`renma.skill-authoring-handoff.v1` exchange artifact when useful or required and
+run `scaffold skill <path> --handoff <handoff.json>` once. Create or reuse only
 justified Context Assets, complete the focused workflow, and validate with
 `renma scan . --fail-on high`. For deeper authoring guidance, see the
 [Authoring Guide](authoring-guide.md). For rule details, see the
@@ -974,8 +976,7 @@ flowchart LR
   Structure --> Ready{"Every gate requirement established and no blockers?"}
   Ready -- No --> Gate
   Ready -- Yes --> Pass["Declare the creation gate passed"]
-  Pass --> Handoff["Write renma.skill-authoring-handoff.v1"]
-  Handoff --> Scaffold["Run renma scaffold skill --handoff once"]
+  Pass --> Scaffold["Scaffold once with owner or structured handoff"]
   Scaffold --> Context["Scaffold or reuse justified Context"]
   Context --> Complete["Complete the focused workflow"]
   Complete --> Validate["Run renma scan . --fail-on high"]
@@ -1047,7 +1048,9 @@ finished Skill later according to its own runtime behavior.
 
 2. After every creation-gate requirement is established, including the smallest
    justified asset structure, and the supplied state declares no Blocking
-   decisions, have the external LLM write a
+   decisions, choose direct scaffolding with an explicit owner for simple
+   in-session work. When structured transfer or review is useful or repository
+   policy requires it, have the external LLM write a
    `renma.skill-authoring-handoff.v1` JSON file. Its
    `currentUnderstanding` preserves Confirmed, Proposed, and Unresolved state;
    `progression` separately preserves Blocking, Reversible default, and Deferred
@@ -3212,7 +3215,11 @@ renma guide skill --json
 
 Prompt is the default. It is a compact execution projection of the core
 contract; JSON is the complete deterministic structured reference. Both derive
-from the same guidance data and include the installed Renma version. The command writes only
+from the same guidance data and include the installed Renma version. JSON
+adds `coreContract`, the short projection rendered by prompt mode, while
+preserving the existing detailed v2 fields. Prompt mode names conditional
+reference sections to consult when their detailed rules apply; consumers need
+not load every section for ordinary authoring. The command writes only
 to stdout, needs no repository, and performs no filesystem or network
 operations. Missing or unknown topics and unsupported arguments exit `2`; use
 `renma guide --help` for the supported contract.
@@ -3231,9 +3238,11 @@ Confirmed, Proposed, and Unresolved decisions, classify Blocking, Reversible
 default, and Deferred progression separately, evaluate and pass the creation
 gate, ask only when unresolved Blocking human truth remains, classify findings
 conservatively, and re-enter the gate when asset boundaries may change. It also
-distinguishes authoring decisions from runtime task unknowns and gives unresolved items an action:
-Ask now, Queue as blocker, Proceed with reversible default, Defer, or Report as
-finding. Questions should respect prerequisite dependencies; their count and
+distinguishes authoring decisions from runtime task unknowns and summarizes
+safe progression. The detailed Ask now, Queue as blocker, Proceed with reversible
+default, Defer, and Report as finding dispositions remain in the conditional
+`interaction.unresolvedItemDispositions` reference. Questions should respect
+prerequisite dependencies; their count and
 batching are adaptive, and Renma requires no decision graph, frontier, or
 round-based algorithm. These working classifications are not repository metadata
 or stored conversation state.
@@ -3245,8 +3254,10 @@ Both projections describe the small
 `handoff` section with its purpose, trust boundary, construction rules, and a
 template; the default prompt includes the handoff boundary and directs
 consumers to JSON for the template and complete reference. The consuming LLM
-creates a filled handoff only after no declared
-Blocking authoring decision remains. `guide` never fills or writes one itself.
+creates a filled handoff only when useful or required, after all gate
+requirements are established and no declared Blocking authoring decision
+remains. Direct scaffolding satisfies the same gate. `guide` never fills or
+writes one itself.
 
 The complete reference is domain-neutral and structurally separate from its
 optional illustrations. Renma does not classify a request by matching it to a built-in
