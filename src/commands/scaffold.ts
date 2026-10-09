@@ -439,7 +439,7 @@ function renderPrompt(input: {
     : "";
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
 
-${handoffSection}Preserve the scaffold's id, title, owner, tags, version, and status values.
+${handoffSection}Preserve the scaffold's id, title, owner, tags, ${input.kind === "context_lens" ? "and status values. Set version to `0.1.0`." : "version, and status values."}
 
 Local resource directories: \`${input.resources.join(",") || "none"}\`
 
