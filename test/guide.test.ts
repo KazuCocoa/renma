@@ -1479,7 +1479,7 @@ test("direct and handoff authoring preserve the same gate and scoped re-entry", 
   const prompt = renderSkillGuidePrompt(guidance);
   assert.match(
     prompt,
-    /direct scaffolding with `renma scaffold skill <path> --owner <explicit-owner>`/,
+    /direct scaffolding with `renma scaffold skill skills\/<name>\/SKILL\.md --owner <explicit-owner>`/,
   );
   assert.match(
     prompt,

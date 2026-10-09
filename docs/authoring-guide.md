@@ -624,6 +624,30 @@ When using a handoff, the external LLM or coding agent records current decisions
 rules and a template; the default prompt gives a concise version. Renma does
 not create or fill the exchange file.
 
+Read just `handoff` from the JSON reference for this step. Its `itemExamples`
+shows the object shapes hidden by the template's empty arrays:
+`assetGraph.supportingAssets`, `sourceAuthorities`, `securityDecisions`, and
+`runtimeUnknownHandling` contain objects, not plain strings. Replace the example
+content with applicable decisions; keep an array empty only when no items apply.
+Do not copy `itemExamples` itself into the exchange file. The complete shape is
+defined in the installed [handoff schema](schemas/skill-authoring-handoff-v1.schema.json).
+
+For example, a confirmed decision and a runtime input policy use these shapes:
+
+```json
+{
+  "securityDecisions": [
+    { "decision": "No network access.", "state": "confirmed" }
+  ],
+  "runtimeUnknownHandling": [
+    { "unknown": "Missing input logs.", "behavior": "ask", "condition": "Logs are needed for the requested diagnosis." }
+  ]
+}
+```
+
+This is a shape illustration, not a complete handoff or authorization to assume
+these decisions for another task.
+
 The handoff keeps these layers separate:
 
 - Confirmed, Proposed, and Unresolved current understanding;

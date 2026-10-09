@@ -131,6 +131,12 @@ export interface SkillAuthoringHandoffGuidance {
   boundary: string;
   rules: string[];
   template: SkillAuthoringHandoff;
+  itemExamples: Pick<
+    SkillAuthoringHandoff,
+    "sourceAuthorities" | "securityDecisions" | "runtimeUnknownHandling"
+  > & {
+    supportingAssets: SkillAuthoringHandoff["assetGraph"]["supportingAssets"];
+  };
 }
 
 /** Build the single structured source used by every Skill guide projection. */
@@ -171,7 +177,7 @@ export function buildSkillAuthoringGuidance(
         "Use the installed scaffold and supported Agent Skills and Renma fields and encodings. Keep metadata compact; do not invent owners, dependencies, policy, or fields. Preserve existing unknown vendor metadata. State each requirement once in its owning asset and persist only durable reviewed workflow, governance, source, and rationale decisions, not conversation history or temporary decision state.",
       ],
       handoff: [
-        "After the gate passes, choose direct scaffolding with `renma scaffold skill <path> --owner <explicit-owner>` for simple in-session work, or an optional `renma.skill-authoring-handoff.v1` exchange when structured transfer or review is useful. Both routes require the same gate; a repository may require a handoff.",
+        "After the gate passes, choose direct scaffolding with `renma scaffold skill skills/<name>/SKILL.md --owner <explicit-owner>` for simple in-session work, or an optional `renma.skill-authoring-handoff.v1` exchange when structured transfer or review is useful. Pass the canonical SKILL.md file path, not its directory; direct file creation requires --owner. Both routes require the same gate; a repository may require a handoff.",
         "When using a handoff, record caller-declared authoring decisions only after every creation-gate requirement is established and no Blocking authoring decision remains; invoke `renma scaffold skill <path> --handoff <handoff.json>`. Consult `handoff` in the complete JSON reference for construction and validation rules. Its validity does not prove authoring claims, source truth, blocker completeness, or human approval; recheck material supporting evidence if applicability is unknown.",
         "Use one scaffold generator per target, then platform-native guidance to refine semantics within established boundaries. Do not create a second target through another generator. Renma does not select or execute Skills, fetch sources, conduct clarification, or certify that authoring or domain claims are true.",
       ],
@@ -184,7 +190,7 @@ export function buildSkillAuthoringGuidance(
         "Finish with human review of semantic correctness and material non-obvious decisions, their governing evidence or authority, evidence-backed consequences of changing them, or potential impact explicitly labeled Proposed or Unresolved. Report remaining uncertainty. Clean deterministic output does not prove semantic correctness; do not claim reviewer understanding, approval, or independent verification.",
       ],
       references: [
-        "Use `renma guide skill --format json` for the complete reference. Read the applicable sections before a decision relies on their detailed rules; do not load every section as ceremony. Unchanged detailed rules remain normative when their conditions apply.",
+        "Use `renma guide skill --format json` for the complete reference. Select only the fields needed for the current decision, such as metadataRules for field names or handoff for exchange construction; do not read every suggested section together. Read applicable detail before relying on it. Unchanged detailed rules remain normative when their conditions apply.",
         "Evidence conflicts, derived artifacts, or unclear authority: `interaction.truthSources`, `interaction.decisionClasses`, and `interaction.questionRules`. Complex blocker or runtime handling: `interaction.unknownScopes`, `interaction.progressionClasses`, `interaction.unresolvedItemDispositions`, and `interaction.creationGate`.",
         "Context or support design: `placementRules`, `artifactRules`, `metadataRules`, and the installed metadata and security-policy documentation. Semantic diagnostics or boundary changes: `interaction.postValidationActions`. Handoff transfer: `handoff` and `interaction.handoffRules`. Validation and review: `verification` and `interaction.humanReviewRules`.",
         "If the finished Skill may recursively follow references discovered inside an external source, consult and apply `externalTraversalRules` before passing the creation gate. Named source reading alone does not require recursive traversal. Illustrations are optional, non-normative, and must not supply assumptions or asset structure for another task.",
@@ -204,6 +210,9 @@ export function buildSkillAuthoringGuidance(
         "A structurally valid handoff does not prove that its supporting evidence remains applicable. When current applicability cannot be established, recheck only the evidence supporting material handoff decisions that scaffolding or semantic authoring will rely on. Re-enter the creation gate when the result changes the Skill contract, source authority, security decisions, runtime-unknown handling, or asset boundaries.",
         "Do not infer required versus optional relationships, ownership, domain truth, or broader security permission. Every planned Context requires an independent maintenance or governance justification.",
         "Keep the positional scaffold target equal to assetGraph.skill.path after safe normalization. One scaffold invocation creates only that explicit target and declared Skill-local resource directories, never supporting assets.",
+        "The template's empty arrays do not describe their item types. assetGraph.supportingAssets, sourceAuthorities, securityDecisions, and runtimeUnknownHandling contain objects, never plain strings. Use itemExamples for their shapes, replacing example content with applicable evidence; use [] only when no items apply. itemExamples is guide reference data, not a field to copy into the handoff.",
+        "Each sourceAuthorities item requires source and status (provided, consulted, or designated_unconsulted); authority and evidence (a string array) are optional. Each securityDecisions item requires decision and state (confirmed, proposed, or unresolved); rationale is optional. Each runtimeUnknownHandling item requires unknown and behavior (ask, report, defer, or stop); condition is optional.",
+        "Each supportingAssets item requires kind (context or context_lens), id, path, disposition (reuse or create), relationship (required or optional), and justification. Its identity and relationship must agree with assetGraph.skill. Omit absent optional fields; do not add unknown fields. The installed docs/schemas/skill-authoring-handoff-v1.schema.json describes the full shape.",
       ],
       template: {
         schemaVersion: SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
@@ -249,6 +258,46 @@ export function buildSkillAuthoringGuidance(
         sourceAuthorities: [],
         securityDecisions: [],
         runtimeUnknownHandling: [],
+      },
+      itemExamples: {
+        supportingAssets: [
+          {
+            kind: "context",
+            id: "context.example",
+            path: "contexts/example.md",
+            disposition: "reuse",
+            relationship: "required",
+            justification:
+              "Replace with the independent maintenance or governance reason.",
+          },
+        ],
+        sourceAuthorities: [
+          {
+            source: "Replace with the supplied source identifier.",
+            status: "provided",
+            authority: "Replace with the evidence-backed scope of authority.",
+            evidence: [
+              "Replace with the relevant supplied section or evidence.",
+            ],
+          },
+        ],
+        securityDecisions: [
+          {
+            decision: "Replace with the actual security decision.",
+            state: "confirmed",
+            rationale:
+              "Replace with the applicable evidence or explicit authorization.",
+          },
+        ],
+        runtimeUnknownHandling: [
+          {
+            unknown:
+              "Replace with the runtime information that may be missing.",
+            behavior: "ask",
+            condition:
+              "Replace with when the current task requires that information.",
+          },
+        ],
       },
     },
     interaction: {

@@ -16,6 +16,7 @@ import { Ajv2020, type AnySchemaObject } from "ajv/dist/2020.js";
 import { main } from "../src/cli.js";
 import { classifyCliError, CLI_EXIT, CliUserError } from "../src/cli-errors.js";
 import { buildSkillAuthoringGuidance } from "../src/guidance/skill-authoring.js";
+import { renderSkillGuidePrompt } from "../src/renderers/guide.js";
 import {
   classifySkillAuthoringHandoffReadError,
   SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
@@ -693,6 +694,97 @@ test("published handoff schema validates the guide template and bounds malformed
   assert.ok(
     validate.errors?.some((error) => error.keyword === "additionalProperties"),
   );
+});
+
+test("guide object-array examples satisfy both the published schema and scaffold validator", async () => {
+  const guidance = buildSkillAuthoringGuidance("test");
+  const examples = guidance.handoff.itemExamples;
+  const handoff = gateReadyHandoff();
+  handoff.sourceAuthorities = structuredClone(examples.sourceAuthorities);
+  handoff.securityDecisions = structuredClone(examples.securityDecisions);
+  handoff.runtimeUnknownHandling = structuredClone(
+    examples.runtimeUnknownHandling,
+  );
+  handoff.assetGraph.supportingAssets = structuredClone(
+    examples.supportingAssets,
+  );
+  handoff.assetGraph.skill.requiresContext = [examples.supportingAssets[0]!.id];
+  handoff.assetGraph.skill.optionalContext = [];
+  handoff.assetGraph.skill.requiresLens = [];
+  const schema = JSON.parse(
+    await readFile(SCHEMA_PATH, "utf8"),
+  ) as AnySchemaObject;
+  const validate = new Ajv2020({ allErrors: true, strict: true }).compile(
+    schema,
+  );
+  assert.equal(validate(handoff), true, JSON.stringify(validate.errors));
+
+  const root = await handoffFixtureRoot("renma-guide-items-");
+  const handoffPath = path.join(root, "handoff.json");
+  const target = path.join(root, "skills", "example", "SKILL.md");
+  await writeHandoff(handoffPath, handoff);
+  const result = await capture(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--handoff",
+      handoffPath,
+      "--format",
+      "json",
+    ]),
+  );
+  assert.equal(result.code, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).handoff, handoff);
+
+  for (const field of [
+    "sourceAuthorities",
+    "securityDecisions",
+    "runtimeUnknownHandling",
+  ] as const) {
+    const malformed = {
+      ...handoff,
+      [field]: ["A decision expressed as a plain string."],
+    };
+    assert.equal(validate(malformed), false, field);
+    await writeFile(handoffPath, JSON.stringify(malformed));
+    const rejected = await capture(() =>
+      main([
+        "scaffold",
+        "skill",
+        target,
+        "--handoff",
+        handoffPath,
+        "--format",
+        "json",
+      ]),
+    );
+    assert.equal(rejected.code, 2, field);
+    assert.ok(
+      rejected.stderr.includes(`${field}[0] must be an object.`),
+      rejected.stderr,
+    );
+  }
+});
+
+test("the short guide's direct command creates the canonical Skill file", async () => {
+  const prompt = renderSkillGuidePrompt(buildSkillAuthoringGuidance("test"));
+  const command = prompt.match(
+    /`(renma scaffold skill [^`]+ --owner <explicit-owner>)`/,
+  )?.[1];
+  assert.ok(command);
+  const root = await handoffFixtureRoot("renma-guide-command-");
+  const target = path.join(root, "skills", "probe", "SKILL.md");
+  const args = command
+    .replace("<name>", "probe")
+    .replace("<explicit-owner>", "maintainers")
+    .split(" ")
+    .slice(1);
+  assert.equal(args[2], "skills/probe/SKILL.md");
+  args[2] = target;
+  const result = await capture(() => main(args));
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(await readFile(target, "utf8"), /renma\.owner: 'maintainers'/);
 });
 
 test("scaffold JSON adds its schema identity without requiring a handoff", async () => {

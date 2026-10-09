@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Skill authoring guidance now spells out the canonical `SKILL.md` scaffold
+  target and required direct owner, and provides typed object examples for
+  handoff arrays. Conditional reference guidance favors only the fields needed
+  for the current decision.
+
 - `guide skill` now prints a short core contract with conditional pointers to
   the complete JSON reference. The additive `coreContract` projection retains
   the v2 schema and existing detailed fields. Simple in-session authoring may
