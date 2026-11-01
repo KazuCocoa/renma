@@ -3,10 +3,12 @@ import packageJson from "../../package.json" with { type: "json" };
 import { graphFromRepositorySnapshot } from "./graph.js";
 import type { GraphEdge } from "../graph-report.js";
 import {
-  buildReadinessReport,
-  readinessDiagnosticsFromRepositorySnapshot,
   type ReadinessLevel,
   type ReadinessReport,
+} from "../readiness-report.js";
+import {
+  buildReadinessReport,
+  readinessDiagnosticsFromRepositorySnapshot,
 } from "./readiness.js";
 import { scanFromRepositorySnapshot } from "../scanner.js";
 import {

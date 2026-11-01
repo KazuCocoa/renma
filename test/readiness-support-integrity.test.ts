@@ -4,10 +4,12 @@ import test, { type TestContext } from "node:test";
 
 import { buildBomReport } from "../src/commands/bom.js";
 import {
-  readiness,
-  readinessFromRepositorySnapshot,
   type ReadinessCheck,
   type ReadinessReport,
+} from "../src/readiness-report.js";
+import {
+  readiness,
+  readinessFromRepositorySnapshot,
 } from "../src/commands/readiness.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import { scanFromRepositorySnapshot } from "../src/scanner.js";

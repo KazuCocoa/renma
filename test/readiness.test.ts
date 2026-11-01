@@ -6,13 +6,17 @@ import { test } from "node:test";
 import { main } from "../src/cli.js";
 import type { GraphReport } from "../src/graph-report.js";
 import {
-  buildReadinessReport,
-  formatReadinessJson,
-  formatReadinessMarkdown,
-  readiness,
-  readinessFromRepositorySnapshot,
   type ReadinessReport,
   type ReadinessCheckStatus,
+} from "../src/readiness-report.js";
+import {
+  formatReadinessJson,
+  formatReadinessMarkdown,
+} from "../src/renderers/readiness.js";
+import {
+  buildReadinessReport,
+  readiness,
+  readinessFromRepositorySnapshot,
 } from "../src/commands/readiness.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
