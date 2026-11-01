@@ -1,3 +1,5 @@
+import { formatCiPolicySections } from "../renderers/ci-policy.js";
+import { MAX_LIST_ITEMS, formatOverflow } from "../renderers/ci-report-list.js";
 import { formatWritableByEvidence } from "../renderers/writable-by.js";
 import {
   executeDiff,
@@ -26,7 +28,6 @@ import {
 } from "../executable-surface-diff.js";
 import { zeroExecutableSurfaceInventory } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
-import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatVersionedJsonDocument } from "../report.js";
 import type {
   SkillDiscoveryCycleDiff,
@@ -45,45 +46,36 @@ import {
   evaluateSecurityPolicyCiPolicy,
   type SecurityPolicyCiConfiguration,
   type SecurityPolicyCiEvaluation,
-  type SecurityPolicyCiMatch,
 } from "../security-policy-ci-policy.js";
 import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 import {
   evaluateScanBoundaryCiPolicy,
   type ScanBoundaryCiConfiguration,
   type ScanBoundaryCiEvaluation,
-  type ScanBoundaryCiMatch,
 } from "../scan-boundary-ci-policy.js";
 import {
-  EXECUTABLE_SURFACE_CI_MATCH_IDS,
   evaluateExecutableSurfaceCiPolicy,
   type ExecutableSurfaceCiConfiguration,
   type ExecutableSurfaceCiEvaluation,
-  type ExecutableSurfaceCiMatch,
 } from "../executable-surface-ci-policy.js";
 import type { EffectiveCiScanBoundaryEvidence } from "../scan-boundary.js";
 import {
   zeroInspectionCoverageDiff,
   type InspectionCoverageDiff,
 } from "../inspection-coverage.js";
-import {
-  QUALITY_POLICY_DIFF_SCHEMA_VERSION,
-  type QualityPolicyThresholdChange,
-} from "../quality-policy-diff.js";
+import { QUALITY_POLICY_DIFF_SCHEMA_VERSION } from "../quality-policy-diff.js";
 import {
   evaluateQualityPolicyCiPolicy,
   type QualityPolicyCiConfiguration,
   type QualityPolicyCiEvaluation,
 } from "../quality-policy-ci-policy.js";
 import { CLI_EXIT } from "../cli-errors.js";
-import type { MetadataPolicyRequiredFieldChange } from "../metadata-policy-diff.js";
 import {
   evaluateMetadataPolicyCiPolicy,
   type MetadataPolicyCiConfiguration,
   type MetadataPolicyCiEvaluation,
 } from "../metadata-policy-ci-policy.js";
 import { REQUIRED_METADATA_CONFIGURATION_KEY } from "../metadata-definitions.js";
-import type { DiagnosticSeverityPolicyChange } from "../diagnostic-severity-policy-diff.js";
 import {
   evaluateDiagnosticSeverityCiPolicy,
   type DiagnosticSeverityCiConfiguration,
@@ -184,8 +176,6 @@ interface CiReportOptions {
   overrides?: ConfigOverrides;
   instrumentation?: DiffCollectionInstrumentation;
 }
-
-const MAX_LIST_ITEMS = DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
 
 interface ReportFinding {
   id: string;
@@ -748,121 +738,29 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
       `- Inspection coverage regressions: ${inspectionCoverage.regressions.length}`,
     );
   }
-  const securityPolicy =
-    "securityPolicy" in report ? report.securityPolicy : undefined;
-  if (securityPolicy && securityPolicy.matchCount > 0) {
-    const suffix =
-      securityPolicy.matchCount === 1 ? "relaxation" : "relaxations";
-    const effect =
-      securityPolicy.configured.effective === "off"
-        ? "GATE OFF"
-        : securityPolicy.outcome.toUpperCase();
-    summaryLines.push(
-      `- Security policy relaxation: ${effect} — ${securityPolicy.matchCount} ${suffix}; explicit human security review required`,
-    );
-  }
-  const securityPolicyLines =
-    securityPolicy && securityPolicy.matchCount > 0
-      ? ["", ...formatSecurityPolicyRelaxationSection(securityPolicy)]
-      : [];
-  const scanBoundaryPolicy =
-    "scanBoundaryPolicy" in report ? report.scanBoundaryPolicy : undefined;
-  if (scanBoundaryPolicy && scanBoundaryPolicy.matchCount > 0) {
-    const effect =
-      scanBoundaryPolicy.configured.effective === "off"
-        ? "GATE OFF"
-        : scanBoundaryPolicy.outcome.toUpperCase();
-    summaryLines.push(
-      `- Scan boundary weakening: ${effect} — ${scanBoundaryPolicy.matchCount} exact changes; target-local narrowing is not trusted`,
-    );
-  }
-  const scanBoundaryPolicyLines =
-    scanBoundaryPolicy && scanBoundaryPolicy.matchCount > 0
-      ? ["", ...formatScanBoundaryWeakeningSection(scanBoundaryPolicy)]
-      : [];
-  const executableSurfacePolicy =
-    "executableSurfacePolicy" in report
-      ? report.executableSurfacePolicy
-      : undefined;
-  if (executableSurfacePolicy && executableSurfacePolicy.matchCount > 0) {
-    const effect =
-      executableSurfacePolicy.configured.effective === "off"
-        ? "GATE OFF"
-        : executableSurfacePolicy.outcome.toUpperCase();
-    const suffix =
-      executableSurfacePolicy.matchCount === 1 ? "change" : "changes";
-    summaryLines.push(
-      `- Executable-surface CI policy: ${effect} — ${executableSurfacePolicy.matchCount} review-triggering ${suffix}`,
-    );
-  }
-  const executableSurfacePolicyLines = executableSurfacePolicy
-    ? ["", ...formatExecutableSurfaceCiPolicySection(executableSurfacePolicy)]
-    : [];
-  const qualityPolicy =
-    "qualityPolicy" in report ? report.qualityPolicy : undefined;
-  const hasQualityPolicyEvidence =
-    qualityPolicy !== undefined &&
-    (qualityPolicy.configured.from !== qualityPolicy.configured.to ||
-      qualityDiff.changes.length > 0 ||
-      qualityPolicy.matchCount > 0);
-  if (qualityPolicy && hasQualityPolicyEvidence) {
-    const effect =
-      qualityPolicy.matchCount > 0 &&
-      qualityPolicy.configured.effective === "off"
-        ? "GATE OFF"
-        : qualityPolicy.outcome.toUpperCase();
-    summaryLines.push(
-      `- Quality policy: ${effect} — mode ${qualityPolicy.modeTransition.direction}; ${qualityPolicy.numericThresholdChanges.weakenings} numeric weakenings / ${qualityPolicy.numericThresholdChanges.tightenings} numeric tightenings`,
-    );
-  }
-  const qualityPolicyLines =
-    qualityPolicy && hasQualityPolicyEvidence
-      ? ["", ...formatQualityPolicySection(qualityPolicy, qualityDiff.changes)]
-      : [];
   const metadataPolicy =
     "metadataPolicy" in report ? report.metadataPolicy : undefined;
-  if (metadataPolicy) {
-    const effect =
-      metadataPolicy.matchCount > 0 &&
-      metadataPolicy.configured.effective === "off"
-        ? "GATE OFF"
-        : metadataPolicy.outcome.toUpperCase();
-    summaryLines.push(
-      `- Required metadata policy: ${effect} — mode ${metadataPolicy.modeTransition.direction}; ${metadataPolicy.requiredFieldChanges.weakenings} removals / ${metadataPolicy.requiredFieldChanges.tightenings} additions`,
-    );
-  }
-  const metadataPolicyLines = metadataPolicy
-    ? [
-        "",
-        ...formatMetadataPolicySection(
-          metadataPolicy,
-          metadataDiff?.changes ?? [],
-        ),
-      ]
-    : [];
   const diagnosticSeverityPolicy =
     "diagnosticSeverityPolicy" in report
       ? report.diagnosticSeverityPolicy
       : undefined;
-  if (diagnosticSeverityPolicy) {
-    const effect =
-      diagnosticSeverityPolicy.matchCount > 0 &&
-      diagnosticSeverityPolicy.configured.effective === "off"
-        ? "GATE OFF"
-        : diagnosticSeverityPolicy.outcome.toUpperCase();
-    summaryLines.push(
-      `- Diagnostic severity policy: ${effect} — mode ${diagnosticSeverityPolicy.modeTransition.direction}; ${diagnosticSeverityPolicy.severityChanges.weakenings} weakenings / ${diagnosticSeverityPolicy.severityChanges.tightenings} strengthenings / ${diagnosticSeverityPolicy.severityChanges.neutrals} neutral / ${diagnosticSeverityPolicy.severityChanges.reviewRequired} review required`,
-    );
-  }
-  const diagnosticSeverityPolicyLines = diagnosticSeverityPolicy
-    ? [
-        "",
-        ...formatDiagnosticSeverityPolicySection(
-          diagnosticSeverityPolicy,
-          diagnosticSeverityDiff?.changes ?? [],
-        ),
-      ]
-    : [];
+  const policySections = formatCiPolicySections({
+    securityPolicy:
+      "securityPolicy" in report ? report.securityPolicy : undefined,
+    scanBoundaryPolicy:
+      "scanBoundaryPolicy" in report ? report.scanBoundaryPolicy : undefined,
+    executableSurfacePolicy:
+      "executableSurfacePolicy" in report
+        ? report.executableSurfacePolicy
+        : undefined,
+    qualityPolicy: "qualityPolicy" in report ? report.qualityPolicy : undefined,
+    metadataPolicy,
+    diagnosticSeverityPolicy,
+    qualityChanges: qualityDiff.changes,
+    metadataChanges: metadataDiff?.changes ?? [],
+    diagnosticSeverityChanges: diagnosticSeverityDiff?.changes ?? [],
+  });
+  summaryLines.push(...policySections.summary);
 
   const detailLines = [
     "## Readiness",
@@ -978,12 +876,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "",
     ...summaryLines,
     ...formatChangeOverview(report, executableSurface),
-    ...securityPolicyLines,
-    ...scanBoundaryPolicyLines,
-    ...executableSurfacePolicyLines,
-    ...qualityPolicyLines,
-    ...metadataPolicyLines,
-    ...diagnosticSeverityPolicyLines,
+    ...policySections.sections,
     "",
     "## Review Notes",
     "",
@@ -1212,306 +1105,6 @@ function countNonZeroNumbers(value: unknown): number {
     (count, item) => count + countNonZeroNumbers(item),
     0,
   );
-}
-
-function formatSecurityPolicyRelaxationSection(
-  policy: SecurityPolicyCiEvaluation,
-): string[] {
-  const { from, to, effective } = policy.configured;
-  const configured =
-    from === to
-      ? [`- CI review policy: ${from}`]
-      : [
-          `- CI review policy: ${from} -> ${to}`,
-          `- Effective CI review policy: ${effective}`,
-        ];
-  return [
-    "## Security Policy Relaxation",
-    "",
-    ...configured,
-    ...(effective === "off"
-      ? [
-          "- CI status effect: none — gate disabled; explicit human security review required",
-        ]
-      : [
-          `- Policy outcome: ${policy.outcome.toUpperCase()} — explicit human security review required`,
-        ]),
-    "",
-    ...policy.matches
-      .slice(0, MAX_LIST_ITEMS)
-      .map((match) => `- ${formatSecurityPolicyCiMatch(match)}`),
-    ...formatOverflow(policy.matches.length),
-  ];
-}
-
-function formatQualityPolicySection(
-  policy: QualityPolicyCiEvaluation,
-  changes: readonly QualityPolicyThresholdChange[],
-): string[] {
-  const { from, to, effective } = policy.configured;
-  return [
-    "## Quality Policy",
-    "",
-    `- Configured CI review policy: ${from} -> ${to}`,
-    `- Effective CI review policy: ${effective}`,
-    `- Policy outcome: ${policy.outcome.toUpperCase()}`,
-    `- Mode-transition direction: ${policy.modeTransition.direction}`,
-    `- Numeric threshold weakenings: ${policy.numericThresholdChanges.weakenings}`,
-    `- Numeric threshold tightenings: ${policy.numericThresholdChanges.tightenings}`,
-    `- Evaluator matches: ${policy.matchCount}`,
-    ...(effective === "off" && policy.matchCount > 0
-      ? ["- CI status effect: none — gate disabled"]
-      : []),
-    "",
-    ...(changes.length === 0
-      ? ["- No numeric threshold changes."]
-      : [
-          ...changes
-            .slice(0, MAX_LIST_ITEMS)
-            .map((change) => `- ${formatQualityPolicyChange(change)}`),
-          ...formatOverflow(changes.length),
-        ]),
-  ];
-}
-
-function formatQualityPolicyChange(
-  change: QualityPolicyThresholdChange,
-): string {
-  const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  return `${direction}: ${change.assetKind} ${change.thresholdType} ${change.from.value} (${change.from.source}) -> ${change.to.value} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
-}
-
-function formatMetadataPolicySection(
-  policy: MetadataPolicyCiEvaluation,
-  changes: readonly MetadataPolicyRequiredFieldChange[],
-): string[] {
-  const { from, to, effective } = policy.configured;
-  return [
-    "## Required Metadata Policy",
-    "",
-    `- Configured CI review policy: ${from} -> ${to}`,
-    `- Effective CI review policy: ${effective}`,
-    `- Policy outcome: ${policy.outcome.toUpperCase()}`,
-    `- Mode-transition direction: ${policy.modeTransition.direction}`,
-    `- Required-field removals: ${policy.requiredFieldChanges.weakenings}`,
-    `- Required-field additions: ${policy.requiredFieldChanges.tightenings}`,
-    `- Evaluator matches: ${policy.matchCount}`,
-    ...(effective === "off" && policy.matchCount > 0
-      ? ["- CI status effect: none — gate disabled"]
-      : []),
-    "",
-    ...changes
-      .slice(0, MAX_LIST_ITEMS)
-      .map((change) => `- ${formatMetadataPolicyChange(change)}`),
-    ...formatOverflow(changes.length),
-  ];
-}
-
-function formatMetadataPolicyChange(
-  change: MetadataPolicyRequiredFieldChange,
-): string {
-  const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  return `${direction}: required ${formatMarkdownInlineCode(change.field)} ${formatMetadataPolicyEndpoint(change.from)} -> ${formatMetadataPolicyEndpoint(change.to)}; ${formatMarkdownInlineCode(change.configKey)}`;
-}
-
-function formatDiagnosticSeverityPolicySection(
-  policy: DiagnosticSeverityCiEvaluation,
-  changes: readonly DiagnosticSeverityPolicyChange[],
-): string[] {
-  const { from, to, effective } = policy.configured;
-  const impact = [
-    ...(policy.severityChanges.tightenings > 0
-      ? [
-          "Severity tightening is non-blocking by itself; higher-severity findings can change CI failure behavior.",
-        ]
-      : []),
-    ...(policy.matchCount > 0
-      ? [
-          effective === "off"
-            ? "CI status effect: none — gate disabled."
-            : `CI status effect: ${policy.outcome.toUpperCase()} — effective CI review policy: ${effective}.`,
-        ]
-      : []),
-  ];
-  return [
-    "## Diagnostic Severity Policy",
-    "",
-    ...(changes.length > 0
-      ? [
-          "Configuration keys: `diagnostics.severity.<Diagnostic>`.",
-          "",
-          "| Diagnostic | Previous | Current | Change |",
-          "| --- | --- | --- | --- |",
-          ...changes
-            .slice(0, MAX_LIST_ITEMS)
-            .map(formatDiagnosticSeverityPolicyChange),
-          "",
-        ]
-      : []),
-    ...(impact.length > 0 ? [`> ${impact.join(" ")}`, ""] : []),
-    ...formatOverflow(changes.length),
-    `- Configured CI review policy: ${from} -> ${to}; Effective CI review policy: ${effective}; Policy outcome: ${policy.outcome.toUpperCase()}`,
-    `- Mode-transition direction: ${policy.modeTransition.direction}; Evaluator matches: ${policy.matchCount}`,
-    `- Severity weakenings: ${policy.severityChanges.weakenings}; Severity strengthenings: ${policy.severityChanges.tightenings}; Severity neutral changes: ${policy.severityChanges.neutrals}; Severity review-required changes: ${policy.severityChanges.reviewRequired}`,
-  ];
-}
-
-function formatDiagnosticSeverityPolicyChange(
-  change: DiagnosticSeverityPolicyChange,
-): string {
-  const direction =
-    change.direction === "weakening"
-      ? "↓ WEAKENING"
-      : change.direction === "tightening"
-        ? "↑ tightening"
-        : change.direction === "neutral"
-          ? "neutral"
-          : "REVIEW REQUIRED";
-  const from = change.from.severity ?? "unknown producer default";
-  const to = change.to.severity ?? "unknown producer default";
-  const diagnostic = formatMarkdownInlineCode(change.diagnosticId).replaceAll(
-    "|",
-    "\\|",
-  );
-  return `| ${diagnostic} | ${from} (${change.from.source}) | ${to} (${change.to.source}) | ${direction} |`;
-}
-
-function formatMetadataPolicyEndpoint(
-  endpoint: MetadataPolicyRequiredFieldChange["from"],
-): string {
-  if (endpoint.provenance.source === "renma_default") {
-    return `${endpoint.required ? "required" : "not required"} (renma default)`;
-  }
-  return `${endpoint.required ? "required" : "not required"} (repository configuration ${formatMarkdownInlineCode(endpoint.provenance.configPath ?? "(explicit config path)")})`;
-}
-
-function formatExecutableSurfaceCiPolicySection(
-  policy: ExecutableSurfaceCiEvaluation,
-): string[] {
-  const { from, to, effective } = policy.configured;
-  return [
-    "## Executable Surface CI Policy",
-    "",
-    `- Configured: ${from} -> ${to}`,
-    `- Effective: ${effective}`,
-    `- Outcome: ${policy.outcome.toUpperCase()}`,
-    `- Matches: ${policy.matchCount}`,
-    ...(policy.matchCount > 0
-      ? [
-          "",
-          ...policy.matches
-            .slice(0, MAX_LIST_ITEMS)
-            .map((match) => `- ${formatExecutableSurfaceCiMatch(match)}`),
-          ...formatOverflow(policy.matches.length),
-        ]
-      : []),
-  ];
-}
-
-function formatExecutableSurfaceCiMatch(
-  match: ExecutableSurfaceCiMatch,
-): string {
-  const id = formatMarkdownInlineCode(match.id);
-  if (match.kind === "surface") {
-    return `${id}: ${formatMarkdownInlineCode(match.path)}`;
-  }
-  const location = formatMarkdownInlineCode(
-    `${match.sourcePath}:L${"line" in match ? match.line : match.toLine}`,
-  );
-  const target = formatMarkdownInlineCode(match.target);
-  if (
-    match.id === EXECUTABLE_SURFACE_CI_MATCH_IDS.PROBLEMATIC_INVOCATION_ADDED
-  ) {
-    return `${id}: ${location} -> ${target} (${match.resolution})`;
-  }
-  if (
-    match.id === EXECUTABLE_SURFACE_CI_MATCH_IDS.PROBLEMATIC_DEPENDENCY_ADDED
-  ) {
-    return `${id}: ${location} ${match.analyzer} ${match.relation} -> ${target} (${match.resolution})`;
-  }
-  if (match.transition === "added") {
-    return `${id}: ${location} -> ${target}; effective fingerprints: ${match.distinctEffectivePolicyFingerprints.length}`;
-  }
-  return `${id}: ${location} -> ${target}; policy evidence ${match.fromHasEffectivePolicyEvidence ? "present" : "missing"} -> ${match.toHasEffectivePolicyEvidence ? "present" : "missing"}; effective fingerprints ${match.fromDistinctEffectivePolicyFingerprints.length} -> ${match.toDistinctEffectivePolicyFingerprints.length}`;
-}
-
-function formatScanBoundaryWeakeningSection(
-  policy: ScanBoundaryCiEvaluation,
-): string[] {
-  const { from, to, effective } = policy.configured;
-  const configured =
-    from === to
-      ? [`- CI review policy: ${from}`]
-      : [
-          `- CI review policy: ${from} -> ${to}`,
-          `- Effective CI review policy: ${effective}`,
-        ];
-  const boundary = policy.effectiveBoundary;
-  return [
-    "## Scan Boundary Weakening",
-    "",
-    ...configured,
-    ...(effective === "off"
-      ? ["- CI status effect: none — gate disabled; explicit review required"]
-      : [`- Policy outcome: ${policy.outcome.toUpperCase()}`]),
-    ...(boundary
-      ? [
-          `- Enforcement coverage: endpoint-boundary union over ${boundary.inspectedPaths.length} inspected target paths`,
-          `- Enforcement suppressions trusted on both revisions: ${boundary.activeSuppressions.length}`,
-        ]
-      : []),
-    "",
-    ...policy.matches
-      .slice(0, MAX_LIST_ITEMS)
-      .map((match) => `- ${formatScanBoundaryCiMatch(match)}`),
-    ...formatOverflow(policy.matches.length),
-  ];
-}
-
-function formatScanBoundaryCiMatch(match: ScanBoundaryCiMatch): string {
-  const change = match.change;
-  if (change.kind === "glob") {
-    return `include glob removed: ${formatMarkdownInlineCode(change.pattern)} (${match.id})`;
-  }
-  if (change.kind === "exclusion") {
-    return `exclusion added: ${formatMarkdownInlineCode(change.pattern)} (${match.id})`;
-  }
-  if (change.kind === "limit") {
-    const label =
-      change.property === "maxDepth" ? "max depth" : "max file size bytes";
-    return `${label}: ${change.from} -> ${change.to} (${match.id})`;
-  }
-  const expires =
-    change.suppression.fromExpires === null
-      ? `expires ${change.suppression.toExpires}`
-      : `expires ${change.suppression.fromExpires} -> ${change.suppression.toExpires}`;
-  return `suppression ${formatMarkdownInlineCode(change.suppression.id)} at ${formatMarkdownInlineCode(change.suppression.path)}; ${expires} (${match.id})`;
-}
-
-function formatSecurityPolicyCiMatch(match: SecurityPolicyCiMatch): string {
-  const asset = `${formatMarkdownInlineCode(match.asset.id)} (${formatMarkdownInlineCode(match.asset.path)})`;
-  if (match.kind === "scalar") {
-    return `${asset}: ${match.property} ${match.fromState} -> ${match.toState} (${match.id})`;
-  }
-  const values =
-    match.direction === "allowed_value_added"
-      ? match.addedValues
-      : match.removedValues;
-  const action =
-    match.direction === "allowed_value_added"
-      ? "allowed value added"
-      : "restricted value removed";
-  const renderedValues = values
-    .slice(0, MAX_LIST_ITEMS)
-    .map(formatMarkdownInlineCode)
-    .join(", ");
-  const overflow =
-    values.length > MAX_LIST_ITEMS
-      ? `; ${values.length - MAX_LIST_ITEMS} more not shown; see JSON for the full list`
-      : "";
-  return `${asset}: ${match.property} — ${action}: ${renderedValues}${overflow} (${match.id})`;
 }
 
 function formatReviewNotes(report: CiReportFormatInput): string[] {
@@ -2252,13 +1845,6 @@ function formatCountChanges(
           `- ${change.id}: ${change.from} -> ${change.to} (${formatDelta(change.delta)})`,
       ),
     ...formatOverflow(changes.length),
-  ];
-}
-
-function formatOverflow(length: number): string[] {
-  if (length <= MAX_LIST_ITEMS) return [];
-  return [
-    `- ${length - MAX_LIST_ITEMS} more not shown; see JSON for the full list.`,
   ];
 }
 
