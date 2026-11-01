@@ -1,3 +1,4 @@
+import { RepositoryFixture } from "./repository-fixture.js";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -1162,6 +1163,38 @@ review_cycle: P90D
   assert.equal(finding?.evidence.path, "contexts/testing/workflow.md");
   assert.match(finding?.evidence.snippet ?? "", /last_reviewed_at/);
   assert.match(finding?.llmHint ?? "", /2000-03-31/);
+});
+
+test("expiration and overdue review retain separate metadata evidence", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.write(
+    "contexts/freshness.md",
+    `---
+id: freshness
+owner: docs
+expires_at: 2000-01-01
+last_reviewed_at: 2000-01-01
+review_cycle: P90D
+---
+# Freshness
+`,
+  );
+  const result = await scan(fixture.root);
+  const expired = result.findings.filter(
+    (finding) => finding.id === "MAINT-ASSET-EXPIRED",
+  );
+  const overdue = result.findings.filter(
+    (finding) => finding.id === "MAINT-ASSET-REVIEW-OVERDUE",
+  );
+  assert.equal(expired.length, 1);
+  assert.equal(overdue.length, 1);
+  assert.match(expired[0]?.evidence.snippet ?? "", /expires_at/);
+  assert.match(overdue[0]?.evidence.snippet ?? "", /last_reviewed_at/);
+  assert.match(overdue[0]?.llmHint ?? "", /2000-03-31/);
+  assert.notEqual(
+    expired[0]?.evidence.startLine,
+    overdue[0]?.evidence.startLine,
+  );
 });
 
 test("scan does not report future expiration or in-cycle review metadata", async () => {
