@@ -576,75 +576,47 @@ contracts and diagnostic IDs.
 
 ## RepositorySnapshot Is the Repository Evidence Source
 
-`collectRepositorySnapshotCore` in `src/repository-evidence.ts` performs one
-discovery pass and parses each discovered artifact once. Collection copies the
-complete evidence graph into runtime-immutable values: the effective
-configuration and its nested collections, every Artifact and ParsedDocument,
-their nested arrays and metadata evidence, discovered paths, and discovery
-diagnostics. Sets and Maps use protected read-only views because freezing a
-native Set or Map object does not disable its mutator methods. Their mutable
-backing collections are never exposed. No derived projection may rediscover
-files or reread repository content.
+`collectRepositorySnapshotCore` in `src/repository-evidence.ts` discovers once
+and parses each artifact once. It copies the entire evidence graph into
+runtime-immutable values: effective configuration, Artifacts, ParsedDocuments,
+nested arrays and metadata evidence, paths, and diagnostics. Sets and Maps have
+protected read-only views with hidden backing collections; freezing a native
+Set or Map alone would leave mutators usable. Derived projections must not
+rediscover files or reread repository content.
 
-Effective rule configuration is snapshot-scoped. `loadConfig` normalizes the
-repository's optional snake-case Skill, Context, Reference, Profile, and Example
-`quality.*_token_warning` / `quality.*_token_high` fields into complete
-camel-case token policies, including independent default/configuration
-provenance for every value. The shape rule consumes that snapshot value without
-mutating `DEFAULT_QUALITY_PROFILE` or consulting process-global state. These
-values do not enter `scan-boundary` identity because they change finding
-evaluation, not the repository paths or bytes Renma can inspect. A valid
-support-asset metadata override composes as an effective warning floor, while
-the effective High threshold remains at least that floor. Override declaration
-validity uses a stable compatibility baseline independent from current warning
-defaults, so raising a default cannot invalidate an established decision.
+Rule configuration belongs to the snapshot. `loadConfig` normalizes optional
+snake-case Skill, Context, Reference, Profile, and Example token-warning/high
+fields into complete camel-case policies with independent default/configuration
+provenance. Shape rules neither mutate `DEFAULT_QUALITY_PROFILE` nor consult
+global state. These policies affect evaluation, not inspectable paths or bytes,
+so they stay outside `scan-boundary` identity. A valid support-asset override is
+an effective warning floor; High remains at least that floor. Override validity
+uses a stable compatibility baseline, so changing defaults cannot invalidate an
+established decision.
 
-An explicit projection store derives and memoizes these facts from that stable
-input:
+The projection store memoizes catalog and parent-Skill indexes, catalog
+diagnostics, Agent Skills validation, dependent Skill Discovery, structural
+classification, effective security policy, executable-surface evidence, and
+Context Lens summaries/diagnostics. Executable evidence composes artifacts,
+helper commands, support reachability, path states, and prepared policies.
+Each caller-visible projection is copied into an immutable graph; repeated
+access returns the same object without allowing mutations to affect dependents.
+Compatibility properties `core`, `config`, `artifacts`, and `documents` reference
+the same collected facts.
 
-- catalog, catalog diagnostics, and the parent-Skill index;
-- Agent Skills validation and the dependent Skill Discovery index;
-- structural classification evidence;
-- effective security-policy evidence;
-- executable-surface evidence composed from artifacts, helper commands, support
-  reachability, repository path states, and prepared security policies;
-- Context Lens summary and diagnostics.
+Repository path existence is captured eagerly before `collectRepositorySnapshot`
+returns, using the catalog from that core. Later filesystem changes therefore
+cannot affect partially prepared snapshots. Pure projections may remain lazy.
+Consumers explicitly request their required projections:
 
-Repository path existence states are captured before
-`collectRepositorySnapshot` returns, using the catalog derived from the same
-core. They remain eager because later filesystem mutation must not change a
-partially prepared snapshot. Pure projections may remain lazy; repeated access
-returns the same prepared object. Each prepared projection is itself copied
-into a runtime-immutable graph before it becomes caller-visible, so mutating a
-prepared catalog or validation result cannot affect a dependent projection.
-The compatibility properties `core`, `config`, `artifacts`, and `documents`
-reference the same immutable collected facts rather than mutable inputs.
-
-Consumers explicitly prepare only what they need. Scan names its required
-projections and includes Skill Discovery only when that diagnostic slice is
-requested. `collectRepositoryEvidence`, the compatibility path used by
-catalog, prepares only catalog and Context Lens and therefore does not validate
-Agent Skills, build Skill Discovery, classify assets, collect security-policy
-evidence, or capture command-only repository path states.
-
-Direct Readiness builds graph and scan evidence plus its compact Skill
-Discovery summary and checks from one `RepositorySnapshot`. Accessing
-`skillDiscovery` prepares its catalog and Agent Skills dependencies at most
-once and reuses the immutable index used by the Discovery graph and Skill
-Index. An internal Discovery-free projection remains available to compatible
-consumers; it omits that access without triggering another collection or parse.
-
-BOM builds graph, scan, its intentionally Discovery-free Readiness subset,
-policy inventory, executable-surface inventory, and diagnostics from the same
-snapshot and core. Scan
-constructs the inventory summary from the already prepared
-`snapshot.securityPolicies` rows, so policy selection, parsing, profile
-resolution, inheritance, and provenance preparation occur once for that
-snapshot path. Semantic diff performs exactly one snapshot collection per ref,
-derives graph and the Discovery-free Readiness subset from it, and builds
-topology changes directly from the memoized Skill Discovery indexes. It does
-not invoke another command, reconstruct Discovery, or recollect repository
-facts.
+| Consumer | Preparation and reuse |
+| --- | --- |
+| Scan | Names required projections; includes Skill Discovery only when requested. Inventory summaries reuse `snapshot.securityPolicies`, so policy selection, parsing, profiles, inheritance, and provenance run once. |
+| `collectRepositoryEvidence` / catalog compatibility path | Prepares only catalog and Context Lens; no Agent Skills validation, Discovery, classification, security-policy evidence, or command-only path states. |
+| Direct Readiness | Uses graph, scan, and compact Discovery checks from one snapshot. Discovery prepares catalog and Agent Skills at most once, sharing the immutable index with Discovery graph and Skill Index. |
+| Discovery-free Readiness | Omits Discovery access without another collection or parse; retained for compatible consumers. |
+| BOM | Uses graph, scan, Discovery-free Readiness, policy inventory, executable inventory, and diagnostics from the same snapshot/core. |
+| Semantic diff | Collects exactly one snapshot per ref; derives graph and Discovery-free Readiness and compares memoized Discovery indexes directly. No command invocation, Discovery reconstruction, or recollection. |
 
 ## Executable Surface Inventory
 
@@ -1201,201 +1173,153 @@ owner or lifecycle value. Those are human repository-design decisions.
 
 ## Decisions, Renderers, And Commands
 
-Decision construction belongs in `src/decisions/`. A decision object carries
-the authoritative `decisionStatus`, stable reason code, summary, and any
-remaining human question. Candidate construction must honor that status before
-anything is presented as an applicable edit.
-
-Metadata suggestion uses pure builders in
-`src/decisions/metadata-suggestion.ts` for Skill migrations, Skill-local parent
-and governance states, unsupported targets, owner conflicts, and independent
-metadata candidates. The command retains filesystem collision checks,
-candidate assembly, next-action construction, and orchestration.
-
-Renderers in `src/renderers/` turn an already-decided result into human text.
-They may improve wording and layout, but they must not rediscover a parent,
-infer governance, change applicability, or create candidate data. JSON output
-serializes the command result directly; it is not reconstructed from rendered
-text.
-
-CI and diff presentation has explicit ownership under `src/renderers/`:
-
-| Module | Responsibility |
-| --- | --- |
-| `ci-policy.ts` | Evaluated CI policy summaries, visibility, and review wording |
-| `ci-discovery.ts` | Discovery topology and its observation-only or warn-only presentation |
-| `ci-executable-surface.ts` | Bounded CI executable details and legacy-compatible input shape |
-| `executable-diff.ts` | Complete executable diff details, without CI truncation |
-| `security-diff.ts` | Security changes and provenance shared by both commands |
-| `diff-policy.ts` | Diff-specific policy-change wording |
-| `inspection-coverage.ts` | Coverage-change descriptions shared by both commands |
-| `ci-report-list.ts`, `diff-format.ts` | Presentation limits and formatting within their respective report contexts |
-
-These renderers consume lower-layer evidence and types, never command types.
-Commands assemble the overall reports, evaluate policy, compose CI status, and
-serialize JSON. Similar-looking diff and CI sections remain independent where
-their review purpose, wording, completeness, or compatibility requirements differ.
-
-Command modules should stay orchestration-oriented:
+`src/decisions/` owns authoritative `decisionStatus`, stable reason code,
+summary, and remaining human question. Candidate construction must honor that
+status. `metadata-suggestion.ts` provides pure builders for Skill migrations,
+local parent/governance states, unsupported targets, owner conflicts, and
+independent metadata candidates. Commands retain filesystem collision checks,
+candidate assembly, next actions, and orchestration:
 
 ```text
 collect context -> build evidence -> decide -> render or serialize
 ```
 
-`guide` is intentionally outside the repository-evidence pipeline because it
-must work without a repository. `src/guidance/skill-authoring.ts` owns one typed
-rule object, `src/renderers/guide.ts` projects that object as prompt or JSON, and
-`src/commands/guide.ts` only selects the projection and writes stdout. Scaffold
-may reuse small exported authoring invariants, but must not duplicate the full
-guide. The guidance source may import canonical metadata definitions; metadata
-and renderers must not import command modules.
+`src/renderers/` presents prepared results. Renderers must not rediscover
+parents, infer governance, change applicability, or create candidate data.
+JSON serializes structured results directly, never reconstructed rendered text.
 
-`src/skill-authoring-handoff.ts` is a repository-layer exchange-contract
-parser and validator. It owns the versioned v1 types, local JSON read and parse
-boundary, bounded shape checks, caller-declared gate check, safe target
-normalization, canonical Skill identity, and asset-graph consistency. The guide
-may reuse its low-level version and types; scaffold orchestrates it before any
-write. The module does not inspect repository contents, call a model, fetch a
-source, or claim that caller-declared authoring facts are true.
+| Renderer module | Responsibility |
+| --- | --- |
+| `ci-policy.ts` | Evaluated CI policy summaries, visibility, and review wording |
+| `ci-discovery.ts` | Discovery topology and observation-only or warn-only presentation |
+| `ci-executable-surface.ts` | Bounded CI executable details and legacy-compatible input shape |
+| `executable-diff.ts` | Complete executable diff details, without CI truncation |
+| `security-diff.ts` | Security changes and provenance shared by CI and diff |
+| `diff-policy.ts` | Diff-specific policy-change wording |
+| `inspection-coverage.ts` | Coverage-change descriptions shared by CI and diff |
+| `ci-report-list.ts`, `diff-format.ts` | Limits and formatting within their respective report contexts |
+| `graph-discovery.ts`, `graph-composition.ts`, `graph-impact.ts` | Independent specialized graph views, each retaining its evidence, labels, limits, and relationships |
+| `graph-format.ts` | Small presentation primitives shared within graph views |
+| `readiness.ts` | Markdown and versioned JSON presentation of prepared Readiness reports |
 
-The `interaction` object owns the authoring contract and reference guidance for
-opening, adaptive activities, truth sources, epistemic state, unknown scope,
-progression, disposition, questions, the gate, validation, persistence,
-handoff, and human review. The legacy `phases` field contains useful authoring
-activities but its array order is not a required reasoning sequence.
-`humanReviewRules` owns human-review semantics explicitly; renderers must not
-infer those semantics from a phase position. `illustrationRules` and the
-ordered top-level `illustrations` array remain structurally separate. They have
-no compatibility aliases in the internal builder shape; public wire
-compatibility is owned by the guide's top-level `schemaVersion`.
+These modules consume lower-layer evidence/types, never command types.
+`src/graph-report.ts` owns graph contracts and exact provenance lookup;
+`src/readiness-report.ts` owns Readiness contracts and its schema identifier.
+Commands import those owners directly, assemble reports, evaluate policy, and
+select presentation. Similar-looking sections remain independent when review
+purpose, wording, completeness, or compatibility requirements differ.
 
-Illustrations share one `SkillAuthoringIllustration` type and demonstrate
-authoring tensions rather than Skill categories. They may be ignored or used
-partially; no selector, similarity matcher, request classifier, or closest-example
-instruction exists. JSON serializes the complete reference directly, including
-the non-normative collection. The compact prompt omits illustrations and points
-to JSON when conditional or reference detail is needed. Illustration membership
-does not modify the core authoring contract.
+Graph dependency lookup prepares one asset-list resolver, preserving ordinary
+first-match order across ID/path matches and Skill declarations' unique-path
+rule. Readiness prepares its own report-local node/edge index, preserving its
+last-entry lookup and target-priority rules. These contexts deliberately keep
+their distinct resolution semantics. Required-context failure and
+optional-context warning checks share input preparation, not their decisions.
 
-`externalTraversalApplicabilityRule` is the compact prompt's conditional
-dispatch to the top-level `externalTraversalRules` normative collection in the
-complete JSON reference. The detailed rules apply only to recursive discovery
-inside external sources and remain absent from the prompt. They define what an
-authored Skill and its consuming runtime must specify; they neither authorize
-nor cause Renma to
-fetch, normalize, identify, or crawl external sources. The contract adds no
-illustration selector, traversal state metadata, hidden prompt package, or live
-visited registry.
+### Authoring source and projections
 
-Prompt and JSON are intentionally different projections of that source. JSON is
-the complete structured reference and retains every interaction activity,
-conditional traversal rule, handoff template, illustration, optional structure,
-responsibility, source-reference, additional-review, verification, and
-not-created-by-default field. The default prompt is the compact execution
-projection: core gate and evidence invariants, adaptive clarification guidance,
-asset responsibilities, handoff boundary, and verification. Renderer tests
-verify presence of the sufficient contract and deliberate omission of detailed
-reference material; they do not require every JSON string to appear in the
-prompt. Disposition and platform-handoff reference tables stay in JSON; the
-prompt preserves their requirements in the questioning, creation-gate,
-post-validation, and structured-handoff sections.
+`guide` works without a repository. Its owners are:
 
-The guide and all scaffold forms share authoring validation wording from
-`src/guidance/skill-authoring.ts`. Scans and repository-required checks remain
-required for the current change and stage after authoring or changes; other
-report commands answer specific evidence questions. Repeat or broaden
-successful checks only for further changes, failures, or unresolved concerns,
-and reuse evidence only while its content, environment, and required scope
-remain applicable. This guidance does not relax required CI or release checks.
+| Module | Responsibility |
+| --- | --- |
+| `src/guidance/skill-authoring.ts` | One typed authoring rule source; may import canonical metadata definitions. Scaffold may reuse small invariants and shared validation wording, not duplicate the full guide. |
+| `src/renderers/guide.ts` | Prompt and JSON projections; adds headings/formatting without recreating protocol decisions. |
+| `src/commands/guide.ts` | Selects the projection and writes stdout. Metadata and renderers must not import commands. |
+| `src/skill-authoring-handoff.ts` | Repository-layer v1 exchange types, local JSON reading/parsing, bounded shape and caller-declared gate checks, safe target normalization, canonical identity, and graph consistency. Guide may reuse low-level types/version; scaffold validates before writing. No repository inspection, model calls, source fetching, or truth certification. |
 
-The public JSON projection is `renma.skill-authoring-guide.v2`. Consumers must
-branch on `schemaVersion`; v2 must not be parsed with v1 assumptions about phase
-ordering, mandatory clarification, fixed question batches, or last-phase
-human-review ownership. The v1 identity is not reinterpreted or emitted for the
-new interaction semantics. The independently versioned Skill Authoring Handoff
-remains `renma.skill-authoring-handoff.v1`.
+`interaction` owns opening, adaptive activities, truth sources, epistemic
+state, unknown scope, progression, disposition, questions, gate entry/re-entry,
+validation, persistence, handoff, and human review. Its strategies do not
+prescribe internal reasoning. Legacy `phases` are useful activities, not an
+ordered algorithm; `workflow` is a short summary. Placement, artifact,
+metadata, and conciseness sections retain their own rules.
+`humanReviewRules` explicitly owns review semantics, never a phase position.
 
-`interaction` is normative for truth qualification, the outcomes questioning
-must preserve, gate entry and re-entry, finding classification, persistence,
-and semantic handoff. Its strategies do not prescribe internal reasoning.
-The legacy `workflow` projection is only a short top-level summary, while
-placement, artifact, metadata, and conciseness sections retain rules they
-uniquely own. Renderers add headings and list formatting; they do not recreate
-protocol decisions.
+`illustrationRules` and the ordered `illustrations` array are structurally
+separate from the normative contract. All illustrations use
+`SkillAuthoringIllustration` and show authoring tensions, not Skill categories.
+They may be ignored or partly used; there is no selector, similarity matcher,
+request classifier, or closest-example instruction. Membership never changes
+the contract. Internal builder fields have no compatibility aliases; wire
+compatibility belongs to top-level `schemaVersion`.
 
-Epistemic and progression classifications are independent. Confirmed, Proposed,
-and Unresolved describe support for a decision; Blocking, Reversible default,
-and Deferred describe whether the consuming LLM may proceed. The interaction
-contract requires the LLM to retain unresolved Blocking decisions until they
-are resolved and to declare the gate passed only after every gate requirement
-is established, including the smallest justified asset structure, and none
-remains. This is an externally observable dependency rather than a prescribed
-internal reasoning sequence. Clarification is not required when the request and
-applicable evidence already establish the gate. Small focused batches are
-adaptive guidance rather than fixed correctness requirements, and the complete
-blocker set need not be reproduced in every response.
+| Projection | Included content |
+| --- | --- |
+| JSON | Complete structured reference: every interaction activity, conditional traversal rule, handoff template, illustration, optional structure, responsibility, source-reference, additional-review, verification, and not-created-by-default field. |
+| Default prompt | Compact execution contract: gate/evidence invariants, adaptive clarification, asset responsibilities, handoff, and verification. Omits illustrations and detailed reference tables, pointing to JSON. Disposition/platform-handoff requirements remain in questioning, gate, post-validation, and structured-handoff sections. |
 
-Question dependency is an invariant: do not ask a downstream authoring decision
-whose meaningful answer depends on an unresolved upstream decision. Investigate
-or resolve the prerequisite first. Renma does not require an explicit decision
-tree, graph, frontier, round-based algorithm, persisted conversation state, or
-new metadata. Dependency management remains in the consuming LLM's temporary
-reasoning state.
+Renderer tests protect the sufficient prompt contract and deliberate omissions;
+they do not require every JSON string in the prompt.
+`externalTraversalApplicabilityRule` dispatches conditionally to the JSON
+`externalTraversalRules`. Those detailed rules cover recursive discovery inside
+external sources and stay out of the prompt. They constrain the authored Skill
+and consuming runtime; they do not authorize Renma to fetch, normalize,
+identify, or crawl sources, or introduce traversal metadata, a hidden prompt
+package, or live visited registry.
 
-Unknown scope and disposition remain separate from both axes. An authoring
-decision defines repository structure or Skill behavior and may block the gate;
-a runtime task unknown belongs to material the finished Skill processes and can
-be reported as an evidence-backed finding. Ask now, Queue as blocker, Proceed
-with reversible default, Defer, and Report as finding are temporary actions over
-those items, not additional progression classes.
+The public guide is `renma.skill-authoring-guide.v2`; consumers must branch on
+`schemaVersion`. V1 assumptions about ordered phases, mandatory clarification,
+fixed question batches, or last-phase human review do not apply. V1 is neither
+reinterpreted nor emitted. Handoff versioning remains independently
+`renma.skill-authoring-handoff.v1`.
 
-A runtime task unknown may block a later execution stage, but that task-instance
-fact never enters the authoring creation-gate blocker set. The finished Skill
-follows its authored ask, report, defer, or stop policy. Only uncertainty about
-that handling policy or the asset boundary returns to authoring clarification.
+### Authoring state and runtime boundary
 
-Truth-source evidence remains outside Renma's runtime state. A consuming LLM
-may use explicit user statements, clearly applicable supplied artifacts,
-applicable and effective repository evidence, or successfully consulted
-authoritative source content. Renma structural rules constrain placement but do
-not establish domain truth. Authoring-time source access comes from the current
-request, tools, and environment; finished-Skill policy is not retroactive
-authorization.
+The [Authoring Guide](../authoring-guide.md#authoring-contract-and-adaptive-clarification)
+is the canonical explanation of interaction requirements. Keep these dimensions
+independent in the typed source:
 
-Likewise, deterministic detection does not imply deterministic repair. The
-protocol permits automatic correction only when evidence and Diagnostics v2
-constraints uniquely determine a patch. Repeated-context evidence remains a
-consolidation input requiring repository investigation and human review.
+| Dimension | Meaning |
+| --- | --- |
+| Confirmed / Proposed / Unresolved | Evidence supporting a decision. |
+| Blocking / Reversible default / Deferred | Whether authoring may proceed. Retain unresolved blockers until resolved. |
+| Authoring decision / runtime task unknown | Repository structure or behavior versus material processed by the finished Skill. Runtime facts may block execution, but not the authoring gate; uncertainty about handling policy or asset boundaries returns to authoring. |
+| Ask now / Queue as blocker / Proceed with reversible default / Defer / Report as finding | Temporary dispositions, not extra progression classes. |
 
-The interaction model is an instruction contract for the consuming LLM, not a
-Renma state machine:
+The gate passes only when every requirement, including the smallest justified
+structure, is established and no blocker remains. Clarification is unnecessary
+when request and evidence establish the gate; focused batches and progress
+formats are adaptive aids. Do not ask a dependent question before resolving its
+prerequisite. Neither an explicit decision graph/round algorithm nor repeating
+the entire blocker list in each response is required.
+
+Domain truth comes from explicit user statements, applicable supplied
+artifacts, effective unambiguous repository evidence, or successfully consulted
+authoritative content. Renma's structural rules are not domain truth.
+Authoring access follows the current request/tools/environment; future Skill
+policy never retroactively authorizes it. Runtime unknowns follow the authored
+ask, report, defer, or stop policy.
+
+Deterministic detection permits automatic repair only when evidence and
+Diagnostics v2 constraints uniquely determine a patch. Repeated-context
+consolidation requires investigation and human review. Boundary changes found
+during source review, refinement, use, or validation return as Proposed or
+Unresolved decisions through the creation gate.
+
+The guide and scaffolds share validation wording: scan and repository-required
+checks apply to the current change/stage; other reports answer specific
+questions. Broaden or repeat passed checks only for changes, failures, or
+unresolved concerns. Reuse evidence only while content, environment, and scope
+remain applicable. Required CI and release checks remain in force.
 
 ```text
-renma guide skill -> deterministic protocol on stdout
+renma guide skill -> deterministic contract on stdout
 consuming LLM     -> investigates evidence, proposes, asks, and edits
 user              -> supplies domain and governance truth
 Renma commands    -> provide deterministic rules and repository evidence
 human             -> approves meaningful decisions
 ```
 
-This remains an elaboration of `LLM proposes. Renma verifies. Human approves.`
-If source review, semantic refinement, usage, or validation suggests a boundary
-change, the consuming LLM records it as Proposed or Unresolved and re-enters the
-creation gate. Renma stores no gate or conversation state.
+This is an instruction contract, not a Renma state machine. `guide` accepts no
+task text, asks no questions, retains no history, interprets no answers, creates
+no files, calls no LLM, and repairs no assets. Understanding/progression
+summaries, queued blockers, defaults, unknown scopes, raw-gap themes,
+stage-dependent dispositions, and runtime findings stay ephemeral; none creates
+command state, metadata, or an automatic Skill split.
 
-No interaction state crosses the command boundary. `guide` does not accept task
-text, ask questions, retain history, interpret answers, create files, call an
-LLM, or repair assets. Confirmed / Proposed / Unresolved summaries remain
-ephemeral conversation state and must not become new Renma metadata.
-Progression summaries, queued blockers, reversible defaults, and Deferred items
-are likewise ephemeral. So are unknown scopes, raw-gap themes, stage-dependent
-dispositions, and runtime findings during authoring. They create no command
-state, metadata field, or automatic Skill split.
-
-A `no-change-recommended` decision is a successful result. It means Renma
-completed the analysis and found no supported change. The command must not
-manufacture metadata, a migration, or verification work merely to return an
-edit-shaped response.
+`no-change-recommended` is successful completed analysis with no supported
+change. Commands must not manufacture metadata, migration, or verification work
+to produce an edit-shaped response.
 
 ## Public JSON And Internal Working Types
 
