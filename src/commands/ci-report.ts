@@ -1,3 +1,4 @@
+import { formatSecurityChanges } from "../renderers/security-diff.js";
 import {
   formatExecutableSurfaceChanges,
   type CiCompatibleExecutableSurfaceDiff,
@@ -9,7 +10,6 @@ import { formatWritableByEvidence } from "../renderers/writable-by.js";
 import {
   executeDiff,
   formatInspectionCoverageChange,
-  formatSecurityChanges,
   type AssetChange,
   type AssetDelta,
   type DiffCollectionInstrumentation,
