@@ -426,54 +426,29 @@ export function parseAssetMetadata(document: ParsedDocument): {
   const diagnostics: Diagnostic[] = [];
   diagnostics.push(...unsupportedCompatibilityMetadataDiagnostics(document));
   const source = operationalMetadataSource(document, diagnostics);
+  const readText = (key: string) =>
+    optionalText(metadataText(source.values[key]));
+  const readList = (key: string) =>
+    operationalListValue(document, source, key, diagnostics);
   const rawStatusText = metadataText(source.values.status);
   const rawStatus = source.canonicalSkill
     ? rawStatusText?.trim()
     : rawStatusText;
   const status = parseStatus(rawStatus);
-  const statusReason = optionalText(metadataText(source.values.status_reason));
-  const statusChangedAt = optionalText(
-    metadataText(source.values.status_changed_at),
-  );
-  const lastReviewedAt = optionalText(
-    metadataText(source.values.last_reviewed_at),
-  );
-  const reviewCycle = optionalText(metadataText(source.values.review_cycle));
-  const expiresAt = optionalText(metadataText(source.values.expires_at));
+  const statusReason = readText("status_reason");
+  const statusChangedAt = readText("status_changed_at");
+  const lastReviewedAt = readText("last_reviewed_at");
+  const reviewCycle = readText("review_cycle");
+  const expiresAt = readText("expires_at");
   const tokenBudget = parseSupportAssetTokenBudgetDecision(document);
   const metadata: AssetMetadata = {
-    tags: operationalListValue(document, source, "tags", diagnostics),
-    whenToUse: operationalListValue(
-      document,
-      source,
-      "when_to_use",
-      diagnostics,
-    ),
-    whenNotToUse: operationalListValue(
-      document,
-      source,
-      "when_not_to_use",
-      diagnostics,
-    ),
-    requiresContext: operationalListValue(
-      document,
-      source,
-      "requires_context",
-      diagnostics,
-    ),
-    optionalContext: operationalListValue(
-      document,
-      source,
-      "optional_context",
-      diagnostics,
-    ),
-    conflicts: operationalListValue(document, source, "conflicts", diagnostics),
-    supersededBy: operationalListValue(
-      document,
-      source,
-      "superseded_by",
-      diagnostics,
-    ),
+    tags: readList("tags"),
+    whenToUse: readList("when_to_use"),
+    whenNotToUse: readList("when_not_to_use"),
+    requiresContext: readList("requires_context"),
+    optionalContext: readList("optional_context"),
+    conflicts: readList("conflicts"),
+    supersededBy: readList("superseded_by"),
   };
 
   if (rawStatus !== undefined && status === undefined) {
@@ -488,42 +463,18 @@ export function parseAssetMetadata(document: ParsedDocument): {
     );
   }
 
-  assignOptional(metadata, "id", optionalText(metadataText(source.values.id)));
+  assignOptional(metadata, "id", readText("id"));
   if (document.artifact.kind === "skill") {
-    assignOptional(
-      metadata,
-      "title",
-      optionalText(metadataText(source.values.title)),
-    );
+    assignOptional(metadata, "title", readText("title"));
   }
-  assignOptional(
-    metadata,
-    "type",
-    optionalText(metadataText(source.values.type)),
-  );
-  assignOptional(
-    metadata,
-    "version",
-    optionalText(metadataText(source.values.version)),
-  );
-  assignOptional(
-    metadata,
-    "owner",
-    optionalText(metadataText(source.values.owner)),
-  );
-  assignOptionalList(
-    metadata,
-    "writableBy",
-    operationalListValue(document, source, "writable_by", diagnostics),
-  );
+  assignOptional(metadata, "type", readText("type"));
+  assignOptional(metadata, "version", readText("version"));
+  assignOptional(metadata, "owner", readText("owner"));
+  assignOptionalList(metadata, "writableBy", readList("writable_by"));
   assignOptional(metadata, "status", status);
   assignOptional(metadata, "statusReason", statusReason);
   assignOptional(metadata, "statusChangedAt", statusChangedAt);
-  assignOptional(
-    metadata,
-    "purpose",
-    optionalText(metadataText(source.values.purpose)),
-  );
+  assignOptional(metadata, "purpose", readText("purpose"));
   assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
   assignOptional(metadata, "reviewCycle", reviewCycle);
   assignOptional(metadata, "expiresAt", expiresAt);
@@ -540,42 +491,14 @@ export function parseAssetMetadata(document: ParsedDocument): {
       tokenBudget.tokenBudgetReviewedAt,
     );
   }
-  assignOptionalList(
-    metadata,
-    "appliesTo",
-    operationalListValue(document, source, "applies_to", diagnostics),
-  );
-  assignOptionalList(
-    metadata,
-    "focus",
-    operationalListValue(document, source, "focus", diagnostics),
-  );
-  assignOptionalList(
-    metadata,
-    "expectedOutputs",
-    operationalListValue(document, source, "expected_outputs", diagnostics),
-  );
-  assignOptionalList(
-    metadata,
-    "requiresLens",
-    operationalListValue(document, source, "requires_lens", diagnostics),
-  );
-  assignOptionalList(
-    metadata,
-    "optionalLens",
-    operationalListValue(document, source, "optional_lens", diagnostics),
-  );
+  assignOptionalList(metadata, "appliesTo", readList("applies_to"));
+  assignOptionalList(metadata, "focus", readList("focus"));
+  assignOptionalList(metadata, "expectedOutputs", readList("expected_outputs"));
+  assignOptionalList(metadata, "requiresLens", readList("requires_lens"));
+  assignOptionalList(metadata, "optionalLens", readList("optional_lens"));
 
-  assignOptionalList(
-    metadata,
-    "requiresSkill",
-    operationalListValue(document, source, "requires_skill", diagnostics),
-  );
-  assignOptionalList(
-    metadata,
-    "optionalSkill",
-    operationalListValue(document, source, "optional_skill", diagnostics),
-  );
+  assignOptionalList(metadata, "requiresSkill", readList("requires_skill"));
+  assignOptionalList(metadata, "optionalSkill", readList("optional_skill"));
 
   if (source.canonicalSkill) {
     const continuesWith = parseContinuationValue(source.values.continues_with);
