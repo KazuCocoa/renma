@@ -230,9 +230,27 @@ export function buildReadinessReport(
     graphEdgesCheck(unresolvedBlockingEdges),
     workflowContextClosureCheck(workflowContexts),
     workflowOptionalContextCheck(workflowContexts),
-    workflowClarityCheck(findings),
-    workflowRequiredInputsCheck(findings),
-    workflowCompletionCriteriaCheck(findings),
+    workflowFindingCheck(findings, WORKFLOW_CLARITY_FINDING_IDS, {
+      id: "workflow.clarity",
+      title: "Workflow clarity",
+      passSummary:
+        "All skill workflow entrypoints include static routing clarity.",
+      findingLabel: "workflow clarity",
+    }),
+    workflowFindingCheck(findings, WORKFLOW_REQUIRED_INPUTS_FINDING_IDS, {
+      id: "workflow.required_inputs",
+      title: "Workflow required inputs",
+      passSummary:
+        "All skill workflow entrypoints document required inputs or prerequisites.",
+      findingLabel: "workflow required-input",
+    }),
+    workflowFindingCheck(findings, WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS, {
+      id: "workflow.completion_criteria",
+      title: "Workflow completion criteria",
+      passSummary:
+        "All skill workflow entrypoints document completion criteria.",
+      findingLabel: "workflow completion-criteria",
+    }),
     contextLensGovernanceCheck(contextLens, diagnostics),
     lifecycleCheck(lifecycleAssets),
     freshnessCheck(findings),
@@ -1152,100 +1170,44 @@ function resolveWorkflowContextTarget(
   return nodesById.get(edge.to) ?? nodesByPath.get(normalizeGraphPath(edge.to));
 }
 
-function workflowClarityCheck(findings: Finding[]): ReadinessCheck {
+function workflowFindingCheck(
+  findings: Finding[],
+  findingIds: ReadonlySet<string>,
+  {
+    id,
+    title,
+    passSummary,
+    findingLabel,
+  }: {
+    id: string;
+    title: string;
+    passSummary: string;
+    findingLabel: string;
+  },
+): ReadinessCheck {
   const matched = findings.filter(
     (finding) =>
-      WORKFLOW_CLARITY_FINDING_IDS.has(finding.id) &&
+      findingIds.has(finding.id) &&
       isSkillEntrypointPath(finding.evidence.path),
   );
-  if (matched.length === 0) {
-    return {
-      id: "workflow.clarity",
-      title: "Workflow clarity",
-      status: "pass",
-      severity: "info",
-      summary: "All skill workflow entrypoints include static routing clarity.",
-    };
-  }
-
+  const hasFindings = matched.length > 0;
   return {
-    id: "workflow.clarity",
-    title: "Workflow clarity",
-    status: "warn",
-    severity: "warning",
-    summary: `${matched.length} workflow clarity finding${
-      matched.length === 1 ? "" : "s"
-    } matched skill entrypoints.`,
-    evidence: matched.map((finding) => ({
-      id: finding.id,
-      path: finding.evidence.path,
-      message: finding.remediation,
-    })),
-  };
-}
-
-function workflowRequiredInputsCheck(findings: Finding[]): ReadinessCheck {
-  const matched = findings.filter(
-    (finding) =>
-      WORKFLOW_REQUIRED_INPUTS_FINDING_IDS.has(finding.id) &&
-      isSkillEntrypointPath(finding.evidence.path),
-  );
-  if (matched.length === 0) {
-    return {
-      id: "workflow.required_inputs",
-      title: "Workflow required inputs",
-      status: "pass",
-      severity: "info",
-      summary:
-        "All skill workflow entrypoints document required inputs or prerequisites.",
-    };
-  }
-
-  return {
-    id: "workflow.required_inputs",
-    title: "Workflow required inputs",
-    status: "warn",
-    severity: "warning",
-    summary: `${matched.length} workflow required-input finding${
-      matched.length === 1 ? "" : "s"
-    } matched skill entrypoints.`,
-    evidence: matched.map((finding) => ({
-      id: finding.id,
-      path: finding.evidence.path,
-      message: finding.remediation,
-    })),
-  };
-}
-
-function workflowCompletionCriteriaCheck(findings: Finding[]): ReadinessCheck {
-  const matched = findings.filter(
-    (finding) =>
-      WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS.has(finding.id) &&
-      isSkillEntrypointPath(finding.evidence.path),
-  );
-  if (matched.length === 0) {
-    return {
-      id: "workflow.completion_criteria",
-      title: "Workflow completion criteria",
-      status: "pass",
-      severity: "info",
-      summary: "All skill workflow entrypoints document completion criteria.",
-    };
-  }
-
-  return {
-    id: "workflow.completion_criteria",
-    title: "Workflow completion criteria",
-    status: "warn",
-    severity: "warning",
-    summary: `${matched.length} workflow completion-criteria finding${
-      matched.length === 1 ? "" : "s"
-    } matched skill entrypoints.`,
-    evidence: matched.map((finding) => ({
-      id: finding.id,
-      path: finding.evidence.path,
-      message: finding.remediation,
-    })),
+    id,
+    title,
+    status: hasFindings ? "warn" : "pass",
+    severity: hasFindings ? "warning" : "info",
+    summary: hasFindings
+      ? `${matched.length} ${findingLabel} finding${matched.length === 1 ? "" : "s"} matched skill entrypoints.`
+      : passSummary,
+    ...(hasFindings
+      ? {
+          evidence: matched.map((finding) => ({
+            id: finding.id,
+            path: finding.evidence.path,
+            message: finding.remediation,
+          })),
+        }
+      : {}),
   };
 }
 
