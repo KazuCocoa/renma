@@ -120,6 +120,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "diagnostic-severity-policy.ts",
         "diagnostic-ids.ts",
         "freshness.ts",
+        "graph-components.ts",
         "lifecycle.ts",
         "metadata-definitions.ts",
         "model.ts",

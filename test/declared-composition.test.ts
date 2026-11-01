@@ -670,3 +670,30 @@ function metadataEvidence(line: number, key: string) {
     raw: `${key}: value`,
   };
 }
+
+test("declared composition resolves a 6,000-asset cycle without recursion", () => {
+  const ids = Array.from(
+    { length: 6_000 },
+    (_, index) => `context.${index.toString().padStart(5, "0")}`,
+  );
+  const report = resolveDeclaredComposition(
+    makeCatalog(
+      ids.map((id) => asset(id, "context")),
+      ids.map((id, index) =>
+        dependency(
+          id,
+          ids[(index + 1) % ids.length]!,
+          "requires_context",
+          index + 1,
+        ),
+      ),
+    ),
+    ids[0]!,
+    { evaluationDate: "2026-07-15" },
+  );
+  assert.equal(report.requiredComplete, true);
+  assert.equal(report.cycleFree, false);
+  assert.equal(report.requiredCycles.length, 1);
+  assert.deepEqual(report.requiredCycles[0]?.assetIds, ids);
+  assert.equal(report.requiredCycles[0]?.edges.length, ids.length);
+});
