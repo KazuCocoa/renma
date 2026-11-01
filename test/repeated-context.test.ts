@@ -4,10 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import {
-  formatReadinessMarkdown,
-  readiness,
-} from "../src/commands/readiness.js";
+import { formatReadinessMarkdown } from "../src/renderers/readiness.js";
+import { readiness } from "../src/commands/readiness.js";
 import { repeatedContextFindingCap } from "../src/repeated-context.js";
 import { scan } from "../src/scanner.js";
 import type { Finding } from "../src/types/diagnostics.js";

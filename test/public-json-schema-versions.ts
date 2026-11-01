@@ -12,7 +12,7 @@ import {
   INSPECT_SLICE_JSON_SCHEMA_VERSION,
 } from "../src/commands/inspect.js";
 import { OWNERSHIP_JSON_SCHEMA_VERSION } from "../src/commands/ownership.js";
-import { READINESS_JSON_SCHEMA_VERSION } from "../src/commands/readiness.js";
+import { READINESS_JSON_SCHEMA_VERSION } from "../src/readiness-report.js";
 import { SCAFFOLD_JSON_SCHEMA_VERSION } from "../src/commands/scaffold.js";
 import { SKILL_INDEX_SCHEMA_VERSION } from "../src/commands/skill-index.js";
 import { METADATA_SUGGESTION_JSON_SCHEMA_VERSION } from "../src/commands/suggest-metadata.js";

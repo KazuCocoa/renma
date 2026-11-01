@@ -22,10 +22,10 @@ import { execFile as execFileCallback } from "node:child_process";
 import { CLI_EXIT, CliUserError } from "../cli-errors.js";
 import { graphFromRepositorySnapshot } from "./graph.js";
 import type { GraphReport } from "../graph-report.js";
+import { type ReadinessReport } from "../readiness-report.js";
 import {
   buildReadinessReport,
   readinessDiagnosticsFromRepositorySnapshot,
-  type ReadinessReport,
 } from "./readiness.js";
 import {
   buildSecurityDiffSummary,

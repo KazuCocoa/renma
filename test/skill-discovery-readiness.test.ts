@@ -3,14 +3,16 @@ import test from "node:test";
 
 import fc from "fast-check";
 
+import { type ReadinessCheck } from "../src/readiness-report.js";
 import {
-  buildSkillDiscoveryReadiness,
   formatReadinessJson,
   formatReadinessMarkdown,
+} from "../src/renderers/readiness.js";
+import {
+  buildSkillDiscoveryReadiness,
   readiness,
   readinessFromRepositorySnapshot,
   runReadinessCommand,
-  type ReadinessCheck,
 } from "../src/commands/readiness.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";

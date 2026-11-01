@@ -4,12 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
+import { type ReadinessReport } from "../src/readiness-report.js";
 import {
   formatReadinessJson,
   formatReadinessMarkdown,
-  zeroSkillDiscoveryReadinessSummary,
-  type ReadinessReport,
-} from "../src/commands/readiness.js";
+} from "../src/renderers/readiness.js";
+import { zeroSkillDiscoveryReadinessSummary } from "../src/commands/readiness.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import { zeroSecurityPolicyInventorySummary } from "../src/security-policy-inventory.js";

@@ -198,6 +198,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "scanner.ts",
       "security-diagnostics.ts",
       "graph-report.ts",
+      "readiness-report.ts",
       "security-diff.ts",
       "security-policy-ci-policy.ts",
       "security-policy-diff.ts",
