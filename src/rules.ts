@@ -1107,94 +1107,12 @@ function shapeFindings(
   );
   if (reusableContextFinding) findings.push(reusableContextFinding);
 
-  if (
-    document.artifact.kind === "skill" &&
-    bodyTokenCount > config.quality.skillTokenWarning
-  ) {
-    const triggeredThreshold =
-      bodyTokenCount > config.quality.skillTokenHigh
-        ? config.quality.skillTokenHigh
-        : config.quality.skillTokenWarning;
-    const severity: Severity =
-      bodyTokenCount > config.quality.skillTokenHigh ? "high" : "medium";
-    const overage = tokenBudgetOverage(bodyTokenCount, triggeredThreshold);
-    const sectionCandidates = tokenBudgetSectionCandidates(document);
-    const measurementSummary = `The Skill body is approximately ${bodyTokenCount} estimated tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%). The effective warning and high thresholds are ${config.quality.skillTokenWarning} and ${config.quality.skillTokenHigh} estimated tokens.`;
-    const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
-    const progressiveDisclosureGuidance =
-      sectionCandidates.length > 0
-        ? "Review these sections for progressive disclosure without deleting workflow steps."
-        : "Review the Skill manually for semantic progressive-disclosure boundaries without deleting workflow steps.";
-    findings.push(
-      documentFinding(
-        document,
-        DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET,
-        "Skill body exceeds its effective token-budget threshold",
-        "quality",
-        severity,
-        `${measurementSummary} ${sectionReview} ${progressiveDisclosureGuidance} Keep selection boundaries, read conditions, ordered workflow, constraints, and completion criteria in SKILL.md. Move Skill-specific conditional detail to references/, deterministic repeated implementation to scripts/, output material to assets/, and independently owned cross-Skill knowledge to contexts/. Do not split automatically or choose a destination from heading text alone.`,
-        {
-          whyItMatters:
-            "Long Skill bodies can make activated workflows harder to navigate and maintain. Token size is evidence for progressive-disclosure review, not proof that the Skill has the wrong structure or must be split.",
-          repairConstraints: [
-            {
-              kind: "must_not_change",
-              text: "Do not introduce runtime context resolution.",
-            },
-            { kind: "must_not_change", text: "Do not create prompt packages." },
-            {
-              kind: "must_not_change",
-              text: "Do not make Renma responsible for selecting context.",
-            },
-            {
-              kind: "must_preserve",
-              text: "Preserve ordered workflow steps, constraints, and completion criteria.",
-            },
-            {
-              kind: "allowed_change",
-              text: "Choose a destination by semantic ownership, not by size alone.",
-            },
-          ],
-          verificationSteps: [
-            { text: "Run renma scan.", command: "renma scan" },
-            {
-              text: "Run any project-specific validation checks that apply to this repository.",
-            },
-            {
-              text: "Confirm any moved material remains statically reachable and semantically owned by its destination.",
-            },
-          ],
-          llmHint: `${measurementSummary} ${sectionReview} Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge. Treat the listed sections only as review candidates.`,
-          details: {
-            measured: bodyTokenCount,
-            warningThreshold: config.quality.skillTokenWarning,
-            highThreshold: config.quality.skillTokenHigh,
-            triggeredThreshold,
-            effectiveSeverity: severity,
-            ...overage,
-            unit: "estimated_tokens",
-            profile: QUALITY.profile,
-            measurement: "markdown_body_after_frontmatter",
-            sectionMeasurement: "markdown_body_sections",
-            sectionCandidates,
-            policySource:
-              config.quality.skillTokenWarningSource ===
-                "repository_configuration" &&
-              config.quality.skillTokenHighSource === "repository_configuration"
-                ? "repository_configuration"
-                : config.quality.skillTokenWarningSource === "renma_default" &&
-                    config.quality.skillTokenHighSource === "renma_default"
-                  ? "renma_defaults"
-                  : "mixed",
-            thresholdSources: {
-              warning: config.quality.skillTokenWarningSource,
-              high: config.quality.skillTokenHighSource,
-            },
-          },
-        },
-      ),
-    );
-  }
+  const tokenBudgetFinding = skillTokenBudgetFinding(
+    document,
+    config,
+    bodyTokenCount,
+  );
+  if (tokenBudgetFinding) findings.push(tokenBudgetFinding);
 
   const userLocalPathMatch = USER_LOCAL_PATH_PATTERN.exec(text);
   if (document.artifact.kind === "skill" && userLocalPathMatch) {
@@ -1282,124 +1200,15 @@ function shapeFindings(
     );
   }
 
-  const requiredInputResidue = firstScaffoldResidue(scaffoldResidue, [
-    "requiredInput",
-    "inspectInstruction",
-  ]);
-  if (
-    document.artifact.kind === "skill" &&
-    (!REQUIRED_INPUTS_PATTERN.test(text) || requiredInputResidue)
-  ) {
-    findings.push(
-      documentFinding(
-        document,
-        DIAGNOSTIC_IDS.QUAL_MISSING_REQUIRED_INPUTS,
-        "Skill does not state required inputs",
-        "quality",
-        "medium",
-        "Add a Required inputs or Prerequisites section that states the user-provided inputs, target files, repository state, permissions, credentials, or environment assumptions needed before the workflow can start.",
-        {
-          whyItMatters:
-            "Agents need explicit input requirements before starting a workflow. Missing required inputs can cause the agent to guess targets, assume permissions, or start without enough repository context.",
-          repairConstraints: [
-            { kind: "must_not_change", text: "Do not infer runtime context." },
-            {
-              kind: "must_not_change",
-              text: "Do not assemble prompt packages.",
-            },
-            {
-              kind: "must_not_change",
-              text: "Do not require optional context selection.",
-            },
-            {
-              kind: "must_not_change",
-              text: "Do not make Renma decide whether the workflow can run for the current task.",
-            },
-            {
-              kind: "must_preserve",
-              text: "Keep the skill as a static workflow entrypoint.",
-            },
-          ],
-          verificationSteps: [
-            { text: "Run renma scan.", command: "renma scan" },
-            {
-              text: "Run renma readiness.",
-              command: "renma readiness",
-              expected:
-                "Readiness checks reflect the repaired repository state.",
-            },
-            {
-              text: "Confirm each skill entrypoint either documents required inputs or explicitly states that no special inputs are required.",
-            },
-          ],
-          llmHint:
-            "Add a concise Required inputs or Prerequisites section to this SKILL.md. State user-provided inputs, target files, repository state, permissions, credentials, and environment assumptions needed before the workflow starts. Do not add runtime context selection or prompt assembly behavior.",
-          ...(requiredInputResidue
-            ? { evidence: requiredInputResidue.evidence }
-            : {}),
-        },
-      ),
-    );
-  }
+  const requiredInputs = requiredInputsFinding(document, text, scaffoldResidue);
+  if (requiredInputs) findings.push(requiredInputs);
 
-  const completionResidue = firstScaffoldResidue(scaffoldResidue, [
-    "expectedOutput",
-  ]);
-  if (
-    document.artifact.kind === "skill" &&
-    (!COMPLETION_CRITERIA_PATTERN.test(text) || completionResidue)
-  ) {
-    findings.push(
-      documentFinding(
-        document,
-        DIAGNOSTIC_IDS.QUAL_MISSING_COMPLETION_CRITERIA,
-        "Skill does not state completion criteria",
-        "quality",
-        "medium",
-        "Add a Completion criteria, Success requirements, Deliverables, or Final response section that states the observable outputs or conditions that mean the workflow is complete.",
-        {
-          whyItMatters:
-            "Agents need explicit completion criteria before finishing a workflow. Missing completion criteria can cause incomplete delivery, unnecessary follow-up work, or inconsistent final responses.",
-          repairConstraints: [
-            { kind: "must_not_change", text: "Do not infer runtime context." },
-            {
-              kind: "must_not_change",
-              text: "Do not assemble prompt packages.",
-            },
-            {
-              kind: "must_not_change",
-              text: "Do not require optional context selection.",
-            },
-            {
-              kind: "must_not_change",
-              text: "Do not make Renma decide task-specific success at runtime.",
-            },
-            {
-              kind: "must_preserve",
-              text: "Keep the skill as a static workflow entrypoint.",
-            },
-          ],
-          verificationSteps: [
-            { text: "Run renma scan.", command: "renma scan" },
-            {
-              text: "Run renma readiness.",
-              command: "renma readiness",
-              expected:
-                "Readiness checks reflect the repaired repository state.",
-            },
-            {
-              text: "Confirm each skill workflow entrypoint documents completion criteria.",
-            },
-          ],
-          llmHint:
-            "Add a concise Completion criteria, Success requirements, Deliverables, or Final response section to this SKILL.md. State the observable outputs, checks, or final-response conditions that mean the workflow is complete. Do not add runtime context selection or prompt assembly behavior.",
-          ...(completionResidue
-            ? { evidence: completionResidue.evidence }
-            : {}),
-        },
-      ),
-    );
-  }
+  const completionCriteria = completionCriteriaFinding(
+    document,
+    text,
+    scaffoldResidue,
+  );
+  if (completionCriteria) findings.push(completionCriteria);
 
   const verificationResidue = firstScaffoldResidue(scaffoldResidue, [
     "reviewInstruction",
@@ -1444,6 +1253,218 @@ function shapeFindings(
   }
 
   return findings;
+}
+
+function skillTokenBudgetFinding(
+  document: ParsedDocument,
+  config: ScanConfig,
+  bodyTokenCount: number,
+): Finding | undefined {
+  const exceedsWarning = bodyTokenCount > config.quality.skillTokenWarning;
+  if (document.artifact.kind !== "skill" || !exceedsWarning) return undefined;
+
+  const triggeredThreshold =
+    bodyTokenCount > config.quality.skillTokenHigh
+      ? config.quality.skillTokenHigh
+      : config.quality.skillTokenWarning;
+  const severity: Severity =
+    bodyTokenCount > config.quality.skillTokenHigh ? "high" : "medium";
+  const overage = tokenBudgetOverage(bodyTokenCount, triggeredThreshold);
+  const sectionCandidates = tokenBudgetSectionCandidates(document);
+  const measurementSummary = `The Skill body is approximately ${bodyTokenCount} estimated tokens. It exceeds the effective ${triggeredThreshold}-token ${severity} threshold by ${overage.overBy} tokens (~${overage.overPercent}%). The effective warning and high thresholds are ${config.quality.skillTokenWarning} and ${config.quality.skillTokenHigh} estimated tokens.`;
+  const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
+  const progressiveDisclosureGuidance =
+    sectionCandidates.length > 0
+      ? "Review these sections for progressive disclosure without deleting workflow steps."
+      : "Review the Skill manually for semantic progressive-disclosure boundaries without deleting workflow steps.";
+  return documentFinding(
+    document,
+    DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET,
+    "Skill body exceeds its effective token-budget threshold",
+    "quality",
+    severity,
+    `${measurementSummary} ${sectionReview} ${progressiveDisclosureGuidance} Keep selection boundaries, read conditions, ordered workflow, constraints, and completion criteria in SKILL.md. Move Skill-specific conditional detail to references/, deterministic repeated implementation to scripts/, output material to assets/, and independently owned cross-Skill knowledge to contexts/. Do not split automatically or choose a destination from heading text alone.`,
+    {
+      whyItMatters:
+        "Long Skill bodies can make activated workflows harder to navigate and maintain. Token size is evidence for progressive-disclosure review, not proof that the Skill has the wrong structure or must be split.",
+      repairConstraints: [
+        {
+          kind: "must_not_change",
+          text: "Do not introduce runtime context resolution.",
+        },
+        { kind: "must_not_change", text: "Do not create prompt packages." },
+        {
+          kind: "must_not_change",
+          text: "Do not make Renma responsible for selecting context.",
+        },
+        {
+          kind: "must_preserve",
+          text: "Preserve ordered workflow steps, constraints, and completion criteria.",
+        },
+        {
+          kind: "allowed_change",
+          text: "Choose a destination by semantic ownership, not by size alone.",
+        },
+      ],
+      verificationSteps: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run any project-specific validation checks that apply to this repository.",
+        },
+        {
+          text: "Confirm any moved material remains statically reachable and semantically owned by its destination.",
+        },
+      ],
+      llmHint: `${measurementSummary} ${sectionReview} Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge. Treat the listed sections only as review candidates.`,
+      details: {
+        measured: bodyTokenCount,
+        warningThreshold: config.quality.skillTokenWarning,
+        highThreshold: config.quality.skillTokenHigh,
+        triggeredThreshold,
+        effectiveSeverity: severity,
+        ...overage,
+        unit: "estimated_tokens",
+        profile: QUALITY.profile,
+        measurement: "markdown_body_after_frontmatter",
+        sectionMeasurement: "markdown_body_sections",
+        sectionCandidates,
+        policySource:
+          config.quality.skillTokenWarningSource ===
+            "repository_configuration" &&
+          config.quality.skillTokenHighSource === "repository_configuration"
+            ? "repository_configuration"
+            : config.quality.skillTokenWarningSource === "renma_default" &&
+                config.quality.skillTokenHighSource === "renma_default"
+              ? "renma_defaults"
+              : "mixed",
+        thresholdSources: {
+          warning: config.quality.skillTokenWarningSource,
+          high: config.quality.skillTokenHighSource,
+        },
+      },
+    },
+  );
+}
+
+function requiredInputsFinding(
+  document: ParsedDocument,
+  text: string,
+  scaffoldResidue: readonly RenmaScaffoldPlaceholderResidue[],
+): Finding | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  const requiredInputResidue = firstScaffoldResidue(scaffoldResidue, [
+    "requiredInput",
+    "inspectInstruction",
+  ]);
+  if (REQUIRED_INPUTS_PATTERN.test(text) && !requiredInputResidue)
+    return undefined;
+
+  return documentFinding(
+    document,
+    DIAGNOSTIC_IDS.QUAL_MISSING_REQUIRED_INPUTS,
+    "Skill does not state required inputs",
+    "quality",
+    "medium",
+    "Add a Required inputs or Prerequisites section that states the user-provided inputs, target files, repository state, permissions, credentials, or environment assumptions needed before the workflow can start.",
+    {
+      whyItMatters:
+        "Agents need explicit input requirements before starting a workflow. Missing required inputs can cause the agent to guess targets, assume permissions, or start without enough repository context.",
+      repairConstraints: [
+        { kind: "must_not_change", text: "Do not infer runtime context." },
+        {
+          kind: "must_not_change",
+          text: "Do not assemble prompt packages.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not require optional context selection.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not make Renma decide whether the workflow can run for the current task.",
+        },
+        {
+          kind: "must_preserve",
+          text: "Keep the skill as a static workflow entrypoint.",
+        },
+      ],
+      verificationSteps: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma readiness.",
+          command: "renma readiness",
+          expected: "Readiness checks reflect the repaired repository state.",
+        },
+        {
+          text: "Confirm each skill entrypoint either documents required inputs or explicitly states that no special inputs are required.",
+        },
+      ],
+      llmHint:
+        "Add a concise Required inputs or Prerequisites section to this SKILL.md. State user-provided inputs, target files, repository state, permissions, credentials, and environment assumptions needed before the workflow starts. Do not add runtime context selection or prompt assembly behavior.",
+      ...(requiredInputResidue
+        ? { evidence: requiredInputResidue.evidence }
+        : {}),
+    },
+  );
+}
+
+function completionCriteriaFinding(
+  document: ParsedDocument,
+  text: string,
+  scaffoldResidue: readonly RenmaScaffoldPlaceholderResidue[],
+): Finding | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  const completionResidue = firstScaffoldResidue(scaffoldResidue, [
+    "expectedOutput",
+  ]);
+  if (COMPLETION_CRITERIA_PATTERN.test(text) && !completionResidue)
+    return undefined;
+
+  return documentFinding(
+    document,
+    DIAGNOSTIC_IDS.QUAL_MISSING_COMPLETION_CRITERIA,
+    "Skill does not state completion criteria",
+    "quality",
+    "medium",
+    "Add a Completion criteria, Success requirements, Deliverables, or Final response section that states the observable outputs or conditions that mean the workflow is complete.",
+    {
+      whyItMatters:
+        "Agents need explicit completion criteria before finishing a workflow. Missing completion criteria can cause incomplete delivery, unnecessary follow-up work, or inconsistent final responses.",
+      repairConstraints: [
+        { kind: "must_not_change", text: "Do not infer runtime context." },
+        {
+          kind: "must_not_change",
+          text: "Do not assemble prompt packages.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not require optional context selection.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not make Renma decide task-specific success at runtime.",
+        },
+        {
+          kind: "must_preserve",
+          text: "Keep the skill as a static workflow entrypoint.",
+        },
+      ],
+      verificationSteps: [
+        { text: "Run renma scan.", command: "renma scan" },
+        {
+          text: "Run renma readiness.",
+          command: "renma readiness",
+          expected: "Readiness checks reflect the repaired repository state.",
+        },
+        {
+          text: "Confirm each skill workflow entrypoint documents completion criteria.",
+        },
+      ],
+      llmHint:
+        "Add a concise Completion criteria, Success requirements, Deliverables, or Final response section to this SKILL.md. State the observable outputs, checks, or final-response conditions that mean the workflow is complete. Do not add runtime context selection or prompt assembly behavior.",
+      ...(completionResidue ? { evidence: completionResidue.evidence } : {}),
+    },
+  );
 }
 
 interface RenmaScaffoldPlaceholderResidue {
