@@ -43,17 +43,30 @@ export function tokenBudgetSectionCandidates(
   const candidateDepth = tokenBudgetCandidateDepth(headings);
   if (candidateDepth === undefined) return [];
 
+  // Only headings at or above the candidate depth end a section. Index unique
+  // lines so every candidate uses the next strictly later boundary, even when
+  // supplied heading evidence contains multiple entries on the same line.
+  const boundaryLines = [
+    ...new Set(
+      headings
+        .filter((heading) => heading.depth <= candidateDepth)
+        .map((heading) => heading.line),
+    ),
+  ];
+  const sectionEndLines = new Map(
+    boundaryLines.map((line, index) => [
+      line,
+      boundaryLines[index + 1] ?? document.lines.length + 1,
+    ]),
+  );
+
   const sections = headings
     .filter((heading) => heading.depth === candidateDepth)
     .map((heading) => {
-      const nextBoundary = headings.find(
-        (candidate) =>
-          candidate.line > heading.line && candidate.depth <= candidateDepth,
-      );
       const sectionText = document.lines
         .slice(
           heading.line - 1,
-          (nextBoundary?.line ?? document.lines.length + 1) - 1,
+          (sectionEndLines.get(heading.line) ?? document.lines.length + 1) - 1,
         )
         .join("\n");
       return {
