@@ -1,3 +1,4 @@
+import { captureProcessOutput as withCapturedConsole } from "./process-output.js";
 import assert from "node:assert/strict";
 import {
   mkdir,
@@ -1038,29 +1039,4 @@ async function jsonSuggestion(args: string[]): Promise<JsonMetadataSuggestion> {
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
   return JSON.parse(result.stdout);
-}
-
-async function withCapturedConsole(
-  callback: () => Promise<number>,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const stdoutWrite = process.stdout.write;
-  const stderrWrite = process.stderr.write;
-  let stdout = "";
-  let stderr = "";
-
-  process.stdout.write = ((chunk: string | Uint8Array) => {
-    stdout += chunk.toString();
-    return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr += chunk.toString();
-    return true;
-  }) as typeof process.stderr.write;
-
-  try {
-    return { code: await callback(), stdout, stderr };
-  } finally {
-    process.stdout.write = stdoutWrite;
-    process.stderr.write = stderrWrite;
-  }
 }
