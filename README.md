@@ -61,14 +61,14 @@ deterministic evidence for humans, CI, and coding agents. `renma scan` is the
 normal starting point; focused commands expose the related inventory, graph,
 ownership, readiness, and change evidence.
 
-| Area                             | Examples of what Renma checks or reports                                                                                                                                                                                                                                                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Agent Skills and layout          | Canonical entrypoints and metadata shapes, historical paths, reserved-directory boundaries, and repository classification.                                                                                                                                                                                                                                         |
-| Governance                       | Stable identity, declared and inherited ownership, lifecycle and freshness, required metadata, and security-profile resolution.                                                                                                                                                                                                                                    |
-| Relationships and support        | Missing, inactive, conflicting, or cyclic dependencies; broken references; unreachable Skill support; and inspection blockers such as symlinks, unreadable files, size limits, or depth limits.                                                                                                                                                                    |
-| Authoring quality                | Selection boundaries, required inputs, preflight and verification guidance, scaffold residue, machine-local paths, token budgets, and possible mixed responsibilities.                                                                                                                                                                                             |
-| Security policy and instructions | Policy alignment for data, network and upload destinations, secrets, forbidden inputs, and human approval; sensitive-data exposure; destructive or privileged commands; risky error suppression; floating dependency or remote-script execution; hidden or untrusted instructions; hierarchy or safeguard bypass; and suspicious Unicode or frontmatter integrity. |
-| Review coverage                  | Which expected files were inspected, which supported security-analysis layers ran, and which formats or surfaces remained unsupported, blocked, or not analyzable.                                                                                                                                                                                                 |
+| Area | Examples |
+| --- | --- |
+| Skills and layout | Canonical entrypoints, metadata, historical paths, and support-directory boundaries. |
+| Governance | Identity, ownership, lifecycle, freshness, required metadata, and security profiles. |
+| Relationships and support | Missing, inactive, conflicting, or cyclic dependencies; broken references; unreachable support. |
+| Authoring quality | Selection boundaries, inputs, verification guidance, scaffold residue, local paths, token budgets, and mixed responsibilities. |
+| Security | Policy violations, sensitive-data exposure, risky commands and dependencies, untrusted instructions, and hidden Unicode. |
+| Review coverage | Inspected files, blocked paths, analysis layers, and unsupported or ambiguous formats. |
 
 Security checks apply to documented, supported forms in agent-facing
 instructions and metadata. They do not perform general code SAST, CVE lookup,

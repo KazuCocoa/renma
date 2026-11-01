@@ -1211,6 +1211,13 @@ infer governance, change applicability, or create candidate data. JSON output
 serializes the command result directly; it is not reconstructed from rendered
 text.
 
+`src/renderers/ci-policy.ts` owns CI policy summaries, section visibility, and
+Markdown details. It consumes evaluated policies and their changes without
+importing command types or reevaluating policy. Each policy retains its own
+visibility and review wording. `src/renderers/ci-report-list.ts` supplies the
+CI report's shared detail limit and overflow text; other report formats retain
+their own presentation contracts.
+
 Command modules should stay orchestration-oriented:
 
 ```text
