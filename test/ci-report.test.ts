@@ -2100,6 +2100,47 @@ test("CI status composition keeps fail dominant and Discovery warn-only", () => 
   assert.equal(composeCiReportStatus("fail", "pass", "pass"), "fail");
 });
 
+test("each CI gate retains its status precedence when combined with other gates", () => {
+  type Outcome = "pass" | "warn" | "fail";
+  type GateOutcomes = [Outcome, Outcome, Outcome, Outcome, Outcome, Outcome];
+  for (let gate = 0; gate < 6; gate += 1) {
+    const failures: GateOutcomes = [
+      "warn",
+      "warn",
+      "warn",
+      "warn",
+      "warn",
+      "warn",
+    ];
+    failures[gate] = "fail";
+    assert.equal(
+      composeCiReportStatus("pass", "warn", ...failures),
+      "fail",
+      `gate ${gate} must dominate warnings`,
+    );
+
+    const warnings: GateOutcomes = [
+      "pass",
+      "pass",
+      "pass",
+      "pass",
+      "pass",
+      "pass",
+    ];
+    warnings[gate] = "warn";
+    assert.equal(
+      composeCiReportStatus("pass", "pass", ...warnings),
+      "warn",
+      `gate ${gate} must request review`,
+    );
+    assert.equal(
+      composeCiReportStatus("fail", "pass", ...warnings),
+      "fail",
+      `gate ${gate} must not clear an existing failure`,
+    );
+  }
+});
+
 test("default security policy gate fails relaxation and rejects remediation praise", () => {
   const compatible = policyDiffReport({
     summary: { findingsDelta: -2, highOrCriticalFindingsDelta: -2 },
