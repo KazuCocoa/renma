@@ -243,7 +243,7 @@ export function buildExecutableSurfaceDiff(
         },
       ];
     })
-    .sort(compareInvocationChanges);
+    .sort(compareInvocationIdentity);
   const invocationGovernanceChanges = [...toInvocations]
     .flatMap(([key, toInvocation]) => {
       const fromInvocation = fromInvocations.get(key);
@@ -256,7 +256,7 @@ export function buildExecutableSurfaceDiff(
       }
       return [governanceChange(fromInvocation, toInvocation)];
     })
-    .sort(compareGovernanceChanges);
+    .sort(compareInvocationIdentity);
   const newInvocationsWithoutEffectivePolicyEvidence = [...toInvocations]
     .filter(
       ([key, invocation]) =>
@@ -264,7 +264,7 @@ export function buildExecutableSurfaceDiff(
         !invocation.governance.hasEffectivePolicyEvidence,
     )
     .map(([, invocation]) => governanceDelta(invocation))
-    .sort(compareGovernanceDeltas);
+    .sort(compareInvocationIdentity);
   const newInvocationsWithMultipleEffectivePolicyFingerprints = [
     ...toInvocations,
   ]
@@ -274,7 +274,7 @@ export function buildExecutableSurfaceDiff(
         invocation.governance.distinctEffectivePolicyFingerprints.length > 1,
     )
     .map(([, invocation]) => governanceDelta(invocation))
-    .sort(compareGovernanceDeltas);
+    .sort(compareInvocationIdentity);
   const invocationsGainedEffectivePolicyEvidence =
     invocationGovernanceChanges.filter(
       (change) =>
@@ -302,15 +302,15 @@ export function buildExecutableSurfaceDiff(
       );
     })
     .map(([, invocation]) => invocation)
-    .sort(compareInvocationDeltas);
+    .sort(compareInvocationIdentity);
   const addedDependencies = [...toDependencies]
     .filter(([key]) => !fromDependencies.has(key))
     .map(([, dependency]) => dependencyDelta(dependency))
-    .sort(compareDependencyDeltas);
+    .sort(compareDependencyIdentity);
   const removedDependencies = [...fromDependencies]
     .filter(([key]) => !toDependencies.has(key))
     .map(([, dependency]) => dependencyDelta(dependency))
-    .sort(compareDependencyDeltas);
+    .sort(compareDependencyIdentity);
   const dependencyResolutionChanges = [...toDependencies]
     .flatMap(([key, toDependency]) => {
       const fromDependency = fromDependencies.get(key);
@@ -334,7 +334,7 @@ export function buildExecutableSurfaceDiff(
         },
       ];
     })
-    .sort(compareDependencyChanges);
+    .sort(compareDependencyIdentity);
   const newProblematicDependencies = [...toDependencies]
     .filter(([key, dependency]) => {
       const previous = fromDependencies.get(key);
@@ -344,7 +344,7 @@ export function buildExecutableSurfaceDiff(
       );
     })
     .map(([, dependency]) => dependencyDelta(dependency))
-    .sort(compareDependencyDeltas);
+    .sort(compareDependencyIdentity);
 
   return {
     summary: summaryDelta(from.summary, to.summary),
@@ -870,9 +870,19 @@ function sameStrings(
   );
 }
 
-function compareInvocationChanges(
-  left: ExecutableSurfaceInvocationResolutionChange,
-  right: ExecutableSurfaceInvocationResolutionChange,
+type InvocationSortKey = Pick<
+  ExecutableSurfaceInvocationDelta,
+  "sourcePath" | "launcher" | "target" | "occurrenceOrdinal"
+>;
+
+type DependencySortKey = Pick<
+  ExecutableSurfaceDependencyDelta,
+  "sourcePath" | "analyzer" | "relation" | "target" | "occurrenceOrdinal"
+>;
+
+function compareInvocationIdentity(
+  left: InvocationSortKey,
+  right: InvocationSortKey,
 ): number {
   return (
     compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
@@ -882,63 +892,14 @@ function compareInvocationChanges(
   );
 }
 
-function compareInvocationDeltas(
-  left: ExecutableSurfaceInvocationDelta,
-  right: ExecutableSurfaceInvocationDelta,
-): number {
-  return (
-    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
-    compareUtf16CodeUnits(left.launcher, right.launcher) ||
-    compareUtf16CodeUnits(left.target, right.target) ||
-    left.occurrenceOrdinal - right.occurrenceOrdinal
-  );
-}
-
-function compareDependencyChanges(
-  left: ExecutableSurfaceDependencyResolutionChange,
-  right: ExecutableSurfaceDependencyResolutionChange,
+function compareDependencyIdentity(
+  left: DependencySortKey,
+  right: DependencySortKey,
 ): number {
   return (
     compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
     compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
     compareUtf16CodeUnits(left.relation, right.relation) ||
-    compareUtf16CodeUnits(left.target, right.target) ||
-    left.occurrenceOrdinal - right.occurrenceOrdinal
-  );
-}
-
-function compareDependencyDeltas(
-  left: ExecutableSurfaceDependencyDelta,
-  right: ExecutableSurfaceDependencyDelta,
-): number {
-  return (
-    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
-    compareUtf16CodeUnits(left.analyzer, right.analyzer) ||
-    compareUtf16CodeUnits(left.relation, right.relation) ||
-    compareUtf16CodeUnits(left.target, right.target) ||
-    left.occurrenceOrdinal - right.occurrenceOrdinal
-  );
-}
-
-function compareGovernanceChanges(
-  left: ExecutableInvocationGovernanceChange,
-  right: ExecutableInvocationGovernanceChange,
-): number {
-  return (
-    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
-    compareUtf16CodeUnits(left.launcher, right.launcher) ||
-    compareUtf16CodeUnits(left.target, right.target) ||
-    left.occurrenceOrdinal - right.occurrenceOrdinal
-  );
-}
-
-function compareGovernanceDeltas(
-  left: ExecutableInvocationGovernanceDelta,
-  right: ExecutableInvocationGovernanceDelta,
-): number {
-  return (
-    compareUtf16CodeUnits(left.sourcePath, right.sourcePath) ||
-    compareUtf16CodeUnits(left.launcher, right.launcher) ||
     compareUtf16CodeUnits(left.target, right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
