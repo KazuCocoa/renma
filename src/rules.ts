@@ -5,6 +5,7 @@ import { declaredCompositionFindings } from "./declared-composition.js";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import {
   evaluateAssetFreshness,
+  type AssetFreshnessEvaluation,
   isIsoDate,
   todayIsoDate,
 } from "./freshness.js";
@@ -332,15 +333,21 @@ function freshnessGovernanceFindings(
         entry.kind === "context_lens" ||
         entry.kind === "skill",
     )
-    .flatMap((entry) => [
-      ...expiredAssetFindings(entry, today),
-      ...reviewOverdueAssetFindings(entry, today),
-    ]);
+    .flatMap((entry) => {
+      const freshness = evaluateAssetFreshness(entry.metadata, today);
+      return [
+        ...expiredAssetFindings(entry, freshness),
+        ...reviewOverdueAssetFindings(entry, freshness),
+      ];
+    });
 }
 
-function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
+function expiredAssetFindings(
+  entry: CatalogEntry,
+  freshness: AssetFreshnessEvaluation,
+): Finding[] {
   const expiresAt = entry.metadata.expiresAt;
-  if (!expiresAt || !evaluateAssetFreshness(entry.metadata, today).expired) {
+  if (!expiresAt || !freshness.expired) {
     return [];
   }
 
@@ -387,12 +394,11 @@ function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
 
 function reviewOverdueAssetFindings(
   entry: CatalogEntry,
-  today: string,
+  freshness: AssetFreshnessEvaluation,
 ): Finding[] {
   const lastReviewedAt = entry.metadata.lastReviewedAt;
   const reviewCycle = entry.metadata.reviewCycle;
   if (!lastReviewedAt || !reviewCycle) return [];
-  const freshness = evaluateAssetFreshness(entry.metadata, today);
   if (!freshness.reviewOverdue || !freshness.reviewDueAt) return [];
   const dueAt = freshness.reviewDueAt;
 
