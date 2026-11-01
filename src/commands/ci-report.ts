@@ -403,28 +403,20 @@ export function composeCiReportStatus(
   metadataPolicyOutcome: MetadataPolicyCiEvaluation["outcome"] = "pass",
   diagnosticSeverityPolicyOutcome: DiagnosticSeverityCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
-  if (
-    existingStatus === "fail" ||
-    securityPolicyOutcome === "fail" ||
-    scanBoundaryPolicyOutcome === "fail" ||
-    executableSurfacePolicyOutcome === "fail" ||
-    qualityPolicyOutcome === "fail" ||
-    metadataPolicyOutcome === "fail" ||
-    diagnosticSeverityPolicyOutcome === "fail"
-  )
-    return "fail";
-  if (
-    existingStatus === "warn" ||
-    discoveryPolicyOutcome === "warn" ||
-    securityPolicyOutcome === "warn" ||
-    scanBoundaryPolicyOutcome === "warn" ||
-    executableSurfacePolicyOutcome === "warn" ||
-    qualityPolicyOutcome === "warn" ||
-    metadataPolicyOutcome === "warn" ||
-    diagnosticSeverityPolicyOutcome === "warn"
-  )
-    return "warn";
-  return "pass";
+  const blockingOutcomes = [
+    existingStatus,
+    securityPolicyOutcome,
+    scanBoundaryPolicyOutcome,
+    executableSurfacePolicyOutcome,
+    qualityPolicyOutcome,
+    metadataPolicyOutcome,
+    diagnosticSeverityPolicyOutcome,
+  ];
+  if (blockingOutcomes.includes("fail")) return "fail";
+  // Discovery can request review, but it cannot make the report fail.
+  return discoveryPolicyOutcome === "warn" || blockingOutcomes.includes("warn")
+    ? "warn"
+    : "pass";
 }
 
 function hasNewHighOrCriticalFinding(report: CiCompatibleDiffReport): boolean {
