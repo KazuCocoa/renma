@@ -12,16 +12,12 @@ of the consuming LLM's internal reasoning algorithm.
 For a new Skill, or when intentionally redesigning asset boundaries, start with
 `renma guide skill`. Renma first establishes:
 
-- the smallest non-redundant asset graph;
-- Skill, Context, Context Lens, Reference, Script, and Example responsibilities;
-- canonical metadata and Agent Skills compatibility;
-- Context placement and source-of-truth representation;
-- file and resource boundaries;
-- dependency and graph validation;
-- ownership and lifecycle governance;
-- security policy validation;
-- workflow clarity diagnostics; and
-- repository-wide scan and readiness evidence.
+- the smallest non-redundant asset graph, file/resource boundaries, and Skill,
+  Context, Context Lens, Reference, Script, and Example responsibilities;
+- canonical metadata, Agent Skills compatibility, Context placement, and
+  source-of-truth representation;
+- dependency/graph validation, ownership, lifecycle, and security governance;
+- workflow clarity diagnostics and repository-wide scan and readiness evidence.
 
 After those boundaries are established and the creation gate passes,
 platform-native Skill authoring guidance may refine the name and trigger
@@ -57,9 +53,8 @@ so security-sensitive instructions placed there receive a dedicated finding.
 
 `renma guide skill` remains deterministic and non-interactive. It prints the
 authoring contract; the consuming LLM conducts any needed conversation and
-investigates applicable evidence, the user supplies domain and governance truth,
-Renma supplies deterministic rules and repository evidence, and a human approves
-meaningful decisions. The external LLM investigates and proposes, Renma
+investigates applicable evidence, and the user supplies domain and governance
+truth. The external LLM investigates and proposes, Renma
 validates supplied structure and deterministic repository evidence, and the
 human reviews meaningful decisions. Renma does not accept task text, ask
 questions, retain conversation state, interpret answers, or create assets from

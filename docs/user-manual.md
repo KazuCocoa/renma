@@ -859,25 +859,20 @@ residue detection, not a claim that marker-free prose is semantically complete.
 
 ## LLM-Assisted Skill Maintenance
 
-Renma output can support a human or coding agent, but the authoring and
-governance responsibilities remain separate. Respect the repository's existing
-Renma boundaries while using platform-native Skill authoring guidance to refine
-semantics. Do not treat a clean scan as permission to invent domain knowledge
-or as proof that the workflow is semantically correct or its source
-authoritative.
+Use the [existing-Skill workflow](#user-story-improve-existing-skills-with-diagnostics)
+for ordinary maintenance: scan, inspect relevant evidence, prepare the smallest
+supported patch, validate, and obtain human review for meaningful semantic
+changes. A clean scan does not establish domain truth, source authority, or
+semantic correctness.
 
-Recommended loop for ordinary maintenance:
+Use `renma guide skill` when intentionally reconsidering Skill or Context
+boundaries, resource placement, source representation, scripts, or the asset
+graph. The [Authoring Guide](authoring-guide.md) owns that contract.
 
-1. Run `renma scan . --fail-on high --format json`.
-2. Inspect the target and relevant repository evidence.
-3. Review triggers, instructions, workflow, constraints, and completion criteria
-   when the requested change calls for semantic review.
-4. Prepare a minimal patch without inventing domain knowledge, ownership,
-   references, product rules, or source-of-truth claims.
-5. Run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun it.
-6. Summarize changed files, resolved findings, remaining uncertainty, and
-   verification commands.
-7. Require human review before merging meaningful semantic changes.
+When `suggest-metadata` reports `decisionStatus: "no-change-recommended"`
+with `suggestedMode: "no-proposal"`, do not manufacture a metadata or
+migration patch. Continue any separately requested Skill-body improvement;
+stop only when no other intended work remains.
 
 Example instruction for an agent:
 
@@ -885,27 +880,8 @@ Example instruction for an agent:
 Start with `renma scan . --fail-on high`, then inspect the target and only the repository evidence needed for the change. Make only evidence-backed changes. Do not invent owners, references, product rules, or source-of-truth claims. Preserve existing semantics unless a diagnostic or explicit requirement supports a change. Run `renma scan . --fail-on high` after editing, fix relevant diagnostics, rerun it, and summarize both resolved and remaining findings.
 ```
 
-Use `renma guide skill` during existing-Skill work only when intentionally
-reconsidering Skill or Context boundaries, file or resource placement, source
-representation, scripts or other support, or the asset graph.
-
-Recommended evidence-first preflight:
-
-1. Run `renma scan . --fail-on high --format json`.
-2. Run `renma inspect <SKILL.md> --format json`.
-3. Inspect relevant local resources and referenced Context Assets.
-4. Use `renma suggest-metadata` only when retrofit or migration evidence exists.
-5. When `suggest-metadata` reports `decisionStatus: "no-change-recommended"`
-   with `suggestedMode: "no-proposal"`, do not manufacture a metadata or
-   migration patch. Continue any separately requested Skill-body improvement;
-   stop only when no other intended work remains.
-6. Prepare the smallest intended patch.
-7. After changes, rerun `renma scan . --fail-on high --format json` and the
-   repository-required checks for the change and stage.
-8. Report unresolved human decisions.
-
-For one classification question, `renma inspect <target> --format json` may be
-the initial preflight. Repository-wide work should normally start with `scan`.
+For a single classification question, `renma inspect <target> --format json`
+may be the initial preflight. Repository-wide work normally starts with `scan`.
 
 ## Context Asset Discovery Boundary
 
@@ -959,10 +935,10 @@ deterministic. Renma never moves a file based on content. A successful
 
 ## User Story: Create A New Skill With Scaffold
 
-Use this flow when adding a new agent-facing Skill. Renma defines the repository
-contract and creates one compatible starting point; platform-native Skill
-authoring guidance refines Skill semantics within that contract only after the
-creation gate passes.
+Use this command sequence to create a Skill within the canonical
+[Authoring Guide](authoring-guide.md#new-skill-workflow). Renma establishes the
+repository contract and generates one starting point; platform-native authoring
+guidance refines semantics inside that contract after the creation gate passes.
 
 ```mermaid
 flowchart LR
@@ -987,211 +963,114 @@ flowchart LR
 ```
 
 The arrows expose gate dependencies and observable transitions, not a required
-internal reasoning algorithm. The consuming LLM may combine or revisit these
-activities in any order, but it cannot declare the gate passed before the
-smallest justified asset structure and every other gate requirement are
-established.
+internal reasoning algorithm. Activities may be combined or revisited, but every
+gate requirement, including the smallest justified structure, must be established
+before the gate passes. Decision tables, question themes, and progress-summary
+formats are optional aids; evidence, authority, ownership, security, completion,
+asset responsibilities, and the structured handoff remain requirements.
 
-Evidence, authority, ownership, security, asset responsibilities, completion,
-and the handoff contract remain requirements. Decision tables, question themes,
-and progress-summary formats are optional working aids, not extra gate
-requirements. The handoff's structured fields remain unchanged.
-
-Renma creates and validates repository assets; the consuming agent follows the
-finished Skill later according to its own runtime behavior.
-
-1. Run `renma guide skill`. The consuming LLM develops a provisional
-   understanding, inspects only applicable truth sources, separates Confirmed,
-   Proposed, and Unresolved decisions from Blocking, Reversible default, and
-   Deferred progression, and evaluates the creation gate. If the request and
-   evidence establish every gate requirement, it proceeds without clarification.
-   Otherwise it uses applicable evidence, still-valid decisions and
-   authorizations, and authorized reversible defaults before asking only about
-   unresolved Blocking authoring decisions that still require human truth.
-   Existing authorization applies only to the same scope and action; preserve
-   any requirement for separate or immediate approval. Continue independent
-   investigation and preparation while waiting, but do not create files before
-   the gate passes. Retain the complete Blocking set in temporary authoring
-   state rather than hiding blockers or relabeling them Deferred; show
-   enough state for the user to understand material blockers and progress. The
-   user need not provide a plan-quality specification. Repository evidence must
-   be applicable, effective, and unambiguous; supplied artifacts need clear
-   provenance and applicability; source content must be successfully consulted or supplied
-   rather than recalled from model memory.
-
-   Classify unknown scope before progression. Ask now or retain only authoring
-   decision themes that block the current stage; use safe Proposed defaults,
-   Defer non-material items, and make evidence-backed runtime unknowns findings
-   in the finished Skill's output. Do not ask a downstream decision when a
-   meaningful answer depends on an unresolved upstream decision; investigate or
-   resolve the prerequisite first. A small focused question batch is a useful
-   default, not a fixed correctness rule or required decision-graph algorithm.
-   Reassess relevant unknowns at meaningful workflow stage transitions. When
-   the next execution stage depends on a runtime task unknown, treat it as a runtime-stage
-   blocker and follow the Skill's authored ask, report, defer, or stop policy;
-   do not add the task-instance fact to the authoring creation-gate blocker set.
-   Return to authoring clarification only when that policy or an asset boundary
-   is unresolved.
-
-   Before creating files, establish the focused recurring task, expected result,
-   meaningful completion or failure behavior, smallest justified structure,
-   source authority, authoring-time consultation, finished-Skill runtime access,
-   blocking security and domain decisions, and the file-mode owner. Wording,
-   tags, examples, and speculative future extensions do not block creation.
-   Declare the gate passed and proceed only after every requirement is
-   established, including the smallest justified structure, and no Blocking
-   decision remains; visible safe reversible defaults and meaningful Deferred
-   decisions may remain Proposed or Unresolved. See the
-   [Authoring Guide](authoring-guide.md#progression-and-adaptive-questioning) for
-   the complete interaction and boundary-reconsideration contract.
-
-2. After every creation-gate requirement is established, including the smallest
-   justified asset structure, and the supplied state declares no Blocking
-   decisions, have the external LLM write a
-   `renma.skill-authoring-handoff.v1` JSON file. Its
-   `currentUnderstanding` preserves Confirmed, Proposed, and Unresolved state;
-   `progression` separately preserves Blocking, Reversible default, and Deferred
-   state. It also records the core Skill contract, one Skill node, planned
-   supporting Context or Context Lens nodes, local resources, source-authority
-   status, security decisions, and runtime-unknown handling. It contains no
-   finished Markdown or complete implementation plan.
-
-3. Run the Renma generator once for the explicit target path.
+1. **Establish the contract.** Run `renma guide skill`, investigate applicable
+   evidence, and resolve Blocking authoring decisions before creating files.
+   Clarification is needed only when evidence and existing authorization do not
+   establish the required truth. Keep authoring decisions separate from runtime
+   task unknowns. The detailed rules live in
+   [adaptive clarification](authoring-guide.md#authoring-contract-and-adaptive-clarification),
+   [truth sources](authoring-guide.md#truth-sources), and the
+   [creation gate](authoring-guide.md#creation-gate).
+2. **Record the handoff after the gate passes.** The external LLM writes
+   `renma.skill-authoring-handoff.v1`, preserving Confirmed / Proposed /
+   Unresolved understanding separately from Blocking / Reversible default /
+   Deferred progression. It records the Skill contract, justified asset graph,
+   authority, security, and runtime-unknown handling; it contains no finished
+   Markdown or complete implementation plan. Follow the
+   [structured handoff contract](authoring-guide.md#_2-record-the-structured-authoring-handoff).
+3. **Generate once for the agreed path.**
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md \
   --handoff /tmp/spec-review-handoff.json
 ```
 
-The positional target must agree with `assetGraph.skill.path` after safe
-normalization. `--handoff` cannot be combined with `--id`, `--title`, `--owner`,
-`--tags`, or `--resources`; the handoff is the single structural authority.
-Existing direct use with `--owner` remains supported when no handoff is
-provided.
+The target must match `assetGraph.skill.path` after safe normalization.
+`--handoff` is the single structural authority and cannot be combined with
+`--id`, `--title`, `--owner`, `--tags`, or `--resources`. Direct use with `--owner`
+remains supported without a handoff.
 
-4. Open and review the generated Skill.
-
-`scaffold` creates a starter file, not a complete production-ready Skill. Use
-platform-native Skill authoring guidance only to refine the description,
-instructions, workflow, constraints, completion criteria, and
-ambiguity-resolving examples within the Renma asset and metadata boundaries.
-
-The Skill scaffold writes canonical Agent Skills identity and
-`metadata.renma.*` fields directly. Replace its placeholder prose and fill in
-any required security policy before depending on it. Context and context-lens
-scaffolds keep their existing top-level metadata shape. Preserve intended
-repository behavior and do not invent owners, policies, dependencies, domain
-rules, or source-of-truth claims.
-
-Do not create a generic Skill for later Renma enrichment or run a second
-independent generator against the same target. A tool that provides
-platform-native Skill authoring guidance must not generate before the gate, add
-assets outside the agreed structure, or create a second target; after the gate,
-ask it only to refine semantics inside the existing Renma scaffold and graph.
-If refinement reveals a justified asset-boundary change, stop structural edits,
-record it as Proposed or Unresolved, inspect evidence, and re-enter the creation
-gate before changing the structure.
-
-5. Add a Context Asset when knowledge is reusable across Skills, has independent
-   ownership or lifecycle, is maintained separately, is an authoritative source
-   of truth, or has another explicit reason for independent review and
-   governance. Source-of-truth status alone is sufficient; correctness
-   importance alone is not.
+4. **Complete the starter.** Replace placeholder prose and supply required
+   security policy. The Skill uses Agent Skills identity and `metadata.renma.*`;
+   Context and Context Lens retain their top-level metadata shape. Refine the
+   workflow, constraints, completion criteria, and useful examples without
+   inventing owners, policies, dependencies, domain rules, or authority. Do not
+   run a second independent generator or add unagreed assets. Re-enter the gate
+   if refinement changes asset boundaries.
+5. **Add independently justified Context and relationships.** Context may be
+   justified by independent ownership, lifecycle, maintenance, source-of-truth
+   status, cross-Skill reuse, or another explicit governance need. Source-of-truth
+   status alone suffices; correctness importance alone does not. Cross-Skill
+   reuse is not required.
 
 ```bash
 renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
 ```
 
-Cross-Skill reuse is not required. An external authoritative URL normally
-justifies a concise Context Asset through its user-designated source-of-truth
-role. The designation does not confirm the source's schema, fields, constraints,
-or behavior; those facts require successfully consulted or supplied content.
-The Context records the governed source, URL, consultation rule, scope, and
-fallback behavior without copying the full external document. After Context is
-independently justified, use correctness dependency to choose a required versus
-optional relationship.
+An external authoritative URL normally warrants a concise governed Context,
+not a full copy. Authority designation does not establish its contents.
+Authoring-time consultation and future runtime access are separate decisions;
+a URL does not grant network permission and future metadata does not authorize
+the authoring agent. Follow the [truth-source rules](authoring-guide.md#truth-sources)
+for consultation, supplied content, uncertainty, scope, fallback, and aligned
+security policy.
 
-Authoring-time consultation depends on the current request, tools, and
-environment. If it is unavailable, request supplied content or keep dependent
-facts Unresolved. Separately decide whether future execution fetches the URL or
-expects approved supplied content. A Markdown URL does not grant runtime network
-permission, and future Skill metadata never retroactively authorizes the
-authoring agent. For runtime access, review the supported allowed-data, network,
-approved-destination, external-upload, secrets, and human-approval policy. Keep
-the Skill body, Context instructions, and effective policy aligned.
+Add `renma.requires-context` or `renma.optional-context` under Skill `metadata`
+as JSON-array strings. Choose required versus optional only after Context is
+independently justified. These are static graph relationships; Renma does not
+select or load runtime Context.
 
-6. Connect the Skill to Context Assets.
-
-In a canonical Skill, add `renma.requires-context` or
-`renma.optional-context` under `metadata` as JSON-array strings. These fields
-create static repository graph relationships. They do
-not make Renma choose runtime context for an agent.
-
-7. Run repository validation.
-
-After authoring or changes, run the scan and all repository-required checks for
-the current change and stage:
+6. **Validate, repair, and review.** Run the scan and repository-required checks
+   for the change and stage:
 
 ```bash
 renma scan . --fail-on high
 ```
 
-Use additional views only when they answer a current structural or governance
-question, for example:
+Use `catalog`, `graph`, or `readiness` when they answer a structural or governance
+question. Classify findings using the Authoring Guide's
+[post-validation decisions](authoring-guide.md#post-validation-decisions):
+deterministic repair, repository investigation, human decision, or no justified
+change. Repair only when evidence and Diagnostics v2 constraints uniquely
+establish the patch. Re-enter the gate for boundary changes; never weaken policy,
+manufacture metadata, or add suppressions merely to pass.
 
-```bash
-renma catalog . --format markdown
-renma graph . --format markdown
-renma readiness . --format markdown
-```
-
-8. Fix relevant diagnostics and rerun affected checks.
-
-Use `scan` for concrete problems, `catalog` for discovered assets and metadata,
-`graph` for Skill-to-Context relationships, and `readiness` for repository-level
-health. Classify each finding as a deterministic repair, repository
-investigation, human decision required, or no change justified. Inspect before
-asking when repository evidence may resolve the issue. A finding is not an
-automatic repair merely because detection is deterministic: follow Diagnostics
-v2 constraints, require a uniquely determined patch, and treat repeated-context
-consolidation as investigation plus human review. If validation reveals a
-possible boundary change, re-enter clarification and the creation gate. Do not
-weaken security policy, manufacture metadata, or add suppressions merely to
-pass. Rerun relevant validation after supported repairs and complete human
-review.
-Neither a clean scan nor a valid graph proves the external source is
-authoritative or accessible at runtime.
-
-Verify new or changed scripts and affected existing executable behavior with
-relevant tests or observable checks, rather than executing every script in the
-repository. Use external runtime evaluation for complex Skill behavior when
-the change, unresolved execution evidence, or repository requirements call for
-it. Report unavailable required checks and their impact. After relevant checks
-pass, repeat or broaden validation only for further changes, failed checks, or
-unresolved concerns. Existing evidence is reusable only while it applies to
-the current content, environment, and required scope. Required CI and release
+Verify changed scripts and affected executable behavior with relevant checks.
+Use external runtime evaluation when the change, unresolved evidence, or
+repository requirements call for it. Report unavailable required checks and
+impact. After relevant checks pass, repeat or broaden validation only for further
+changes, failed checks, or unresolved concerns. Reuse evidence only while its
+content, environment, and required scope remain applicable. Required CI and release
 checks still apply.
 
-Persist only durable reviewed workflow, boundary, relationship, authority,
-fallback, metadata, and security decisions. Do not write the conversation
-transcript, temporary Confirmed / Proposed / Unresolved summary, rejected
-proposals, unanswered questions, or invented conversation-state metadata into
-the repository.
+Complete human review and persist only
+[durable reviewed decisions](authoring-guide.md#reviewed-decision-persistence),
+not temporary conversation state. Neither a clean scan nor a valid graph proves
+source authority or runtime accessibility.
 
-9. Optionally generate a BOM for review or CI artifacts.
+7. **Optionally generate review evidence.**
 
 ```bash
 renma bom . --format markdown
 renma bom . --format json
 ```
 
-The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for v3 boundaries.
+The [BOM v3 contract](repository-context-bom.md) combines declared catalog,
+graph, diagnostics, Readiness, lifecycle, hash, and security evidence. It does
+not record actual LLM runtime usage.
 
 ## User Story: Improve Existing Skills With Diagnostics
 
-Use this flow for ordinary maintenance of an existing Skill. Start with
-repository evidence and treat metadata suggestions as narrowly scoped
-candidates.
+Start with repository evidence and treat suggestions as reviewed candidates.
+LLM assistance is optional; Renma does not rewrite files or accept changes
+automatically. See the [Authoring Guide](authoring-guide.md#existing-skill-workflow)
+for semantic review and boundary reconsideration.
 
 ```mermaid
 flowchart TD
@@ -1206,103 +1085,63 @@ flowchart TD
   Fix --> Review["Human review"]
 ```
 
-LLM assistance is optional. Renma does not rewrite files or accept a proposed
-change automatically.
-
-1. Run `scan` on the existing repository.
+1. **Scan and inspect.** Start repository-wide work with:
 
 ```bash
-renma scan . --fail-on high
+renma scan . --fail-on high --format json
 ```
 
-`scan` reports concrete findings such as broken references, risky instructions, missing or invalid metadata, unclear workflow structure, and layout issues.
+Findings identify broken references, risky instructions, metadata problems,
+unclear workflows, and layout issues. Choose additional views for the current
+question rather than running every view as ceremony:
 
-2. Inspect relevant repository evidence. Use only the views that answer the
-   current question; they are not mandatory ceremony.
+| Question | Command |
+| --- | --- |
+| What assets, metadata, owners, lifecycle states, hashes, tags, and dependencies exist? | `renma catalog . --format markdown` |
+| What relationships or unresolved references need review? | `renma graph . --format markdown` |
+| What is one asset's direct neighborhood? | `renma graph . --focus skill.testing.spec-review --format markdown` |
+| What repository health checks need attention? | `renma readiness . --format markdown` |
+| What does one target contain? | `renma inspect skills/testing/spec-review/SKILL.md --format json` |
+| What is the exact source evidence? | `renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42` |
 
-Inspect the current asset inventory when needed:
+Inspect relevant local resources and referenced Context Assets. Readiness is a
+static repository signal, not a runtime Context-selection decision.
 
-```bash
-renma catalog . --format markdown
-```
-
-`catalog` helps you see existing skills, contexts, references, profiles, examples, IDs, owners, lifecycle states, hashes, tags, and declared dependencies.
-
-Check graph relationships when needed:
-
-```bash
-renma graph . --format markdown
-renma graph . --focus skill.testing.spec-review --format markdown
-```
-
-`graph` helps find missing context, broken references, unexpected isolation, and unclear dependencies. Focused graph output keeps one asset and its direct neighborhood so you can inspect one skill or context without reading the whole graph.
-
-Check readiness when needed:
-
-```bash
-renma readiness . --format markdown
-```
-
-`readiness` gives a repository-level health score and checks. It is a static repository review signal, not a runtime decision about which context an agent should use.
-
-Use `inspect` for one file:
-
-```bash
-renma inspect skills/testing/spec-review/SKILL.md
-renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
-```
-
-Use this when you want a compact outline or exact line slice before editing a specific asset.
-
-3. Use `suggest-metadata` only when metadata or migration work is needed.
+2. **Request a suggestion only when needed.** For metadata or migration work:
 
 ```bash
 renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
 ```
 
-`suggest-metadata` does not rewrite files. It emits a deterministic prompt or
-JSON payload that a human or coding agent can use to prepare a reviewed metadata
-or one-way migration patch while preserving the existing Markdown body. Review
-the candidate and apply only intended changes.
+For `SKILL.md`, this supports only the one-way migration from pre-0.16 Renma
+fields to Agent Skills identity plus flat `metadata.renma.*` string values,
+preserving the Markdown body. Unsafe or ambiguous evidence blocks canonical
+frontmatter output. Review conflicts, confirm intent, correct evidence, and
+rerun; do not apply a blocked candidate. Follow the
+[compatibility contract](agent-skills-compatibility.md) and the
+[no-proposal rule](#llm-assisted-skill-maintenance). An already canonical Skill
+needs no ceremonial metadata suggestion.
 
-For a `SKILL.md` target, the command proposes only the one-way transition from
-pre-0.16 Renma Skill fields to Agent Skills identity plus flat
-`metadata.renma.*` string values. Unsafe or ambiguous input blocks canonical
-frontmatter output. When blocked, review the conflicts or invalid evidence,
-confirm intent using platform-native Skill authoring guidance, do not apply a
-candidate, correct the source evidence, and rerun `suggest-metadata`. See
-[Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
-
-An already canonical Skill with no metadata or migration need should not pass
-through `suggest-metadata` merely as ceremony.
-
-4. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
+For an oversized or mixed-purpose file:
 
 ```bash
 renma suggest-semantic-split docs/large-runbook.md
 ```
 
-`suggest-semantic-split` does not rewrite files either. It packages source context and guidance so a human or coding agent can draft a reviewable split.
+This packages source and guidance for a reviewable split; it does not edit files.
 
-5. Prepare and review intended changes, then validate, fix relevant
-   diagnostics, and rerun.
+3. **Prepare, validate, and review the smallest intended patch.** Rerun
+   `renma scan . --fail-on high`, fix relevant diagnostics, and rerun affected
+   checks plus repository-required validation. Use other reports only for an
+   open evidence question. Summarize changed files, resolved and remaining
+   findings, uncertainty, required human decisions, and verification commands.
+   Obtain human review for meaningful semantic changes; a suggestion or clean
+   scan does not replace it.
 
-```bash
-renma scan . --fail-on high
-renma catalog . --format markdown
-renma graph . --format markdown
-renma readiness . --format markdown
-```
-
-The loop ends with human review. A metadata suggestion or clean scan does not
-replace semantic review of the Skill.
-
-For a repository-aware specification-review example using a Skill, a Context
-Lens, and direct Context Asset relationships, see
-[`examples/context-repo`](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo).
-It is statically navigable
-only for a consumer with the repository checkout that follows the Skill and
-Lens relative links; Renma validates the relationships but does not load them.
+The [`examples/context-repo`](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo)
+example combines a Skill, Context Lens, and direct Context relationships. Static
+navigation requires a consumer with the checkout following relative links;
+Renma validates those relationships but does not load them.
 
 ## Configuration
 
