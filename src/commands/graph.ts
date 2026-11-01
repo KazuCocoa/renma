@@ -45,7 +45,7 @@ import {
 } from "../declared-impact.js";
 import {
   normalizeDependencyReference,
-  resolveDependencyTarget,
+  prepareDependencyTargetResolver,
   resolveUniqueDependencyTarget,
 } from "../dependency-resolution.js";
 
@@ -162,8 +162,11 @@ export function graphFromRepositoryEvidence(
   evidence: RepositoryEvidence,
 ): GraphReport {
   const nodes = stableAssets(evidence.catalog.assets).map(toNode);
+  const resolveTarget = prepareDependencyTargetResolver(
+    evidence.catalog.assets,
+  );
   const edges = stableDependencies(evidence.catalog.dependencies).map(
-    (dependency) => toEdge(dependency, evidence.catalog.assets),
+    (dependency) => toEdge(dependency, resolveTarget(dependency)),
   );
 
   return {
@@ -279,9 +282,7 @@ function staticDependencyGraphReport(
     } else {
       return [];
     }
-    return [
-      { source, target, edge: toEdge(dependency, target ? [target] : []) },
-    ];
+    return [{ source, target, edge: toEdge(dependency, target) }];
   });
   const adjacency = new Map<string, typeof arcs>();
   for (const arc of arcs) {
@@ -1007,8 +1008,7 @@ function unownedOwnership(): AssetOwnership {
   };
 }
 
-function toEdge(dependency: Dependency, assets: Asset[]): GraphEdge {
-  const target = resolveDependencyTarget(dependency, assets);
+function toEdge(dependency: Dependency, target: Asset | undefined): GraphEdge {
   return {
     ...(dependency.bindings ? { bindings: dependency.bindings } : {}),
     ...(dependency.bindingDiagnostics
