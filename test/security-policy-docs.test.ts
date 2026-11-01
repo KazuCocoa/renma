@@ -63,12 +63,17 @@ test("Security Policy Guide documents the current Skill and non-Skill syntax bou
   );
 });
 
-test("User Manual documents bounded policy-boundary CI details and complete JSON", async () => {
+test("User Manual links canonical policy semantics and retains CI presentation and controls", async () => {
   const manual = await readFile(
     path.join(process.cwd(), "docs/user-manual.md"),
     "utf8",
   );
 
+  const guide = await readFile(
+    path.join(process.cwd(), "docs/security-policy.md"),
+    "utf8",
+  );
+  assert.match(manual, /security-policy\.md#security-aware-semantic-diff/);
   assert.match(manual, /diff\.security\.policyChanges/);
   assert.match(manual, /diff\.security\.policyTransitions/);
   assert.match(manual, /diff\.security\.sharedPolicyChanges/);
@@ -77,32 +82,32 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
     /Removed forbidden inputs[\s\S]*removed disallowed commands[\s\S]*`none declared`/,
   );
   assert.match(
-    manual,
-    /Markdown shows[\s\S]*bounded by the shared\s+presentation limit;[\s\S]*JSON retains every asset\s+and every value/,
+    guide,
+    /JSON retains the complete sorted[\s\S]*Markdown uses the shared presentation limit/,
   );
   assert.match(
-    manual,
-    /`direct`,\s+`inherited`, `mixed`, or `unresolved`[\s\S]*`mixed` means that both a direct asset[\s\S]*inherited evidence contributed/,
+    guide,
+    /direct asset-local declaration change[\s\S]*mixed only when both direct and inherited\s+evidence contributed/,
   );
   assert.match(
-    manual,
-    /`unresolved` means exact field-level attribution[\s\S]*known partial sources may remain/,
+    guide,
+    /cannot establish an exact field-level source[\s\S]*unresolved instead of guessing[\s\S]*Known partial source evidence remains/,
   );
   assert.match(
-    manual,
-    /accumulating lists[\s\S]*normalized effective declaration additions and removals[\s\S]*same added or removed value, each source is retained[\s\S]*redundant contributor[\s\S]*does not erase another/,
+    guide,
+    /accumulating lists[\s\S]*normalized effective declaration additions and\s+removals[\s\S]*multiple changed sources\s+supply the same added or removed value, every such source remains attributable/,
   );
   assert.match(
     manual,
     /access[\s\S]*becomes enabled[\s\S]*effective destination scope[\s\S]*shared\s+presentation limit[\s\S]*JSON retains the complete/,
   );
   assert.match(
-    manual,
+    guide,
     /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.approved_network_destination_added[\s\S]*security_policy_ci\.allowed_data_added[\s\S]*security_policy_ci\.forbidden_input_removed[\s\S]*security_policy_ci\.disallowed_command_removed/,
   );
   assert.match(
-    manual,
-    /Adding an approved network destination[\s\S]*allowed-data value[\s\S]*Removing a forbidden input or disallowed command[\s\S]*relaxation/,
+    guide,
+    /approvedNetworkDestinations[\s\S]*approved value added[\s\S]*allowedData[\s\S]*allowed value added[\s\S]*forbiddenInputs[\s\S]*forbidden value removed[\s\S]*disallowedCommands[\s\S]*disallowed value removed/,
   );
   assert.match(
     manual,

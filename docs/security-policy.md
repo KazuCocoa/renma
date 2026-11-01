@@ -1132,6 +1132,9 @@ exit behavior nor CI status. CI becomes `WARN` or `FAIL` only when an
 independent readiness, finding, security-policy, scan-boundary, Discovery, or
 executable-surface rule requires that outcome.
 
+Asset changes appear in `diff.security.policyChanges`; shared-source changes
+and their affected assets appear in `diff.security.sharedPolicyChanges`.
+
 Each asset change retains its canonical ID/path, normalized before/after policy,
 concrete added and removed list values, and field-level provenance. Provenance
 distinguishes a direct asset-local declaration change from policy inherited
@@ -1149,7 +1152,8 @@ local replacements and invalid fail-closed destinations still suppress sources
 that cannot contribute. A changed profile parent link is retained when its
 reachable contributor-chain delta supplies the transition. If the retained
 evidence cannot establish an exact field-level source, provenance is reported as
-unresolved instead of guessing.
+unresolved instead of guessing. Known partial source evidence remains in the
+source list when exact attribution is unresolved.
 This is declared/effective-policy provenance, not an inference about which
 runtime action used the policy. A profile or repository-policy change also
 records its effective-policy blast radius: JSON retains the complete sorted

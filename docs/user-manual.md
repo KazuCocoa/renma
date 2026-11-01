@@ -2272,65 +2272,21 @@ labels. If no canonical relationship is available, the view explains the
 normalization boundary and directs the reader to
 `scan --format json` → `executableSurfaceInventory` for unresolved evidence.
 
-The composition view expands only `requires_context`, `optional_context`,
-`requires_lens`, `optional_lens`, and Lens `applies_to`. It reports the root,
-required and optional members, line-level declaration provenance, unknown and
-wrong-kind targets, required and optional cycles, declared conflicts, lifecycle
-and freshness concerns, and separate `requiredComplete`, `optionalComplete`,
-and `cycleFree` flags. It does not expand `references`, `conflicts`,
-`superseded_by`, ownership, policy, static support, or `extends`.
+Composition and Impact follow declared Context/Lens relationships in opposite
+directions. Composition reports the focus asset's transitive dependencies;
+Impact reports its transitive dependents. Both preserve required/optional
+membership and declaration evidence. Complete composition may still contain
+cycles; declaration order does not choose precedence or conflict winners.
+See [Declared Composition](declared-composition.md) and
+[Declared Impact](declared-impact.md) for relationship, resolution, and
+completeness rules.
 
-Renma models explicit composition, not general natural-language inheritance.
-Declaration order does not define precedence, overriding, or conflict winners.
-The same stable asset ID appears once while all declaration provenance remains.
-A composition may be complete and still cyclic. See the
-[Declared Composition contract](declared-composition.md).
-
-The impact view traverses incoming forms of the same five composition
-relationships. It reports required and optional dependents, required and
-optional affected Skills, direct versus transitive status, original-direction
-declaration provenance, and invalid resolved incoming declarations. An
-all-required dependent-to-focus route is required impact; any optional
-declaration keeps that route optional upstream. Required classification wins
-when both route classes reach the same stable ID, while both provenance classes
-remain visible.
-
-Impact does not expand general references, conflicts, `superseded_by`,
-ownership, policy, static support, lifecycle, or `extends`. It does not infer an
-unresolved declaration's target or invent Skill-to-Skill composition. A
-resolved asset with no incoming composition declarations returns a successful
-empty report. See the [Declared Impact contract](declared-impact.md).
-
-The discovery view expands canonical `metadata.renma.continues-with` items and
-the exact string marker
-`metadata.renma.published-entrypoint: "true"`. It resolves one exact stable asset ID or
-repository-relative source path, rejects absolute and repository-escaping
-paths, and never matches aliases, titles, tags, basenames, suffixes, prose, or
-ordinary Markdown links. Resolution remains separate from route usability, so
-invalid, inactive, duplicate-ID, wrong-kind, ambiguous, and missing targets
-stay visible without becoming authoritative graph edges. Structural roots are
-route-eligible Skills with no incoming usable route; they are not published
-entrypoints or coverage claims. Publication is explicit and additionally
-requires a valid, active, unique-ID canonical Skill. Repository-wide adoption
-is declared separately by boolean `skill_discovery.adopted`; the view reports
-`not-adopted`, `partial`, `incomplete`, or `adopted`. Effective published
-entrypoints seed cycle-safe traversal over only usable representative resolved
-Skill-to-Skill routes. Partial adoption with an effective entrypoint reports
-descriptive reachability; adopted repositories report authoritative coverage
-and one warning per not-reached eligible Skill. JSON coverage counts remain
-repository-scoped under `--focus`, while visible ID arrays and summary counts
-are filtered to the exact direct-neighborhood projection. JSON, Markdown, and
-Mermaid use one index prepared in the repository snapshot. See the
-[Skill Discovery Graph contract](skill-discovery.md).
-
-The same authoritative usable route graph is checked for self-loops and
-multi-Skill strongly connected components. `DISCOVERY-ROUTE-CYCLE` reports one
-warning per maximal component with complete internal declaration evidence.
-Cycle detection runs repository-wide before focus; a focused report retains the
-warning when any internal cycle route is visible. A cycle is static
-continuation evidence, not proof of runtime recursion. Traversal remains
-cycle-safe, and an intentional bounded review or retry loop may remain after a
-human reviews its stop, ask, retry, handoff, and completion behavior.
+Discovery reports explicit Skill continuations and publication, including
+unusable declarations without treating them as authoritative graph edges.
+Structural roots and published entrypoints are different facts. Repository-wide
+adoption controls whether reachability is descriptive or authoritative; focus
+preserves that global meaning. See the [Discovery graph contract](skill-discovery.md#graph-view)
+and [route-cycle review guidance](skill-discovery.md#route-cycle-review-diagnostics).
 
 The graph forms answer distinct questions:
 
@@ -2757,79 +2713,22 @@ presentation limit and reports omitted values; an empty scope says `none declare
 and is not described as unrestricted. JSON retains the complete
 post-change destination lists.
 
-JSON exposes the additive `diff.security.policyChanges` array with the complete
-normalized before/after effective-policy state, changed fields, canonical asset
-ID/path, and field-level provenance. Provenance labels a change `direct`,
-`inherited`, `mixed`, or `unresolved` and names the asset, owning Skill,
-selected or changed security profile, and/or repository security configuration
-supported by the existing evidence. `mixed` means that both a direct asset
-decision and inherited evidence contributed to the effective boundary
-transition; unrelated local and shared declarations changing in the same diff
-do not make the result mixed. `unresolved` means exact field-level attribution
-cannot be established without guessing; known partial sources may remain in its
-source list. For accumulating lists, Renma compares each changed shared source's
-normalized effective declaration additions and removals with the effective field
-transition. If several changed profiles or repository configuration supply the
-same added or removed value, each source is retained consistently in field-level
-provenance and `diff.security.sharedPolicyChanges`; one redundant contributor
-does not erase another. Local replacement lists and invalid fail-closed
-destinations still exclude suppressed sources, while a changed profile parent
-link remains attributable when its reachable contributor-chain delta supplies
-the transition. `diff.security.sharedPolicyChanges` groups a changed reusable
-profile or repository security configuration only with the complete,
-deterministically sorted list of assets for which that shared change contributed
-to an effective-policy transition. Markdown shows the affected count and a
-sorted list bounded by the shared presentation limit; JSON retains every asset
-and every value. Declaration reordering and duplicate list values do not create
-semantic changes, and Markdown does not print policy fingerprints.
+For complete machine-readable evidence, use:
 
-JSON also exposes `diff.security.policyTransitions` for matched assets. Each
-row retains canonical asset ID/path/kind, property, provenance, and a `kind`
-discriminator. Scalar rows contain exact boolean-or-`unspecified`
-`fromState`/`toState`; list rows contain complete normalized `added`/`removed`
-values. New and deleted assets do not produce transition rows. Aggregate
-inventory counts are summaries only; CI policy consumes these per-asset rows,
-so a relaxation on one asset and a tightening on another cannot cancel.
+- `diff.security.policyChanges`: normalized before/after policy and field-level provenance.
+- `diff.security.sharedPolicyChanges`: shared-source changes and every affected asset.
+- `diff.security.policyTransitions`: matched-asset scalar/list transitions consumed by CI.
 
-For network, external upload, and secrets, effective `false` is restrictive:
-`false -> true` and `false -> unspecified` are relaxations. For human approval,
-effective `true` is restrictive: `true -> false` and `true -> unspecified` are
-relaxations. Under current effective diagnostic semantics,
-`true <-> unspecified` is neutral for permission fields and
-`false <-> unspecified` is neutral for approval; moving from `unspecified` to
-the restrictive state is tightening. `Unspecified` remains absence of an
-effective declaration, not a runtime permission grant.
+CI evaluates per-asset transitions, so opposite changes on different assets
+cannot cancel through aggregate counts. Direct `diff` Markdown shows a bounded
+`Security policy relaxations` list before `Aggregate security metrics`;
+CI-report keeps the policy outcome and transitions above collapsed details.
 
-Adding an approved network destination, approved upload destination, or
-allowed-data value expands an effective allow boundary and is a relaxation.
-Removing a forbidden input or disallowed command reduces an effective deny
-boundary and is also a relaxation. The opposite list directions are
-tightening. When one list replacement contains both directions, canonical
-transition evidence retains both, while the CI match identifies only the
-weakening values.
-
-These policy details are a deterministic projection of static declared and
-effective Renma evidence. An approved destination is not the same as a
-destination mentioned in instructions, and neither is evidence that a runtime
-connection or upload occurred. The projection adds no target detector, runtime
-monitoring, permission inference, or enforcement. The security transition gate
-classifies the scalar and list relaxations above for revision review; it does not
-change `scan --fail-on`, Readiness score, or Readiness level.
-
-Direct `diff` Markdown shows a bounded `Security policy relaxations` list before
-an explicit `Aggregate security metrics` subsection. CI-report keeps a matching
-policy outcome and per-asset transitions visible above the collapsed details.
-Stable match IDs are `security_policy_ci.network_relaxed`,
-`security_policy_ci.approved_network_destination_added`,
-`security_policy_ci.external_upload_relaxed`,
-`security_policy_ci.approved_upload_destination_added`,
-`security_policy_ci.allowed_data_added`,
-`security_policy_ci.forbidden_input_removed`,
-`security_policy_ci.secrets_relaxed`,
-`security_policy_ci.human_approval_removed`, and
-`security_policy_ci.disallowed_command_removed`. CI matches carry canonical
-asset identity, property, provenance, an explicit relaxation direction, and
-either scalar from/to states or exact added/removed weakening values.
+The [Security-aware semantic diff contract](security-policy.md#security-aware-semantic-diff)
+defines direct/inherited/mixed/unresolved provenance, restrictive states,
+list-change directions, stable match IDs, and complete JSON versus bounded
+Markdown evidence. These are static policy-review facts; they neither prove
+runtime activity nor change `scan --fail-on` or Readiness scoring.
 
 Configure this review policy independently from Skill Discovery:
 
