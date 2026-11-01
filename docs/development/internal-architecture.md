@@ -69,6 +69,22 @@ contracts from command modules. Command- and CLI-local option types, formatter
 inputs, intermediate DTOs, and internal error classes remain module-private
 unless another source module has a concrete consumer.
 
+## Composing Shared Behavior
+
+Prefer small functions composed by each feature (mixin-style reuse) over a
+shared base class or a configurable framework. Share behavior only when its
+meaning and reasons to change are shared; similar code in independently owned
+contexts may remain separate. Keep feature-specific types, decisions, and
+evidence with their owner.
+
+For example, `src/ci-policy-mode.ts` owns comparison and outcome operations for
+the `off` / `warn` / `fail` modes. Each CI evaluator chooses the operations it
+needs and owns its matches, ordering, summaries, and output shape. Metadata,
+quality, and diagnostic-severity evaluators also report mode weakening;
+security, scan-boundary, and executable-surface evaluators retain their own
+matching rules. Skill Discovery keeps its separate warn-only evaluator,
+including its disabled-mode behavior.
+
 ## Repository-Required Metadata Policy
 
 `src/metadata-definitions.ts` is the single vocabulary authority. A catalog

@@ -1,3 +1,4 @@
+import { ciPolicyOutcome, stricterCiMode } from "./ci-policy-mode.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { SecurityDiffSummary } from "./security-diff.js";
 import type {
@@ -90,12 +91,6 @@ export interface SecurityPolicyCiEvaluation {
   matches: SecurityPolicyCiMatch[];
 }
 
-const MODE_RANK: Record<SecurityCiPolicyMode, number> = {
-  off: 0,
-  warn: 1,
-  fail: 2,
-};
-
 const MATCH_ID_BY_PROPERTY: Record<
   SecurityPolicyTransition["property"],
   SecurityPolicyCiMatchId
@@ -144,9 +139,7 @@ const ALLOWED_VALUE_PROPERTIES = new Set<SecurityPolicyTransition["property"]>([
 export function effectiveSecurityPolicyCiPolicy(
   configured: SecurityPolicyCiConfiguration,
 ): SecurityCiPolicyMode {
-  return MODE_RANK[configured.from] >= MODE_RANK[configured.to]
-    ? configured.from
-    : configured.to;
+  return stricterCiMode(configured.from, configured.to);
 }
 
 /** Classify whether a canonical scalar or list transition weakens policy. */
@@ -224,21 +217,10 @@ export function evaluateSecurityPolicyCiPolicy(
     }))
     .sort(compareMatches);
 
-  if (effective === "off") {
-    return {
-      schemaVersion: SECURITY_POLICY_CI_POLICY_SCHEMA_VERSION,
-      configured: configuredResult,
-      outcome: "pass",
-      matchCount: matches.length,
-      matches,
-    };
-  }
-
   return {
     schemaVersion: SECURITY_POLICY_CI_POLICY_SCHEMA_VERSION,
     configured: configuredResult,
-    outcome:
-      matches.length === 0 ? "pass" : effective === "fail" ? "fail" : "warn",
+    outcome: ciPolicyOutcome(effective, matches.length),
     matchCount: matches.length,
     matches,
   };

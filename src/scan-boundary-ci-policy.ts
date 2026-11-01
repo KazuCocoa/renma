@@ -1,3 +1,4 @@
+import { ciPolicyOutcome, stricterCiMode } from "./ci-policy-mode.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type { EffectiveCiScanBoundaryEvidence } from "./scan-boundary.js";
 import type {
@@ -44,26 +45,12 @@ export interface ScanBoundaryCiEvaluation {
   effectiveBoundary?: EffectiveCiScanBoundaryEvidence;
 }
 
-const MODE_RANK: Record<ScanBoundaryCiPolicyMode, number> = {
-  off: 0,
-  warn: 1,
-  fail: 2,
-};
-
-function effectiveScanBoundaryCiPolicy(
-  configured: ScanBoundaryCiConfiguration,
-): ScanBoundaryCiPolicyMode {
-  return MODE_RANK[configured.from] >= MODE_RANK[configured.to]
-    ? configured.from
-    : configured.to;
-}
-
 export function evaluateScanBoundaryCiPolicy(
   diff: Pick<ScanBoundaryDiff, "changes">,
   configured: ScanBoundaryCiConfiguration,
   effectiveBoundary?: EffectiveCiScanBoundaryEvidence,
 ): ScanBoundaryCiEvaluation {
-  const effective = effectiveScanBoundaryCiPolicy(configured);
+  const effective = stricterCiMode(configured.from, configured.to);
   const matches = diff.changes
     .filter((change) => change.direction === "weakening")
     .map((change) => toMatch(change))
@@ -73,12 +60,7 @@ export function evaluateScanBoundaryCiPolicy(
   return {
     schemaVersion: SCAN_BOUNDARY_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },
-    outcome:
-      effective === "off" || matches.length === 0
-        ? "pass"
-        : effective === "fail"
-          ? "fail"
-          : "warn",
+    outcome: ciPolicyOutcome(effective, matches.length),
     matchCount: matches.length,
     matches,
     ...(effectiveBoundary ? { effectiveBoundary } : {}),

@@ -138,34 +138,11 @@ fields. See
 [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
 for the exact current and compatibility forms.
 
-Run `renma guide skill` before generating a new Skill. It prints a deterministic
-creation-gate contract with adaptive clarification guidance for the consuming LLM. Renma remains
-non-interactive: the LLM investigates and proposes, Renma validates supplied
-structure and the resulting repository evidence it can determine, and a human
-reviews meaningful decisions. Renma does not certify caller-declared human or
-domain truth.
-
-After every creation-gate requirement is established, including the smallest
-justified asset structure, no Blocking authoring decision remains, and the gate
-is declared passed, the external LLM can write
-`renma.skill-authoring-handoff.v1` and invoke:
-
-```bash
-renma scaffold skill skills/example/SKILL.md --handoff /tmp/example-handoff.json
-```
-
-The handoff remains an external exchange artifact. Renma validates its shape,
-target agreement, canonical identity, declared relationships, and zero blocker
-state before any write; Proposed reversible defaults and Unresolved Deferred
-items may remain. Existing scaffold use with `--owner` remains supported.
-
-After the gate, platform-native Skill authoring guidance may refine semantics
-inside the agreed Renma asset graph. It is not the authority for Renma metadata,
-Context placement, source-of-truth boundaries, or whether support files should
-exist.
-
-The [Authoring Guide](docs/authoring-guide.md) owns the complete new-Skill and
-existing-Skill workflows.
+For new Skills, use the [authoring flow below](#create-a-skill-interactively).
+The [Authoring Guide](docs/authoring-guide.md) defines the creation gate,
+structured handoff, and existing-Skill maintenance workflow. Platform-native
+Skill guidance may refine semantics within the agreed asset graph; Renma owns
+its metadata, Context placement, and source-of-truth boundaries.
 
 ## Install And Quick Start
 
@@ -258,37 +235,24 @@ node dist/index.js scan . --fail-on high
 
 ### Library imports
 
-Renma v1 intentionally exposes only the stable type surface and pure discovery
-helpers to TypeScript or JavaScript consumers. For example:
+The package exposes stable types, pure discovery helpers, and a read-only
+asset-binding API for external builders:
 
 ```ts
 import type { ScanJsonDocument } from "renma/types";
-import {
-  classifyAssetPath,
-  normalizeRepositorySkillRelativePath,
-  type CanonicalSkillEntrypointPath,
-} from "renma/discovery";
+import { classifyAssetPath } from "renma/discovery";
 ```
 
-`ScanJsonDocument` is the public wire document emitted by `formatJson()` and
-`scan --format json`; it has the literal `schemaVersion: "renma.scan.v2"` and
-`format: "json"`. Public discovery recognizes only exact
-canonical `SKILL.md` entrypoints. Historical lowercase and flat entrypoints
-remain available only to explicit CLI migration tooling.
+`ScanJsonDocument` describes `scan --format json` with
+`schemaVersion: "renma.scan.v2"`. Focused type entrypoints are
+`renma/types/classification`, `renma/types/diagnostics`, and
+`renma/types/scan-result`. See [JSON compatibility](docs/machine-readable-json.md)
+for wire contracts and [Asset Bindings](docs/asset-bindings.md) for
+`renma/asset-bindings`.
 
-The allowlist is `renma/types`, the focused `renma/types/classification`,
-`renma/types/diagnostics`, and `renma/types/scan-result` contracts, plus
-`renma/discovery`. Raw artifacts, parsed documents, normalized runtime config,
-internal decision/governance projections, and the producerless core scan model
-remain implementation details. Commands, renderers, guidance builders, and
-migration helpers are also private. Every other semantic or `renma/dist/...`
-specifier is rejected with `ERR_PACKAGE_PATH_NOT_EXPORTED`. The package root
-remains a CLI entrypoint rather than a library import.
-
-`SecurityAnalysisCoverage` and its schema constant are available from
-`renma/types` as part of the composed scan contract. There is intentionally no
-separate `renma/types/security-analysis-coverage` package subpath; the focused
-subpaths are reserved for independently useful cohesive contracts.
+The package root is the CLI entrypoint. Commands, renderers, runtime models,
+and `renma/dist/...` imports remain private; unsupported package subpaths are
+rejected with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
 
 ## Command Overview
 
@@ -345,88 +309,23 @@ policy is temporarily relaxed without introducing executable configuration.
 is rejected with guidance to rename it; Renma does not support or execute
 `.mjs` configuration.
 
-Repositories can promote supported optional catalog metadata to an explicit
-repository requirement without changing portable Agent Skills validity or
-Renma's defaults:
+Repository policy is optional and explicit. The
+[User Manual configuration reference](docs/user-manual.md#configuration) owns
+supported keys, defaults, validation, and complete examples:
 
-```jsonc
-{
-  "metadata": {
-    "ci_policy": "fail",
-    "required": ["owner"]
-  }
-}
-```
+| Policy | Purpose |
+| --- | --- |
+| `metadata.required` | Require explicit metadata declarations; inherited ownership does not satisfy a required declaration. |
+| `diagnostics.severity` | Override supported Finding severities used by `fail_on`; suppressions remain separately reviewed exceptions. |
+| `quality` | Configure token-budget warning and High thresholds by asset kind. See the [Quality Profile](docs/quality-profile.md) for measurements and rationale. |
+| `security`, `scan_boundary`, `executable_surface`, `skill_discovery` | Govern security, inspection coverage, executable changes, and declared Discovery routes. |
 
-Skills satisfy this policy only with valid canonical `metadata.renma.*`
-declarations; non-Skills use the registered top-level key. An inherited
-effective owner still supports ownership calculations, but does not satisfy a
-policy requiring an explicit `owner` declaration. Removing a requirement or
-weakening `metadata.ci_policy` is governed by the stricter archived endpoint
-mode in `ci-report`. See the User Manual for the exact supported vocabulary.
-
-Repositories can also select the effective severity of a scan finding by its
-stable configurable Finding ID:
-
-```jsonc
-{
-  "fail_on": "critical",
-  "diagnostics": {
-    "ci_policy": "fail",
-    "severity": {
-      "META-REQUIRED-SUSPENDED-DEPENDENCY": "critical"
-    }
-  }
-}
-```
-
-Required dependency on a suspended asset is already built-in High severity and
-therefore blocks with the default `fail_on: "high"`. The example strengthens
-that repository-effective severity to Critical without changing the producer.
-`fail_on` consumes the effective severity, while path-scoped suppressions remain
-explicit reviewed exceptions. Changes that lower effective severity, or weaken
-`diagnostics.ci_policy`, are governed by the stricter archived endpoint in
-`ci-report`. Renma does not automatically suspend or rewrite the dependent
-asset. Raw discovery/configuration diagnostic IDs are not configurable through
-this Finding policy and are rejected instead of being silently ignored.
-
-Revoked assets use the separate
-`META-REQUIRED-REVOKED-DEPENDENCY` (built-in High) and
-`META-OPTIONAL-REVOKED-DEPENDENCY` (built-in Low) Finding IDs. Revocation means
-trust or authorization was explicitly withdrawn because of a known problem;
-Renma keeps that current lifecycle evidence and does not propagate the status
-or automatically rewrite dependents.
-
-Repositories may set effective warning and High token-budget thresholds for
-Skills and each governed Markdown content kind:
-
-```jsonc
-{
-  "quality": {
-    "ci_policy": "fail",
-    "skill_token_warning": 6400,
-    "skill_token_high": 8000,
-    "context_token_warning": 6400,
-    "context_token_high": 8000,
-    "reference_token_warning": 7200,
-    "reference_token_high": 9000,
-    "profile_token_warning": 3200,
-    "profile_token_high": 4000,
-    "example_token_warning": 4800,
-    "example_token_high": 6000
-  }
-}
-```
-
-These are Renma repository-governance thresholds, not portable Agent Skills
-requirements. The portable Agent Skills recommendation remains 5,000 Skill
-body tokens; Renma's default warning begins at 6,400. Increasing any threshold
-or weakening `quality.ci_policy` (`fail` to `warn`/`off`, or `warn` to `off`)
-is an explicit governance relaxation. The stricter mode from both compared
-revisions determines whether that relaxation fails or warns; mode tightening
-is visible and non-blocking. See the User Manual's
-[authoritative configuration contract](docs/user-manual.md#configuration) for
-defaults, validation, and independent fallback behavior.
+`ci-report` applies each policy's review rules. Metadata, diagnostic-severity,
+and quality policies use the stricter archived endpoint mode to govern
+weakening, including disabling their CI gate. See the
+[CI report reference](docs/user-manual.md#ci-report) for each policy's scope.
+Lifecycle states and their effects are covered in
+[Context Lifecycle Diagnostics](docs/context-lifecycle-diagnostics.md).
 
 `contexts/**` is the only independently governed Context Asset root;
 `context/**` receives migration guidance and is not interpreted. Canonical
@@ -441,39 +340,14 @@ Top-level `tools/**` is repository implementation, not Context. Top-level
 `references/**` is not a Context root, and `skills/**/tools/**` is not canonical
 Skill-local support.
 
-Declared composition, declared impact, Skill Discovery, the Repository Context
-BOM, and the Trust Graph are static repository relationships and evidence.
-They do not describe runtime selection, retrieval, loading, actual consumption,
-prompt assembly, injection, execution, telemetry, or a trust score.
-
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [User Manual](docs/user-manual.md)
-- [Authoring Guide](docs/authoring-guide.md)
-- [Diagnostics Reference](docs/diagnostics.md)
-- [Security Policy Guide](docs/security-policy.md)
-- [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
-- [Declared Composition](docs/declared-composition.md)
-- [Version-pinned Asset References and Builder API](docs/asset-bindings.md)
-- [Declared Impact](docs/declared-impact.md)
-- [Skill Discovery](docs/skill-discovery.md)
-- [Repository Context BOM v3](docs/repository-context-bom.md)
-- [Experimental Execution Contract](docs/execution-contract.md)
-- [Trust Graph v2](docs/trust-graph.md)
-- [Machine-Readable JSON Compatibility](docs/machine-readable-json.md)
-- [Skill Authoring Handoff v1 Schema](docs/schemas/skill-authoring-handoff-v1.schema.json)
-- [Changelog](CHANGELOG.md)
-- [Examples](https://github.com/KazuCocoa/renma/tree/main/examples)
+- [Documentation index](docs/README.md): all guides, contracts, schemas, and development documents.
+- [User Manual](docs/user-manual.md): configuration, metadata, and CLI reference.
+- [Authoring Guide](docs/authoring-guide.md): create and maintain Skills and Context Assets.
+- [Diagnostics Reference](docs/diagnostics.md) and [Security Policy Guide](docs/security-policy.md): interpret findings and policy evidence.
+- [Changelog](CHANGELOG.md) and [Examples](https://github.com/KazuCocoa/renma/tree/main/examples).
 
 Development architecture, design, and roadmap documents are
-source-repository-only and intentionally excluded from the npm package:
-
-- [Public Architecture](docs/development/architecture.md)
-- [Internal Architecture](docs/development/internal-architecture.md)
-- [Product Design](docs/development/design.md)
-- [Current Roadmap](docs/development/plan.md)
-
-```text
-LLM investigates and proposes. Renma validates deterministic structure and repository evidence. Human reviews and approves.
-```
+[source-repository-only](docs/README.md#development) and excluded from the npm
+package.
