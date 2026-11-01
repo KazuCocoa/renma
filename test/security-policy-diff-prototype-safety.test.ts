@@ -1,3 +1,4 @@
+import { captureProcessOutput } from "./process-output.js";
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -314,27 +315,4 @@ function artifact(artifactPath: string, content: string): Artifact {
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFile("git", ["-C", cwd, ...args]);
   return stdout.trim();
-}
-
-async function captureProcessOutput(
-  callback: () => Promise<number>,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const stdoutWrite = process.stdout.write;
-  const stderrWrite = process.stderr.write;
-  let stdout = "";
-  let stderr = "";
-  process.stdout.write = ((chunk: string | Uint8Array) => {
-    stdout += chunk.toString();
-    return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr += chunk.toString();
-    return true;
-  }) as typeof process.stderr.write;
-  try {
-    return { code: await callback(), stdout, stderr };
-  } finally {
-    process.stdout.write = stdoutWrite;
-    process.stderr.write = stderrWrite;
-  }
 }

@@ -100,18 +100,14 @@ export function buildSecurityDiffSummary(
   };
 }
 
-function deltaNumber(to: number, from: number): number {
-  return to - from;
-}
-
 function deltaPolicyBoolean(
   to: PolicyBooleanCounts,
   from: PolicyBooleanCounts,
 ): PolicyBooleanDelta {
   return {
-    true: deltaNumber(to.true, from.true),
-    false: deltaNumber(to.false, from.false),
-    unspecified: deltaNumber(to.unspecified, from.unspecified),
+    true: to.true - from.true,
+    false: to.false - from.false,
+    unspecified: to.unspecified - from.unspecified,
   };
 }
 
@@ -120,11 +116,11 @@ function deltaProfileCounts(
   from: SecurityPolicyInventorySummary["securityProfiles"],
 ): SecurityPolicyInventoryDelta["securityProfiles"] {
   return {
-    referenced: deltaNumber(to.referenced, from.referenced),
-    resolved: deltaNumber(to.resolved, from.resolved),
-    missing: deltaNumber(to.missing, from.missing),
-    cyclic: deltaNumber(to.cyclic, from.cyclic),
-    none: deltaNumber(to.none, from.none),
+    referenced: to.referenced - from.referenced,
+    resolved: to.resolved - from.resolved,
+    missing: to.missing - from.missing,
+    cyclic: to.cyclic - from.cyclic,
+    none: to.none - from.none,
   };
 }
 
@@ -165,40 +161,24 @@ function deltaSecurityPolicyInventory(
   from: SecurityPolicyInventorySummary,
 ): SecurityPolicyInventoryDelta {
   return {
-    totalPolicyAssets: deltaNumber(
-      to.totalPolicyAssets,
-      from.totalPolicyAssets,
-    ),
-    assetsWithLocalPolicyMetadata: deltaNumber(
-      to.assetsWithLocalPolicyMetadata,
-      from.assetsWithLocalPolicyMetadata,
-    ),
-    assetsWithInheritedPolicy: deltaNumber(
-      to.assetsWithInheritedPolicy,
-      from.assetsWithInheritedPolicy,
-    ),
-    assetsWithEffectivePolicy: deltaNumber(
-      to.assetsWithEffectivePolicy,
-      from.assetsWithEffectivePolicy,
-    ),
-    assetsWithoutEffectivePolicy: deltaNumber(
-      to.assetsWithoutEffectivePolicy,
-      from.assetsWithoutEffectivePolicy,
-    ),
+    totalPolicyAssets: to.totalPolicyAssets - from.totalPolicyAssets,
+    assetsWithLocalPolicyMetadata:
+      to.assetsWithLocalPolicyMetadata - from.assetsWithLocalPolicyMetadata,
+    assetsWithInheritedPolicy:
+      to.assetsWithInheritedPolicy - from.assetsWithInheritedPolicy,
+    assetsWithEffectivePolicy:
+      to.assetsWithEffectivePolicy - from.assetsWithEffectivePolicy,
+    assetsWithoutEffectivePolicy:
+      to.assetsWithoutEffectivePolicy - from.assetsWithoutEffectivePolicy,
     policySources: {
-      local: deltaNumber(to.policySources.local, from.policySources.local),
-      security_profile: deltaNumber(
-        to.policySources.security_profile,
-        from.policySources.security_profile,
-      ),
-      repository_config: deltaNumber(
-        to.policySources.repository_config,
+      local: to.policySources.local - from.policySources.local,
+      security_profile:
+        to.policySources.security_profile - from.policySources.security_profile,
+      repository_config:
+        to.policySources.repository_config -
         from.policySources.repository_config,
-      ),
-      owning_skill: deltaNumber(
-        to.policySources.owning_skill,
-        from.policySources.owning_skill,
-      ),
+      owning_skill:
+        to.policySources.owning_skill - from.policySources.owning_skill,
     },
     networkAllowed: deltaPolicyBoolean(to.networkAllowed, from.networkAllowed),
     externalUploadAllowed: deltaPolicyBoolean(
@@ -214,22 +194,13 @@ function deltaSecurityPolicyInventory(
       to.humanApprovalRequired,
       from.humanApprovalRequired,
     ),
-    approvedNetworkDestinationCount: deltaNumber(
-      to.approvedNetworkDestinationCount,
-      from.approvedNetworkDestinationCount,
-    ),
-    approvedUploadDestinationCount: deltaNumber(
-      to.approvedUploadDestinationCount,
-      from.approvedUploadDestinationCount,
-    ),
-    forbiddenInputCount: deltaNumber(
-      to.forbiddenInputCount,
-      from.forbiddenInputCount,
-    ),
-    disallowedCommandCount: deltaNumber(
-      to.disallowedCommandCount,
-      from.disallowedCommandCount,
-    ),
+    approvedNetworkDestinationCount:
+      to.approvedNetworkDestinationCount - from.approvedNetworkDestinationCount,
+    approvedUploadDestinationCount:
+      to.approvedUploadDestinationCount - from.approvedUploadDestinationCount,
+    forbiddenInputCount: to.forbiddenInputCount - from.forbiddenInputCount,
+    disallowedCommandCount:
+      to.disallowedCommandCount - from.disallowedCommandCount,
     securityProfiles: deltaProfileCounts(
       to.securityProfiles,
       from.securityProfiles,
@@ -260,19 +231,13 @@ function deltaExternalUploadGovernance(
   from: ExternalUploadGovernanceCounts,
 ): ExternalUploadGovernanceDelta {
   return {
-    denied: deltaNumber(to.denied, from.denied),
-    allowedApprovalRequired: deltaNumber(
-      to.allowedApprovalRequired,
-      from.allowedApprovalRequired,
-    ),
-    allowedNoApprovalRequired: deltaNumber(
-      to.allowedNoApprovalRequired,
-      from.allowedNoApprovalRequired,
-    ),
-    allowedApprovalUnspecified: deltaNumber(
-      to.allowedApprovalUnspecified,
-      from.allowedApprovalUnspecified,
-    ),
-    unspecified: deltaNumber(to.unspecified, from.unspecified),
+    denied: to.denied - from.denied,
+    allowedApprovalRequired:
+      to.allowedApprovalRequired - from.allowedApprovalRequired,
+    allowedNoApprovalRequired:
+      to.allowedNoApprovalRequired - from.allowedNoApprovalRequired,
+    allowedApprovalUnspecified:
+      to.allowedApprovalUnspecified - from.allowedApprovalUnspecified,
+    unspecified: to.unspecified - from.unspecified,
   };
 }

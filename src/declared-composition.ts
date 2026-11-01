@@ -1,3 +1,4 @@
+import { stronglyConnectedComponents } from "./graph-components.js";
 import type { AssetBindingDiagnostic } from "./types/asset-bindings.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import {
@@ -1317,10 +1318,7 @@ function compositionCycles(
   const edges = provenanceEdges.filter(
     (edge) => edge.membership === membership,
   );
-  const internalEdges = edges.map((edge) => ({
-    ...edge,
-    ...identities.get(edge)!,
-  }));
+  const internalEdges = edges.map((edge) => identities.get(edge)!);
   const components = stronglyConnectedComponents(internalEdges);
   return components
     .filter((assetIds) => {
@@ -1350,64 +1348,6 @@ function compositionCycles(
         right.assetIds.join("\0"),
       ),
     );
-}
-
-function stronglyConnectedComponents(
-  edges: CompositionProvenanceEdge[],
-): string[][] {
-  const adjacency = new Map<string, Set<string>>();
-  for (const edge of edges) {
-    if (!adjacency.has(edge.from)) adjacency.set(edge.from, new Set());
-    if (!adjacency.has(edge.to)) adjacency.set(edge.to, new Set());
-    adjacency.get(edge.from)?.add(edge.to);
-  }
-  const indexById = new Map<string, number>();
-  const lowLinkById = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const components: string[][] = [];
-  let nextIndex = 0;
-
-  const visit = (id: string): void => {
-    indexById.set(id, nextIndex);
-    lowLinkById.set(id, nextIndex);
-    nextIndex += 1;
-    stack.push(id);
-    onStack.add(id);
-
-    for (const target of [...(adjacency.get(id) ?? [])].sort(
-      compareUtf16CodeUnits,
-    )) {
-      if (!indexById.has(target)) {
-        visit(target);
-        lowLinkById.set(
-          id,
-          Math.min(lowLinkById.get(id) ?? 0, lowLinkById.get(target) ?? 0),
-        );
-      } else if (onStack.has(target)) {
-        lowLinkById.set(
-          id,
-          Math.min(lowLinkById.get(id) ?? 0, indexById.get(target) ?? 0),
-        );
-      }
-    }
-
-    if (lowLinkById.get(id) !== indexById.get(id)) return;
-    const component: string[] = [];
-    while (stack.length > 0) {
-      const member = stack.pop();
-      if (!member) break;
-      onStack.delete(member);
-      component.push(member);
-      if (member === id) break;
-    }
-    components.push(component.sort(compareUtf16CodeUnits));
-  };
-
-  for (const id of [...adjacency.keys()].sort(compareUtf16CodeUnits)) {
-    if (!indexById.has(id)) visit(id);
-  }
-  return components;
 }
 
 function compositionConflicts(

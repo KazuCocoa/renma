@@ -1,3 +1,4 @@
+import { captureProcessOutput as withCapturedConsole } from "./process-output.js";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rename, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -1719,30 +1720,4 @@ function expectedBomContract(): BomReport {
     executableSurfaceInventory: zeroExecutableSurfaceInventory(),
     diagnostics: [],
   };
-}
-
-async function withCapturedConsole(
-  callback: () => Promise<number>,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const stdoutWrite = process.stdout.write;
-  const stderrWrite = process.stderr.write;
-  let stdout = "";
-  let stderr = "";
-
-  process.stdout.write = ((chunk: string | Uint8Array) => {
-    stdout += chunk.toString();
-    return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr += chunk.toString();
-    return true;
-  }) as typeof process.stderr.write;
-
-  try {
-    const code = await callback();
-    return { code, stdout, stderr };
-  } finally {
-    process.stdout.write = stdoutWrite;
-    process.stderr.write = stderrWrite;
-  }
 }

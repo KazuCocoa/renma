@@ -496,13 +496,22 @@ async function runScan(values: CliValues, target: string): Promise<number> {
   });
 }
 
-async function runCatalog(values: CliValues, target: string): Promise<number> {
+/** Select the shared report formats; callers retain their own validation order. */
+function jsonMarkdownFormat(
+  values: CliValues,
+  command: Pick<CommandSpec, "name" | "defaultFormat">,
+): "json" | "markdown" | number {
   const format = values.json
     ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.catalog);
-  if (format !== "json" && format !== "markdown") {
-    return usageError("catalog", "--format must be either json or markdown.");
-  }
+    : (stringValue(values.format) ?? command.defaultFormat);
+  return format === "json" || format === "markdown"
+    ? format
+    : usageError(command.name, "--format must be either json or markdown.");
+}
+
+async function runCatalog(values: CliValues, target: string): Promise<number> {
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY.catalog);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
 
@@ -513,12 +522,8 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
 }
 
 async function runBom(values: CliValues, target: string): Promise<number> {
-  const format = values.json
-    ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.bom);
-  if (format !== "json" && format !== "markdown") {
-    return usageError("bom", "--format must be either json or markdown.");
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY.bom);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
 
@@ -533,12 +538,8 @@ async function runDiff(values: CliValues, target: string): Promise<number> {
   const refs = comparisonRefs(values, "diff");
   if ("error" in refs) return usageError("diff", refs.error);
 
-  const format = values.json
-    ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.diff);
-  if (format !== "json" && format !== "markdown") {
-    return usageError("diff", "--format must be either json or markdown.");
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY.diff);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
 
@@ -553,12 +554,8 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
   const refs = comparisonRefs(values, "ci-report");
   if ("error" in refs) return usageError("ci-report", refs.error);
 
-  const format = values.json
-    ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS["ci-report"]);
-  if (format !== "json" && format !== "markdown") {
-    return usageError("ci-report", "--format must be either json or markdown.");
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY["ci-report"]);
+  if (typeof format === "number") return format;
 
   const failOnStatusValue = stringValue(values["fail-on-status"]);
   if (
@@ -661,15 +658,8 @@ async function runSkillIndex(
       "--json conflicts with a non-JSON --format value.",
     );
   }
-  const format = values.json
-    ? "json"
-    : (explicitFormat ?? COMMAND_DEFAULT_FORMATS["skill-index"]);
-  if (format !== "json" && format !== "markdown") {
-    return usageError(
-      "skill-index",
-      "--format must be either json or markdown.",
-    );
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY["skill-index"]);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
   const focus = stringValue(values.focus);
@@ -685,15 +675,8 @@ async function runTrustGraph(
   values: CliValues,
   target: string,
 ): Promise<number> {
-  const format = values.json
-    ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS["trust-graph"]);
-  if (format !== "json" && format !== "markdown") {
-    return usageError(
-      "trust-graph",
-      "--format must be either json or markdown.",
-    );
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY["trust-graph"]);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
 
@@ -726,12 +709,8 @@ async function runOwnership(
   values: CliValues,
   target: string,
 ): Promise<number> {
-  const format = values.json
-    ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.ownership);
-  if (format !== "json" && format !== "markdown") {
-    return usageError("ownership", "--format must be either json or markdown.");
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY.ownership);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
 
@@ -748,12 +727,8 @@ async function runReadiness(
   values: CliValues,
   target: string,
 ): Promise<number> {
-  const format = values.json
-    ? "json"
-    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.readiness);
-  if (format !== "json" && format !== "markdown") {
-    return usageError("readiness", "--format must be either json or markdown.");
-  }
+  const format = jsonMarkdownFormat(values, COMMAND_REGISTRY.readiness);
+  if (typeof format === "number") return format;
 
   const overrides = configOverrides(values);
 

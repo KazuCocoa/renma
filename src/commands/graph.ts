@@ -37,11 +37,13 @@ import {
   resolveDeclaredCompositionFromIndex,
   resolveCompositionDeclaration,
   type DeclaredCompositionReport,
+  type CompositionProvenanceEdge,
 } from "../declared-composition.js";
 import {
   prepareDeclaredImpactIndex,
   resolveDeclaredImpactFromIndex,
   type DeclaredImpactReport,
+  type ImpactProvenanceEdge,
 } from "../declared-impact.js";
 import {
   normalizeDependencyReference,
@@ -384,30 +386,9 @@ function compositionGraphReport(
     ...composition.optionalAssets.map((asset) => asset.sourcePath),
   ]);
   const nodes = report.nodes.filter((node) => nodeIds.has(node.sourcePath));
-  const edges = composition.provenanceEdges.map((edge): GraphEdge => {
-    const target = focusedProvenanceTarget(edge, nodes);
-    return {
-      ...(edge.bindings ? { bindings: edge.bindings } : {}),
-      ...(edge.bindingDiagnostics
-        ? { bindingDiagnostics: edge.bindingDiagnostics }
-        : {}),
-      from: edge.from,
-      to: edge.declaredTarget,
-      kind: edge.kind,
-      declaration: edge.relationship,
-      ...(edge.declarationIndex !== undefined
-        ? { declarationIndex: edge.declarationIndex }
-        : {}),
-      sourcePath: edge.sourcePath,
-      ...(edge.evidence ? { evidence: edge.evidence } : {}),
-      membership: edge.membership,
-      resolved: true,
-      targetId: edge.to,
-      ...(target
-        ? { targetKind: target.kind, targetPath: target.sourcePath }
-        : {}),
-    };
-  });
+  const edges = composition.provenanceEdges.map((edge) =>
+    provenanceGraphEdge(edge, nodes, { membership: edge.membership }),
+  );
   return {
     ...report,
     view: "composition",
@@ -429,30 +410,11 @@ function impactGraphReport(
     ...impact.optionalDependents.map((asset) => asset.sourcePath),
   ]);
   const nodes = report.nodes.filter((node) => nodeIds.has(node.sourcePath));
-  const edges = impact.provenanceEdges.map((edge): GraphEdge => {
-    const target = focusedProvenanceTarget(edge, nodes);
-    return {
-      ...(edge.bindings ? { bindings: edge.bindings } : {}),
-      ...(edge.bindingDiagnostics
-        ? { bindingDiagnostics: edge.bindingDiagnostics }
-        : {}),
-      from: edge.from,
-      to: edge.declaredTarget,
-      kind: edge.kind,
-      declaration: edge.relationship,
-      ...(edge.declarationIndex !== undefined
-        ? { declarationIndex: edge.declarationIndex }
-        : {}),
-      sourcePath: edge.sourcePath,
-      ...(edge.evidence ? { evidence: edge.evidence } : {}),
+  const edges = impact.provenanceEdges.map((edge) =>
+    provenanceGraphEdge(edge, nodes, {
       dependentMembership: edge.dependentMembership,
-      resolved: true,
-      targetId: edge.to,
-      ...(target
-        ? { targetKind: target.kind, targetPath: target.sourcePath }
-        : {}),
-    };
-  });
+    }),
+  );
   return {
     ...report,
     view: "impact",
@@ -461,6 +423,35 @@ function impactGraphReport(
     nodes,
     edges,
     impact,
+  };
+}
+
+function provenanceGraphEdge(
+  edge: CompositionProvenanceEdge | ImpactProvenanceEdge,
+  nodes: GraphNode[],
+  membership: Pick<GraphEdge, "membership" | "dependentMembership">,
+): GraphEdge {
+  const target = focusedProvenanceTarget(edge, nodes);
+  return {
+    ...(edge.bindings ? { bindings: edge.bindings } : {}),
+    ...(edge.bindingDiagnostics
+      ? { bindingDiagnostics: edge.bindingDiagnostics }
+      : {}),
+    from: edge.from,
+    to: edge.declaredTarget,
+    kind: edge.kind,
+    declaration: edge.relationship,
+    ...(edge.declarationIndex !== undefined
+      ? { declarationIndex: edge.declarationIndex }
+      : {}),
+    sourcePath: edge.sourcePath,
+    ...(edge.evidence ? { evidence: edge.evidence } : {}),
+    ...membership,
+    resolved: true,
+    targetId: edge.to,
+    ...(target
+      ? { targetKind: target.kind, targetPath: target.sourcePath }
+      : {}),
   };
 }
 

@@ -512,21 +512,9 @@ void (undefined as unknown as PrivateFocusedScanResult);
 export {};
 `,
   );
-  const typescriptBin = path.resolve("node_modules/typescript/bin/tsc");
-  const verified = spawnSync(
-    process.execPath,
-    [
-      typescriptBin,
-      "--noEmit",
-      "--module",
-      "NodeNext",
-      "--moduleResolution",
-      "NodeNext",
-      "--target",
-      "ES2022",
-      verificationSource,
-    ],
-    { cwd: consumerDirectory, encoding: "utf8" },
+  const verified = compilePackageDeclarations(
+    consumerDirectory,
+    verificationSource,
   );
   if (verified.error) {
     throw new Error(
@@ -539,26 +527,68 @@ export {};
     );
   }
 
-  await verifyPrivatePackageSpecifierDeclarations(consumerDirectory);
-  await verifyCliOnlyPackageSpecifierDeclarations(consumerDirectory);
+  await verifyUnavailablePackageSpecifierDeclarations(consumerDirectory, {
+    name: "private",
+    label: "Private",
+    importPrefix: "PrivatePackageImport",
+    specifiers: PRIVATE_DECLARATION_SPECIFIERS,
+  });
+  await verifyUnavailablePackageSpecifierDeclarations(consumerDirectory, {
+    name: "cli-only",
+    label: "CLI-only",
+    importPrefix: "CliOnlyPackageImport",
+    specifiers: CLI_ONLY_DECLARATION_SPECIFIERS,
+  });
 }
 
-async function verifyPrivatePackageSpecifierDeclarations(consumerDirectory) {
+async function verifyUnavailablePackageSpecifierDeclarations(
+  consumerDirectory,
+  { name, label, importPrefix, specifiers },
+) {
   const verificationSource = path.join(
     consumerDirectory,
-    "verify-private-package-declarations.ts",
+    `verify-${name}-package-declarations.ts`,
   );
   await writeFile(
     verificationSource,
-    `${PRIVATE_DECLARATION_SPECIFIERS.map(
-      (specifier, index) =>
-        `type PrivatePackageImport${index} = typeof import(${JSON.stringify(specifier)});`,
-    ).join("\n")}
+    `${specifiers
+      .map(
+        (specifier, index) =>
+          `type ${importPrefix}${index} = typeof import(${JSON.stringify(specifier)});`,
+      )
+      .join("\n")}
 export {};
 `,
   );
+  const verified = compilePackageDeclarations(
+    consumerDirectory,
+    verificationSource,
+  );
+  if (verified.error) {
+    throw new Error(
+      `${label} package declaration verification failed: ${verified.error.message}`,
+    );
+  }
+  if (verified.status === 0) {
+    throw new Error(
+      `${label} package declaration verification unexpectedly succeeded.`,
+    );
+  }
+  const diagnostics = `${verified.stdout}\n${verified.stderr}`;
+  for (const specifier of specifiers) {
+    if (
+      !diagnostics.includes(`error TS2307: Cannot find module '${specifier}'`)
+    ) {
+      throw new Error(
+        `${label} package declaration did not fail with TS2307 for ${specifier}: ${diagnostics.trim()}`,
+      );
+    }
+  }
+}
+
+function compilePackageDeclarations(consumerDirectory, verificationSource) {
   const typescriptBin = path.resolve("node_modules/typescript/bin/tsc");
-  const verified = spawnSync(
+  return spawnSync(
     process.execPath,
     [
       typescriptBin,
@@ -573,78 +603,6 @@ export {};
     ],
     { cwd: consumerDirectory, encoding: "utf8" },
   );
-  if (verified.error) {
-    throw new Error(
-      `Private package declaration verification failed: ${verified.error.message}`,
-    );
-  }
-  if (verified.status === 0) {
-    throw new Error(
-      "Private package declaration verification unexpectedly succeeded.",
-    );
-  }
-  const diagnostics = `${verified.stdout}\n${verified.stderr}`;
-  for (const specifier of PRIVATE_DECLARATION_SPECIFIERS) {
-    if (
-      !diagnostics.includes(`error TS2307: Cannot find module '${specifier}'`)
-    ) {
-      throw new Error(
-        `Private package declaration did not fail with TS2307 for ${specifier}: ${diagnostics.trim()}`,
-      );
-    }
-  }
-}
-
-async function verifyCliOnlyPackageSpecifierDeclarations(consumerDirectory) {
-  const verificationSource = path.join(
-    consumerDirectory,
-    "verify-cli-only-package-declarations.ts",
-  );
-  await writeFile(
-    verificationSource,
-    `${CLI_ONLY_DECLARATION_SPECIFIERS.map(
-      (specifier, index) =>
-        `type CliOnlyPackageImport${index} = typeof import(${JSON.stringify(specifier)});`,
-    ).join("\n")}
-export {};
-`,
-  );
-  const typescriptBin = path.resolve("node_modules/typescript/bin/tsc");
-  const verified = spawnSync(
-    process.execPath,
-    [
-      typescriptBin,
-      "--noEmit",
-      "--module",
-      "NodeNext",
-      "--moduleResolution",
-      "NodeNext",
-      "--target",
-      "ES2022",
-      verificationSource,
-    ],
-    { cwd: consumerDirectory, encoding: "utf8" },
-  );
-  if (verified.error) {
-    throw new Error(
-      `CLI-only package declaration verification failed: ${verified.error.message}`,
-    );
-  }
-  if (verified.status === 0) {
-    throw new Error(
-      "CLI-only package declaration verification unexpectedly succeeded.",
-    );
-  }
-  const diagnostics = `${verified.stdout}\n${verified.stderr}`;
-  for (const specifier of CLI_ONLY_DECLARATION_SPECIFIERS) {
-    if (
-      !diagnostics.includes(`error TS2307: Cannot find module '${specifier}'`)
-    ) {
-      throw new Error(
-        `CLI-only package declaration did not fail with TS2307 for ${specifier}: ${diagnostics.trim()}`,
-      );
-    }
-  }
 }
 
 function verifyInstalledCommand(consumerDirectory, cacheDirectory) {

@@ -1,3 +1,4 @@
+import { stronglyConnectedComponents } from "./graph-components.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
 
@@ -751,94 +752,12 @@ export function resolveSkillDiscoveryRouteCycles(
   const eligibleRoutes = routes
     .filter(isAuthoritativeUsableSkillRoute)
     .sort(compareCycleRoutes);
-  const nodeIds = [
-    ...new Set(
-      eligibleRoutes.flatMap((route) => [
-        route.sourceId,
-        route.resolvedTarget!.id,
-      ]),
-    ),
-  ].sort((left, right) => compareUtf16CodeUnits(left, right));
-  const targetSetsBySource = new Map<string, Set<string>>(
-    nodeIds.map((id) => [id, new Set<string>()]),
+  const components = stronglyConnectedComponents(
+    eligibleRoutes.map((route) => ({
+      from: route.sourceId,
+      to: route.resolvedTarget!.id,
+    })),
   );
-  const sourceSetsByTarget = new Map<string, Set<string>>(
-    nodeIds.map((id) => [id, new Set<string>()]),
-  );
-  for (const route of eligibleRoutes) {
-    const targetId = route.resolvedTarget!.id;
-    targetSetsBySource.get(route.sourceId)!.add(targetId);
-    sourceSetsByTarget.get(targetId)!.add(route.sourceId);
-  }
-  const targetsBySource = new Map<string, string[]>(
-    nodeIds.map((id) => [
-      id,
-      [...targetSetsBySource.get(id)!].sort((left, right) =>
-        compareUtf16CodeUnits(left, right),
-      ),
-    ]),
-  );
-  const sourcesByTarget = new Map<string, string[]>(
-    nodeIds.map((id) => [
-      id,
-      [...sourceSetsByTarget.get(id)!].sort((left, right) =>
-        compareUtf16CodeUnits(left, right),
-      ),
-    ]),
-  );
-
-  const visited = new Set<string>();
-  const finishingOrder: string[] = [];
-  for (const nodeId of nodeIds) {
-    if (visited.has(nodeId)) continue;
-    visited.add(nodeId);
-    const traversal: Array<{ nodeId: string; nextTargetIndex: number }> = [
-      { nodeId, nextTargetIndex: 0 },
-    ];
-    while (traversal.length > 0) {
-      const frame = traversal[traversal.length - 1]!;
-      const targets = targetsBySource.get(frame.nodeId)!;
-      const targetId = targets[frame.nextTargetIndex];
-      if (targetId !== undefined) {
-        frame.nextTargetIndex += 1;
-        if (!visited.has(targetId)) {
-          visited.add(targetId);
-          traversal.push({ nodeId: targetId, nextTargetIndex: 0 });
-        }
-        continue;
-      }
-      finishingOrder.push(frame.nodeId);
-      traversal.pop();
-    }
-  }
-
-  const assigned = new Set<string>();
-  const components: string[][] = [];
-  for (let index = finishingOrder.length - 1; index >= 0; index -= 1) {
-    const nodeId = finishingOrder[index]!;
-    if (assigned.has(nodeId)) continue;
-    assigned.add(nodeId);
-    const component: string[] = [];
-    const traversal = [nodeId];
-    while (traversal.length > 0) {
-      const member = traversal.pop()!;
-      component.push(member);
-      const sources = sourcesByTarget.get(member)!;
-      for (
-        let sourceIndex = sources.length - 1;
-        sourceIndex >= 0;
-        sourceIndex -= 1
-      ) {
-        const sourceId = sources[sourceIndex]!;
-        if (assigned.has(sourceId)) continue;
-        assigned.add(sourceId);
-        traversal.push(sourceId);
-      }
-    }
-    components.push(
-      component.sort((left, right) => compareUtf16CodeUnits(left, right)),
-    );
-  }
 
   const componentBySkillId = new Map<string, number>();
   for (const [componentId, component] of components.entries()) {
