@@ -1211,12 +1211,23 @@ infer governance, change applicability, or create candidate data. JSON output
 serializes the command result directly; it is not reconstructed from rendered
 text.
 
-`src/renderers/ci-policy.ts` owns CI policy summaries, section visibility, and
-Markdown details. It consumes evaluated policies and their changes without
-importing command types or reevaluating policy. Each policy retains its own
-visibility and review wording. `src/renderers/ci-report-list.ts` supplies the
-CI report's shared detail limit and overflow text; other report formats retain
-their own presentation contracts.
+CI and diff presentation has explicit ownership under `src/renderers/`:
+
+| Module | Responsibility |
+| --- | --- |
+| `ci-policy.ts` | Evaluated CI policy summaries, visibility, and review wording |
+| `ci-discovery.ts` | Discovery topology and its observation-only or warn-only presentation |
+| `ci-executable-surface.ts` | Bounded CI executable details and legacy-compatible input shape |
+| `executable-diff.ts` | Complete executable diff details, without CI truncation |
+| `security-diff.ts` | Security changes and provenance shared by both commands |
+| `diff-policy.ts` | Diff-specific policy-change wording |
+| `inspection-coverage.ts` | Coverage-change descriptions shared by both commands |
+| `ci-report-list.ts`, `diff-format.ts` | Presentation limits and formatting within their respective report contexts |
+
+These renderers consume lower-layer evidence and types, never command types.
+Commands assemble the overall reports, evaluate policy, compose CI status, and
+serialize JSON. Similar-looking diff and CI sections remain independent where
+their review purpose, wording, completeness, or compatibility requirements differ.
 
 Command modules should stay orchestration-oriented:
 
