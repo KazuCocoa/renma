@@ -85,6 +85,13 @@ security, scan-boundary, and executable-surface evaluators retain their own
 matching rules. Skill Discovery keeps its separate warn-only evaluator,
 including its disabled-mode behavior.
 
+In `src/rules.ts`, each rule run prepares scaffold-marker evidence by document
+identity, and shape analysis prepares body statements once. Diagnostic
+producers still own their conditions, messages, repair constraints, and evidence
+selection. Token-budget, required-input, and completion-criteria producers stay
+separate so each can evolve independently; their call order preserves finding
+order when source locations tie.
+
 ## Repository-Required Metadata Policy
 
 `src/metadata-definitions.ts` is the single vocabulary authority. A catalog
