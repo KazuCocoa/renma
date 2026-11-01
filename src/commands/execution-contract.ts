@@ -26,11 +26,8 @@ import { formatJsonDocument } from "../report.js";
 import { normalizeSkillRouteTarget } from "../skill-discovery.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 import { executableGraphReport } from "./executable-graph.js";
-import {
-  graphFromRepositorySnapshot,
-  type GraphEdge,
-  type GraphReport,
-} from "./graph.js";
+import { graphFromRepositorySnapshot } from "./graph.js";
+import type { GraphEdge, GraphReport } from "../graph-report.js";
 
 export const EXPERIMENTAL_EXECUTION_CONTRACT_SCHEMA =
   "renma.experimental-execution-contract.v1" as const;

@@ -1,6 +1,7 @@
 import { compareUtf16CodeUnits } from "../canonical-json.js";
 import packageJson from "../../package.json" with { type: "json" };
-import { graphFromRepositorySnapshot, type GraphEdge } from "./graph.js";
+import { graphFromRepositorySnapshot } from "./graph.js";
+import type { GraphEdge } from "../graph-report.js";
 import {
   buildReadinessReport,
   readinessDiagnosticsFromRepositorySnapshot,

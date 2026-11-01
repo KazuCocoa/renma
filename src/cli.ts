@@ -5,11 +5,8 @@ import { runCatalogCommand } from "./commands/catalog.js";
 import { runCiReportCommand } from "./commands/ci-report.js";
 import { runDiffCommand } from "./commands/diff.js";
 import { runExecutionContractCommand } from "./commands/execution-contract.js";
-import {
-  runGraphCommand,
-  type GraphFormat,
-  type GraphView,
-} from "./commands/graph.js";
+import { runGraphCommand, type GraphFormat } from "./commands/graph.js";
+import type { GraphView } from "./graph-report.js";
 import { runGuideCommand } from "./commands/guide.js";
 import { runInspectCommand } from "./commands/inspect.js";
 import { runInitCommand } from "./commands/init.js";

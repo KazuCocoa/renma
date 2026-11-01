@@ -1,8 +1,5 @@
-import {
-  graphFromRepositorySnapshot,
-  type GraphEdge,
-  type GraphReport,
-} from "./graph.js";
+import { graphFromRepositorySnapshot } from "./graph.js";
+import type { GraphEdge, GraphReport } from "../graph-report.js";
 import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
