@@ -1,3 +1,4 @@
+import { formatInspectionCoverageChange } from "../renderers/inspection-coverage.js";
 import { formatSecurityChanges } from "../renderers/security-diff.js";
 import {
   formatExecutableSurfaceChanges,
@@ -9,7 +10,6 @@ import { MAX_LIST_ITEMS, formatOverflow } from "../renderers/ci-report-list.js";
 import { formatWritableByEvidence } from "../renderers/writable-by.js";
 import {
   executeDiff,
-  formatInspectionCoverageChange,
   type AssetChange,
   type AssetDelta,
   type DiffCollectionInstrumentation,
