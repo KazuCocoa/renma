@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
-import type { GraphReport } from "../src/commands/graph.js";
+import type { GraphReport } from "../src/graph-report.js";
 import {
   buildReadinessReport,
   formatReadinessJson,

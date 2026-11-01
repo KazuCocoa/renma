@@ -18,7 +18,7 @@ import type {
   GraphEdge,
   GraphNode,
   GraphReport,
-} from "./graph.js";
+} from "../graph-report.js";
 
 interface ResolvedExecutableEvidence {
   sourcePath: string;

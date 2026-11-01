@@ -20,7 +20,8 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { CLI_EXIT, CliUserError } from "../cli-errors.js";
-import { graphFromRepositorySnapshot, type GraphReport } from "./graph.js";
+import { graphFromRepositorySnapshot } from "./graph.js";
+import type { GraphReport } from "../graph-report.js";
 import {
   buildReadinessReport,
   readinessDiagnosticsFromRepositorySnapshot,
