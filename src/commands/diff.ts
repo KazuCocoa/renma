@@ -1,3 +1,10 @@
+import {
+  formatScanBoundaryChange,
+  formatQualityPolicyChange,
+  formatMetadataPolicyChange,
+  formatDiagnosticSeverityPolicyChange,
+} from "../renderers/diff-policy.js";
+import { formatInspectionCoverageChange } from "../renderers/inspection-coverage.js";
 import { formatSecurityChanges } from "../renderers/security-diff.js";
 import {
   DIFF_DETAIL_LIMIT,
@@ -65,7 +72,6 @@ import type { SkillDiscoveryIndex } from "../skill-discovery.js";
 import {
   buildInspectionCoverageDiff,
   type InspectionCoverage,
-  type InspectionCoverageChange,
   type InspectionCoverageDiff,
   zeroInspectionCoverage,
 } from "../inspection-coverage.js";
@@ -89,17 +95,14 @@ import {
   buildQualityPolicyDiff,
   QUALITY_POLICY_DIFF_SCHEMA_VERSION,
   type QualityPolicyDiff,
-  type QualityPolicyThresholdChange,
 } from "../quality-policy-diff.js";
 import {
   buildMetadataPolicyDiff,
   type MetadataPolicyDiff,
-  type MetadataPolicyRequiredFieldChange,
 } from "../metadata-policy-diff.js";
 import {
   buildDiagnosticSeverityPolicyDiff,
   type DiagnosticSeverityPolicyDiff,
-  type DiagnosticSeverityPolicyChange,
 } from "../diagnostic-severity-policy-diff.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import {
@@ -1010,85 +1013,6 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
   }
 
   return `${lines.join("\n")}\n`;
-}
-
-export function formatInspectionCoverageChange(
-  change: InspectionCoverageChange,
-): string {
-  const subtree =
-    change.scope === "subtree"
-      ? ` (subtree; ${change.affectedBoundary ?? "agent-facing"} boundary)`
-      : "";
-  const prior =
-    change.previouslyInspectedPaths.length > 0
-      ? `; previously inspected ${change.previouslyInspectedPaths
-          .map(formatMarkdownInlineCode)
-          .join(", ")}`
-      : "";
-  return `${formatMarkdownInlineCode(change.path)}: ${change.fromState} -> ${change.toState}${subtree}${prior}`;
-}
-
-function formatScanBoundaryChange(
-  change: ScanBoundaryDiff["changes"][number],
-): string {
-  const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  if (change.kind === "glob" || change.kind === "exclusion") {
-    return `- ${direction}: ${change.kind} ${change.change} ${formatMarkdownInlineCode(change.pattern)}`;
-  }
-  if (change.kind === "limit") {
-    return `- ${direction}: ${change.property} ${change.from} -> ${change.to}`;
-  }
-  const expires =
-    change.suppression.fromExpires === null
-      ? `expires ${change.suppression.toExpires}`
-      : change.suppression.toExpires === null
-        ? `expires ${change.suppression.fromExpires}`
-        : `expires ${change.suppression.fromExpires} -> ${change.suppression.toExpires}`;
-  return `- ${direction}: suppression ${change.change} ${formatMarkdownInlineCode(change.suppression.id)} at ${formatMarkdownInlineCode(change.suppression.path)}; ${expires}`;
-}
-
-function formatQualityPolicyChange(
-  change: QualityPolicyThresholdChange,
-): string {
-  const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  return `- ${direction}: ${change.assetKind} ${change.thresholdType} ${change.from.value} (${change.from.source}) -> ${change.to.value} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
-}
-
-function formatMetadataPolicyChange(
-  change: MetadataPolicyRequiredFieldChange,
-): string {
-  const direction =
-    change.direction === "weakening" ? "WEAKENING" : "tightening";
-  return `- ${direction}: required ${formatMarkdownInlineCode(change.field)} ${formatMetadataRequirementEndpoint(change.from)} -> ${formatMetadataRequirementEndpoint(change.to)}; ${formatMarkdownInlineCode(change.configKey)}`;
-}
-
-function formatDiagnosticSeverityPolicyChange(
-  change: DiagnosticSeverityPolicyChange,
-): string {
-  const direction = formatDiagnosticSeverityDirection(change.direction);
-  const from = change.from.severity ?? "(producer default unknown)";
-  const to = change.to.severity ?? "(producer default unknown)";
-  return `- ${direction}: ${formatMarkdownInlineCode(change.diagnosticId)} ${from} (${change.from.source}) -> ${to} (${change.to.source}); ${formatMarkdownInlineCode(change.configKey)}`;
-}
-
-function formatDiagnosticSeverityDirection(
-  direction: DiagnosticSeverityPolicyChange["direction"],
-): string {
-  if (direction === "weakening") return "WEAKENING";
-  if (direction === "tightening") return "tightening";
-  if (direction === "neutral") return "neutral";
-  return "REVIEW REQUIRED";
-}
-
-function formatMetadataRequirementEndpoint(
-  endpoint: MetadataPolicyRequiredFieldChange["from"],
-): string {
-  if (endpoint.provenance.source === "renma_default") {
-    return `${endpoint.required ? "required" : "not required"} (renma default)`;
-  }
-  return `${endpoint.required ? "required" : "not required"} (repository configuration ${formatMarkdownInlineCode(endpoint.provenance.configPath ?? "(explicit config path)")})`;
 }
 
 function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
