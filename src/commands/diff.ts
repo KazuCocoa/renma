@@ -1560,18 +1560,17 @@ function changedAssets(
       const contentChanged = hasComparableContentHash(fromAsset, toAsset)
         ? fromAsset.contentHash !== toAsset.contentHash
         : undefined;
-      return changedFields.length === 0 && contentChanged !== true
-        ? []
-        : [
-            {
-              id: toAsset.id,
-              path: toAsset.path,
-              changedFields,
-              ...(contentChanged === undefined ? {} : { contentChanged }),
-              from: fromAsset,
-              to: toAsset,
-            },
-          ];
+      if (changedFields.length === 0 && contentChanged !== true) return [];
+      return [
+        {
+          id: toAsset.id,
+          path: toAsset.path,
+          changedFields,
+          ...(contentChanged === undefined ? {} : { contentChanged }),
+          from: fromAsset,
+          to: toAsset,
+        },
+      ];
     })
     .sort(compareBy((change) => change.id));
 }
@@ -1587,27 +1586,15 @@ function checkChanges(
     .flatMap((check) => {
       const id = stringField(check, "id");
       const previous = fromById.get(id);
-      if (!previous) {
-        return [
-          {
-            id,
-            title: stringField(check, "title"),
-            fromStatus: "absent",
-            toStatus: stringField(check, "status"),
-            fromSeverity: "absent",
-            toSeverity: stringField(check, "severity"),
-            summaryChanged: true,
-          },
-        ];
-      }
       const change = {
         id,
         title: stringField(check, "title"),
-        fromStatus: stringField(previous, "status"),
+        fromStatus: previous ? stringField(previous, "status") : "absent",
         toStatus: stringField(check, "status"),
-        fromSeverity: stringField(previous, "severity"),
+        fromSeverity: previous ? stringField(previous, "severity") : "absent",
         toSeverity: stringField(check, "severity"),
         summaryChanged:
+          !previous ||
           stringField(previous, "summary") !== stringField(check, "summary"),
       };
       return change.fromStatus === change.toStatus &&
