@@ -1,3 +1,4 @@
+import { captureProcessOutput as captured } from "./process-output.js";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -1926,29 +1927,6 @@ function skillText(
     "Review evidence and report completion.",
     "",
   ].join("\n");
-}
-
-async function captured(
-  callback: () => Promise<number>,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const stdoutWrite = process.stdout.write;
-  const stderrWrite = process.stderr.write;
-  let stdout = "";
-  let stderr = "";
-  process.stdout.write = ((chunk: string | Uint8Array) => {
-    stdout += chunk.toString();
-    return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr += chunk.toString();
-    return true;
-  }) as typeof process.stderr.write;
-  try {
-    return { code: await callback(), stdout, stderr };
-  } finally {
-    process.stdout.write = stdoutWrite;
-    process.stderr.write = stderrWrite;
-  }
 }
 
 function assertDiscoveryFree(value: unknown): void {

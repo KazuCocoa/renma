@@ -1,3 +1,4 @@
+import { captureProcessOutput as captured } from "./process-output.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
@@ -639,28 +640,4 @@ function markdownSection(
   assert.notEqual(start, -1, startHeading);
   assert.notEqual(end, -1, endHeading);
   return markdown.slice(start, end);
-}
-
-async function captured(
-  callback: () => Promise<number>,
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const stdoutWrite = process.stdout.write;
-  const stderrWrite = process.stderr.write;
-  let stdout = "";
-  let stderr = "";
-  process.stdout.write = ((chunk: string | Uint8Array) => {
-    stdout += chunk.toString();
-    return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: string | Uint8Array) => {
-    stderr += chunk.toString();
-    return true;
-  }) as typeof process.stderr.write;
-  try {
-    const code = await callback();
-    return { code, stdout, stderr };
-  } finally {
-    process.stdout.write = stdoutWrite;
-    process.stderr.write = stderrWrite;
-  }
 }
