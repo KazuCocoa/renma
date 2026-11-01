@@ -1,118 +1,56 @@
 # Renma Documentation
 
-Start with the README for an overview, then choose the guide for your task.
-Each reference below owns its detailed contract.
+Start with the README for an overview, then choose the reference for your task.
+Each linked guide owns its detailed contract; this index maps where to look.
 
 ## Start Here
 
-- [README](https://github.com/KazuCocoa/renma/blob/main/README.md) is the product entrypoint: what Renma is, why a
-  Context Repository exists, the primary product boundary, installation, first
-  use, and a short command overview.
-- [User Manual](user-manual.md) is authoritative for the complete operational
-  metadata and [repository configuration](user-manual.md#configuration)
-  references and for current CLI workflows, command purposes, options, formats,
-  examples, expected outputs, and next steps. Emitted `renma --help` and
-  `renma <command> --help` remain the command-line authority.
-- [Authoring Guide](authoring-guide.md) is authoritative for Renma authoring
-  boundaries, evidence rules, the creation gate, asset responsibilities, and the
-  handoff contract. It offers adaptive interaction guidance but does not prescribe
-  the consuming LLM's internal reasoning algorithm.
+- [README](https://github.com/KazuCocoa/renma/blob/main/README.md): product purpose, boundaries, installation, and first commands.
+- [User Manual](user-manual.md): CLI workflows, operational metadata, and [repository configuration](user-manual.md#configuration). Emitted `renma --help` and `renma <command> --help` remain the command-line authority.
+- [Authoring Guide](authoring-guide.md): asset responsibilities, evidence, creation gate, and handoff. Interaction guidance is adaptive, not a prescribed LLM reasoning algorithm.
 
 ## Diagnostics And Security
 
-- [Diagnostics Reference](diagnostics.md) defines Finding semantics, diagnostic
-  interpretation, classification and evidence conventions,
-  compatibility-sensitive identifiers, repair constraints, and verification
-  expectations.
-- [Security Policy Guide](security-policy.md) defines effective-policy
-  semantics, revision-transition governance, and bounded agent-facing
-  instruction analysis; the User Manual owns the complete security field
-  mapping. The guide also defines the boundary between Renma, SAST, secret
-  scanning, dependency scanning, and runtime controls.
-- [Renma Quality Profile](quality-profile.md) records the exact deterministic
-  thresholds, units, provenance, rationale, and configuration status used by
-  quality checks.
-- [Metadata Budget](metadata-budget.md) focuses on metadata size diagnostics.
-- [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md),
-  [Context Conflict Diagnostics](context-conflict-diagnostics.md), and
-  [Context Language Diagnostics](context-language-diagnostics.md) explain their
-  respective focused diagnostic families.
+- [Diagnostics Reference](diagnostics.md): Finding semantics, stable IDs, evidence, repair constraints, and verification.
+- [Security Policy Guide](security-policy.md): effective policy, revision review, and supported instruction analysis. The User Manual owns field mappings; the guide explains the boundaries with SAST, secret/dependency scanning, and runtime controls.
+- [Renma Quality Profile](quality-profile.md): exact thresholds, units, provenance, rationale, and configuration status.
+- [Metadata Budget](metadata-budget.md): metadata-size diagnostics.
+- [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md), [Context Conflict Diagnostics](context-conflict-diagnostics.md), and [Context Language Diagnostics](context-language-diagnostics.md): focused diagnostic families.
 
 ## Asset And Relationship Contracts
 
-- [Version-pinned Asset References and Builder API](asset-bindings.md) defines
-  exact asset references, version binding, and the read-only public builder API.
-- [Agent Skills Compatibility and Migration](agent-skills-compatibility.md)
-  defines canonical Skill paths and metadata, accepted migration-only forms,
-  validation, and the one-way migration boundary.
-- [Advanced Skill Authoring](advanced-skill-authoring.md) applies the canonical
-  authoring model to focused workflows, orchestration, and progressive
-  disclosure.
-- [Context Lens](context-lens.md) defines when a Context Lens is justified, its
-  fields and relationships, and its non-runtime boundary.
-- [Declared Composition](declared-composition.md) defines the forward explicit
-  required/optional closure, provenance, completeness, conflicts, and cycles.
-- [Declared Impact](declared-impact.md) defines the reverse explicit
-  composition closure and its change-review boundary.
-- [Skill Discovery](skill-discovery.md) defines declared continuations,
-  publication, route resolution, reachability, coverage,
-  `renma.skill-index.v1`, Discovery diff, and warn-only CI policy without
-  describing runtime routing.
-- [Repository Context BOM v3](repository-context-bom.md) defines
-  `renma.repository-context-bom.v3`, deterministic ordering, reproducibility,
-  and the declared-manifest boundary.
-- [Machine-Readable JSON Compatibility](machine-readable-json.md) inventories
-  top-level command contracts, defines the 1.x additive/breaking policy, and
-  identifies environment-derived fields.
-- [Experimental Execution Contract](execution-contract.md) defines the
-  `renma.experimental-execution-contract.v1` static `possible` relationship
-  artifact, single-snapshot guarantee, bounded completeness, and external
-  revision/hash binding boundary.
-- [Trust Graph v2](trust-graph.md) defines `renma.trustGraph.v2`, node and edge
-  provenance, ordering, and the distinction between evidence and a trust score.
-- [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas)
-  contains the machine-readable BOM v3, Trust Graph v2, and Skill Authoring
-  Handoff v1 contracts shipped in the npm package.
-
-The development architecture, design, and roadmap documents below are
-source-repository-only and intentionally excluded from the npm package.
+- [Version-pinned Asset References and Builder API](asset-bindings.md): exact references, version binding, and the read-only builder API.
+- [Agent Skills Compatibility and Migration](agent-skills-compatibility.md): canonical paths and metadata, validation, and one-way migration.
+- [Advanced Skill Authoring](advanced-skill-authoring.md): focused workflows, orchestration, and progressive disclosure.
+- [Context Lens](context-lens.md): justification, fields, relationships, and the non-runtime boundary.
+- [Declared Composition](declared-composition.md): forward required/optional closure, provenance, completeness, conflicts, and cycles.
+- [Declared Impact](declared-impact.md): reverse explicit composition and change review.
+- [Skill Discovery](skill-discovery.md): static publication, continuation routes, reachability, coverage, Skill Index, diff, and warn-only CI policy.
+- [Repository Context BOM v3](repository-context-bom.md): deterministic, reproducible declared manifests.
+- [Machine-Readable JSON Compatibility](machine-readable-json.md): top-level schemas, 1.x compatibility rules, and environment-derived fields.
+- [Experimental Execution Contract](execution-contract.md): static possible relationships, one-snapshot guarantees, bounded completeness, and external revision/hash binding.
+- [Trust Graph v2](trust-graph.md): evidence provenance and ordering, not a trust score.
+- [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas): packaged BOM, Trust Graph, and Skill Authoring Handoff contracts.
 
 ## Development
 
-- [Public Architecture](development/architecture.md) owns the high-level layers, data
-  flow, stable product boundaries, and public contract surfaces.
-- [Internal Architecture](development/internal-architecture.md) owns module
-  responsibilities, dependency direction, shared projections, compatibility
-  facades, invariants, and implementation rationale.
-- [Product Design](development/design.md) owns durable product decisions and distinctions,
-  including capabilities intentionally outside Renma core.
-- [External Review Governance](external-review-governance.md) records a
-  candidate design direction and SkillSpector experiment plan, not a current
-  CLI, metadata, schema, or configuration contract.
-- [Current Roadmap](development/plan.md) owns
-  the completed 1.0 stabilization baseline, open candidates, deferred ecosystem
-  concerns, and explicit non-commitments.
-- [Renma 1.0 Stabilization Boundary](development/stabilization-1.0.md) records
-  the completed pre-1.0 reduction, retained shell-family and `ci-report`
-  contracts, precision-first natural-language boundary, and remaining release
-  assurance gates.
-- [Skill Discovery Design](development/plan-discovery.md)
-  records the durable rationale behind the current static Discovery boundary;
-  the current operational contract remains in
-  [Skill Discovery](skill-discovery.md).
-- [Versioned Asset Bindings Design](development/versioned-skill-bindings.md)
-  records the implemented metadata and reference contracts for external plugin
-  builders, including the boundary of the read-only public API.
-- [Release Publication Security](development/release-security.md) documents the
-  repository-visible npm publication checks, their limits, and the required
-  npm and GitHub controls outside the repository.
-- [Changelog](changelog.md) owns chronological release history, version-specific
-  changes, and compatibility notes.
+Files under `development/` explain implementation rationale and are excluded
+from the npm package. User-facing contracts remain in the references above.
+
+- [Public Architecture](development/architecture.md): layers, data flow, and stable product boundaries.
+- [Internal Architecture](development/internal-architecture.md): module ownership, dependencies, projections, compatibility seams, and invariants.
+- [Product Design](development/design.md): durable decisions and capabilities outside core.
+- [External Review Governance](external-review-governance.md): candidate direction and SkillSpector experiment plan, not a current product contract.
+- [Current Roadmap](development/plan.md): stabilization baseline, open candidates, deferred concerns, and non-commitments.
+- [Renma 1.0 Stabilization Boundary](development/stabilization-1.0.md): completed reduction, retained shell/CI contracts, precision-first analysis, and release gates.
+- [Skill Discovery Design](development/plan-discovery.md): rationale behind the current static Discovery contract.
+- [Versioned Asset Bindings Design](development/versioned-skill-bindings.md): reference and metadata decisions for external builders.
+- [Release Publication Security](development/release-security.md): repository checks, their limits, and required external npm/GitHub controls.
+- [Changelog](changelog.md): release history and compatibility notes.
 
 ## Examples
 
-Repository examples are source-checkout resources rather than npm package
-contents:
+Examples require a source checkout and are not included in the npm package:
 
 - [Interactive Placeholder](https://github.com/KazuCocoa/renma/tree/main/examples/interactive-placeholder)
 - [Example Context Repository](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo)
@@ -121,8 +59,8 @@ contents:
 
 ## Maintaining The Documentation Site
 
-The Markdown in this directory remains the documentation source of truth. Run
-the site locally from the repository root:
+Markdown in this directory is the documentation source of truth. From the
+repository root:
 
 ```bash
 npm run docs:dev
@@ -130,7 +68,6 @@ npm run docs:build
 npm run docs:preview
 ```
 
-Fenced `mermaid` blocks under `docs/` render automatically, while their
-Mermaid source remains the canonical editable form. Test diagram changes with
-`npm run docs:build` and a local preview. Diagrams must not require loose
-security or executable click behavior.
+Fenced `mermaid` blocks render automatically; their source remains the editable
+form. Verify diagram changes with `npm run docs:build` and a local preview.
+Diagrams must not require loose security or executable click behavior.
