@@ -22,6 +22,78 @@ import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import type { Finding } from "../src/types/diagnostics.js";
 
+test("workflow checks share lookup evidence while preserving target priority and input order", () => {
+  const graph = securityGraphReport();
+  const context = (
+    id: string,
+    sourcePath: string,
+    status: "stable" | "deprecated" | "archived",
+  ): GraphReport["nodes"][number] => ({
+    id,
+    sourcePath,
+    status,
+    kind: "context",
+    tags: [],
+    ownership: {
+      declaredOwner: "platform",
+      effectiveOwner: "platform",
+      source: "declared",
+    },
+  });
+  graph.nodes.push(
+    context("chosen", "contexts/stable.md", "stable"),
+    context("chosen", "contexts/archived.md", "archived"),
+    context("path-first", "./contexts/shared.md", "stable"),
+    context("path-last", "contexts\\shared.md", "deprecated"),
+  );
+  graph.edges = (["requires", "optional"] as const).flatMap((kind) => [
+    {
+      from: "security",
+      to: "by-id",
+      kind,
+      sourcePath: "skills/security/SKILL.md",
+      resolved: true,
+      targetId: "chosen",
+      targetPath: "contexts/stable.md",
+    },
+    {
+      from: "security",
+      to: "by-path",
+      kind,
+      sourcePath: "skills/security/SKILL.md",
+      resolved: true,
+      targetId: "missing",
+      targetPath: "contexts/shared.md",
+    },
+  ]);
+  graph.nodeCount = graph.nodes.length;
+  graph.edgeCount = graph.edges.length;
+  const report = buildReadinessReport(graph);
+  assertCheckStatuses(report, {
+    "workflow.context_closure": "fail",
+    "workflow.optional_context": "warn",
+  });
+  for (const [id, label] of [
+    ["workflow.context_closure", "Required"],
+    ["workflow.optional_context", "Optional"],
+  ]) {
+    assert.deepEqual(
+      report.checks
+        .find((check) => check.id === id)
+        ?.evidence?.map((item) => item.message),
+      [
+        `${label} context "by-id" resolves to archived asset contexts/archived.md.`,
+        `${label} context "by-path" resolves to deprecated asset contexts\\shared.md.`,
+      ],
+    );
+  }
+  graph.nodes.reverse();
+  assertCheckStatuses(buildReadinessReport(graph), {
+    "workflow.context_closure": "pass",
+    "workflow.optional_context": "pass",
+  });
+});
+
 test("readiness collects one repository snapshot for graph and scan evidence", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform", status: "stable" });

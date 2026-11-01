@@ -10,7 +10,7 @@ import {
   formatReadinessMarkdown,
 } from "../renderers/readiness.js";
 import { graphFromRepositorySnapshot } from "./graph.js";
-import type { GraphEdge, GraphReport } from "../graph-report.js";
+import type { GraphEdge, GraphNode, GraphReport } from "../graph-report.js";
 import { compareUtf16CodeUnits } from "../canonical-json.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
@@ -193,6 +193,7 @@ export function buildReadinessReport(
   inspectionEvidence: ReadinessInspectionEvidence = {},
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
+  const workflowContexts = prepareWorkflowContextIndex(graphReport);
   const totalAssets = graphReport.nodes.length;
   const ownedAssets = graphReport.nodes.filter((node) =>
     hasOwner(node.ownership.effectiveOwner ?? undefined),
@@ -227,8 +228,8 @@ export function buildReadinessReport(
     blockingSecurityCheck(findings),
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
     graphEdgesCheck(unresolvedBlockingEdges),
-    workflowContextClosureCheck(graphReport),
-    workflowOptionalContextCheck(graphReport),
+    workflowContextClosureCheck(workflowContexts),
+    workflowOptionalContextCheck(workflowContexts),
     workflowClarityCheck(findings),
     workflowRequiredInputsCheck(findings),
     workflowCompletionCriteriaCheck(findings),
@@ -301,33 +302,11 @@ export function buildReadinessReport(
             QUALITY.readiness.ownershipMaximumPenalty,
         );
   const layoutPenalty = layoutReadinessPenalty(checks);
-  const hasWorkflowClarityWarning = checks.some(
-    (check) => check.id === "workflow.clarity" && check.status === "warn",
+  const warningCheckIds = new Set(
+    checks.filter((check) => check.status === "warn").map((check) => check.id),
   );
-  const hasWorkflowOptionalContextWarning = checks.some(
-    (check) =>
-      check.id === "workflow.optional_context" && check.status === "warn",
-  );
-  const hasWorkflowRequiredInputsWarning = checks.some(
-    (check) =>
-      check.id === "workflow.required_inputs" && check.status === "warn",
-  );
-  const hasWorkflowCompletionCriteriaWarning = checks.some(
-    (check) =>
-      check.id === "workflow.completion_criteria" && check.status === "warn",
-  );
-  const workflowClarityPenalty = hasWorkflowClarityWarning
-    ? QUALITY.readiness.workflowClarityPenalty
-    : 0;
-  const workflowOptionalContextPenalty = hasWorkflowOptionalContextWarning
-    ? QUALITY.readiness.workflowOptionalContextPenalty
-    : 0;
-  const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
-    ? QUALITY.readiness.workflowRequiredInputsPenalty
-    : 0;
-  const workflowCompletionCriteriaPenalty = hasWorkflowCompletionCriteriaWarning
-    ? QUALITY.readiness.workflowCompletionCriteriaPenalty
-    : 0;
+  const warningPenalty = (id: string, penalty: number): number =>
+    warningCheckIds.has(id) ? penalty : 0;
   const score = Math.max(
     0,
     100 -
@@ -343,14 +322,26 @@ export function buildReadinessReport(
         ? QUALITY.readiness.scaffoldResiduePenalty
         : 0) -
       layoutPenalty -
-      workflowClarityPenalty -
-      workflowOptionalContextPenalty -
-      workflowRequiredInputsPenalty -
-      workflowCompletionCriteriaPenalty,
+      warningPenalty(
+        "workflow.clarity",
+        QUALITY.readiness.workflowClarityPenalty,
+      ) -
+      warningPenalty(
+        "workflow.optional_context",
+        QUALITY.readiness.workflowOptionalContextPenalty,
+      ) -
+      warningPenalty(
+        "workflow.required_inputs",
+        QUALITY.readiness.workflowRequiredInputsPenalty,
+      ) -
+      warningPenalty(
+        "workflow.completion_criteria",
+        QUALITY.readiness.workflowCompletionCriteriaPenalty,
+      ),
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
-  const workflow = workflowSummary(graphReport, checks);
+  const workflow = workflowSummary(workflowContexts.skillCount, checks);
   const securityPosture = summarizeSecurityPosture(findings);
 
   return {
@@ -998,9 +989,39 @@ function graphEdgesCheck(unresolvedEdges: GraphEdge[]): ReadinessCheck {
   };
 }
 
-function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
-  const skills = graphReport.nodes.filter((node) => node.kind === "skill");
-  if (skills.length === 0) {
+interface WorkflowContextIndex {
+  skillCount: number;
+  nodesById: ReadonlyMap<string, GraphNode>;
+  nodesByPath: ReadonlyMap<string, GraphNode>;
+  requiredEdges: readonly GraphEdge[];
+  optionalEdges: readonly GraphEdge[];
+}
+
+function prepareWorkflowContextIndex(
+  report: GraphReport,
+): WorkflowContextIndex {
+  const nodesById = new Map<string, GraphNode>();
+  const nodesByPath = new Map<string, GraphNode>();
+  let skillCount = 0;
+  for (const node of report.nodes) {
+    nodesById.set(node.id, node);
+    nodesByPath.set(normalizeGraphPath(node.sourcePath), node);
+    if (node.kind === "skill") skillCount++;
+  }
+  const requiredEdges: GraphEdge[] = [];
+  const optionalEdges: GraphEdge[] = [];
+  for (const edge of report.edges) {
+    if (nodesById.get(edge.from)?.kind !== "skill") continue;
+    if (edge.kind === "requires") requiredEdges.push(edge);
+    if (edge.kind === "optional") optionalEdges.push(edge);
+  }
+  return { skillCount, nodesById, nodesByPath, requiredEdges, optionalEdges };
+}
+
+function workflowContextClosureCheck(
+  index: WorkflowContextIndex,
+): ReadinessCheck {
+  if (index.skillCount === 0) {
     return {
       id: "workflow.context_closure",
       title: "Workflow context closure",
@@ -1010,20 +1031,9 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
     };
   }
 
-  const nodesById = new Map(graphReport.nodes.map((node) => [node.id, node]));
-  const nodesByPath = new Map(
-    graphReport.nodes.map((node) => [
-      normalizeGraphPath(node.sourcePath),
-      node,
-    ]),
-  );
-  const requiredEdges = graphReport.edges.filter(
-    (edge) =>
-      edge.kind === "requires" && nodesById.get(edge.from)?.kind === "skill",
-  );
-  const problems = requiredEdges.flatMap((edge) => {
+  const problems = index.requiredEdges.flatMap((edge) => {
     const target = edge.resolved
-      ? resolveWorkflowContextTarget(edge, nodesById, nodesByPath)
+      ? resolveWorkflowContextTarget(edge, index)
       : undefined;
     if (target === undefined) {
       return [
@@ -1070,15 +1080,9 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
 }
 
 function workflowOptionalContextCheck(
-  graphReport: GraphReport,
+  index: WorkflowContextIndex,
 ): ReadinessCheck {
-  const nodesById = new Map(graphReport.nodes.map((node) => [node.id, node]));
-  const optionalEdges = graphReport.edges.filter(
-    (edge) =>
-      edge.kind === "optional" && nodesById.get(edge.from)?.kind === "skill",
-  );
-
-  if (optionalEdges.length === 0) {
+  if (index.optionalEdges.length === 0) {
     return {
       id: "workflow.optional_context",
       title: "Workflow optional context",
@@ -1088,15 +1092,9 @@ function workflowOptionalContextCheck(
     };
   }
 
-  const nodesByPath = new Map(
-    graphReport.nodes.map((node) => [
-      normalizeGraphPath(node.sourcePath),
-      node,
-    ]),
-  );
-  const problems = optionalEdges.flatMap((edge) => {
+  const problems = index.optionalEdges.flatMap((edge) => {
     const target = edge.resolved
-      ? resolveWorkflowContextTarget(edge, nodesById, nodesByPath)
+      ? resolveWorkflowContextTarget(edge, index)
       : undefined;
     if (target === undefined) {
       return [
@@ -1141,9 +1139,8 @@ function workflowOptionalContextCheck(
 
 function resolveWorkflowContextTarget(
   edge: GraphEdge,
-  nodesById: Map<string, GraphReport["nodes"][number]>,
-  nodesByPath: Map<string, GraphReport["nodes"][number]>,
-): GraphReport["nodes"][number] | undefined {
+  { nodesById, nodesByPath }: WorkflowContextIndex,
+): GraphNode | undefined {
   if (edge.targetId !== undefined) {
     const byTargetId = nodesById.get(edge.targetId);
     if (byTargetId !== undefined) return byTargetId;
@@ -1559,7 +1556,7 @@ function layoutReadinessPenalty(checks: ReadinessCheck[]): number {
 }
 
 function workflowSummary(
-  graphReport: GraphReport,
+  skillCount: number,
   checks: ReadinessCheck[],
 ): WorkflowReadinessSummary {
   const workflowChecks = checks.filter((check) =>
@@ -1570,8 +1567,7 @@ function workflowSummary(
   const fail = workflowChecks.filter((check) => check.status === "fail").length;
 
   return {
-    skillEntrypoints: graphReport.nodes.filter((node) => node.kind === "skill")
-      .length,
+    skillEntrypoints: skillCount,
     checks: workflowChecks.length,
     pass,
     warn,
