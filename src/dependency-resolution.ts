@@ -46,3 +46,84 @@ export function resolveUniqueDependencyTarget(
   );
   return uniquePaths.size === 1 ? [...uniquePaths.values()][0] : undefined;
 }
+
+interface IndexedAssetMatch {
+  first: { asset: Asset; position: number };
+  last: { asset: Asset; position: number };
+  normalizedPath: string;
+  ambiguous: boolean;
+}
+
+/** Prepare repeated lookups over one fixed asset list, preserving source order. */
+export function prepareDependencyTargetResolver(
+  assets: readonly Asset[],
+): (dependency: Dependency) => Asset | undefined {
+  const byId = new Map<string, IndexedAssetMatch>();
+  const byPath = new Map<string, IndexedAssetMatch>();
+  assets.forEach((asset, position) => {
+    const normalizedPath = normalizeDependencyReference(asset.sourcePath);
+    addIndexedAssetMatch(byId, asset.id, asset, position, normalizedPath);
+    addIndexedAssetMatch(
+      byPath,
+      normalizedPath,
+      asset,
+      position,
+      normalizedPath,
+    );
+  });
+
+  return (dependency) => {
+    const idMatch = byId.get(dependency.to);
+    const pathMatch = byPath.get(normalizeDependencyReference(dependency.to));
+    if (
+      dependency.declaration === "requires_skill" ||
+      dependency.declaration === "optional_skill"
+    ) {
+      if (
+        idMatch?.ambiguous ||
+        (idMatch &&
+          pathMatch &&
+          idMatch.normalizedPath !== pathMatch.normalizedPath)
+      )
+        return undefined;
+
+      // Unique resolution keeps the last matching asset for the one path.
+      const latest =
+        !idMatch ||
+        (pathMatch && pathMatch.last.position > idMatch.last.position)
+          ? pathMatch
+          : idMatch;
+      return latest?.last.asset;
+    }
+
+    // Ordinary resolution keeps the first match across both ID and path.
+    const earliest =
+      !idMatch ||
+      (pathMatch && pathMatch.first.position < idMatch.first.position)
+        ? pathMatch
+        : idMatch;
+    return earliest?.first.asset;
+  };
+}
+
+function addIndexedAssetMatch(
+  index: Map<string, IndexedAssetMatch>,
+  key: string,
+  asset: Asset,
+  position: number,
+  normalizedPath: string,
+): void {
+  const match = index.get(key);
+  if (match) {
+    match.last = { asset, position };
+    match.ambiguous ||= match.normalizedPath !== normalizedPath;
+  } else {
+    const entry = { asset, position };
+    index.set(key, {
+      first: entry,
+      last: entry,
+      normalizedPath,
+      ambiguous: false,
+    });
+  }
+}
