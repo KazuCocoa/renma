@@ -7,7 +7,10 @@ import test from "node:test";
 import { main } from "../src/cli.js";
 import { readiness } from "../src/commands/readiness.js";
 import { buildScaffoldBundle } from "../src/commands/scaffold.js";
+import { DEFAULT_CONFIG } from "../src/config.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
+import { parseDocument } from "../src/markdown.js";
+import { runRules } from "../src/rules.js";
 import {
   RENMA_SCAFFOLD_PLACEHOLDER_MARKERS,
   RENMA_SCAFFOLD_PLACEHOLDERS,
@@ -17,6 +20,36 @@ import {
 import { scan } from "../src/scanner.js";
 
 const PLACEHOLDER_ID = DIAGNOSTIC_IDS.QUAL_RENMA_SCAFFOLD_PLACEHOLDER;
+
+test("scaffold evidence belongs to each document, even when paths repeat", () => {
+  const parseSkill = (body: string) => {
+    const content = `---\nname: demo\ndescription: Use when reviewing repository files.\n---\n# Demo\n${body}\n`;
+    return parseDocument({
+      path: "skills/demo/SKILL.md",
+      absolutePath: "/skills/demo/SKILL.md",
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    });
+  };
+  const starter = parseSkill(
+    RENMA_SCAFFOLD_PLACEHOLDERS.skill.reviewInstruction,
+  );
+  const authored = parseSkill("Verify changes with npm test.");
+  const placeholders = (documents: Parameters<typeof runRules>[0]) =>
+    runRules(documents, DEFAULT_CONFIG).filter(
+      (finding) => finding.id === PLACEHOLDER_ID,
+    );
+
+  const expected = placeholders([starter]);
+  assert.equal(expected.length, 1);
+  assert.equal(expected[0]?.details?.placeholder, "reviewInstruction");
+  assert.deepEqual(placeholders([authored]), []);
+  assert.deepEqual(placeholders([starter, authored]), expected);
+  assert.deepEqual(placeholders([authored, starter]), expected);
+});
 
 test("untouched Skill and Context scaffolds retain precise High placeholder evidence", async (t) => {
   const skillRoot = await repositoryFixture(t);
