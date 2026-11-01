@@ -108,11 +108,16 @@ export async function ownership(
   const assets = stableAssets(result.catalog.assets);
   const ownerFilter = options.owner?.trim();
   const totalAssets = assets.length;
-  const ownedAssets = assets.filter(hasOwner).length;
-  const unownedAssetList = assets
-    .filter((asset) => !hasOwner(asset))
-    .map(toUnownedAsset);
-  const ownedAssetList = assets.filter(hasOwner).map(toOwnedAsset);
+  const ownedAssetList: OwnedAsset[] = [];
+  const unownedAssetList: UnownedAsset[] = [];
+  for (const asset of assets) {
+    if (hasOwner(asset)) {
+      ownedAssetList.push(toOwnedAsset(asset));
+    } else {
+      unownedAssetList.push(toUnownedAsset(asset));
+    }
+  }
+  const ownedAssets = ownedAssetList.length;
   const filteredOwnedAssetList = ownerFilter
     ? ownedAssetList.filter(
         (asset) => asset.ownership.effectiveOwner === ownerFilter,
@@ -182,28 +187,18 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
     if (!owner) {
       lines.push("(none)");
     } else {
-      appendOwnerAssets(lines, owner.assets);
+      appendOwnershipAssets(lines, owner.assets);
     }
   } else {
     lines.push("## Owners", "");
     appendOwners(lines, report.owners);
     lines.push("", "## Unowned Assets", "");
-    appendUnownedAssets(lines, report.unownedAssetList ?? []);
+    appendOwnershipAssets(lines, report.unownedAssetList ?? []);
   }
 
   if (report.ownedAssetList && !report.ownerFilter) {
     lines.push("", "## Owned Assets", "");
-    if (report.ownedAssetList.length === 0) {
-      lines.push("(none)");
-    } else {
-      lines.push("| ID | Kind | Source | Ownership | Status | Tags |");
-      lines.push("| --- | --- | --- | --- | --- | --- |");
-      for (const asset of report.ownedAssetList) {
-        lines.push(
-          `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${formatAssetOwnership(asset.ownership)} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
-        );
-      }
-    }
+    appendOwnershipAssets(lines, report.ownedAssetList);
   }
 
   if (report.diagnostics && report.diagnostics.length > 0) {
@@ -234,26 +229,14 @@ function appendOwners(lines: string[], owners: OwnershipOwnerSummary[]): void {
       lines.push(`| ${summary.kind} | ${summary.totalAssets} |`);
     }
     lines.push("");
-    appendOwnerAssets(lines, owner.assets);
+    appendOwnershipAssets(lines, owner.assets);
   }
 }
 
-function appendOwnerAssets(lines: string[], assets: OwnedAsset[]): void {
-  if (assets.length === 0) {
-    lines.push("(none)");
-    return;
-  }
-
-  lines.push("| ID | Kind | Source | Ownership | Status | Tags |");
-  lines.push("| --- | --- | --- | --- | --- | --- |");
-  for (const asset of assets) {
-    lines.push(
-      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${formatAssetOwnership(asset.ownership)} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
-    );
-  }
-}
-
-function appendUnownedAssets(lines: string[], assets: UnownedAsset[]): void {
+function appendOwnershipAssets(
+  lines: string[],
+  assets: readonly (OwnedAsset | UnownedAsset)[],
+): void {
   if (assets.length === 0) {
     lines.push("(none)");
     return;
