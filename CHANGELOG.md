@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.41.2] - 2026-10-31
+
+### Changed
+
+- Simplified CLI, configuration, metadata, readiness, graph, and diff/CI report
+  implementations while preserving public API and report contracts, command
+  help, and LLM-facing Skill authoring guidance.
+- Reused indexed dependency lookups, section boundaries, freshness evaluation,
+  and scan-local authoring evidence to avoid repeated analysis work.
+- Shared iterative cycle detection between Composition and Skill Discovery,
+  retaining each feature's relationship rules and deterministic evidence.
+- Consolidated test output capture and package declaration verification, and
+  simplified documentation navigation and repeated contract explanations.
+- Updated dependency lockfile resolutions and GitHub Actions dependencies.
+
+### Fixed
+
+- Avoid recursive traversal stack limits when resolving large declared
+  Composition cycles.
+
 ## [0.41.1] - 2026-10-08
 
 ### Changed
@@ -2895,8 +2915,9 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.41.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.41.2...HEAD
 [0.41.0]: https://github.com/KazuCocoa/renma/compare/v0.40.1...v0.41.0
+[0.41.2]: https://github.com/KazuCocoa/renma/compare/v0.41.1...v0.41.2
 [0.41.1]: https://github.com/KazuCocoa/renma/compare/v0.41.0...v0.41.1
 [0.40.1]: https://github.com/KazuCocoa/renma/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/KazuCocoa/renma/compare/v0.39.2...v0.40.0
