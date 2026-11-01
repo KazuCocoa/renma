@@ -1,3 +1,4 @@
+import { ciPolicyOutcome, stricterCiMode } from "./ci-policy-mode.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import type {
   ExecutableInvocationGovernanceChange,
@@ -95,18 +96,10 @@ export interface ExecutableSurfaceCiEvaluation {
   matches: ExecutableSurfaceCiMatch[];
 }
 
-const MODE_RANK: Record<ExecutableSurfaceCiPolicyMode, number> = {
-  off: 0,
-  warn: 1,
-  fail: 2,
-};
-
 export function effectiveExecutableSurfaceCiPolicy(
   configured: ExecutableSurfaceCiConfiguration,
 ): ExecutableSurfaceCiPolicyMode {
-  return MODE_RANK[configured.from] >= MODE_RANK[configured.to]
-    ? configured.from
-    : configured.to;
+  return stricterCiMode(configured.from, configured.to);
 }
 
 /** Evaluate high-signal CI review events from the canonical executable diff. */
@@ -214,12 +207,7 @@ export function evaluateExecutableSurfaceCiPolicy(
   return {
     schemaVersion: EXECUTABLE_SURFACE_CI_POLICY_SCHEMA_VERSION,
     configured: { ...configured, effective },
-    outcome:
-      effective === "off" || matches.length === 0
-        ? "pass"
-        : effective === "fail"
-          ? "fail"
-          : "warn",
+    outcome: ciPolicyOutcome(effective, matches.length),
     matchCount: matches.length,
     matches,
   };

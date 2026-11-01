@@ -39,16 +39,16 @@ test("normative token-budget documentation matches DEFAULT_QUALITY_PROFILE", asy
 
   for (const [key, value] of configThresholds) {
     assert.match(
-      readme,
-      new RegExp(`"${key}"\\s*:\\s*${value}`),
-      `README ${key}`,
-    );
-    assert.match(
       manual,
       new RegExp(`\\b${key}\\b[^\\n]*${formatted(value)}`),
       `User Manual ${key}`,
     );
   }
+
+  // The entrypoint links to the authoritative defaults instead of duplicating
+  // a second configuration example that must change with every threshold.
+  assert.match(readme, /\]\(docs\/user-manual\.md#configuration\)/);
+  assert.match(readme, /\]\(docs\/quality-profile\.md\)/);
 
   const profileRows: Array<readonly [string, number]> = [
     ["skillTokenWarning", DEFAULT_QUALITY_PROFILE.skillTokenWarning],
@@ -100,7 +100,6 @@ test("normative token-budget documentation matches DEFAULT_QUALITY_PROFILE", asy
   );
   const repository = formatted(DEFAULT_QUALITY_PROFILE.skillTokenWarning);
   for (const [label, document] of [
-    ["README", readme],
     ["User Manual", manual],
     ["quality profile", profile],
     ["diagnostics", diagnostics],

@@ -1,17 +1,7 @@
 # Renma Documentation
 
-For an initial overview, read `user-manual.md`.
-
-For authoring Skills and Context Assets, read `authoring-guide.md`.
-
-For diagnostics and remediation, read `diagnostics.md`.
-
-For security-related metadata and policy, read `security-policy.md`.
-
-For machine-readable contracts, use the schemas under `schemas/`.
-
-Development and internal design documents are under `development/`.
-They describe implementation rationale and are not normative user guidance.
+Start with the README for an overview, then choose the guide for your task.
+Each reference below owns its detailed contract.
 
 ## Start Here
 
@@ -50,6 +40,8 @@ They describe implementation rationale and are not normative user guidance.
 
 ## Asset And Relationship Contracts
 
+- [Version-pinned Asset References and Builder API](asset-bindings.md) defines
+  exact asset references, version binding, and the read-only public builder API.
 - [Agent Skills Compatibility and Migration](agent-skills-compatibility.md)
   defines canonical Skill paths and metadata, accepted migration-only forms,
   validation, and the one-way migration boundary.
@@ -108,7 +100,6 @@ source-repository-only and intentionally excluded from the npm package.
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
   [Skill Discovery](skill-discovery.md).
-- [Version-pinned Asset References and Builder API](asset-bindings.md)
 - [Versioned Asset Bindings Design](development/versioned-skill-bindings.md)
   records the implemented metadata and reference contracts for external plugin
   builders, including the boundary of the read-only public API.

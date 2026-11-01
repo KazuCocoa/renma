@@ -1,3 +1,8 @@
+import {
+  ciModeTransitionDirection,
+  ciPolicyOutcome,
+  stricterCiMode,
+} from "./ci-policy-mode.js";
 import type {
   DiagnosticSeverityPolicyChange,
   DiagnosticSeverityPolicyDiff,
@@ -66,19 +71,11 @@ export interface DiagnosticSeverityCiEvaluation {
   matches: DiagnosticSeverityCiMatch[];
 }
 
-const MODE_RANK: Record<DiagnosticsCiPolicyMode, number> = {
-  off: 0,
-  warn: 1,
-  fail: 2,
-};
-
 /** Select the stricter endpoint so a target cannot disable review. */
 export function effectiveDiagnosticSeverityCiPolicy(
   configured: DiagnosticSeverityCiConfiguration,
 ): DiagnosticsCiPolicyMode {
-  return MODE_RANK[configured.from] >= MODE_RANK[configured.to]
-    ? configured.from
-    : configured.to;
+  return stricterCiMode(configured.from, configured.to);
 }
 
 export function diagnosticSeverityCiModeTransition(
@@ -86,12 +83,7 @@ export function diagnosticSeverityCiModeTransition(
 ): DiagnosticSeverityCiModeTransition {
   return {
     ...configured,
-    direction:
-      configured.from === configured.to
-        ? "unchanged"
-        : MODE_RANK[configured.from] > MODE_RANK[configured.to]
-          ? "weakening"
-          : "tightening",
+    direction: ciModeTransitionDirection(configured.from, configured.to),
   };
 }
 
@@ -158,12 +150,7 @@ export function evaluateDiagnosticSeverityCiPolicy(
         .length,
       reviewRequired: reviewRequiredMatches.length,
     },
-    outcome:
-      effective === "off" || matches.length === 0
-        ? "pass"
-        : effective === "fail"
-          ? "fail"
-          : "warn",
+    outcome: ciPolicyOutcome(effective, matches.length),
     matchCount: matches.length,
     matches,
   };

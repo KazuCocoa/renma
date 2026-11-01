@@ -1,3 +1,8 @@
+import {
+  ciModeTransitionDirection,
+  ciPolicyOutcome,
+  stricterCiMode,
+} from "./ci-policy-mode.js";
 import type {
   QualityPolicyDiff,
   QualityPolicyThresholdChange,
@@ -57,32 +62,21 @@ export interface QualityPolicyCiEvaluation {
   matches: QualityPolicyCiMatch[];
 }
 
-const MODE_RANK: Record<QualityCiPolicyMode, number> = {
-  off: 0,
-  warn: 1,
-  fail: 2,
-};
-
 /** Select the stricter archived-ref mode so the target cannot disable review. */
 export function effectiveQualityPolicyCiPolicy(
   configured: QualityPolicyCiConfiguration,
 ): QualityCiPolicyMode {
-  return MODE_RANK[configured.from] >= MODE_RANK[configured.to]
-    ? configured.from
-    : configured.to;
+  return stricterCiMode(configured.from, configured.to);
 }
 
 /** Classify the archived CI-mode transition independently from threshold changes. */
 export function qualityPolicyCiModeTransition(
   configured: QualityPolicyCiConfiguration,
 ): QualityPolicyCiModeTransition {
-  const direction: QualityPolicyCiModeTransitionDirection =
-    configured.from === configured.to
-      ? "unchanged"
-      : MODE_RANK[configured.from] > MODE_RANK[configured.to]
-        ? "weakening"
-        : "tightening";
-  return { ...configured, direction };
+  return {
+    ...configured,
+    direction: ciModeTransitionDirection(configured.from, configured.to),
+  };
 }
 
 /** Gate numeric threshold increases and CI-mode weakening as independent evidence. */
@@ -119,12 +113,7 @@ export function evaluateQualityPolicyCiPolicy(
       weakenings: thresholdMatches.length,
       tightenings: diff.changes.length - thresholdMatches.length,
     },
-    outcome:
-      effective === "off" || matches.length === 0
-        ? "pass"
-        : effective === "fail"
-          ? "fail"
-          : "warn",
+    outcome: ciPolicyOutcome(effective, matches.length),
     matchCount: matches.length,
     matches,
   };

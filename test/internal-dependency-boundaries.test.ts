@@ -110,6 +110,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       [
         "canonical-json.ts",
         "catalog-findings.ts",
+        "ci-policy-mode.ts",
         "cli-errors.ts",
         "command-invocation.ts",
         "config.ts",
