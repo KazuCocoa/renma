@@ -194,6 +194,10 @@ const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
 
 interface RuleContext {
   documents: ParsedDocument[];
+  scaffoldResidues: ReadonlyMap<
+    ParsedDocument,
+    readonly RenmaScaffoldPlaceholderResidue[]
+  >;
   catalog?: Catalog;
   config: ScanConfig;
 }
@@ -207,10 +211,17 @@ export function runRules(
   catalog?: Catalog,
   options: RuleOptions = {},
 ): Finding[] {
-  const context: RuleContext =
-    catalog === undefined
-      ? { documents, config }
-      : { documents, catalog, config };
+  const context: RuleContext = {
+    documents,
+    config,
+    ...(catalog === undefined ? {} : { catalog }),
+    scaffoldResidues: new Map(
+      documents.map((document) => [
+        document,
+        renmaScaffoldPlaceholderResidue(document),
+      ]),
+    ),
+  };
   const findings = rulesForEvaluationDate(
     evaluationDay(options.evaluationDate),
     options.repositoryPaths,
@@ -248,15 +259,22 @@ function rulesForEvaluationDate(
           ...secretFindings(document),
           ...commandFindings(document),
         ]),
-    ({ documents, config }) =>
+    ({ documents, config, scaffoldResidues }) =>
       documents.flatMap((document) => [
-        ...shapeFindings(document, config),
+        ...shapeFindings(
+          document,
+          config,
+          scaffoldResidues.get(document) ?? [],
+        ),
         ...contextBudgetFindings(document, config),
         ...profileFindings(document),
       ]),
-    ({ documents }) =>
+    ({ documents, scaffoldResidues }) =>
       documents.flatMap((document) =>
-        renmaScaffoldPlaceholderFindings(document),
+        renmaScaffoldPlaceholderFindings(
+          document,
+          scaffoldResidues.get(document) ?? [],
+        ),
       ),
     ({ documents }) =>
       skillLocalSupportReachabilityFindings(
@@ -1033,13 +1051,13 @@ function commandFindings(document: ParsedDocument): Finding[] {
 function shapeFindings(
   document: ParsedDocument,
   config: ScanConfig,
+  scaffoldResidue: readonly RenmaScaffoldPlaceholderResidue[],
 ): Finding[] {
   if (document.artifact.kind !== "skill" && document.artifact.kind !== "agent")
     return [];
 
   const text = document.artifact.content.toLowerCase();
   const findings: Finding[] = [];
-  const scaffoldResidue = renmaScaffoldPlaceholderResidue(document);
   const description =
     document.artifact.kind === "skill"
       ? (resolvedAgentSkillDescription(document) ?? "")
@@ -1047,6 +1065,7 @@ function shapeFindings(
   // Skill budgets measure only Markdown after frontmatter. Agent Skills loads
   // metadata separately, and Renma applies independent metadata budgets.
   const bodyTokenCount = estimateTokens(markdownBodyForDocument(document));
+  const bodyGuidance = markdownBodyGuidanceStatements(document);
 
   if (!description) {
     findings.push(
@@ -1215,7 +1234,11 @@ function shapeFindings(
     "purpose",
   ]);
   if (
-    !hasRoutingClarity(document, metadataText(description) ?? "") ||
+    !hasRoutingClarity(
+      document,
+      metadataText(description) ?? "",
+      bodyGuidance,
+    ) ||
     routingResidue
   ) {
     findings.push(
@@ -1381,7 +1404,7 @@ function shapeFindings(
   const verificationResidue = firstScaffoldResidue(scaffoldResidue, [
     "reviewInstruction",
   ]);
-  if (!hasVerificationGuidance(document) || verificationResidue) {
+  if (!hasVerificationGuidance(document, bodyGuidance) || verificationResidue) {
     findings.push(
       documentFinding(
         document,
@@ -1479,59 +1502,63 @@ function firstScaffoldResidue(
   return residues.find((residue) => names.includes(residue.marker.name));
 }
 
-function renmaScaffoldPlaceholderFindings(document: ParsedDocument): Finding[] {
-  return renmaScaffoldPlaceholderResidue(document).map(
-    ({ marker, evidence: markerEvidence }) =>
-      documentFinding(
-        document,
-        DIAGNOSTIC_IDS.QUAL_RENMA_SCAFFOLD_PLACEHOLDER,
-        "Renma scaffold placeholder remains unresolved",
-        "quality",
-        "high",
-        "Replace this exact Renma-generated starter line with repository-grounded content before treating the asset as complete.",
-        {
-          evidence: markerEvidence,
-          whyItMatters:
-            "Renma's own starter prose is deterministic creation guidance, not authored workflow or Context content. Leaving it in place can make keyword-based quality checks overstate readiness.",
-          repairConstraints: [
-            {
-              kind: "allowed_change",
-              text: "Replace only the evidenced Renma-generated marker.",
-            },
-            {
-              kind: "must_not_change",
-              text: "Do not invent domain facts, owners, policies, dependencies, or source authority.",
-            },
-            {
-              kind: "must_not_change",
-              text: "Do not treat this exact-marker check as proof of general semantic completeness.",
-            },
-          ],
-          verificationSteps: [
-            {
-              text: "Run renma scan . --fail-on high --strict.",
-              command: "renma scan",
-            },
-            {
-              text: "Run renma readiness . and confirm scaffold completeness passes.",
-              command: "renma readiness",
-              expected:
-                "Readiness checks reflect the repaired repository state.",
-            },
-          ],
-          llmHint:
-            "Use repository evidence or human input to replace the exact scaffold marker. Preserve the asset's intended boundary and report any truth that remains unresolved.",
-          details: {
-            scaffoldKind: marker.kind,
-            placeholder: marker.name,
-            matchBoundary: "exact_renma_generated_marker",
+function renmaScaffoldPlaceholderFindings(
+  document: ParsedDocument,
+  residues: readonly RenmaScaffoldPlaceholderResidue[],
+): Finding[] {
+  return residues.map(({ marker, evidence: markerEvidence }) =>
+    documentFinding(
+      document,
+      DIAGNOSTIC_IDS.QUAL_RENMA_SCAFFOLD_PLACEHOLDER,
+      "Renma scaffold placeholder remains unresolved",
+      "quality",
+      "high",
+      "Replace this exact Renma-generated starter line with repository-grounded content before treating the asset as complete.",
+      {
+        evidence: markerEvidence,
+        whyItMatters:
+          "Renma's own starter prose is deterministic creation guidance, not authored workflow or Context content. Leaving it in place can make keyword-based quality checks overstate readiness.",
+        repairConstraints: [
+          {
+            kind: "allowed_change",
+            text: "Replace only the evidenced Renma-generated marker.",
           },
+          {
+            kind: "must_not_change",
+            text: "Do not invent domain facts, owners, policies, dependencies, or source authority.",
+          },
+          {
+            kind: "must_not_change",
+            text: "Do not treat this exact-marker check as proof of general semantic completeness.",
+          },
+        ],
+        verificationSteps: [
+          {
+            text: "Run renma scan . --fail-on high --strict.",
+            command: "renma scan",
+          },
+          {
+            text: "Run renma readiness . and confirm scaffold completeness passes.",
+            command: "renma readiness",
+            expected: "Readiness checks reflect the repaired repository state.",
+          },
+        ],
+        llmHint:
+          "Use repository evidence or human input to replace the exact scaffold marker. Preserve the asset's intended boundary and report any truth that remains unresolved.",
+        details: {
+          scaffoldKind: marker.kind,
+          placeholder: marker.name,
+          matchBoundary: "exact_renma_generated_marker",
         },
-      ),
+      },
+    ),
   );
 }
 
-function hasVerificationGuidance(document: ParsedDocument): boolean {
+function hasVerificationGuidance(
+  document: ParsedDocument,
+  bodyGuidance: readonly string[],
+): boolean {
   if (
     document.headings.some((heading) =>
       VERIFICATION_HEADING_PATTERNS.some((pattern) =>
@@ -1542,7 +1569,7 @@ function hasVerificationGuidance(document: ParsedDocument): boolean {
     return true;
   }
 
-  return markdownBodyGuidanceStatements(document).some((statement) => {
+  return bodyGuidance.some((statement) => {
     const normalized = normalizeInlineCodeForGuidance(statement);
     return (
       !NEGATED_VERIFICATION_PATTERNS.some((pattern) =>
@@ -1556,6 +1583,7 @@ function hasVerificationGuidance(document: ParsedDocument): boolean {
 function hasRoutingClarity(
   document: ParsedDocument,
   description: string,
+  bodyGuidance: readonly string[],
 ): boolean {
   if (hasPositiveRoutingStatement(description, ROUTING_DESCRIPTION_PATTERNS)) {
     return true;
@@ -1570,7 +1598,7 @@ function hasRoutingClarity(
     return true;
   }
 
-  return markdownBodyGuidanceStatements(document).some((statement) =>
+  return bodyGuidance.some((statement) =>
     hasPositiveRoutingStatement(statement, ROUTING_BODY_PATTERNS),
   );
 }
