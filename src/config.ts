@@ -114,36 +114,35 @@ const SECURITY_PROFILE_LEGACY_KEYS = new Map<string, string>([
   ["allowedData", SECURITY_PROFILE_KEYS.allowedData],
   ["forbiddenInputs", SECURITY_PROFILE_KEYS.forbiddenInputs],
 ] as const);
-const TOP_LEVEL_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  TOP_LEVEL_CONFIG_KEYS,
-);
-const QUALITY_CONFIG_KEY_REGISTRY =
-  configurationKeyRegistry(QUALITY_CONFIG_KEYS);
-const METADATA_CONFIG_KEY_REGISTRY =
-  configurationKeyRegistry(METADATA_CONFIG_KEYS);
-const DIAGNOSTICS_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  DIAGNOSTICS_CONFIG_KEYS,
-);
-const SUPPRESSION_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  SUPPRESSION_CONFIG_KEYS,
-);
-const SCAN_BOUNDARY_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  SCAN_BOUNDARY_CONFIG_KEYS,
-);
-const EXECUTABLE_SURFACE_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  EXECUTABLE_SURFACE_CONFIG_KEYS,
-);
-const SECURITY_CONFIG_KEY_REGISTRY =
-  configurationKeyRegistry(SECURITY_CONFIG_KEYS);
-const SECURITY_PROFILE_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  Object.values(SECURITY_PROFILE_KEYS),
-);
-const SKILL_DISCOVERY_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  SKILL_DISCOVERY_CONFIG_KEYS,
-);
-const AGENT_SKILLS_CONFIG_KEY_REGISTRY = configurationKeyRegistry(
-  AGENT_SKILLS_CONFIG_KEYS,
-);
+// Insertion order is the stable diagnostic scope order.
+const CONFIGURATION_KEYS = {
+  "top-level": configurationKeyRegistry("top-level", TOP_LEVEL_CONFIG_KEYS),
+  quality: configurationKeyRegistry("quality", QUALITY_CONFIG_KEYS),
+  metadata: configurationKeyRegistry("metadata", METADATA_CONFIG_KEYS),
+  diagnostics: configurationKeyRegistry("diagnostics", DIAGNOSTICS_CONFIG_KEYS),
+  suppression: configurationKeyRegistry("suppression", SUPPRESSION_CONFIG_KEYS),
+  "scan-boundary": configurationKeyRegistry(
+    "scan_boundary",
+    SCAN_BOUNDARY_CONFIG_KEYS,
+  ),
+  "executable-surface": configurationKeyRegistry(
+    "executable_surface",
+    EXECUTABLE_SURFACE_CONFIG_KEYS,
+  ),
+  security: configurationKeyRegistry("security", SECURITY_CONFIG_KEYS),
+  "security-profile": configurationKeyRegistry(
+    "security profile",
+    Object.values(SECURITY_PROFILE_KEYS),
+  ),
+  "agent-skills": configurationKeyRegistry(
+    "agent_skills",
+    AGENT_SKILLS_CONFIG_KEYS,
+  ),
+  "skill-discovery": configurationKeyRegistry(
+    "skill_discovery",
+    SKILL_DISCOVERY_CONFIG_KEYS,
+  ),
+};
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = [
@@ -953,31 +952,23 @@ function securityProfiles(
 }
 
 interface ConfigurationKeyRegistry {
+  label: string;
   acceptedKeys: ReadonlySet<string>;
   sortedKeys: readonly string[];
 }
 
 function configurationKeyRegistry(
+  label: string,
   keys: readonly string[],
 ): ConfigurationKeyRegistry {
   return {
+    label,
     acceptedKeys: new Set(keys),
     sortedKeys: [...keys].sort(compareUtf16CodeUnits),
   };
 }
 
-type ConfigurationKeyScope =
-  | "top-level"
-  | "quality"
-  | "metadata"
-  | "diagnostics"
-  | "suppression"
-  | "scan-boundary"
-  | "executable-surface"
-  | "security"
-  | "security-profile"
-  | "agent-skills"
-  | "skill-discovery";
+type ConfigurationKeyScope = keyof typeof CONFIGURATION_KEYS;
 type ConfigurationKeyIssueKind = "historical" | "removed" | "unknown";
 
 interface ConfigurationKeyIssueBase {
@@ -993,25 +984,9 @@ type ConfigurationKeyIssue = ConfigurationKeyIssueBase &
     | { kind: "removed" | "unknown"; replacement?: never }
   );
 
-const CONFIGURATION_KEY_SCOPE_ORDER: Record<ConfigurationKeyScope, number> = {
-  "top-level": 0,
-  quality: 1,
-  metadata: 2,
-  diagnostics: 3,
-  suppression: 4,
-  "scan-boundary": 5,
-  "executable-surface": 6,
-  security: 7,
-  "security-profile": 8,
-  "agent-skills": 9,
-  "skill-discovery": 10,
-};
-const CONFIGURATION_KEY_SCOPES_IN_ORDER = (
-  Object.keys(CONFIGURATION_KEY_SCOPE_ORDER) as ConfigurationKeyScope[]
-).sort(
-  (left, right) =>
-    CONFIGURATION_KEY_SCOPE_ORDER[left] - CONFIGURATION_KEY_SCOPE_ORDER[right],
-);
+const CONFIGURATION_KEY_SCOPES_IN_ORDER = Object.keys(
+  CONFIGURATION_KEYS,
+) as ConfigurationKeyScope[];
 
 function validateConfigurationStructure(config: Record<string, unknown>): void {
   if (config.quality !== undefined && !isRecord(config.quality)) {
@@ -1083,7 +1058,7 @@ function validateConfigurationKeys(
 ): void {
   const issues: ConfigurationKeyIssue[] = [];
   for (const key of Object.keys(config)) {
-    if (TOP_LEVEL_CONFIG_KEY_REGISTRY.acceptedKeys.has(key)) continue;
+    if (CONFIGURATION_KEYS["top-level"].acceptedKeys.has(key)) continue;
     issues.push({
       scope: "top-level",
       key,
@@ -1091,29 +1066,18 @@ function validateConfigurationKeys(
     });
   }
 
-  if (isRecord(config.quality)) {
-    collectUnknownConfigurationKeys(
-      "quality",
-      config.quality,
-      QUALITY_CONFIG_KEY_REGISTRY,
-      issues,
-    );
-  }
-  if (isRecord(config.metadata)) {
-    collectUnknownConfigurationKeys(
-      "metadata",
-      config.metadata,
-      METADATA_CONFIG_KEY_REGISTRY,
-      issues,
-    );
-  }
-  if (isRecord(config.diagnostics)) {
-    collectUnknownConfigurationKeys(
-      "diagnostics",
-      config.diagnostics,
-      DIAGNOSTICS_CONFIG_KEY_REGISTRY,
-      issues,
-    );
+  for (const scope of CONFIGURATION_KEY_SCOPES_IN_ORDER) {
+    if (
+      scope === "top-level" ||
+      scope === "suppression" ||
+      scope === "security-profile"
+    )
+      continue;
+    const registry = CONFIGURATION_KEYS[scope];
+    const section = config[registry.label];
+    if (isRecord(section)) {
+      collectUnknownConfigurationKeys(scope, section, registry, issues);
+    }
   }
   if (Array.isArray(config.suppressions)) {
     for (const [
@@ -1124,54 +1088,14 @@ function validateConfigurationKeys(
       collectUnknownConfigurationKeys(
         "suppression",
         suppression,
-        SUPPRESSION_CONFIG_KEY_REGISTRY,
+        CONFIGURATION_KEYS["suppression"],
         issues,
         { suppressionIndex },
       );
     }
   }
-  if (isRecord(config.scan_boundary)) {
-    collectUnknownConfigurationKeys(
-      "scan-boundary",
-      config.scan_boundary,
-      SCAN_BOUNDARY_CONFIG_KEY_REGISTRY,
-      issues,
-    );
-  }
-  if (isRecord(config.executable_surface)) {
-    collectUnknownConfigurationKeys(
-      "executable-surface",
-      config.executable_surface,
-      EXECUTABLE_SURFACE_CONFIG_KEY_REGISTRY,
-      issues,
-    );
-  }
-  if (isRecord(config.security)) {
-    collectUnknownConfigurationKeys(
-      "security",
-      config.security,
-      SECURITY_CONFIG_KEY_REGISTRY,
-      issues,
-    );
-    if (isRecord(config.security.profiles)) {
-      collectSecurityProfileKeyIssues(config.security.profiles, issues);
-    }
-  }
-  if (isRecord(config.agent_skills)) {
-    collectUnknownConfigurationKeys(
-      "agent-skills",
-      config.agent_skills,
-      AGENT_SKILLS_CONFIG_KEY_REGISTRY,
-      issues,
-    );
-  }
-  if (isRecord(config.skill_discovery)) {
-    collectUnknownConfigurationKeys(
-      "skill-discovery",
-      config.skill_discovery,
-      SKILL_DISCOVERY_CONFIG_KEY_REGISTRY,
-      issues,
-    );
+  if (isRecord(config.security) && isRecord(config.security.profiles)) {
+    collectSecurityProfileKeyIssues(config.security.profiles, issues);
   }
   if (issues.length === 0) return;
 
@@ -1202,7 +1126,8 @@ function collectSecurityProfileKeyIssues(
   for (const [profileName, profile] of Object.entries(profiles)) {
     if (!isRecord(profile)) continue;
     for (const key of Object.keys(profile)) {
-      if (SECURITY_PROFILE_CONFIG_KEY_REGISTRY.acceptedKeys.has(key)) continue;
+      if (CONFIGURATION_KEYS["security-profile"].acceptedKeys.has(key))
+        continue;
       const replacement = SECURITY_PROFILE_LEGACY_KEYS.get(key);
       if (replacement) {
         issues.push({
@@ -1229,8 +1154,8 @@ function compareConfigurationKeyIssues(
   right: ConfigurationKeyIssue,
 ): number {
   return (
-    CONFIGURATION_KEY_SCOPE_ORDER[left.scope] -
-      CONFIGURATION_KEY_SCOPE_ORDER[right.scope] ||
+    CONFIGURATION_KEY_SCOPES_IN_ORDER.indexOf(left.scope) -
+      CONFIGURATION_KEY_SCOPES_IN_ORDER.indexOf(right.scope) ||
     (left.suppressionIndex ?? -1) - (right.suppressionIndex ?? -1) ||
     compareUtf16CodeUnits(left.profileName ?? "", right.profileName ?? "") ||
     compareUtf16CodeUnits(left.key, right.key)
@@ -1269,26 +1194,12 @@ function configurationKeyIssueGroup(issue: ConfigurationKeyIssue): string {
   switch (issue.scope) {
     case "top-level":
       return "Top-level configuration";
-    case "quality":
-      return "quality";
-    case "metadata":
-      return "metadata";
-    case "diagnostics":
-      return "diagnostics";
     case "suppression":
       return `suppressions[${issue.suppressionIndex}]`;
-    case "scan-boundary":
-      return "scan_boundary";
-    case "executable-surface":
-      return "executable_surface";
-    case "security":
-      return "security";
     case "security-profile":
       return `security.profiles.${issue.profileName}`;
-    case "agent-skills":
-      return "agent_skills";
-    case "skill-discovery":
-      return "skill_discovery";
+    default:
+      return CONFIGURATION_KEYS[issue.scope].label;
   }
 }
 
@@ -1304,70 +1215,8 @@ function formatConfigurationKeyIssue(issue: ConfigurationKeyIssue): string {
 }
 
 function allowedConfigurationKeys(scope: ConfigurationKeyScope): string {
-  switch (scope) {
-    case "top-level":
-      return allowedConfigurationKeysMessage(
-        "top-level",
-        TOP_LEVEL_CONFIG_KEY_REGISTRY,
-      );
-    case "quality":
-      return allowedConfigurationKeysMessage(
-        "quality",
-        QUALITY_CONFIG_KEY_REGISTRY,
-      );
-    case "metadata":
-      return allowedConfigurationKeysMessage(
-        "metadata",
-        METADATA_CONFIG_KEY_REGISTRY,
-      );
-    case "diagnostics":
-      return allowedConfigurationKeysMessage(
-        "diagnostics",
-        DIAGNOSTICS_CONFIG_KEY_REGISTRY,
-      );
-    case "suppression":
-      return allowedConfigurationKeysMessage(
-        "suppression",
-        SUPPRESSION_CONFIG_KEY_REGISTRY,
-      );
-    case "scan-boundary":
-      return allowedConfigurationKeysMessage(
-        "scan_boundary",
-        SCAN_BOUNDARY_CONFIG_KEY_REGISTRY,
-      );
-    case "executable-surface":
-      return allowedConfigurationKeysMessage(
-        "executable_surface",
-        EXECUTABLE_SURFACE_CONFIG_KEY_REGISTRY,
-      );
-    case "security":
-      return allowedConfigurationKeysMessage(
-        "security",
-        SECURITY_CONFIG_KEY_REGISTRY,
-      );
-    case "security-profile":
-      return allowedConfigurationKeysMessage(
-        "security profile",
-        SECURITY_PROFILE_CONFIG_KEY_REGISTRY,
-      );
-    case "agent-skills":
-      return allowedConfigurationKeysMessage(
-        "agent_skills",
-        AGENT_SKILLS_CONFIG_KEY_REGISTRY,
-      );
-    case "skill-discovery":
-      return allowedConfigurationKeysMessage(
-        "skill_discovery",
-        SKILL_DISCOVERY_CONFIG_KEY_REGISTRY,
-      );
-  }
-}
-
-function allowedConfigurationKeysMessage(
-  label: string,
-  registry: ConfigurationKeyRegistry,
-): string {
-  return `Allowed ${label} keys: ${registry.sortedKeys.join(", ")}.`;
+  const { label, sortedKeys } = CONFIGURATION_KEYS[scope];
+  return `Allowed ${label} keys: ${sortedKeys.join(", ")}.`;
 }
 
 function configurationKeyIssueAction(
