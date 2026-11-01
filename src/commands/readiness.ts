@@ -230,9 +230,27 @@ export function buildReadinessReport(
     graphEdgesCheck(unresolvedBlockingEdges),
     workflowContextClosureCheck(workflowContexts),
     workflowOptionalContextCheck(workflowContexts),
-    workflowClarityCheck(findings),
-    workflowRequiredInputsCheck(findings),
-    workflowCompletionCriteriaCheck(findings),
+    workflowFindingCheck(findings, WORKFLOW_CLARITY_FINDING_IDS, {
+      id: "workflow.clarity",
+      title: "Workflow clarity",
+      passSummary:
+        "All skill workflow entrypoints include static routing clarity.",
+      findingLabel: "workflow clarity",
+    }),
+    workflowFindingCheck(findings, WORKFLOW_REQUIRED_INPUTS_FINDING_IDS, {
+      id: "workflow.required_inputs",
+      title: "Workflow required inputs",
+      passSummary:
+        "All skill workflow entrypoints document required inputs or prerequisites.",
+      findingLabel: "workflow required-input",
+    }),
+    workflowFindingCheck(findings, WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS, {
+      id: "workflow.completion_criteria",
+      title: "Workflow completion criteria",
+      passSummary:
+        "All skill workflow entrypoints document completion criteria.",
+      findingLabel: "workflow completion-criteria",
+    }),
     contextLensGovernanceCheck(contextLens, diagnostics),
     lifecycleCheck(lifecycleAssets),
     freshnessCheck(findings),
