@@ -1,6 +1,6 @@
 {
   "name": "renma",
-  "version": "0.41.2",
+  "version": "0.42.0",
   "description": "Manage human-curated context assets for LLMs and agents in Git.",
   "license": "MIT",
   "repository": {
