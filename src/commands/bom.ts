@@ -773,7 +773,7 @@ function formatExecutableSurfaceInventoryMarkdown(
   const lines = [
     `- Schema: ${inventory.schema}`,
     `- Surfaces: ${summary.totalSurfaces}`,
-    `- Scope: ${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.noncanonicalSurfaces} non-canonical`,
+    `- Scope: ${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.repositoryScriptSurfaces} Context/Lens scripts, ${summary.noncanonicalSurfaces} non-canonical`,
     `- Skill-local reachability: ${summary.reachableSkillLocalSurfaces} reachable, ${summary.unreachableSkillLocalSurfaces} unreachable`,
     `- Referenced/invoked: ${summary.referencedSurfaces}/${summary.invokedSurfaces}`,
     `- Surface policy evidence: ${summary.surfacesWithEffectivePolicy} with, ${summary.surfacesWithoutEffectivePolicy} without`,

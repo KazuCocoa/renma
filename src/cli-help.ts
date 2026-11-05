@@ -284,6 +284,7 @@ export const COMMAND_HELP = [
       "You need to inspect dependencies, references, unresolved targets, or isolation.",
       "You want a one-hop neighborhood with --focus for one asset ID or path.",
       "You want to inspect which scripts a Skill invokes or which Skills use a script.",
+      "You want to inspect individual scripts referenced or invoked by a Context or Lens.",
       "You need Markdown, JSON, or Mermaid evidence for review.",
     ],
     doNotUseFor: [
@@ -311,7 +312,7 @@ export const COMMAND_HELP = [
       "The impact view resolves reverse explicit composition to required and optional declared dependents; it reports neither runtime usage nor breakage and requires --focus.",
       "The dependencies and asset-impact views traverse explicit composition plus static support references forward or backward; both require --focus and exclude ownership and runtime usage.",
       "The discovery view derives cycle-safe reachability from explicit published entrypoints through usable declared continuations, with descriptive partial coverage and authoritative adopted coverage; optional focus keeps repository-wide adoption and coverage while filtering visible arrays and summary counts to one Skill's direct neighborhood.",
-      "The executable view shows canonical Skill/script invocation and script dependency edges separately from deterministic Skill-local structural containment; optional focus supports either a Skill ID/path or executable path.",
+      "The executable view shows Skill/Context/Lens invocation, individual Context/Lens script references, and script dependency edges separately from deterministic Skill-local structural containment; focus supports asset IDs/paths or executable paths.",
     ],
     exitBehavior: [
       "0: The graph report contains no error diagnostics.",

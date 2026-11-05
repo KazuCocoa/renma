@@ -1,4 +1,5 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
+import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 import { createHash } from "node:crypto";
 import { lstatSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -437,6 +438,18 @@ export function classifyAssetPath(
   // 3. Recognized top-level asset roots.
   const segments = currentPath.split("/");
   const root = segments[0] ?? "";
+  if (isGovernedRepositoryScriptPath(currentPath)) {
+    return {
+      ...classification(
+        "script",
+        "repository-support",
+        "repository-script",
+        "governed-repository-script",
+        "The executable file is under a Context or Lens root; references do not establish ownership or policy inheritance.",
+      ),
+      recognizedRoot: root,
+    };
+  }
   if (root === "context") {
     return classification(
       "unknown",

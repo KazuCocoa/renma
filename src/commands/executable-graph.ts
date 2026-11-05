@@ -36,6 +36,15 @@ export function executableGraphReport(
   const skillNodes = report.nodes
     .filter((node) => node.kind === "skill")
     .map((node): GraphNode => ({ ...node, executableRole: "skill" }));
+  const documentNodes = report.nodes
+    .filter((node) => node.kind === "context" || node.kind === "context_lens")
+    .map((node): GraphNode => ({
+      ...node,
+      executableRole: node.kind === "context" ? "context" : "context-lens",
+    }));
+  const documentsBySourcePath = new Map(
+    documentNodes.map((node) => [node.sourcePath, node]),
+  );
   const skillsBySourcePath = new Map(
     skillNodes.map((node) => [node.sourcePath, node]),
   );
@@ -61,6 +70,8 @@ export function executableGraphReport(
   const sourceNode = (sourcePath: string): GraphNode | undefined => {
     const surface = surfaceNodesByPath.get(sourcePath);
     if (surface) return surface;
+    const document = documentsBySourcePath.get(sourcePath);
+    if (document) return document;
     const skillDirectory = logicalSkillDirectory(sourcePath);
     if (!skillDirectory) return skillsBySourcePath.get(sourcePath);
     const parents = skillParents.get(skillDirectory) ?? [];
@@ -179,8 +190,34 @@ export function executableGraphReport(
     });
   }
 
+  const referenceEdges = report.edges.flatMap((edge): GraphEdge[] => {
+    if (edge.kind !== "statically_references" || !edge.resolved) return [];
+    const source = sourceNode(edge.sourcePath);
+    const target = edge.targetPath
+      ? surfacesByPath.get(edge.targetPath)
+      : undefined;
+    if (
+      !source ||
+      !target ||
+      (source.executableRole !== "context" &&
+        source.executableRole !== "context-lens" &&
+        target.scope !== "repository-script")
+    )
+      return [];
+    return [
+      {
+        ...edge,
+        from: source.id,
+        to: target.path,
+        targetId: target.path,
+        targetKind: "script",
+        targetPath: target.path,
+      },
+    ];
+  });
   const edges = uniqueExecutableEdges([
     ...containmentEdges,
+    ...referenceEdges,
     ...invocationEdges,
     ...dependencyEdges,
     ...externalInvocationEdges.values(),
@@ -205,6 +242,7 @@ export function executableGraphReport(
   }));
   const candidateNodes = [
     ...skillNodes,
+    ...documentNodes,
     ...surfaceNodes,
     ...externalNodes,
   ].sort(compareGraphNodes);
@@ -216,7 +254,7 @@ export function executableGraphReport(
     );
     if (!selected) {
       throw new CliUserError(
-        `graph --view executable --focus did not match any known Skill or executable surface: ${focus}. Run renma scan . --format json and inspect executableSurfaceInventory for unresolved evidence.`,
+        `graph --view executable --focus did not match any known Skill, Context, Lens, or executable surface: ${focus}. Run renma scan . --format json and inspect executableSurfaceInventory for unresolved evidence.`,
       );
     }
   }
@@ -307,7 +345,7 @@ export function formatExecutableGraphMarkdown(report: GraphReport): string {
     lines.push(
       "No canonical executable relationships were found for this projection.",
       "",
-      "Renma renders normalized resolved or non-canonical invocation/dependency targets whose sources map to a Skill or repository script, plus deterministic Skill-local structural placement. Evidence from other source asset kinds stays auditable below without becoming topology. Run `renma scan . --format json` and inspect `executableSurfaceInventory` for missing, unsafe, unavailable, or otherwise unresolved evidence.",
+      "Renma renders exact Context/Lens script references, normalized resolved or non-canonical invocation/dependency targets from Skills, Contexts, Lenses, or repository scripts, and deterministic Skill-local structural placement. Run `renma scan . --format json` and inspect `executableSurfaceInventory` for missing, unsafe, unavailable, or otherwise unresolved evidence.",
     );
   } else if (executable.focus) {
     const focusNode = nodesById.get(executable.focus.id);
@@ -395,6 +433,8 @@ export function formatExecutableGraphMermaid(report: GraphReport): string {
   }
   for (const role of [
     "skill",
+    "context",
+    "context-lens",
     "repository-script",
     "external-executable",
   ] as const) {
@@ -424,7 +464,7 @@ export function formatExecutableGraphMermaid(report: GraphReport): string {
     }
   }
   lines.push(
-    "  %% Solid edges are normalized invocation relationships. Dotted contains edges are deterministic structural placement only; neither relationship states ownership or exclusive use.",
+    "  %% Solid edges are labeled static references or invocation relationships. Dotted contains edges are deterministic structural placement only; none authorizes execution or exclusive use.",
   );
   return `${lines.join("\n")}\n`;
 }
@@ -565,9 +605,13 @@ function renderExecutableRelationships(
       const reverse =
         edge.kind === "contains"
           ? "belongs to"
-          : source?.executableRole === "skill"
-            ? "used by"
-            : "invoked by";
+          : edge.kind === "statically_references"
+            ? "referenced by"
+            : source?.executableRole === "skill" ||
+                source?.executableRole === "context" ||
+                source?.executableRole === "context-lens"
+              ? "used by"
+              : "invoked by";
       relationships.push(
         `- ${reverse} → ${edge.from}${source ? ` (${executableNodeDescription(source)})` : ""}`,
       );
@@ -612,6 +656,10 @@ function executableRoleLabel(role: ExecutableGraphNodeRole): string {
   switch (role) {
     case "skill":
       return "Skill";
+    case "context":
+      return "Context";
+    case "context-lens":
+      return "Context Lens";
     case "repository-script":
       return "repository script";
     case "external-executable":

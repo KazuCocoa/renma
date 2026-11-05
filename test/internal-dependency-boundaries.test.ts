@@ -114,6 +114,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "cli-errors.ts",
         "command-invocation.ts",
         "config.ts",
+        "executable-path-contract.ts",
         "dependency-selectors.ts",
         "dependency-resolution.ts",
         "diagnostic-default-severity.ts",

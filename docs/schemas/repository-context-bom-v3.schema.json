@@ -691,6 +691,7 @@
         "totalSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
         "skillLocalSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
         "repositoryToolSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "repositoryScriptSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
         "noncanonicalSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
         "textSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
         "binarySurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
@@ -841,7 +842,12 @@
       "properties": {
         "path": { "type": "string" },
         "scope": {
-          "enum": ["skill-local", "repository-tool", "noncanonical"]
+          "enum": [
+            "skill-local",
+            "repository-tool",
+            "repository-script",
+            "noncanonical"
+          ]
         },
         "origins": {
           "type": "array",

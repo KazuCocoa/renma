@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Discover supported scripts under `contexts/**` and `lenses/**` using the
+  existing executable inventory, dependency analyzers, security checks, BOM,
+  diff, and CI evidence. Individual Markdown references and helper commands
+  retain their source Context/Lens in graph outputs without implying ownership,
+  policy inheritance, or execution. Skill-local behavior is unchanged.
+- Added `repository-script` executable scope, `repositoryScriptSurfaces`
+  inventory count and diff delta, and Context/Lens executable graph roles.
+  BOM v3 accepts the additive scope/count; the inventory remains v1.
+
 ## [0.41.2] - 2026-10-31
 
 ### Changed

@@ -143,7 +143,12 @@ disclosure when they have a clear local responsibility.
 Promotion to shared `contexts/` is a semantic and governance decision. File size,
 location, repeated wording, or a diagnostic may provide evidence, but none
 authorizes an automatic split. Shared helper implementations belong under
-`tools/**`; shared knowledge belongs in Context Assets.
+`tools/**`; shared knowledge belongs in Context Assets. Contexts and Lenses may
+also reference helper scripts under their own roots to retrieve, filter,
+transform, or validate their associated information. Those files receive the
+same bounded executable governance as Skill scripts. Exact usage references do
+not imply ownership, policy inheritance, or permission to execute; no Context
+manifest or directory entrypoint is required.
 
 Context Assets should be organized by meaning rather than migration state.
 Temporary staging paths may help during a reviewed move, but durable paths

@@ -117,6 +117,7 @@ export interface ExecutableSurfaceDiff {
     totalSurfacesDelta: number;
     skillLocalSurfacesDelta: number;
     repositoryToolSurfacesDelta: number;
+    repositoryScriptSurfacesDelta: number;
     noncanonicalSurfacesDelta: number;
     reachableSkillLocalSurfacesDelta: number;
     unreachableSkillLocalSurfacesDelta: number;
@@ -400,6 +401,8 @@ function summaryDelta(
     skillLocalSurfacesDelta: to.skillLocalSurfaces - from.skillLocalSurfaces,
     repositoryToolSurfacesDelta:
       to.repositoryToolSurfaces - from.repositoryToolSurfaces,
+    repositoryScriptSurfacesDelta:
+      to.repositoryScriptSurfaces - from.repositoryScriptSurfaces,
     noncanonicalSurfacesDelta:
       to.noncanonicalSurfaces - from.noncanonicalSurfaces,
     reachableSkillLocalSurfacesDelta:

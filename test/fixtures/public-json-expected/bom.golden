@@ -809,6 +809,7 @@
       "totalSurfaces": 0,
       "skillLocalSurfaces": 0,
       "repositoryToolSurfaces": 0,
+      "repositoryScriptSurfaces": 0,
       "noncanonicalSurfaces": 0,
       "textSurfaces": 0,
       "binarySurfaces": 0,

@@ -133,7 +133,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
       "missing",
       "unsafe",
       "noncanonical",
-      "unsupported",
+      "resolved",
       "resolved",
     ],
   );
@@ -186,6 +186,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
     summary.totalSurfaces,
     summary.skillLocalSurfaces +
       summary.repositoryToolSurfaces +
+      summary.repositoryScriptSurfaces +
       summary.noncanonicalSurfaces,
   );
   assert.equal(
@@ -238,7 +239,9 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
     );
     assert.ok(surface, invocation.normalizedTarget);
     assert.ok(
-      surface.scope === "skill-local" || surface.scope === "repository-tool",
+      surface.scope === "skill-local" ||
+        surface.scope === "repository-tool" ||
+        surface.scope === "repository-script",
       `${surface.path}: ${surface.scope}`,
     );
   }
@@ -296,7 +299,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.match(text, /Executable Surface Review/);
   assert.match(
     text,
-    /Executable surfaces: \d+; static reachability 3 direct, 0 transitive; invocations 4\/9 resolved; invocation-context policy evidence 8\/9/,
+    /Executable surfaces: \d+; static reachability 4 direct, 0 transitive; invocations 5\/9 resolved; invocation-context policy evidence 8\/9/,
   );
   assert.match(
     text,
@@ -357,7 +360,7 @@ test("helper resolution preserves exact unavailable states and bounded evidence"
       "symlink",
       "unreadable",
       "missing",
-      "noncanonical",
+      "resolved",
       "unsafe",
     ],
   );
@@ -367,7 +370,7 @@ test("helper resolution preserves exact unavailable states and bounded evidence"
   );
 });
 
-test("helper resolution preserves noncanonical repository availability before parsed scope", () => {
+test("helper resolution preserves Context script availability before parsed scope", () => {
   const source = artifact(
     "skills/demo/SKILL.md",
     [
@@ -401,7 +404,7 @@ test("helper resolution preserves noncanonical repository availability before pa
       (command) => resolveHelperCommandEvidence(command, states).resolution,
     ),
     [
-      "noncanonical",
+      "resolved",
       "missing",
       "missing",
       "excluded",

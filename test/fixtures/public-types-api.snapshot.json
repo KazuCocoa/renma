@@ -318,7 +318,7 @@
     },
     "executable-surface-inventory.d.ts#ExecutableSurfaceInventorySummary": {
       "declarations": [
-        "export interface ExecutableSurfaceInventorySummary { totalSurfaces: number; skillLocalSurfaces: number; repositoryToolSurfaces: number; noncanonicalSurfaces: number; textSurfaces: number; binarySurfaces: number; reachableSkillLocalSurfaces: number; unreachableSkillLocalSurfaces: number; referencedSurfaces: number; unreferencedSurfaces: number; invokedSurfaces: number; uninvokedSurfaces: number; surfacesWithEffectivePolicy: number; surfacesWithoutEffectivePolicy: number; totalInvocations: number; resolvedInvocations: number; missingInvocations: number; unsafeInvocations: number; unscopedInvocations: number; noncanonicalInvocations: number; unavailableInvocations: number; invocationsWithEffectivePolicyEvidence: number; invocationsWithoutEffectivePolicyEvidence: number; resolvedInvocationsWithEffectivePolicyEvidence: number; resolvedInvocationsWithoutEffectivePolicyEvidence: number; invocationsWithMultipleEffectivePolicyFingerprints: number; invocationPolicyEvidenceRelations: { sourceArtifact: number; owningSkill: number; }; totalDependencies: number; resolvedDependencies: number; missingDependencies: number; unsafeDependencies: number; ambiguousDependencies: number; noncanonicalDependencies: number; notInventoryDependencies: number; unavailableDependencies: number; surfacesWithIncomingDependencies: number; surfacesWithOutgoingDependencies: number; directlyInvokedSurfaces: number; transitivelyReachableSurfaces: number; unreachedFromInvocationSurfaces: number; dependencyAnalyzers: Array<{ analyzer: BuiltInExecutableDependencyAnalyzerId; count: number; }>; dependencyRelations: Array<{ relation: ExecutableDependencyRelation; count: number; }>; interpreterHints: Array<{ interpreter: string; count: number; }>; }"
+        "export interface ExecutableSurfaceInventorySummary { totalSurfaces: number; skillLocalSurfaces: number; repositoryToolSurfaces: number; repositoryScriptSurfaces: number; noncanonicalSurfaces: number; textSurfaces: number; binarySurfaces: number; reachableSkillLocalSurfaces: number; unreachableSkillLocalSurfaces: number; referencedSurfaces: number; unreferencedSurfaces: number; invokedSurfaces: number; uninvokedSurfaces: number; surfacesWithEffectivePolicy: number; surfacesWithoutEffectivePolicy: number; totalInvocations: number; resolvedInvocations: number; missingInvocations: number; unsafeInvocations: number; unscopedInvocations: number; noncanonicalInvocations: number; unavailableInvocations: number; invocationsWithEffectivePolicyEvidence: number; invocationsWithoutEffectivePolicyEvidence: number; resolvedInvocationsWithEffectivePolicyEvidence: number; resolvedInvocationsWithoutEffectivePolicyEvidence: number; invocationsWithMultipleEffectivePolicyFingerprints: number; invocationPolicyEvidenceRelations: { sourceArtifact: number; owningSkill: number; }; totalDependencies: number; resolvedDependencies: number; missingDependencies: number; unsafeDependencies: number; ambiguousDependencies: number; noncanonicalDependencies: number; notInventoryDependencies: number; unavailableDependencies: number; surfacesWithIncomingDependencies: number; surfacesWithOutgoingDependencies: number; directlyInvokedSurfaces: number; transitivelyReachableSurfaces: number; unreachedFromInvocationSurfaces: number; dependencyAnalyzers: Array<{ analyzer: BuiltInExecutableDependencyAnalyzerId; count: number; }>; dependencyRelations: Array<{ relation: ExecutableDependencyRelation; count: number; }>; interpreterHints: Array<{ interpreter: string; count: number; }>; }"
       ],
       "references": [
         "executable-dependency-analyzer.d.ts#BuiltInExecutableDependencyAnalyzerId",
@@ -350,7 +350,7 @@
     },
     "executable-surface-inventory.d.ts#ExecutableSurfaceScope": {
       "declarations": [
-        "export type ExecutableSurfaceScope = \"skill-local\" | \"repository-tool\" | \"noncanonical\";"
+        "export type ExecutableSurfaceScope = \"skill-local\" | \"repository-tool\" | \"repository-script\" | \"noncanonical\";"
       ],
       "references": []
     },
@@ -777,13 +777,13 @@
     },
     "types/classification.d.ts#ASSET_CLASSIFICATION_REASON_CODES": {
       "declarations": [
-        "ASSET_CLASSIFICATION_REASON_CODES: readonly [ \"under-canonical-skill-root\", \"under-skill-support-directory\", \"outside-recognized-asset-boundary\", \"unsupported-skill-local-directory\", \"under-recognized-context-root\", \"under-recognized-lens-root\", \"under-recognized-agent-root\", \"repository-tool-not-context\", \"recognized-config-file\", \"under-generic-support-directory\", \"outside-recognized-skill-boundary\", \"outside-recognized-context-root\" ]"
+        "ASSET_CLASSIFICATION_REASON_CODES: readonly [ \"under-canonical-skill-root\", \"under-skill-support-directory\", \"outside-recognized-asset-boundary\", \"unsupported-skill-local-directory\", \"under-recognized-context-root\", \"under-recognized-lens-root\", \"under-recognized-agent-root\", \"repository-tool-not-context\", \"governed-repository-script\", \"recognized-config-file\", \"under-generic-support-directory\", \"outside-recognized-skill-boundary\", \"outside-recognized-context-root\" ]"
       ],
       "references": []
     },
     "types/classification.d.ts#ASSET_CLASSIFICATION_RULES": {
       "declarations": [
-        "ASSET_CLASSIFICATION_RULES: readonly [ \"skill-entrypoint\", \"skill-local-support\", \"context-root\", \"lens-root\", \"agent-root\", \"repository-tool\", \"config-file\", \"generic-profile\", \"generic-reference\", \"generic-example\", \"unknown\" ]"
+        "ASSET_CLASSIFICATION_RULES: readonly [ \"skill-entrypoint\", \"skill-local-support\", \"context-root\", \"lens-root\", \"agent-root\", \"repository-tool\", \"repository-script\", \"config-file\", \"generic-profile\", \"generic-reference\", \"generic-example\", \"unknown\" ]"
       ],
       "references": []
     },

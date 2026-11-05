@@ -1,5 +1,6 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
+import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 
 import {
   classifyRepositorySkillPath,
@@ -740,8 +741,21 @@ export function buildStaticSupportDependencies(
   return dedupeDependencies(result);
 }
 
-/** Exact Markdown destinations and quoted paths; no repository-wide basename guessing. */
-function repositorySupportReferences(
+/** Exact script uses shared by discovery, path states, and inspection coverage. */
+export function repositoryScriptReferences(
+  documents: readonly ParsedDocument[],
+): StaticSupportReference[] {
+  return documents.flatMap((document) =>
+    document.artifact.markdownParserEligible
+      ? repositorySupportReferences(document).filter((reference) =>
+          isGovernedRepositoryScriptPath(reference.targetPath),
+        )
+      : [],
+  );
+}
+
+/** Exact Markdown destinations and path tokens; no repository-wide basename guessing. */
+export function repositorySupportReferences(
   document: ParsedDocument,
 ): StaticSupportReference[] {
   const syntax = ensureMarkdownSyntaxForDocument(document);
@@ -769,6 +783,19 @@ function repositorySupportReferences(
         continue;
       if (!value.includes("/")) continue;
       values.push({ value, raw: match[0] });
+    }
+    // File-based Contexts and Lenses also accept the explicit path tokens used
+    // by Skills. No basename guessing or directory expansion establishes use.
+    if (
+      document.artifact.kind === "context" ||
+      document.artifact.kind === "context_lens"
+    ) {
+      const unquoted = line.replace(/([`'"])[^`'"\r\n]+\1/g, " ");
+      for (const match of unquoted.matchAll(
+        /(?:^|[\s([])((?:\.\.?\/)*[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+[^\s)`'"\],;:]*)/g,
+      )) {
+        values.push({ value: match[1]!, raw: match[1]! });
+      }
     }
     for (const { value, raw } of values) {
       const cleaned = decodePath(stripUriSuffix(value.trim())).replace(

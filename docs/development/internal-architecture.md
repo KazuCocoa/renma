@@ -649,9 +649,24 @@ construction, but provider discovery, installation, permissions, and version
 negotiation are deliberately absent.
 
 Dependency sources are only text surfaces already eligible for the inventory:
-Skill-local scripts, repository-root tools, and non-canonical discovered or
+Skill-local scripts, supported Context/Lens repository scripts, repository-root tools, and non-canonical discovered or
 statically invoked scripts. A parsed import target that is not one of those
 surfaces resolves as `not-inventory`; it never creates a surface.
+
+`src/executable-path-contract.ts` owns the shared executable suffix grammar and
+Context/Lens script discovery globs, including non-Markdown `scripts/**`
+contents and supported executable suffixes elsewhere under those roots.
+These files are `script` artifacts with
+`repository-script` executable scope, not independent Markdown Contexts or
+Lenses. Existing Markdown classification remains unchanged. Exact references
+reuse `repositorySupportReferences`; helper commands resolve relative to the
+source document outside Skills. Collection may inspect an explicitly referenced
+script without admitting its directory, using the existing repository boundary.
+The same exact-reference selection feeds path states and inspection coverage;
+uninspectable referenced scripts participate in the existing strict-scan checks.
+References retain source identity without creating containment or inherited
+governance. Executable graph projections include Context/Lens source nodes and
+keep `statically_references` separate from `invokes`.
 
 The JS/TS collector supports `.js`, `.mjs`, `.ts`, `.mts`, and `.cts` sources,
 but not `.cjs`, `.jsx`, or `.tsx` sources. It recognizes string-literal ESM

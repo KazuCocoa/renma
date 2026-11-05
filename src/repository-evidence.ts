@@ -55,7 +55,10 @@ import {
   scanBoundarySource,
   type ScanBoundarySource,
 } from "./scan-boundary.js";
-import { staticallyExpectedSupportInspection } from "./static-support.js";
+import {
+  staticallyExpectedSupportInspection,
+  repositoryScriptReferences,
+} from "./static-support.js";
 
 export interface RepositorySnapshotCore {
   readonly root: string;
@@ -249,14 +252,20 @@ async function collectRepositorySnapshotCore(
           [...discovery.excludedSupportDirectoryPathsBySource[sourceIndex]!],
         );
         const attemptedPaths = attemptedExplicitPathsBySource[sourceIndex]!;
-        return expected.paths
-          .map((expectation) => expectation.targetPath)
-          .filter(
-            (candidate) =>
-              !attemptedPaths.has(candidate) &&
-              !inspectedPaths.has(candidate) &&
-              !localSkippedPathStates.has(candidate),
-          );
+        const exactScriptPaths = repositoryScriptReferences(localDocuments).map(
+          (reference) => reference.targetPath,
+        );
+        return [
+          ...new Set([
+            ...expected.paths.map((expectation) => expectation.targetPath),
+            ...exactScriptPaths,
+          ]),
+        ].filter(
+          (candidate) =>
+            !attemptedPaths.has(candidate) &&
+            !inspectedPaths.has(candidate) &&
+            !localSkippedPathStates.has(candidate),
+        );
       },
     );
     if (candidatesBySource.every((candidates) => candidates.length === 0)) {
