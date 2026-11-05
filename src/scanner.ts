@@ -19,6 +19,7 @@ import { analyzeSecurityDiagnostics } from "./security-diagnostics.js";
 import {
   plainTextSupportSecurityReachability,
   staticallyExpectedSupportInspection,
+  repositoryScriptReferences,
 } from "./static-support.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
@@ -189,6 +190,9 @@ export function scanFromRepositorySnapshot(
       expectedSupport.incompleteBoundaries,
       snapshot.artifacts,
       snapshot.config,
+      repositoryScriptReferences(snapshot.documents).map(
+        (reference) => reference.targetPath,
+      ),
     ),
     securityAnalysisCoverage: securityAnalysis.coverage,
     scannedFileCount: snapshot.scannedFileCount,

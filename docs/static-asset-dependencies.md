@@ -1,6 +1,6 @@
 # Static Asset Dependencies
 
-Use static asset dependency views when a Skill or Context depends on support
+Use static asset dependency views when a Skill, Context, or Lens depends on support
 files as well as other Renma assets:
 
 ```bash
@@ -60,7 +60,7 @@ continuations, and lifecycle relationships are excluded from traversal.
 Existing `composition` and `impact` views continue to follow only explicit
 composition.
 
-## Context and cross-distribution references
+## Context, Lens, and cross-distribution references
 
 No additional dependency metadata is required. Markdown bodies can name
 cataloged support files with links, quoted paths, or the existing bounded
@@ -70,12 +70,17 @@ helper-command grammar. For a Context at `contexts/release/policy.md`:
 Read [the script guide](../../skills/git/references/tagging.md).
 Use `skills/git/assets/tag-format.json`.
 Run `node skills/git/scripts/create-tag.mjs`.
+
+[Local validator](scripts/validate.py)
+
+Run: `python scripts/validate.py`
 ```
 
 New cross-distribution Markdown references resolve exact relative paths from
 the source document's directory. Paths beginning with `skills/`,
 `.agents/skills/`, `contexts/`, or `lenses/` are repository-relative. Helper
-commands retain the existing helper path-resolution grammar. Existing
+commands in Contexts/Lenses resolve relative paths from their source document,
+while explicit repository-root helper paths retain their existing meaning. Existing
 Skill-local support references retain their Skill-relative and unique-basename
 resolution behavior.
 
@@ -83,8 +88,12 @@ Cross-distribution resolution never guesses a repository-wide basename. It
 rejects URLs, absolute paths, repository escapes, dynamic paths, directory
 selectors, and globs. Only discovered, cataloged support targets (`script`,
 `asset`, `reference`, `profile`, or `example`) become new static edges. It does
-not discover additional files, fetch dependencies, install packages, or inspect
-excluded, missing, unreadable, or noncataloged targets. Files outside existing
+not fetch dependencies or install packages. Supported executable files under
+`contexts/**` and `lenses/**` are discovered by default. An exact reference to
+one of these scripts can also make that individual file inspectable under narrow
+discovery globs; exclusions, depth/size limits, and symlink safety still apply.
+Directory references never admit their children. Excluded, missing, unreadable,
+or noncataloged targets do not become resolved edges. Files outside existing
 catalog boundaries, such as repository `tools/` executables, remain available
 through the separate `executable` view.
 

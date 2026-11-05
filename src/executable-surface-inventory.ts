@@ -1,4 +1,5 @@
 import path from "node:path";
+import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 
 import { canonicalSha256, compareUtf16CodeUnits } from "./canonical-json.js";
 import type { SkillParentIndex } from "./catalog.js";
@@ -34,6 +35,7 @@ import {
   localSupportReachabilityDepth,
   staticallyExpectedSupportInspection,
   staticSupportReferences,
+  repositorySupportReferences,
   type StaticSupportReachabilityEvidence,
 } from "./static-support.js";
 import type { Artifact, ArtifactKind } from "./types/artifact.js";
@@ -46,7 +48,7 @@ export type ExecutableSurfaceOrigin =
   "discovered-script" | "resolved-static-invocation";
 
 export type ExecutableSurfaceScope =
-  "skill-local" | "repository-tool" | "noncanonical";
+  "skill-local" | "repository-tool" | "repository-script" | "noncanonical";
 
 export interface ExecutableSurfaceSecurityPolicy {
   hasEffectivePolicy: boolean;
@@ -135,6 +137,7 @@ export interface ExecutableSurfaceInventorySummary {
   totalSurfaces: number;
   skillLocalSurfaces: number;
   repositoryToolSurfaces: number;
+  repositoryScriptSurfaces: number;
   noncanonicalSurfaces: number;
   textSurfaces: number;
   binarySurfaces: number;
@@ -438,6 +441,9 @@ export function summarizeExecutableSurfaceInventory(
     skillLocalSurfaces: skillLocal.length,
     repositoryToolSurfaces: surfaces.filter(
       (surface) => surface.scope === "repository-tool",
+    ).length,
+    repositoryScriptSurfaces: surfaces.filter(
+      (surface) => surface.scope === "repository-script",
     ).length,
     noncanonicalSurfaces: surfaces.filter(
       (surface) => surface.scope === "noncanonical",
@@ -768,6 +774,23 @@ function collectStaticSurfaceReferences(
   expectedSupport: readonly StaticSupportReachabilityEvidence[] = [],
 ): StaticSurfaceReference[] {
   const references = new Map<string, StaticSurfaceReference>();
+  for (const document of input.documents) {
+    if (!document.artifact.markdownParserEligible) continue;
+    for (const reference of repositorySupportReferences(document)) {
+      if (
+        !isGovernedRepositoryScriptPath(reference.targetPath) &&
+        document.artifact.kind !== "context" &&
+        document.artifact.kind !== "context_lens"
+      )
+        continue;
+      const row = {
+        sourcePath: reference.sourcePath,
+        targetPath: reference.targetPath,
+        line: reference.line,
+      };
+      references.set(`${row.sourcePath}\0${row.line}\0${row.targetPath}`, row);
+    }
+  }
   for (const expectation of expectedSupport) {
     if (!hasSupportedHelperExtension(expectation.targetPath)) continue;
     const row = {
@@ -919,6 +942,7 @@ function surfaceScope(
   surfacePath: string,
   skillParents: SkillParentIndex,
 ): ExecutableSurfaceScope {
+  if (isGovernedRepositoryScriptPath(surfacePath)) return "repository-script";
   if (surfacePath.startsWith("tools/")) return "repository-tool";
   const classified = classifyRepositorySkillPath(surfacePath);
   if (

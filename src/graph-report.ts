@@ -37,7 +37,11 @@ export type GraphView =
   | "executable";
 
 export type ExecutableGraphNodeRole =
-  "skill" | "repository-script" | "external-executable";
+  | "skill"
+  | "context"
+  | "context-lens"
+  | "repository-script"
+  | "external-executable";
 
 export interface ExecutableGraphProjection {
   focus?: {

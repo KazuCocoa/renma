@@ -887,7 +887,9 @@ may be the initial preflight. Repository-wide work normally starts with `scan`.
 
 `contexts/**` is the only independent Context Asset root. A `context/**` path
 produces migration guidance and remains operationally unknown. Nested directory
-names never override a recognized root.
+names never override a recognized root for Markdown assets. Supported executable
+files under `contexts/**` and `lenses/**` are repository scripts, with no implied
+parent asset or inherited owner/policy.
 Files under canonical Skill `references/`, `profiles/`, `examples/`, `scripts/`,
 and `assets/` directories are structurally Skill-local. Renma claims one parent
 and possible inherited governance only after repository evidence resolves
@@ -1344,6 +1346,33 @@ against the collected repository snapshot. It validates the declared path but
 does not execute the command. Non-Skill documents do not receive an inferred
 Skill-relative base.
 
+Contexts and Lenses use the same individual-file script references and bounded
+invocation/dependency analyzers. For example, in `contexts/deployment/README.md`:
+
+```markdown
+[Configuration validator](scripts/validate.py)
+
+Run: `python scripts/validate.py`
+```
+
+Relative command paths resolve from the containing Markdown document; explicit
+repository-root paths retain their existing meaning. Exact links, quoted paths,
+and explicit prose path tokens record `statically_references` evidence. A link
+alone is not an invocation, and a directory or glob does not select its contents.
+No `context.yaml`, new frontmatter field, or directory entrypoint is needed.
+Supported scripts are discovered even without references. Each reference retains
+its source asset and target path; references do not transfer ownership or policy.
+Non-Markdown files in `scripts/**`, including extensionless helpers, are script
+surfaces just as in Skill support. Elsewhere in Context/Lens roots, the existing
+supported executable suffixes identify scripts. Markdown files retain their
+Context/Lens classification. Language analysis remains bounded to supported
+extensions; discovery alone does not imply full language coverage.
+Explicitly referenced scripts that cannot be inspected because of exclusions,
+symlinks, depth/size limits, or unreadability remain inspection-completeness
+blockers for strict scans, just like referenced Skill support.
+Skill-local path resolution, containment, and governance inheritance are unchanged.
+All analysis is static: Renma never runs these scripts or fetches their data.
+
 Static support reachability accepts explicit Skill-relative paths under their
 existing parsing semantics. Filename-shaped basenames are accepted only in
 Markdown body text, using quoted or unquoted exact-token forms and Markdown
@@ -1468,6 +1497,14 @@ Other default scan glob families are:
 - `README.md`
 - `contexts/**/*.md`
 - `lenses/**/*.md`
+- `contexts/**/scripts/**/*`
+- `lenses/**/scripts/**/*`
+- `contexts/**/*.{mjs,js,cjs,ts,mts,cts,sh,bash,py}`
+- `contexts/**/*.[pP][sS]1`
+- `contexts/**/*.{[bB][aA][tT],[cC][mM][dD]}`
+- `lenses/**/*.{mjs,js,cjs,ts,mts,cts,sh,bash,py}`
+- `lenses/**/*.[pP][sS]1`
+- `lenses/**/*.{[bB][aA][tT],[cC][mM][dD]}`
 - `skills/**/profiles/**/*.md`
 - `skills/**/references/**/*`
 - `skills/**/examples/**/*.md`
@@ -1740,7 +1777,7 @@ constraints, structured verification steps, and concise LLM hints;
 
 `executableSurfaceInventory` uses schema
 `renma.executable-surface-inventory.v1`. An executable surface is an
-already-discovered repository-local Skill script or `tools/**` helper that
+already-discovered repository-local Skill, Context, or Lens script or `tools/**` helper that
 falls within Renma's existing bounded helper evidence. Rows report normalized
 path, scope, content classification and hash, conservative interpreter hints,
 static references and invocations, Skill-local reachability, and bounded
@@ -2223,10 +2260,10 @@ Views are:
 - `discovery`: exact declared Skill-to-Skill continuations, route
   eligibility/usability, declaration evidence, diagnostics, structural roots,
   and standalone Skills. Focus is optional and exact.
-- `executable`: normalized Skill-to-script and script-to-script invocation
-  relationships plus independent deterministic Skill-local structural
-  containment. Focus is optional and accepts either a Skill ID/path or an
-  executable path.
+- `executable`: normalized Skill/Context/Lens-to-script and script-to-script
+  invocation relationships, individual Context/Lens script references, and
+  independent deterministic Skill-local structural containment. Focus accepts
+  a Skill, Context, or Lens ID/path or an executable path.
 
 Layered Mermaid output groups skills, context lenses, contexts, support assets, and unresolved targets into separate subgraphs. JSON and Markdown keep the same node and edge detail while reporting the selected view.
 
@@ -2246,6 +2283,9 @@ renma graph . --view executable --focus skill.release-prep --format markdown
 
 # Skills using a repository script
 renma graph . --view executable --focus tools/check-changelog.sh --format markdown
+
+# Scripts referenced or invoked by a Context
+renma graph . --view executable --focus contexts/deployment/README.md --format markdown
 ```
 
 `invokes` edges come from normalized executable invocation evidence and the
@@ -2255,6 +2295,12 @@ applicable. Repeated declaration locations remain in the invocation and script
 dependency evidence tables while producing one graph edge. A script invoked by
 multiple Skills is labeled as shared, and focusing that script renders the
 canonical relationship in reverse as `used by`.
+
+Context/Lens consumers retain their asset identity and source path. Exact file
+references appear as `statically_references`, whose reverse label is
+`referenced by`. These edges do not seed invocation reachability or add scripts
+to a Skill's experimental execution contract. Merely requiring a Context or
+Lens also does not imply an invocation of its scripts.
 
 `contains` is separate structural evidence: Renma emits it only for a script
 inside the canonical `scripts/**` boundary of one uniquely resolved Skill.
@@ -2267,7 +2313,7 @@ bounded helper grammar.
 
 JSON preserves detailed evidence rows under `executable`; Markdown presents
 the relationship neighborhood and evidence tables; Mermaid distinguishes
-Skill, repository-script, and external-executable nodes and uses separate edge
+Skill, Context, Lens, repository-script, and external-executable nodes and uses separate edge
 labels. If no canonical relationship is available, the view explains the
 normalization boundary and directs the reader to
 `scan --format json` → `executableSurfaceInventory` for unresolved evidence.

@@ -7,7 +7,10 @@ import {
 } from "./discovery.js";
 import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import type { Catalog } from "./model.js";
-import { staticSupportReferences } from "./static-support.js";
+import {
+  staticSupportReferences,
+  repositoryScriptReferences,
+} from "./static-support.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { ScanConfig } from "./types/configuration.js";
@@ -61,6 +64,9 @@ export function repositoryPathCandidates(
 ): string[] {
   return [
     ...helperCommandPathCandidates(documents),
+    ...repositoryScriptReferences(documents).map(
+      (reference) => reference.targetPath,
+    ),
     ...staticSupportPathCandidates(documents, incompleteSupportDirectories),
     ...catalog.dependencies
       .map((dependency) => dependency.to)

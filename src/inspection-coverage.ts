@@ -146,6 +146,7 @@ export function buildInspectionCoverage(
     ScanConfig,
     "globs" | "exclude" | "maxDepth" | "maxFileSizeBytes"
   >,
+  expectedRepositoryScriptPaths: readonly string[] = [],
 ): InspectionCoverage {
   const firstClassPathEvidence = [...pathStates].flatMap(
     ([candidate, state]): InspectionCoveragePathEvidence[] => {
@@ -224,7 +225,7 @@ export function buildInspectionCoverage(
         observedRepositoryState,
         artifact,
         supportBoundaryConfig,
-        expectation.packageContentKind,
+        expectation.packageContentKind === "canonical-support",
       );
       const inspectionKind = supportInspectionKind(expectation.targetPath);
       const coverageState = supportCoverageState(
@@ -283,9 +284,33 @@ export function buildInspectionCoverage(
       },
     }),
   );
+  const scriptPathEvidence = [
+    ...new Set(expectedRepositoryScriptPaths),
+  ].flatMap((candidate): InspectionCoveragePathEvidence[] => {
+    const observedState = pathStates.get(candidate);
+    if (observedState === undefined || observedState === "absent") return [];
+    const state = expectedSupportRepositoryState(
+      candidate,
+      observedState,
+      artifactsByPath.get(candidate),
+      supportBoundaryConfig,
+      false,
+    );
+    return [
+      {
+        path: candidate,
+        state,
+        scope: "exact",
+        reason: `An exact static script reference requires inspection. ${inspectionCoverageReason(state, "exact")}`,
+        classification: classifyAssetPath(candidate),
+        strictBlocking: state !== "parsed",
+      },
+    ];
+  });
   const pathEvidence = dedupeCoverageEvidence([
     ...firstClassPathEvidence,
     ...supportPathEvidence,
+    ...scriptPathEvidence,
     ...incompleteSupportBoundaryEvidence,
   ]).sort((left, right) => compareUtf16CodeUnits(left.path, right.path));
   const blockingIssues = pathEvidence.filter(
@@ -461,7 +486,7 @@ function expectedSupportRepositoryState(
   config:
     | Pick<ScanConfig, "globs" | "exclude" | "maxDepth" | "maxFileSizeBytes">
     | undefined,
-  packageContentKind: StaticSkillPackageContentKind,
+  requireConfiguredGlob: boolean,
 ): Exclude<RepositoryPathState, "absent"> {
   if (
     observedState === "symlink" ||
@@ -476,7 +501,7 @@ function expectedSupportRepositoryState(
     return "oversize";
   }
   if (
-    packageContentKind === "canonical-support" &&
+    requireConfiguredGlob &&
     !config.globs.some((pattern) => path.matchesGlob(candidate, pattern))
   ) {
     return "unsupported";

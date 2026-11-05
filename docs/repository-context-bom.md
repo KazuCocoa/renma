@@ -157,6 +157,15 @@ per-surface incoming/outgoing and direct/transitive/unreached summaries.
 Surface policy evidence remains separate and is never replaced by caller or
 dependency evidence.
 
+Context/Lens executable files use the additive `repository-script` scope and
+`repositoryScriptSurfaces` summary count. The count is optional in the published
+v3 schema for older producers; current output always includes it. Consumers
+switching exhaustively on scope must accept the new value. Script dependencies
+remain in `executableSurfaceInventory.dependencies`; exact Markdown file
+references use the existing catalog/BOM `statically_references` relationship.
+Source paths identify consumers without implying ownership or policy inheritance.
+The inventory schema remains v1; historical BOM v2 is unchanged.
+
 The inventory's closed analyzer enum additively includes `powershell` and
 `batch`, and its launcher enum additively includes `pwsh`, `powershell`, `cmd`,
 and their `.exe` spellings. Existing fields, analyzer values, launcher values,

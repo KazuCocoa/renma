@@ -12,6 +12,13 @@ import {
 } from "./markdown-syntax.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 import type { ParsedDocument } from "./types/metadata.js";
+import {
+  LEGACY_HELPER_EXTENSION,
+  POWERSHELL_HELPER_EXTENSION,
+  BATCH_HELPER_EXTENSION,
+  isGovernedRepositoryScriptPath,
+} from "./executable-path-contract.js";
+export { hasSupportedHelperExtension } from "./executable-path-contract.js";
 
 const HELPER_COMMAND_LAUNCHERS = [
   "node",
@@ -33,7 +40,7 @@ export type HelperScriptPathResolution =
   | {
       kind: "candidate";
       path: string;
-      source: "repository-root" | "skill-relative";
+      source: "repository-root" | "skill-relative" | "document-relative";
     }
   | { kind: "unsafe"; path: string }
   | { kind: "unscoped"; path: string };
@@ -72,9 +79,6 @@ const POWERSHELL_HELPER_COMMAND_PATTERN =
   /^(pwsh(?:\.exe)?|powershell(?:\.exe)?)\s+-File\s+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|(\S+))/iu;
 const CMD_HELPER_COMMAND_PATTERN =
   /^(cmd(?:\.exe)?)\s+\/c\s+(?:"([^"\r\n]+)"|(\S+))/iu;
-const LEGACY_HELPER_EXTENSION = /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/u;
-const POWERSHELL_HELPER_EXTENSION = /\.ps1$/iu;
-const BATCH_HELPER_EXTENSION = /\.(?:bat|cmd)$/iu;
 const STATIC_WINDOWS_HELPER_PATH_FORBIDDEN_RE = /[\0\r\n`$%!*?\[\]{}()|;&<>]/u;
 
 interface ParsedHelperCommand {
@@ -154,7 +158,7 @@ function helperTargetBoundary(command: string, end: number): boolean {
   return end >= command.length || /\s/u.test(command[end]!);
 }
 
-/** Resolve a helper command path without escaping an unambiguous owning Skill. */
+/** Resolve exact helper paths using the Skill boundary or the Context/Lens document. */
 export function resolveHelperScriptPath(
   sourcePath: string,
   scriptPath: string,
@@ -169,6 +173,18 @@ export function resolveHelperScriptPath(
   }
   const isRepositoryRootPath =
     /^(?:\.\/)?(?:tools|skills|\.agents|contexts?|lenses)\//.test(rawPath);
+  if (
+    !sourceSkill &&
+    /^(?:contexts|lenses)\//u.test(sourcePath) &&
+    !isRepositoryRootPath
+  ) {
+    const candidate = normalizeRepositoryPath(
+      path.posix.join(path.posix.dirname(sourcePath), rawPath),
+    );
+    return candidate
+      ? { kind: "candidate", path: candidate, source: "document-relative" }
+      : { kind: "unsafe", path: rawPath };
+  }
   const isCanonicalSkillRelative = /^(?:\.\/)?scripts\//.test(rawPath);
   const isSkillRelative =
     isCanonicalSkillRelative ||
@@ -251,18 +267,11 @@ export function resolveHelperCommandEvidence(
 }
 
 function isCanonicalHelperTarget(candidate: string): boolean {
+  if (isGovernedRepositoryScriptPath(candidate)) return true;
   if (candidate.startsWith("tools/")) return true;
   const classified = classifyRepositorySkillPath(candidate);
   return (
     classified?.kind === "support" && classified.supportDirectory === "scripts"
-  );
-}
-
-export function hasSupportedHelperExtension(candidate: string): boolean {
-  return (
-    LEGACY_HELPER_EXTENSION.test(candidate) ||
-    POWERSHELL_HELPER_EXTENSION.test(candidate) ||
-    BATCH_HELPER_EXTENSION.test(candidate)
   );
 }
 

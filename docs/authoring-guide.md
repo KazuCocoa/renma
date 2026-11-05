@@ -1286,8 +1286,13 @@ skills/foo/tools/helper.mjs
 ```
 
 Use `contexts/**` for independent Context; move any historical `context/**`
-content there after updating its references. Nested `references/`, `examples/`,
-`profiles/`, `scripts/`, or `assets/` does not override that Context root. The same names are Skill-local
+content there after updating its references. For Markdown assets, nested `references/`, `examples/`,
+`profiles/`, `scripts/`, or `assets/` does not override that Context root. Supported
+executable files under `contexts/**` and `lenses/**` are repository scripts.
+Reference each script by its exact path or a supported command in the consuming
+Context or Lens. References do not establish ownership or policy inheritance,
+and directories/globs do not declare dependencies on their contents.
+The same directory names are Skill-local
 only inside `skills/**` or `.agents/skills/**`, where they establish a structural
 parent candidate. Local metadata overrides remain supported where valid, but
 are not required. `tools/**` is shared repository implementation, and a Skill

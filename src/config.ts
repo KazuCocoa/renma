@@ -8,6 +8,7 @@ import {
   type ParseError,
 } from "jsonc-parser";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
+import { GOVERNED_REPOSITORY_SCRIPT_GLOBS } from "./executable-path-contract.js";
 import { isConfigurableDiagnosticFindingId } from "./diagnostic-default-severity.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
@@ -162,6 +163,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "README.md",
     "contexts/**/*.md",
     "lenses/**/*.md",
+    ...GOVERNED_REPOSITORY_SCRIPT_GLOBS,
     ...DEFAULT_SKILL_SUPPORT_GLOBS,
     "tools/**/*",
   ],

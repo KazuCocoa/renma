@@ -1,4 +1,5 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
+import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 import path from "node:path";
 import { resolvedAgentSkillDescription } from "./agent-skills.js";
 import { declaredCompositionFindings } from "./declared-composition.js";
@@ -3066,8 +3067,9 @@ function helperCommandFindings(
 
     const skillPath = classifyRepositorySkillPath(scriptPath);
     if (
-      skillPath?.kind === "support" &&
-      skillPath.supportDirectory === "scripts"
+      (skillPath?.kind === "support" &&
+        skillPath.supportDirectory === "scripts") ||
+      isGovernedRepositoryScriptPath(scriptPath)
     ) {
       if (!paths.has(scriptPath)) {
         findings.push(
@@ -3174,6 +3176,7 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
 }
 
 function helperRootFindings(document: ParsedDocument): Finding[] {
+  if (isGovernedRepositoryScriptPath(document.artifact.path)) return [];
   const skillPath = classifyRepositorySkillPath(document.artifact.path);
   if (
     skillPath?.kind === "support" &&
@@ -3261,6 +3264,9 @@ function unresolvedHelperCommandFinding(
   details: FindingDetails = {},
 ): Finding {
   const unsafePath = details.details?.unsafePath === true;
+  const repositoryDocument =
+    document.artifact.kind === "context" ||
+    document.artifact.kind === "context_lens";
   return findingAt(
     document,
     DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED,
@@ -3270,14 +3276,19 @@ function unresolvedHelperCommandFinding(
     command.line,
     command.command,
     unsafePath
-      ? "Update this command to a path inside the owning Skill's scripts/** directory or to a repository-root tools/** helper; do not escape the Skill with `..`."
+      ? repositoryDocument
+        ? "Update this command to an exact repository-local script path; do not escape the repository."
+        : "Update this command to a path inside the owning Skill's scripts/** directory or to a repository-root tools/** helper; do not escape the Skill with `..`."
       : `Create \`${scriptPath}\` or update this command to the correct local helper path.`,
     {
-      whyItMatters:
-        "Agents need shared tools/** helpers and Skill-local scripts to resolve deterministically before running them.",
+      whyItMatters: repositoryDocument
+        ? "Script references need to resolve deterministically to repository evidence. Resolution does not authorize execution."
+        : "Agents need shared tools/** helpers and Skill-local scripts to resolve deterministically before running them.",
       verificationSteps: [
         {
-          text: "Confirm the command resolves to an existing tools/** helper or to scripts/** inside its owning Skill.",
+          text: repositoryDocument
+            ? "Confirm the command resolves to an existing repository script, relative to this document or by explicit repository-root path."
+            : "Confirm the command resolves to an existing tools/** helper or to scripts/** inside its owning Skill.",
         },
         {
           text: "Run renma readiness and check paths.helper_commands.",
