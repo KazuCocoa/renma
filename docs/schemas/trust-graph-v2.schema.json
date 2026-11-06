@@ -180,7 +180,8 @@
               "local",
               "security_profile",
               "repository_config",
-              "owning_skill"
+              "owning_skill",
+              "owning_asset"
             ]
           }
         },
@@ -276,7 +277,9 @@
                       "properties": {
                         "policySources": {
                           "type": "array",
-                          "contains": { "const": "owning_skill" }
+                          "contains": {
+                            "enum": ["owning_skill", "owning_asset"]
+                          }
                         }
                       },
                       "required": ["policySources"]

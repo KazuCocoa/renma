@@ -105,6 +105,7 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
     `- Selected security profiles: ${graph.summary.edgeTypeCounts.selects_security_profile}`,
     `- Assets with local effective policy: ${effectivePolicySourceCount(graph, "local")}`,
     `- Assets with owning-Skill effective policy: ${effectivePolicySourceCount(graph, "owning_skill")}`,
+    `- Assets with owning-Context/Lens effective policy: ${effectivePolicySourceCount(graph, "owning_asset")}`,
     `- Assets with security-profile effective policy: ${effectivePolicySourceCount(graph, "security_profile")}`,
     `- Assets with repository-config effective policy: ${effectivePolicySourceCount(graph, "repository_config")}`,
     `- Effective policy fingerprints: ${graph.summary.nodeTypeCounts.effective_policy}`,
@@ -156,7 +157,12 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
 
 function effectivePolicySourceCount(
   graph: TrustGraph,
-  source: "local" | "security_profile" | "repository_config" | "owning_skill",
+  source:
+    | "local"
+    | "security_profile"
+    | "repository_config"
+    | "owning_skill"
+    | "owning_asset",
 ): number {
   return graph.edges.filter(
     (edge) =>

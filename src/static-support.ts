@@ -1,5 +1,9 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
+import {
+  buildRepositoryScriptParentIndex,
+  resolveRepositoryScriptParent,
+} from "./repository-script-parent.js";
 import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 
 import {
@@ -591,7 +595,7 @@ function maskRawMatches(line: string, matches: string[]): string {
 }
 
 /**
- * Derive Skill ownership separately from resolved static support references.
+ * Derive structural Skill/README ownership separately from static references.
  * Cross-distribution references never imply ownership or policy inheritance.
  */
 export function buildStaticSupportDependencies(
@@ -614,6 +618,36 @@ export function buildStaticSupportDependencies(
     skillCounts.set(directory, (skillCounts.get(directory) ?? 0) + 1);
   }
   const result: Dependency[] = [];
+  const scriptParents = buildRepositoryScriptParentIndex(documents);
+  for (const local of entries) {
+    if (local.kind !== "script") continue;
+    const resolution = resolveRepositoryScriptParent(
+      local.sourcePath,
+      scriptParents,
+    );
+    if (resolution.state !== "resolved") continue;
+    const parent = resolution.parent;
+    result.push({
+      from: parent.id,
+      to: local.id,
+      kind: "owns_local_resource",
+      sourcePath: parent.sourcePath,
+    });
+    if (local.ownership.source === "inherited") {
+      result.push({
+        from: local.id,
+        to: parent.id,
+        kind: "inherits_owner",
+        sourcePath: local.sourcePath,
+      });
+    }
+    result.push({
+      from: local.id,
+      to: parent.id,
+      kind: "inherits_policy",
+      sourcePath: local.sourcePath,
+    });
+  }
 
   for (const skill of skillEntries) {
     const skillDirectory = logicalSkillDirectory(skill.sourcePath);

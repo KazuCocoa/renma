@@ -78,7 +78,8 @@ for (const root of ["contexts", "lenses"] as const) {
     assert.equal(inventory.summary.unreachedFromInvocationSurfaces, 1);
     assert.ok(
       inventory.surfaces.every(
-        (surface) => !surface.securityPolicy.hasEffectivePolicy,
+        (surface) =>
+          surface.securityPolicy.hasEffectivePolicy === (root === "contexts"),
       ),
     );
     assert.equal(
@@ -98,7 +99,7 @@ for (const root of ["contexts", "lenses"] as const) {
     );
     assert.equal(
       graph.edges.filter((edge) => edge.kind === "contains").length,
-      0,
+      7,
     );
     assert.match(formatExecutableGraphMarkdown(graph), /collect\.sh/);
     assert.match(formatExecutableGraphMermaid(graph), /\|invokes\|/);

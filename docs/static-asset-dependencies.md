@@ -10,7 +10,8 @@ renma graph . --view asset-impact --focus skills/git/scripts/create-tag.mjs --fo
 
 These views expose file-reference topology for downstream selection and export
 consumers; they do not implement export. The existing `full` graph separately
-exposes `owns_local_resource` for cataloged Skill-local distribution contents.
+exposes `owns_local_resource` for cataloged Skill-local distribution contents
+and scripts belonging to a uniquely resolved Context/Lens package README.
 A consumer can combine that inventory with reference closure when it needs all
 supported files belonging to a selected Skill.
 
@@ -101,6 +102,40 @@ The shared catalog emits these resolved support edges once, so full graph,
 BOM dependency/dependent rows, and Trust Graph also retain them. Adding a
 Context reference does not transfer ownership or policy from that Context to
 the target, and does not expand the Skill-local security inspection boundary.
+
+## Context/Lens script parents
+
+For `contexts/<package>/scripts/**` and `lenses/<package>/scripts/**`, the
+structural parent candidate is `<package>/README.md`. Supported executable
+files immediately alongside that README have the same parent. `<package>`
+may contain multiple directory segments. A deeper directory outside `scripts/`
+needs its own README; Renma does not search ancestors for a replacement parent.
+
+Inheritance requires exactly one discovered, parser-eligible Context or Lens
+README in that directory. README filename case variants count as candidates;
+multiple candidates are ambiguous. Missing, excluded, unreadable, or otherwise
+uninspected parents do not supply governance. Other Markdown filenames and
+README files inside `scripts/` do not establish a parent. Root-level
+`contexts/scripts/**` and `lenses/scripts/**` remain shared scripts even if a
+root README exists.
+
+Scripts inherit the parent's declared owner when present and its effective
+security policy independently. They retain their `script` kind and
+`repository-script` scope. The full graph exposes `owns_local_resource`,
+`inherits_owner` (when an owner was inherited), and `inherits_policy`; the
+executable graph exposes structural `contains` edges. An unused script still
+belongs to the package. These edges do not make it part of reference closure.
+
+Parent reachability follows exact references from the README through discovered
+local Markdown documents, with minimum hop counts and cycle protection. It
+does not cross into another README package, follow references from outside the
+package, or interpret script imports as Markdown references. Executable import
+reachability remains separately reported. Unreachable scripts, absent reachable
+script-reference guidance, and deep reference chains produce the existing
+`SUPPORT-UNREACHABLE-SCRIPT`, `SUPPORT-MISSING-REACHABILITY-GUIDANCE`, and
+`SUPPORT-DEEP-REFERENCE-CHAIN` diagnostics. Missing parents are exposed as
+resolution evidence; they do not by themselves require a README for shared
+scripts.
 
 ## Interpretation
 

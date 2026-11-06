@@ -15,6 +15,10 @@ import type { Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
 import { parseDocument } from "./markdown.js";
+import {
+  buildRepositoryScriptParentIndex,
+  resolveRepositoryScriptParent,
+} from "./repository-script-parent.js";
 
 type InventoryArtifactKind = ArtifactKind;
 
@@ -123,7 +127,11 @@ export interface SecurityPolicyAssetEvidence {
 }
 
 export type SecurityPolicySource =
-  "local" | "security_profile" | "repository_config" | "owning_skill";
+  | "local"
+  | "security_profile"
+  | "repository_config"
+  | "owning_skill"
+  | "owning_asset";
 
 const SECURITY_POLICY_SUMMARY_DETAIL = Symbol("security-policy-summary-detail");
 
@@ -287,10 +295,19 @@ export function collectSecurityPolicyAssetEvidence(
     documents.map((document) => [document.artifact.path, document]),
   );
   const owningSkills = skillArtifactsByDirectory(artifacts);
+  const scriptParents = buildRepositoryScriptParentIndex(documents);
   return documents
     .map((document): SecurityPolicyAssetEvidence | undefined => {
       const artifact = document.artifact;
-      const policyArtifact = policyArtifactFor(artifact, owningSkills);
+      const scriptParent = resolveRepositoryScriptParent(
+        artifact.path,
+        scriptParents,
+      );
+      const policyArtifact =
+        policyArtifactFor(artifact, owningSkills) ??
+        (artifact.kind === "script" && scriptParent.state === "resolved"
+          ? scriptParent.parent.document.artifact
+          : undefined);
       const rawSupportArtifact = isRawSupportArtifact(artifact);
       const evidenceArtifact =
         policyArtifact ??
@@ -325,13 +342,20 @@ export function collectSecurityPolicyAssetEvidence(
         policySources: effectivePolicy
           ? effectivePolicySources(
               resolved.policySources,
-              policyArtifact !== undefined,
+              policyArtifact?.kind === "skill"
+                ? "owning_skill"
+                : policyArtifact
+                  ? "owning_asset"
+                  : undefined,
             )
           : [],
         ...(policyArtifact && effectivePolicy
           ? {
               inheritedFrom: {
-                id: policyArtifact.path,
+                id:
+                  scriptParent.state === "resolved"
+                    ? scriptParent.parent.id
+                    : policyArtifact.path,
                 sourcePath: policyArtifact.path,
               },
             }
@@ -372,6 +396,7 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
       security_profile: 0,
       repository_config: 0,
       owning_skill: 0,
+      owning_asset: 0,
     },
     assetKinds: zeroAssetKinds(),
     networkAllowed: zeroPolicyBooleanCounts(),
@@ -465,11 +490,13 @@ function policyArtifactFor(
 }
 
 function effectivePolicySources(
-  upstream: ReadonlyArray<Exclude<SecurityPolicySource, "owning_skill">>,
-  inherited: boolean,
+  upstream: ReadonlyArray<
+    Exclude<SecurityPolicySource, "owning_skill" | "owning_asset">
+  >,
+  inherited: "owning_skill" | "owning_asset" | undefined,
 ): SecurityPolicySource[] {
   const sources: SecurityPolicySource[] = [...upstream];
-  if (inherited) sources.push("owning_skill");
+  if (inherited) sources.push(inherited);
   return sources;
 }
 

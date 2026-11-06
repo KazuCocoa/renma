@@ -136,6 +136,7 @@ export function zeroSecurityPolicyInventoryDelta(): SecurityPolicyInventoryDelta
       security_profile: 0,
       repository_config: 0,
       owning_skill: 0,
+      owning_asset: 0,
     },
     networkAllowed: zeroPolicyBooleanDelta(),
     externalUploadAllowed: zeroPolicyBooleanDelta(),
@@ -179,6 +180,9 @@ function deltaSecurityPolicyInventory(
         from.policySources.repository_config,
       owning_skill:
         to.policySources.owning_skill - from.policySources.owning_skill,
+      owning_asset:
+        (to.policySources.owning_asset ?? 0) -
+        (from.policySources.owning_asset ?? 0),
     },
     networkAllowed: deltaPolicyBoolean(to.networkAllowed, from.networkAllowed),
     externalUploadAllowed: deltaPolicyBoolean(

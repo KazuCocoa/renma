@@ -614,7 +614,7 @@ restore, or propagate its status to dependents.
 Metadata-declared catalog dependencies come only from required/optional Context
 and Lens fields, `applies_to`, conflicts, and supersession references. Renma
 separately adds structurally derived static-support dependencies from
-deterministic Skill-local containment and static-reference evidence; those
+deterministic Skill-local or Context/Lens README containment and static-reference evidence; those
 relationships are not frontmatter declarations. `continues-with` is a separate
 Skill Discovery route declaration. `published-entrypoint` is separate
 publication intent. Neither creates a catalog dependency or claims runtime
@@ -624,15 +624,18 @@ Ownership inheritance is structural, not metadata merging: a Skill-local
 support asset with no declared owner inherits only when Renma resolves exactly
 one parent Skill with a declared owner. Missing or ambiguous parents remain
 unowned. Shared Context assets never inherit an owner by path.
+Context/Lens package scripts can independently inherit their README parent's
+declared owner under the [script-parent rules](static-asset-dependencies.md#contextlens-script-parents).
 
 Security profile inheritance is a different mechanism. Valid asset-local
 scalars take precedence over the selected profile chain; a child profile takes
 precedence over its base. Allowed-data and forbidden-input lists use their
 documented replacement/fail-closed rules, while approved network/upload
 destinations accumulate from eligible profile and repository configuration
-sources. Repository disallowed commands also accumulate. Separately, only a
+sources. Repository disallowed commands also accumulate. Separately, a
 uniquely resolved Skill-local Script or Asset inherits its owning Skill's
-effective policy. Ordinary Skill-local References, Profiles, and Examples can
+effective policy, and a Context/Lens package Script inherits its resolved
+README parent's effective policy. Ordinary Skill-local References, Profiles, and Examples can
 declare their own top-level policy but do not inherit the Skill's policy by
 placement. `allowed-floating-dependencies` is always asset-local and never
 participates in effective-policy inheritance or fingerprints.
@@ -1373,6 +1376,15 @@ blockers for strict scans, just like referenced Skill support.
 Skill-local path resolution, containment, and governance inheritance are unchanged.
 All analysis is static: Renma never runs these scripts or fetches their data.
 
+For ownership and policy inheritance, a Context/Lens package can provide a
+`README.md` alongside its `scripts/` directory or its immediate executable files.
+Exactly one discovered README must resolve as the parent. Other Markdown files,
+ancestor READMEs, and incoming references do not establish ownership. Root-level
+`contexts/scripts/**` and `lenses/scripts/**` remain shared. See the complete
+[script-parent rules](static-asset-dependencies.md#contextlens-script-parents).
+Parent resolution, inherited owner and policy, containment, and unreachable or
+deeply referenced scripts appear in the corresponding reports and diagnostics.
+
 Static support reachability accepts explicit Skill-relative paths under their
 existing parsing semantics. Filename-shaped basenames are accepted only in
 Markdown body text, using quoted or unquoted exact-token forms and Markdown
@@ -1947,11 +1959,16 @@ terminology.
 
 Canonical scopes are `skill-local` for a script under the resolved owning
 Skill's `scripts/**`, and `repository-tool` for a helper under repository-root
-`tools/**`. Discovered scripts without one of those supported placements remain
-visible as `noncanonical`; the inventory does not silently discard them.
+`tools/**`; Context/Lens scripts use `repository-script`. Other discovered
+scripts remain visible as `noncanonical`; the inventory does not silently discard them.
 Skill-local reachability uses the same static reference graph and minimum depth
-as existing support diagnostics. Repository tools have no invented owning
-Skill or Skill reachability state.
+as existing support diagnostics. Context/Lens scripts use `repository-script`
+scope. Package scripts additionally expose `parentResolution`, the candidate
+README path, ambiguous candidate paths when present, and `owningAsset` when
+resolved. `reachableFromOwningAsset` and `owningAssetReferenceDepth` describe
+exact local Markdown reference closure from that README. These are separate
+from invocation/dependency reachability. Repository tools have no invented
+parent or parent reachability state.
 
 The inventory recognizes the existing `node`, `bash`, `sh`, `python`, and
 `python3` helper grammar plus exact Windows launcher forms: `pwsh -File`,

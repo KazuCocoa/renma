@@ -492,7 +492,14 @@ function surfaceChangeReasons(
   if (
     from.reachableFromOwningSkill !== to.reachableFromOwningSkill ||
     from.reachabilityDepth !== to.reachabilityDepth ||
-    JSON.stringify(from.owningSkill) !== JSON.stringify(to.owningSkill)
+    JSON.stringify(from.owningSkill) !== JSON.stringify(to.owningSkill) ||
+    JSON.stringify(from.owningAsset) !== JSON.stringify(to.owningAsset) ||
+    from.parentResolution !== to.parentResolution ||
+    from.parentAssetCandidatePath !== to.parentAssetCandidatePath ||
+    JSON.stringify(from.parentAssetCandidates) !==
+      JSON.stringify(to.parentAssetCandidates) ||
+    from.reachableFromOwningAsset !== to.reachableFromOwningAsset ||
+    from.owningAssetReferenceDepth !== to.owningAssetReferenceDepth
   ) {
     reasons.push("reachability");
   }

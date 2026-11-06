@@ -564,7 +564,8 @@
             "local": { "type": "integer", "minimum": 0 },
             "security_profile": { "type": "integer", "minimum": 0 },
             "repository_config": { "type": "integer", "minimum": 0 },
-            "owning_skill": { "type": "integer", "minimum": 0 }
+            "owning_skill": { "type": "integer", "minimum": 0 },
+            "owning_asset": { "type": "integer", "minimum": 0 }
           }
         },
         "assetKinds": { "$ref": "#/$defs/assetKindCounts" },
@@ -888,6 +889,26 @@
           "uniqueItems": true
         },
         "shebang": { "type": "string", "maxLength": 160 },
+        "owningAsset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["directory", "sourcePath", "id", "kind"],
+          "properties": {
+            "directory": { "type": "string" },
+            "sourcePath": { "type": "string" },
+            "id": { "type": "string" },
+            "kind": { "enum": ["context", "context_lens"] }
+          }
+        },
+        "parentResolution": { "enum": ["resolved", "missing", "ambiguous"] },
+        "parentAssetCandidatePath": { "type": "string" },
+        "parentAssetCandidates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "reachableFromOwningAsset": { "type": "boolean" },
+        "owningAssetReferenceDepth": { "type": "integer", "minimum": 1 },
         "reachableFromOwningSkill": { "type": "boolean" },
         "reachabilityDepth": { "type": "integer", "minimum": 1 },
         "staticallyReferenced": { "type": "boolean" },
@@ -907,7 +928,8 @@
                   "local",
                   "security_profile",
                   "repository_config",
-                  "owning_skill"
+                  "owning_skill",
+                  "owning_asset"
                 ]
               },
               "uniqueItems": true
@@ -1150,7 +1172,8 @@
               "local",
               "security_profile",
               "repository_config",
-              "owning_skill"
+              "owning_skill",
+              "owning_asset"
             ]
           },
           "uniqueItems": true

@@ -737,6 +737,7 @@ function formatSecurityPolicyInventoryMarkdown(
     `| Effective policy from security profiles | ${inventory.policySources.security_profile} |`,
     `| Effective policy from repository config | ${inventory.policySources.repository_config} |`,
     `| Effective policy from owning Skills | ${inventory.policySources.owning_skill} |`,
+    `| Effective policy from owning Contexts/Lenses | ${inventory.policySources.owning_asset} |`,
     `| Network allowed | ${inventory.networkAllowed.true} |`,
     `| Network denied | ${inventory.networkAllowed.false} |`,
     `| Network unspecified | ${inventory.networkAllowed.unspecified} |`,
@@ -791,8 +792,11 @@ function formatExecutableSurfaceInventoryMarkdown(
     lines.push("| (none) |  |  |  |  | 0/0 | 0 |  | 0/0 | 0 |");
   } else {
     for (const surface of inventory.surfaces) {
-      const reachability =
-        surface.scope !== "skill-local"
+      const reachability = surface.owningAsset
+        ? surface.reachableFromOwningAsset
+          ? `reachable (${surface.owningAssetReferenceDepth})`
+          : "unreachable"
+        : surface.scope !== "skill-local"
           ? "n/a"
           : surface.reachableFromOwningSkill
             ? `reachable (${surface.reachabilityDepth})`

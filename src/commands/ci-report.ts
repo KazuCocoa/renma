@@ -1275,6 +1275,7 @@ function formatSecurityPolicyInventorySection(
     `- Target effective policy from security profiles: ${target.policySources.security_profile}`,
     `- Target effective policy from repository config: ${target.policySources.repository_config}`,
     `- Target effective policy from owning Skills: ${target.policySources.owning_skill}`,
+    `- Target effective policy from owning Contexts/Lenses: ${target.policySources.owning_asset}`,
     ...(target.externalUploadGovernance
       ? [
           `- Target upload denied: ${target.externalUploadGovernance.denied}`,

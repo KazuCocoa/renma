@@ -12,7 +12,7 @@ export function hasSupportedHelperExtension(candidate: string): boolean {
   );
 }
 
-/** Context and Lens roots share file-based executable governance, not ownership. */
+/** Context and Lens roots share file-based executable discovery; parent resolution is separate. */
 export function isGovernedRepositoryScriptPath(candidate: string): boolean {
   return (
     /^(?:contexts|lenses)\//u.test(candidate) &&

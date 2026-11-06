@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  buildRepositoryScriptParentIndex,
+  withResolvedRepositoryScriptParent,
+} from "../repository-script-parent.js";
+import {
   resolveSkillSupportParent,
   withResolvedSkillParent,
   type SkillParentIndex,
@@ -156,10 +160,14 @@ export async function collectTargetRepositoryEvidence(
       target.repositoryRelativePath,
       skillParents,
     );
-    const classification = withResolvedSkillParent(
-      target.classification,
+    const classification = withResolvedRepositoryScriptParent(
+      withResolvedSkillParent(
+        target.classification,
+        target.repositoryRelativePath,
+        skillParents,
+      ),
       target.repositoryRelativePath,
-      skillParents,
+      buildRepositoryScriptParentIndex(snapshot.documents),
     );
     const entry = snapshot.catalog.entries.find(
       (candidate) =>
@@ -257,7 +265,12 @@ function targetMetadataState(
   classification: KnownAssetClassificationEvidence,
 ): "declared" | "partial" | "missing" | "not-required" {
   const hasMetadata = Object.keys(target.document.metadata).length > 0;
-  if (classification.scope === "skill-local" && !hasMetadata) {
+  if (
+    (classification.scope === "skill-local" ||
+      (classification.matchedRule === "repository-script" &&
+        classification.parentResolution === "resolved")) &&
+    !hasMetadata
+  ) {
     return "not-required";
   }
   if (!hasMetadata) return "missing";

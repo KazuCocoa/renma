@@ -1,6 +1,11 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 import path from "node:path";
+import {
+  buildRepositoryScriptParentIndex,
+  resolveRepositoryScriptParent,
+} from "./repository-script-parent.js";
+import { repositoryScriptReachability } from "./repository-script-reachability.js";
 import { resolvedAgentSkillDescription } from "./agent-skills.js";
 import { declaredCompositionFindings } from "./declared-composition.js";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
@@ -284,6 +289,7 @@ function rulesForEvaluationDate(
         repositoryPathStates,
         incompleteSupportDirectories,
       ),
+    ({ documents }) => repositoryScriptReachabilityFindings(documents),
     ({ documents }) =>
       documents.flatMap((document) =>
         supportSharedContextCandidateFindings(document),
@@ -2651,6 +2657,97 @@ function profileFindings(document: ParsedDocument): Finding[] {
       "Declare the base skill or compatibility target so routing conflicts are auditable.",
     ),
   ];
+}
+
+function repositoryScriptReachabilityFindings(
+  documents: ParsedDocument[],
+): Finding[] {
+  const parents = buildRepositoryScriptParentIndex(documents);
+  const reachability = repositoryScriptReachability(documents, parents);
+  const findings: Finding[] = [];
+  const scriptsByParent = new Map<string, ParsedDocument[]>();
+  for (const document of documents) {
+    if (document.artifact.kind !== "script") continue;
+    const resolution = resolveRepositoryScriptParent(
+      document.artifact.path,
+      parents,
+    );
+    if (resolution.state !== "resolved") continue;
+    const parent = resolution.parent;
+    const scripts = scriptsByParent.get(parent.sourcePath) ?? [];
+    scripts.push(document);
+    scriptsByParent.set(parent.sourcePath, scripts);
+    const depth = reachability
+      .get(parent.sourcePath)
+      ?.get(document.artifact.path);
+    const guidance = `Reference this script from ${parent.sourcePath}, directly or through a local Markdown index. Preserve its contents; references from other assets do not establish reachability from its parent.`;
+    if (depth === undefined) {
+      findings.push(
+        documentFinding(
+          document,
+          DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_SCRIPT,
+          "Local script is not reachable from its Context/Lens README",
+          "structure",
+          "low",
+          guidance,
+          {
+            whyItMatters:
+              "Owned scripts can drift outside review when the parent does not reference them.",
+            details: { parentPath: parent.sourcePath },
+          },
+        ),
+      );
+    } else if (depth > MAX_LOCAL_SUPPORT_REFERENCE_HOPS) {
+      findings.push(
+        documentFinding(
+          document,
+          DIAGNOSTIC_IDS.SUPPORT_DEEP_REFERENCE_CHAIN,
+          "Context/Lens script is behind a deep reference chain",
+          "structure",
+          "low",
+          guidance,
+          {
+            whyItMatters:
+              "Shallow references keep local scripts discoverable from their parent.",
+            details: {
+              parentPath: parent.sourcePath,
+              measured: depth,
+              limit: MAX_LOCAL_SUPPORT_REFERENCE_HOPS,
+              unit: "static_reference_hops",
+            },
+          },
+        ),
+      );
+    }
+  }
+  for (const candidates of parents.values()) {
+    if (candidates.length !== 1) continue;
+    const parent = candidates[0]!;
+    const scripts = scriptsByParent.get(parent.sourcePath) ?? [];
+    if (
+      scripts.length &&
+      scripts.every(
+        (script) =>
+          !reachability.get(parent.sourcePath)?.has(script.artifact.path),
+      )
+    ) {
+      findings.push(
+        documentFinding(
+          parent.document,
+          DIAGNOSTIC_IDS.SUPPORT_MISSING_REACHABILITY_GUIDANCE,
+          "Context/Lens README has local scripts but no reachable script references",
+          "structure",
+          "medium",
+          "Describe when to use the local scripts and link to their exact paths, directly or through a local Markdown index.",
+          {
+            whyItMatters:
+              "A package README should make its governed scripts discoverable without inferring runtime execution.",
+          },
+        ),
+      );
+    }
+  }
+  return findings;
 }
 
 function skillLocalSupportReachabilityFindings(

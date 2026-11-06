@@ -40,8 +40,9 @@ ownership or policy inheritance. See [Static Asset Dependencies](static-asset-de
 `inheritedFrom` object with the owning asset ID and source path. Every
 `has_effective_policy` edge has a non-empty, duplicate-free `policySources`
 array. Its values are limited to `local`, `security_profile`,
-`repository_config`, and `owning_skill`, in that generated order. Effective
-policy inherited from an owning Skill retains `inheritedFrom`.
+`repository_config`, `owning_skill`, and `owning_asset`, in that generated order.
+`owning_asset` identifies a uniquely resolved Context/Lens README parent.
+Effective policy inherited from either parent kind retains `inheritedFrom`.
 
 Representative complete top-level document:
 

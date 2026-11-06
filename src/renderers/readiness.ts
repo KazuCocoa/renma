@@ -299,6 +299,7 @@ function formatSecurityPolicyInventoryMarkdown(
     `| Effective policy from security profiles | ${inventory.policySources.security_profile} |`,
     `| Effective policy from repository config | ${inventory.policySources.repository_config} |`,
     `| Effective policy from owning Skills | ${inventory.policySources.owning_skill} |`,
+    `| Effective policy from owning Contexts/Lenses | ${inventory.policySources.owning_asset} |`,
     `| Network allowed | ${inventory.networkAllowed.true} |`,
     `| Network denied | ${inventory.networkAllowed.false} |`,
     `| Network unspecified | ${inventory.networkAllowed.unspecified} |`,
