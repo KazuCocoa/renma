@@ -445,7 +445,7 @@ export function classifyAssetPath(
         "repository-support",
         "repository-script",
         "governed-repository-script",
-        "The executable file is under a Context or Lens root; references do not establish ownership or policy inheritance.",
+        "The executable file is under a Context or Lens root; declared owners of directly linking Contexts/Lenses are resolved separately from classification and security policy.",
       ),
       recognizedRoot: root,
     };

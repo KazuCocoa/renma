@@ -58,6 +58,7 @@ export function formatSecurityChanges(
     `- Effective policy from security profiles: ${formatSignedNumber(policyInventory.policySources.security_profile)}`,
     `- Effective policy from repository config: ${formatSignedNumber(policyInventory.policySources.repository_config)}`,
     `- Effective policy from owning Skills: ${formatSignedNumber(policyInventory.policySources.owning_skill)}`,
+    `- Effective policy from owning Contexts/Lenses: ${formatSignedNumber(policyInventory.policySources.owning_asset)}`,
     `- Network allowed: ${formatSignedNumber(policyInventory.networkAllowed.true)}`,
     `- Network denied: ${formatSignedNumber(policyInventory.networkAllowed.false)}`,
     ...(policyInventory.externalUploadGovernance
@@ -235,6 +236,9 @@ function formatPolicySource(source: SecurityPolicyChangeSource): string {
   }
   if (source.type === "owning_skill") {
     return `owning Skill ${formatMarkdownInlineCode(source.id)}${location}`;
+  }
+  if (source.type === "owning_asset") {
+    return `owning Context/Lens ${formatMarkdownInlineCode(source.id)}${location}`;
   }
   if (source.type === "security_profile") {
     return `security profile ${formatMarkdownInlineCode(source.id)}${location}`;

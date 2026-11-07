@@ -130,21 +130,22 @@ export function executableGraphReport(
   });
 
   // Structural placement is independent of invocation evidence. The inventory's
-  // owningSkill field is a previously resolved path boundary, not ownership.
+  // parent fields are previously resolved path boundaries, not ownership.
   const containmentEdges = inventory.surfaces.flatMap(
     (surface): GraphEdge[] => {
       const entrypointPath = surface.owningSkill?.entrypointPath;
-      const skill = entrypointPath
-        ? skillsBySourcePath.get(entrypointPath)
+      const parent = entrypointPath
+        ? (skillsBySourcePath.get(entrypointPath) ??
+          documentsBySourcePath.get(entrypointPath))
         : undefined;
-      if (!skill || surface.scope !== "skill-local") return [];
+      if (!parent) return [];
       return [
         {
-          from: skill.id,
+          from: parent.id,
           to: surface.path,
           kind: "contains",
           declaration: "structural-skill-boundary",
-          sourcePath: skill.sourcePath,
+          sourcePath: parent.sourcePath,
           resolved: true,
           targetId: surface.path,
           targetKind: "script",
@@ -407,7 +408,7 @@ export function formatExecutableGraphMarkdown(report: GraphReport): string {
 
   lines.push(
     "",
-    "Invocation does not imply ownership. Structural containment does not imply exclusive use. Shared scripts can therefore be invoked by Skills other than the Skill whose directory contains them.",
+    "Invocation does not imply ownership. Structural containment does not imply exclusive use. Scripts may be invoked from multiple Skills, Contexts, or Lenses regardless of their owner.",
   );
   return `${lines.join("\n")}\n`;
 }

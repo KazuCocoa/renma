@@ -1,4 +1,8 @@
 import path from "node:path";
+import {
+  buildRepositoryScriptParentIndex,
+  resolveRepositoryScriptParent,
+} from "./repository-script-parent.js";
 import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 
 import { canonicalSha256, compareUtf16CodeUnits } from "./canonical-json.js";
@@ -105,6 +109,18 @@ export interface ExecutableSurfaceEntry {
     skillDirectory: string;
     entrypointPath?: string;
   };
+  /** Unique directly linking Context/Lens; source multiplicity is separate from owner agreement. */
+  owningAsset?: {
+    directory: string;
+    sourcePath: string;
+    id: string;
+    kind: "context" | "context_lens";
+  };
+  parentResolution?: "resolved" | "missing" | "ambiguous";
+  parentAssetCandidatePath?: string;
+  parentAssetCandidates?: string[];
+  reachableFromOwningAsset?: boolean;
+  owningAssetReferenceDepth?: number;
   interpreterHints: string[];
   shebang?: string;
   reachableFromOwningSkill?: boolean;
@@ -284,6 +300,7 @@ export function buildExecutableSurfaceInventory(
     input.securityPolicies.map((policy) => [policy.path, policy]),
   );
   const reachabilityByPath = collectReachability(input);
+  const scriptParents = buildRepositoryScriptParentIndex(input.documents);
   const baseSurfaces = surfaceArtifacts
     .map((artifact) => {
       const scope = surfaceScope(artifact.path, input.skillParents);
@@ -298,6 +315,14 @@ export function buildExecutableSurfaceInventory(
         matchingInvocations,
       );
       const parent = owningSkill(artifact.path, input.skillParents);
+      const scriptResolution = resolveRepositoryScriptParent(
+        artifact.path,
+        scriptParents,
+      );
+      const scriptParent =
+        scriptResolution.state === "resolved"
+          ? scriptResolution.parent
+          : undefined;
       const policy = policiesByPath.get(artifact.path);
       const origins: ExecutableSurfaceOrigin[] = [
         ...(artifact.kind === "script" ||
@@ -338,6 +363,37 @@ export function buildExecutableSurfaceInventory(
         contentClassification: artifact.contentClassification,
         ...(artifact.contentHash ? { contentHash: artifact.contentHash } : {}),
         ...(parent ? { owningSkill: parent } : {}),
+        ...(scriptResolution.state !== "not-applicable"
+          ? {
+              parentResolution: scriptResolution.state,
+              ...(scriptResolution.state === "resolved"
+                ? {
+                    parentAssetCandidatePath:
+                      scriptResolution.parent.sourcePath,
+                  }
+                : {}),
+              ...(scriptResolution.state === "ambiguous"
+                ? {
+                    parentAssetCandidates: scriptResolution.candidates.map(
+                      (candidate) => candidate.sourcePath,
+                    ),
+                  }
+                : {}),
+            }
+          : {}),
+        ...(scriptParent
+          ? {
+              owningAsset: {
+                directory: scriptParent.directory,
+                sourcePath: scriptParent.sourcePath,
+                id: scriptParent.id,
+                kind: scriptParent.kind,
+              },
+              // Parent resolution already proves a direct link to this surface.
+              reachableFromOwningAsset: true,
+              owningAssetReferenceDepth: 1,
+            }
+          : {}),
         interpreterHints,
         ...(shebang ? { shebang } : {}),
         ...(scope === "skill-local"
@@ -730,6 +786,7 @@ function sortedPolicySources(
     "security_profile",
     "repository_config",
     "owning_skill",
+    "owning_asset",
   ];
   return [...new Set(sources)].sort(
     (left, right) => order.indexOf(left) - order.indexOf(right),

@@ -1,4 +1,9 @@
 import { analyzeAssetBindings } from "./asset-binding-analysis.js";
+import {
+  buildRepositoryScriptParentIndex,
+  resolveRepositoryScriptOwnership,
+  type RepositoryScriptParentIndex,
+} from "./repository-script-parent.js";
 import type { AssetBindingReport } from "./types/asset-bindings.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { createHash } from "node:crypto";
@@ -159,6 +164,7 @@ export function buildCatalog(
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
+  const scriptParents = buildRepositoryScriptParentIndex(documents);
   for (const [skillDirectory, candidates] of skillParents) {
     if (candidates.length <= 1) continue;
     diagnostics.push({
@@ -209,6 +215,7 @@ export function buildCatalog(
         document,
         result.metadata,
         skillParents,
+        scriptParents,
       );
 
       const base = {
@@ -250,6 +257,20 @@ export function buildCatalog(
       return compareUtf16CodeUnits(a.sourcePath, b.sourcePath);
     });
 
+  // Link targets may be missing or outside the inspection boundary. Only
+  // cataloged scripts have ownership evidence on which to diagnose conflicts.
+  for (const entry of entries) {
+    if (entry.kind !== "script" || entry.ownership.source !== "ambiguous")
+      continue;
+    diagnostics.push({
+      severity: "warning",
+      path: entry.sourcePath,
+      message:
+        "Ambiguous Context/Lens script ownership; directly linking assets declare different owners.",
+      details: { candidates: entry.ownership.candidates },
+    });
+  }
+
   const dependencies = [
     ...entries.flatMap((entry) => dependenciesForEntry(entry)),
     ...buildStaticSupportDependencies(
@@ -278,6 +299,7 @@ function resolveAssetOwnership(
   document: ParsedDocument,
   metadata: AssetMetadata,
   skillParents: SkillParentIndex,
+  scriptParents: RepositoryScriptParentIndex,
 ): AssetOwnership {
   // Ownership is governance evidence, not a naming heuristic. Never derive it
   // from the path, prose, Git author, or modification history.
@@ -290,12 +312,22 @@ function resolveAssetOwnership(
     };
   }
 
-  const resolution = resolveSkillSupportParent(
+  const skillResolution = resolveSkillSupportParent(
     document.artifact.path,
     skillParents,
   );
+  if (
+    skillResolution.state === "not-applicable" &&
+    document.artifact.kind === "script"
+  ) {
+    return resolveRepositoryScriptOwnership(
+      document.artifact.path,
+      scriptParents,
+    );
+  }
+  const resolution = skillResolution;
   // Structural placement supplies only a candidate. Inheritance requires one
-  // and only one resolved parent Skill and an owner declared by that parent.
+  // resolved Skill parent and an owner declared by that parent.
   if (resolution.state !== "resolved" || !resolution.parent.owner) {
     return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
   }

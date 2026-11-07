@@ -1,5 +1,9 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
+import {
+  buildRepositoryScriptParentIndex,
+  withResolvedRepositoryScriptParent,
+} from "./repository-script-parent.js";
 
 import {
   validateAgentSkills,
@@ -704,14 +708,19 @@ function createRepositoryProjections(
 function buildClassificationEvidenceIndex(
   documents: ParsedDocument[],
 ): ReadonlyMap<string, KnownAssetClassificationEvidence> {
+  const scriptParents = buildRepositoryScriptParentIndex(documents);
   return new Map(
     documents.map((document) => {
       const metadata = parseAssetMetadata(document).metadata;
       return [
         document.artifact.path,
-        classifyAssetPath(document.artifact.path, {
-          ...(metadata.type ? { metadataType: metadata.type } : {}),
-        }),
+        withResolvedRepositoryScriptParent(
+          classifyAssetPath(document.artifact.path, {
+            ...(metadata.type ? { metadataType: metadata.type } : {}),
+          }),
+          document.artifact.path,
+          scriptParents,
+        ),
       ];
     }),
   );

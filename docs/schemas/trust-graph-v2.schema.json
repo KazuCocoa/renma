@@ -180,7 +180,8 @@
               "local",
               "security_profile",
               "repository_config",
-              "owning_skill"
+              "owning_skill",
+              "owning_asset"
             ]
           }
         },
@@ -197,7 +198,12 @@
         },
         "statusReason": { "type": "string", "minLength": 1 },
         "statusChangedAt": { "type": "string" },
-        "inheritedFrom": { "$ref": "#/$defs/inheritedFrom" }
+        "inheritedFrom": { "$ref": "#/$defs/inheritedFrom" },
+        "inheritedFromCandidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/inheritedFrom" }
+        }
       },
       "additionalProperties": true
     },
@@ -248,7 +254,10 @@
                     },
                     "then": {
                       "type": "object",
-                      "required": ["inheritedFrom"]
+                      "anyOf": [
+                        { "required": ["inheritedFrom"] },
+                        { "required": ["inheritedFromCandidates"] }
+                      ]
                     }
                   }
                 ]
@@ -276,7 +285,9 @@
                       "properties": {
                         "policySources": {
                           "type": "array",
-                          "contains": { "const": "owning_skill" }
+                          "contains": {
+                            "enum": ["owning_skill", "owning_asset"]
+                          }
                         }
                       },
                       "required": ["policySources"]

@@ -10,7 +10,8 @@ renma graph . --view asset-impact --focus skills/git/scripts/create-tag.mjs --fo
 
 These views expose file-reference topology for downstream selection and export
 consumers; they do not implement export. The existing `full` graph separately
-exposes `owns_local_resource` for cataloged Skill-local distribution contents.
+exposes `owns_local_resource` for cataloged Skill-local distribution contents,
+plus reference and owner-provenance edges for Context/Lens scripts.
 A consumer can combine that inventory with reference closure when it needs all
 supported files belonging to a selected Skill.
 
@@ -98,9 +99,42 @@ catalog boundaries, such as repository `tools/` executables, remain available
 through the separate `executable` view.
 
 The shared catalog emits these resolved support edges once, so full graph,
-BOM dependency/dependent rows, and Trust Graph also retain them. Adding a
-Context reference does not transfer ownership or policy from that Context to
-the target, and does not expand the Skill-local security inspection boundary.
+BOM dependency/dependent rows, and Trust Graph also retain them. Reference
+edges do not transfer policy or expand the Skill-local security inspection
+boundary. Direct Context/Lens links to Context/Lens scripts also supply the
+separate owner evidence described below; other references do not transfer ownership.
+
+## Context/Lens script parents
+
+Scripts under Context/Lens roots do not require a README. Each inspected,
+parser-eligible standalone Context or Lens that directly links the script is an
+ownership candidate. Exact Markdown links (including reference-style links) supply
+candidates; consumer Skills, prose path tokens, commands and Python/JavaScript
+imports do not. Excluded, unreadable, oversized or otherwise uninspected sources
+supply no candidate. Transitive references do not establish ownership.
+
+One declared owner, or agreement among multiple declared owners, resolves the
+effective owner. Conflicting declared owners produce `ownership.source: ambiguous`
+and a null effective owner. With no valid declared owners the script is unowned.
+Candidates without a declared owner remain in the evidence but do not vote.
+Every candidate retains its asset ID/path, link locations and owner declaration
+location. Multiple sources never collapse into one `inheritedFrom` parent,
+even when their owners agree. Classification parent resolution describes source
+asset multiplicity, separately from ownership agreement.
+
+Owner-conflict diagnostics apply only to inspected, cataloged scripts. Missing,
+excluded, or otherwise uninspected targets retain their existing reference and
+inspection-coverage handling without acquiring ownership-conflict diagnostics.
+
+Reference reachability and executable import dependencies remain independent of
+ownership. All reference edges survive ambiguity; resolved ownership emits an
+`inherits_owner` edge for each declaring source. Direct links do not imply
+structural containment or policy inheritance. README-package reachability
+requirements no longer apply; existing Skill-local reachability checks remain.
+
+This owner resolution never inherits or merges security policies. Caller policy
+evidence stays attached to each caller/invocation, even for callers with identical
+owners. Scripts retain their script classification and inspection boundary.
 
 ## Interpretation
 

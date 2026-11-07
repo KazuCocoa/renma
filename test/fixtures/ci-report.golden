@@ -377,7 +377,8 @@
           "local": 0,
           "security_profile": 0,
           "repository_config": 0,
-          "owning_skill": 0
+          "owning_skill": 0,
+          "owning_asset": 0
         },
         "networkAllowed": {
           "true": 0,

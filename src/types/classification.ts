@@ -54,7 +54,7 @@ export type KnownAssetClassificationReasonCode =
 export type AssetClassificationReasonCode =
   KnownAssetClassificationReasonCode | (string & Record<never, never>);
 
-/** Resolution state for the structurally implied parent of Skill-local support. */
+/** Resolution state for the structurally implied parent of local support. */
 export type ParentAssetResolution =
   "structural-candidate" | "resolved" | "missing" | "ambiguous";
 

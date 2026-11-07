@@ -78,7 +78,7 @@ for (const root of ["contexts", "lenses"] as const) {
     assert.equal(inventory.summary.unreachedFromInvocationSurfaces, 1);
     assert.ok(
       inventory.surfaces.every(
-        (surface) => !surface.securityPolicy.hasEffectivePolicy,
+        (surface) => surface.securityPolicy.hasEffectivePolicy === false,
       ),
     );
     assert.equal(
@@ -136,7 +136,7 @@ for (const root of ["contexts", "lenses"] as const) {
   });
 }
 
-test("individual Context/Lens references retain source identity without ownership, directory expansion or invocation", async (t) => {
+test("individual Context/Lens references retain source identity with ambiguous ownership and without directory expansion or invocation", async (t) => {
   const fixture = await RepositoryFixture.create({ testContext: t });
   await fixture.write(
     "contexts/deployment.md",
@@ -180,7 +180,7 @@ test("individual Context/Lens references retain source identity without ownershi
   assert.equal(
     snapshot.catalog.assets.find((asset) => asset.sourcePath === check.path)
       ?.ownership.source,
-    "unowned",
+    "ambiguous",
   );
   assert.equal(
     snapshot.catalog.assets.find((asset) =>

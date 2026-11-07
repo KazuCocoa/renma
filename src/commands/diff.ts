@@ -1,3 +1,4 @@
+import type { AssetOwnership } from "../types/governance.js";
 import { formatExecutableSurfaceChanges } from "../renderers/executable-diff.js";
 import {
   formatScanBoundaryChange,
@@ -223,6 +224,7 @@ export interface AssetDelta {
   writableBy?: string[];
   declaredOwner: string | null;
   effectiveOwner: string | null;
+  ownership?: AssetOwnership;
   status?: string | undefined;
   statusReason?: string | undefined;
   statusChangedAt?: string | undefined;
@@ -233,6 +235,7 @@ const COMPARABLE_ASSET_FIELDS = [
   "kind",
   "declaredOwner",
   "effectiveOwner",
+  "ownership",
   "writableBy",
   "status",
   "statusReason",
@@ -1413,7 +1416,7 @@ function changedAssets(
       const changedFields = COMPARABLE_ASSET_FIELDS.filter(
         // Compare normalized sequences by contents: order and duplicates matter.
         (field) =>
-          field === "writableBy"
+          field === "writableBy" || field === "ownership"
             ? JSON.stringify(fromAsset[field]) !==
               JSON.stringify(toAsset[field])
             : fromAsset[field] !== toAsset[field],
@@ -1487,6 +1490,9 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
           optionalNullableStringField(ownership, "declaredOwner") ?? null,
         effectiveOwner:
           optionalNullableStringField(ownership, "effectiveOwner") ?? null,
+        ...(Array.isArray(objectField(ownership, "candidates"))
+          ? { ownership: ownership as AssetOwnership }
+          : {}),
         status: firstOptionalString(node, ["status"]),
         ...(firstOptionalString(node, ["statusReason"])
           ? { statusReason: firstOptionalString(node, ["statusReason"]) }

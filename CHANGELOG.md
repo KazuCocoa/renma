@@ -6,6 +6,25 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Resolve Context/Lens script ownership from direct Markdown links in inspected
+  standalone Contexts/Lenses, without requiring a README. Agreeing declared
+  owners are inherited; conflicting owners are ambiguous and have no effective
+  owner. Every candidate retains source asset, link locations and declaration
+  evidence, including when several sources declare the same owner.
+- Keep reference/import graphs and impact analysis independent of ownership.
+  Catalog, ownership, readiness, BOM, Trust Graph and CI diff preserve the
+  resolution and provenance. Context/Lens owner resolution never inherits or
+  combines security policies; caller policy evidence remains separate.
+
+### Fixed
+
+- Derive direct-link parent reachability from resolved link evidence without
+  computing all Markdown-to-Markdown reference closures during script inventory.
+- Report Context/Lens script owner conflicts only for inspected, cataloged
+  scripts; missing and excluded targets do not receive ownership diagnostics.
+
 ## [0.42.0] - 2026-11-04
 
 ### Added

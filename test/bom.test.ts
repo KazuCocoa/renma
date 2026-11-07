@@ -1571,6 +1571,7 @@ function expectedBomContract(): BomReport {
             security_profile: 0,
             repository_config: 0,
             owning_skill: 0,
+            owning_asset: 0,
           },
           assetKinds: {
             skill: 1,
@@ -1659,6 +1660,7 @@ function expectedBomContract(): BomReport {
         security_profile: 0,
         repository_config: 0,
         owning_skill: 0,
+        owning_asset: 0,
       },
       assetKinds: {
         skill: 1,

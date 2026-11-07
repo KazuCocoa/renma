@@ -124,7 +124,46 @@
       "properties": {
         "declaredOwner": { "type": ["string", "null"] },
         "effectiveOwner": { "type": ["string", "null"] },
-        "source": { "enum": ["declared", "inherited", "unowned"] },
+        "source": { "enum": ["declared", "inherited", "unowned", "ambiguous"] },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "sourcePath", "declaredOwner", "references"],
+            "properties": {
+              "id": { "type": "string" },
+              "sourcePath": { "type": "string" },
+              "declaredOwner": { "type": ["string", "null"] },
+              "references": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "startLine", "endLine", "snippet"],
+                  "properties": {
+                    "path": { "type": "string" },
+                    "startLine": { "type": "integer" },
+                    "endLine": { "type": "integer" },
+                    "snippet": { "type": "string" }
+                  }
+                }
+              },
+              "ownerEvidence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "key", "startLine", "endLine", "raw"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "key": { "type": "string" },
+                  "startLine": { "type": "integer" },
+                  "endLine": { "type": "integer" },
+                  "raw": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
         "inheritedFrom": {
           "type": "object",
           "additionalProperties": false,
@@ -564,7 +603,8 @@
             "local": { "type": "integer", "minimum": 0 },
             "security_profile": { "type": "integer", "minimum": 0 },
             "repository_config": { "type": "integer", "minimum": 0 },
-            "owning_skill": { "type": "integer", "minimum": 0 }
+            "owning_skill": { "type": "integer", "minimum": 0 },
+            "owning_asset": { "type": "integer", "minimum": 0 }
           }
         },
         "assetKinds": { "$ref": "#/$defs/assetKindCounts" },
@@ -888,6 +928,26 @@
           "uniqueItems": true
         },
         "shebang": { "type": "string", "maxLength": 160 },
+        "owningAsset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["directory", "sourcePath", "id", "kind"],
+          "properties": {
+            "directory": { "type": "string" },
+            "sourcePath": { "type": "string" },
+            "id": { "type": "string" },
+            "kind": { "enum": ["context", "context_lens"] }
+          }
+        },
+        "parentResolution": { "enum": ["resolved", "missing", "ambiguous"] },
+        "parentAssetCandidatePath": { "type": "string" },
+        "parentAssetCandidates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "reachableFromOwningAsset": { "type": "boolean" },
+        "owningAssetReferenceDepth": { "type": "integer", "minimum": 1 },
         "reachableFromOwningSkill": { "type": "boolean" },
         "reachabilityDepth": { "type": "integer", "minimum": 1 },
         "staticallyReferenced": { "type": "boolean" },
@@ -907,7 +967,8 @@
                   "local",
                   "security_profile",
                   "repository_config",
-                  "owning_skill"
+                  "owning_skill",
+                  "owning_asset"
                 ]
               },
               "uniqueItems": true
@@ -1150,7 +1211,8 @@
               "local",
               "security_profile",
               "repository_config",
-              "owning_skill"
+              "owning_skill",
+              "owning_asset"
             ]
           },
           "uniqueItems": true

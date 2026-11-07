@@ -50,7 +50,12 @@ export interface SecurityPolicyAffectedAsset {
 }
 
 export interface SecurityPolicyChangeSource {
-  type: "asset" | "owning_skill" | "security_profile" | "repository_config";
+  type:
+    | "asset"
+    | "owning_skill"
+    | "owning_asset"
+    | "security_profile"
+    | "repository_config";
   id: string;
   path?: string;
 }
@@ -622,7 +627,9 @@ function uniqueOwningSources(
       if (!inherited) return [];
       return [
         {
-          type: "owning_skill" as const,
+          type: asset.evidence.policySources.includes("owning_asset")
+            ? ("owning_asset" as const)
+            : ("owning_skill" as const),
           id:
             input.toAssetIdsByPath?.get(inherited.sourcePath) ??
             input.fromAssetIdsByPath?.get(inherited.sourcePath) ??

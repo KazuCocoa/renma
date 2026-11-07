@@ -123,7 +123,11 @@ export interface SecurityPolicyAssetEvidence {
 }
 
 export type SecurityPolicySource =
-  "local" | "security_profile" | "repository_config" | "owning_skill";
+  | "local"
+  | "security_profile"
+  | "repository_config"
+  | "owning_skill"
+  | "owning_asset";
 
 const SECURITY_POLICY_SUMMARY_DETAIL = Symbol("security-policy-summary-detail");
 
@@ -325,7 +329,11 @@ export function collectSecurityPolicyAssetEvidence(
         policySources: effectivePolicy
           ? effectivePolicySources(
               resolved.policySources,
-              policyArtifact !== undefined,
+              policyArtifact?.kind === "skill"
+                ? "owning_skill"
+                : policyArtifact
+                  ? "owning_asset"
+                  : undefined,
             )
           : [],
         ...(policyArtifact && effectivePolicy
@@ -372,6 +380,7 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
       security_profile: 0,
       repository_config: 0,
       owning_skill: 0,
+      owning_asset: 0,
     },
     assetKinds: zeroAssetKinds(),
     networkAllowed: zeroPolicyBooleanCounts(),
@@ -465,11 +474,13 @@ function policyArtifactFor(
 }
 
 function effectivePolicySources(
-  upstream: ReadonlyArray<Exclude<SecurityPolicySource, "owning_skill">>,
-  inherited: boolean,
+  upstream: ReadonlyArray<
+    Exclude<SecurityPolicySource, "owning_skill" | "owning_asset">
+  >,
+  inherited: "owning_skill" | "owning_asset" | undefined,
 ): SecurityPolicySource[] {
   const sources: SecurityPolicySource[] = [...upstream];
-  if (inherited) sources.push("owning_skill");
+  if (inherited) sources.push(inherited);
   return sources;
 }
 

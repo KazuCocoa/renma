@@ -1,8 +1,18 @@
+import type { Evidence } from "./diagnostics.js";
+import type { MetadataFieldEvidence } from "./metadata.js";
+
 /** Declared and effective ownership with explicit provenance. */
 export interface AssetOwnership {
   declaredOwner: string | null;
   effectiveOwner: string | null;
-  source: "declared" | "inherited" | "unowned";
+  source: "declared" | "inherited" | "unowned" | "ambiguous";
+  candidates?: {
+    id: string;
+    sourcePath: string;
+    declaredOwner: string | null;
+    references: Evidence[];
+    ownerEvidence?: MetadataFieldEvidence;
+  }[];
   inheritedFrom?: {
     id: string;
     sourcePath: string;

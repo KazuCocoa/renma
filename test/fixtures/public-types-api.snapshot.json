@@ -293,7 +293,7 @@
     },
     "executable-surface-inventory.d.ts#ExecutableSurfaceEntry": {
       "declarations": [
-        "export interface ExecutableSurfaceEntry { path: string; scope: ExecutableSurfaceScope; origins: ExecutableSurfaceOrigin[]; artifactKind: ArtifactKind; contentClassification: \"text\" | \"binary\"; contentHash?: string; owningSkill?: { skillDirectory: string; entrypointPath?: string; }; interpreterHints: string[]; shebang?: string; reachableFromOwningSkill?: boolean; reachabilityDepth?: number; staticallyReferenced: boolean; staticallyInvoked: boolean; referenceCount: number; invocationCount: number; securityPolicy: ExecutableSurfaceSecurityPolicy; invocationGovernance: ExecutableSurfaceInvocationGovernanceSummary; dependencyEvidence: ExecutableSurfaceDependencySummary; fingerprint: string; }"
+        "export interface ExecutableSurfaceEntry { path: string; scope: ExecutableSurfaceScope; origins: ExecutableSurfaceOrigin[]; artifactKind: ArtifactKind; contentClassification: \"text\" | \"binary\"; contentHash?: string; owningSkill?: { skillDirectory: string; entrypointPath?: string; }; owningAsset?: { directory: string; sourcePath: string; id: string; kind: \"context\" | \"context_lens\"; }; parentResolution?: \"resolved\" | \"missing\" | \"ambiguous\"; parentAssetCandidatePath?: string; parentAssetCandidates?: string[]; reachableFromOwningAsset?: boolean; owningAssetReferenceDepth?: number; interpreterHints: string[]; shebang?: string; reachableFromOwningSkill?: boolean; reachabilityDepth?: number; staticallyReferenced: boolean; staticallyInvoked: boolean; referenceCount: number; invocationCount: number; securityPolicy: ExecutableSurfaceSecurityPolicy; invocationGovernance: ExecutableSurfaceInvocationGovernanceSummary; dependencyEvidence: ExecutableSurfaceDependencySummary; fingerprint: string; }"
       ],
       "references": [
         "executable-surface-inventory.d.ts#ExecutableSurfaceDependencySummary",
@@ -550,7 +550,7 @@
     },
     "security-policy-inventory.d.ts#SecurityPolicySource": {
       "declarations": [
-        "export type SecurityPolicySource = \"local\" | \"security_profile\" | \"repository_config\" | \"owning_skill\";"
+        "export type SecurityPolicySource = \"local\" | \"security_profile\" | \"repository_config\" | \"owning_skill\" | \"owning_asset\";"
       ],
       "references": []
     },
