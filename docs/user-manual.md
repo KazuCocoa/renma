@@ -3328,7 +3328,7 @@ In an ordinary repository, install and commit Renma once as an exact development
 dependency:
 
 ```bash
-npm install --save-dev --save-exact renma@0.42.0
+npm install --save-dev --save-exact renma@0.43.0
 ```
 
 Renma release preparation verifies this complete maintained command and the

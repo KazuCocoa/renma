@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-06
+
 ### Added
 
 - Resolve Context/Lens script ownership from direct Markdown links in inspected
@@ -2962,7 +2964,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.42.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/KazuCocoa/renma/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/KazuCocoa/renma/compare/v0.41.2...v0.42.0
 [0.41.0]: https://github.com/KazuCocoa/renma/compare/v0.40.1...v0.41.0
 [0.41.2]: https://github.com/KazuCocoa/renma/compare/v0.41.1...v0.41.2
