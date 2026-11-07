@@ -119,7 +119,10 @@ test("diff and ci-report emit complete JSON for prototype-property profile trans
         ]),
       );
       assert.ok(ciCommand.code === 0 || ciCommand.code === 1);
-      assert.equal(ciCommand.stderr, "");
+      assert.equal(
+        ciCommand.stderr,
+        "Renma CI exit: report status FAIL meets --fail-on-status fail; exit 1.\n",
+      );
       const ciDocument = JSON.parse(ciCommand.stdout) as {
         schemaVersion: string;
         status: string;

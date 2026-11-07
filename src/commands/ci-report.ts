@@ -171,9 +171,13 @@ export async function runCiReportCommand(
 ): Promise<number> {
   const report = await ciReport(targetPath, options);
   process.stdout.write(formatCiReport(report, options.format));
-  return ciReportStatusMeets(report.status, options.failOnStatus ?? "fail")
-    ? CLI_EXIT.policyFailure
-    : CLI_EXIT.success;
+  const threshold = options.failOnStatus ?? "fail";
+  const meetsThreshold = ciReportStatusMeets(report.status, threshold);
+  const exitCode = meetsThreshold ? CLI_EXIT.policyFailure : CLI_EXIT.success;
+  process.stderr.write(
+    `Renma CI exit: report status ${report.status.toUpperCase()} ${meetsThreshold ? "meets" : "does not meet"} --fail-on-status ${threshold}; exit ${exitCode}.\n`,
+  );
+  return exitCode;
 }
 
 /** Keep semantic report status independent from the caller's exit policy. */
@@ -347,29 +351,121 @@ export function formatCiReport(
 export function determineCiReportStatus(
   report: CiCompatibleDiffReport,
 ): CiReportStatus {
-  if (
-    hasNewHighOrCriticalFinding(report) ||
-    hasNewUnresolvedRequiredEdge(report) ||
-    hasBlockingContextLensDiagnostics(report)
-  ) {
-    return "fail";
-  }
+  return strongestCiStatus(
+    baseCiStatusReasons(report).map((reason) => reason.status),
+  );
+}
 
-  if (
-    hasReadinessRegression(report) ||
-    inspectionCoverageDiff(report).regressions.length > 0 ||
-    report.summary.readinessScoreDelta < 0 ||
-    report.summary.ownershipCoverageDelta < 0 ||
-    report.summary.graphResolutionDelta < 0 ||
+interface CiStatusReason {
+  status: "warn" | "fail";
+  summary: string;
+  evidence: string[];
+}
+
+/** One set of matched conditions owns both base status and its explanation. */
+function baseCiStatusReasons(
+  report: Pick<
+    CiCompatibleDiffReport,
+    | "findings"
+    | "graph"
+    | "from"
+    | "to"
+    | "summary"
+    | "readiness"
+    | "inspectionCoverage"
+  >,
+): CiStatusReason[] {
+  const reasons: CiStatusReason[] = [];
+  const add = (
+    status: "warn" | "fail",
+    summary: string,
+    evidence: string[],
+  ) => {
+    if (evidence.length > 0) reasons.push({ status, summary, evidence });
+  };
+  add(
+    "fail",
+    "New high or critical findings",
+    report.findings.added
+      .filter(
+        (finding) =>
+          finding.severity === "high" || finding.severity === "critical",
+      )
+      .map(
+        (finding) =>
+          `${finding.id} (${finding.severity}) at ${formatFindingLocation(finding)}: ${finding.title}`,
+      ),
+  );
+  add(
+    "fail",
+    "New unresolved required edges",
+    report.graph.newUnresolvedEdges
+      .filter(isRequiredEdge)
+      .map(
+        (edge) =>
+          `${edge.source} -> ${edge.target} (${edge.kind})${edge.evidence?.path ? ` at ${formatFindingLocation(edge)}` : ""}`,
+      ),
+  );
+  const lensErrors = report.to.contextLens?.diagnosticCounts.error ?? 0;
+  add(
+    "fail",
+    "Blocking target Context Lens diagnostics",
+    lensErrors > 0
+      ? [
+          `Target Context Lens error count: ${lensErrors}; see diff.to.contextLens and Context Lens findings in diff.findings.`,
+        ]
+      : [],
+  );
+  add("warn", "Readiness regression", readinessRegressionEvidence(report));
+  add(
+    "warn",
+    "Inspection coverage regression",
+    inspectionCoverageDiff(report).regressions.map(
+      (change) => `${change.path}: ${change.fromState} -> ${change.toState}`,
+    ),
+  );
+  for (const [key, label] of [
+    ["readinessScoreDelta", "Readiness score decreased"],
+    ["ownershipCoverageDelta", "Ownership coverage decreased"],
+    ["graphResolutionDelta", "Graph resolution decreased"],
+  ] as const) {
+    const delta = report.summary[key];
+    add("warn", label, delta < 0 ? [`summary.${key}: ${delta}`] : []);
+  }
+  add(
+    "warn",
+    "Finding count increased",
     report.summary.findingsDelta > 0
-  ) {
-    return "warn";
-  }
+      ? [
+          `summary.findingsDelta: +${report.summary.findingsDelta}`,
+          ...report.findings.added.map(
+            (finding) =>
+              `${finding.id} (${finding.severity}) at ${formatFindingLocation(finding)}`,
+          ),
+        ]
+      : [],
+  );
+  return reasons;
+}
 
-  return "pass";
+function strongestCiStatus(
+  outcomes: readonly CiReportStatus[],
+): CiReportStatus {
+  return outcomes.includes("fail")
+    ? "fail"
+    : outcomes.includes("warn")
+      ? "warn"
+      : "pass";
 }
 
 function hasReadinessRegression(report: CiCompatibleDiffReport): boolean {
+  return readinessRegressionEvidence(report).length > 0;
+}
+
+function readinessRegressionEvidence(
+  report: Pick<CiCompatibleDiffReport, "from" | "to" | "readiness">,
+): string[] {
+  const evidence: string[] = [];
   const levels = new Map([
     ["not_ready", 0],
     ["needs_attention", 1],
@@ -378,13 +474,23 @@ function hasReadinessRegression(report: CiCompatibleDiffReport): boolean {
   const fromLevel = levels.get(report.from.readinessLevel);
   const toLevel = levels.get(report.to.readinessLevel);
   if (fromLevel !== undefined && toLevel !== undefined && toLevel < fromLevel) {
-    return true;
+    evidence.push(
+      `Readiness level: ${report.from.readinessLevel} -> ${report.to.readinessLevel}`,
+    );
   }
-  return report.readiness.checkChanges.some(
-    (change) =>
-      (change.fromStatus === "pass" || change.fromStatus === "absent") &&
-      (change.toStatus === "fail" || change.toSeverity === "error"),
+  evidence.push(
+    ...report.readiness.checkChanges
+      .filter(
+        (change) =>
+          (change.fromStatus === "pass" || change.fromStatus === "absent") &&
+          (change.toStatus === "fail" || change.toSeverity === "error"),
+      )
+      .map(
+        (change) =>
+          `${change.id}: ${change.fromStatus}/${change.fromSeverity} -> ${change.toStatus}/${change.toSeverity}`,
+      ),
   );
+  return evidence;
 }
 
 function inspectionCoverageDiff(
@@ -412,11 +518,11 @@ export function composeCiReportStatus(
     metadataPolicyOutcome,
     diagnosticSeverityPolicyOutcome,
   ];
-  if (blockingOutcomes.includes("fail")) return "fail";
   // Discovery can request review, but it cannot make the report fail.
-  return discoveryPolicyOutcome === "warn" || blockingOutcomes.includes("warn")
-    ? "warn"
-    : "pass";
+  return strongestCiStatus([
+    ...blockingOutcomes,
+    discoveryPolicyOutcome === "warn" ? "warn" : "pass",
+  ]);
 }
 
 function hasNewHighOrCriticalFinding(report: CiCompatibleDiffReport): boolean {
@@ -838,6 +944,8 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "## Summary",
     "",
     ...summaryLines,
+    "",
+    ...formatCiStatusReasons(report),
     ...formatChangeOverview(report, executableSurface),
     ...policySections.sections,
     "",
@@ -855,6 +963,77 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+/** Policies already own their matches; display only outcomes that affect status. */
+function formatCiStatusReasons(report: CiReportFormatInput): string[] {
+  const reasons = baseCiStatusReasons(report.diff);
+  const policies = [
+    [
+      "Skill Discovery",
+      "skillDiscoveryPolicy",
+      "skillDiscoveryPolicy" in report
+        ? report.skillDiscoveryPolicy
+        : undefined,
+    ],
+    [
+      "Security Policy Relaxation",
+      "securityPolicy",
+      "securityPolicy" in report ? report.securityPolicy : undefined,
+    ],
+    [
+      "Scan Boundary Weakening",
+      "scanBoundaryPolicy",
+      "scanBoundaryPolicy" in report ? report.scanBoundaryPolicy : undefined,
+    ],
+    [
+      "Executable Surface CI Policy",
+      "executableSurfacePolicy",
+      "executableSurfacePolicy" in report
+        ? report.executableSurfacePolicy
+        : undefined,
+    ],
+    [
+      "Quality Policy",
+      "qualityPolicy",
+      "qualityPolicy" in report ? report.qualityPolicy : undefined,
+    ],
+    [
+      "Required Metadata Policy",
+      "metadataPolicy",
+      "metadataPolicy" in report ? report.metadataPolicy : undefined,
+    ],
+    [
+      "Diagnostic Severity Policy",
+      "diagnosticSeverityPolicy",
+      "diagnosticSeverityPolicy" in report
+        ? report.diagnosticSeverityPolicy
+        : undefined,
+    ],
+  ] as const;
+  for (const [label, key, policy] of policies) {
+    if (!policy || policy.outcome === "pass") continue;
+    reasons.push({
+      status: policy.outcome,
+      summary: `${label}: effective mode ${policy.configured.effective}; see ${key}.matches and the policy details below`,
+      evidence: policy.matches.map((match) => match.id),
+    });
+  }
+  return [
+    "## Status Reasons",
+    "",
+    "Report status uses the strongest matched outcome (FAIL > WARN > PASS). The CLI exit threshold is applied separately.",
+    "",
+    ...(reasons.length === 0
+      ? ["- No status-affecting conditions matched."]
+      : reasons.flatMap((reason) => [
+          `- **${reason.status.toUpperCase()}**: ${reason.summary}`,
+          ...reason.evidence
+            .slice(0, MAX_LIST_ITEMS)
+            .map((evidence) => `  - ${formatMarkdownInlineCode(evidence)}`),
+          ...formatOverflow(reason.evidence.length).map((line) => `  ${line}`),
+        ])),
+  ];
 }
 
 function formatChangeOverview(
@@ -1345,7 +1524,9 @@ function reportDetailString(
   return typeof value === "string" ? value : undefined;
 }
 
-function formatFindingLocation(finding: ReportFinding): string {
+function formatFindingLocation(
+  finding: Pick<ReportFinding, "evidence">,
+): string {
   if (!finding.evidence?.path) return "unknown";
   if (finding.evidence.startLine === undefined) return finding.evidence.path;
   return `${finding.evidence.path}:L${finding.evidence.startLine}`;

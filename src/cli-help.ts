@@ -703,13 +703,15 @@ export const COMMAND_HELP = [
     interpretation: [
       "The report combines deterministic evidence for review.",
       "Supply one comparison baseline with --from or its --base alias; using both is an error. --to defaults to the Git ref HEAD.",
-      "Skill Discovery changes are observation-only and do not affect CI status or exits.",
+      "Skill Discovery policy can raise report status to WARN, but Discovery alone never makes the report FAIL.",
+      "The report status and --fail-on-status determine the exit code; Discovery WARN exits 1 with --fail-on-status warn and 0 with the default fail threshold.",
       "The failure threshold changes execution policy, not report status, and is never read from repository configuration.",
       "Reviewers should still inspect meaningful semantic changes.",
     ],
     exitBehavior: [
       "With the default --fail-on-status fail, PASS and WARN exit 0; FAIL exits 1.",
       "With --fail-on-status warn, PASS exits 0; WARN and FAIL exit 1.",
+      "A completion summary on stderr explains the report status, selected threshold, and exit code; stdout retains the complete report.",
       "A valid CI report is still emitted to stdout on exit 1.",
       GLOBAL_ERROR_EXIT_REFERENCE,
     ],
@@ -1100,6 +1102,7 @@ export function renderGlobalHelp(version: string): string {
     "  3  Unexpected Renma internal failure.",
     "     Preserve or report stderr; do not treat it as a policy finding or guess input changes to make it pass.",
     "  Report-producing commands use stdout for completed results (0/1) and stderr for errors (2/3).",
+    "  ci-report also writes its completed status/threshold/exit decision to stderr, without changing the stdout report.",
     "",
     "Run `renma <command> --help` for command-specific purpose, boundaries, examples, and options.",
   ].join("\n");

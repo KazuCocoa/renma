@@ -1861,6 +1861,10 @@ test("policy-producing command help explains command-specific exit behavior", as
       patterns: [
         /default --fail-on-status fail, PASS and WARN exit 0; FAIL exits 1/,
         /--fail-on-status warn, PASS exits 0; WARN and FAIL exit 1/,
+        /Skill Discovery policy can raise report status to WARN/,
+        /Discovery alone never makes the report FAIL/,
+        /Discovery WARN exits 1 with --fail-on-status warn/,
+        /completion summary on stderr explains the report status/,
         /valid CI report is still emitted to stdout on exit 1/i,
         /Exit 2 and 3 follow the global CLI contract/,
       ],

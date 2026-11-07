@@ -528,12 +528,15 @@ compatible diff. A separate pure composition keeps `fail > warn > pass`: an
 existing `FAIL` remains `FAIL`, an existing `WARN` remains `WARN`, and an
 existing `PASS` becomes `WARN` only when policy outcome is `warn`. One concise
 policy review note is appended for matches. Discovery policy cannot produce
-`FAIL`, and its `WARN` exits `0`.
+`FAIL`. A report with status `WARN` exits `0` under the default
+`--fail-on-status fail`, but exits `1` under `--fail-on-status warn`. The exit
+threshold does not change report status.
 
 Serialized CI reports that predate both Discovery fields retain their prior JSON
-and Markdown shape. A report with `skillDiscovery` but no
-`skillDiscoveryPolicy` retains its observation-only section. Formatting does not
-mutate either legacy generation.
+shape and format without synthetic Discovery evidence. Markdown status reasons
+can still be derived from their existing compatible diff. A report with
+`skillDiscovery` but no `skillDiscoveryPolicy` retains its observation-only
+section. Formatting does not mutate either legacy generation.
 
 Programmatic compatibility is preserved separately from the direct command
 contract. `buildDiffReport()` accepts older snapshots without prepared

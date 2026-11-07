@@ -146,9 +146,12 @@ authorizes an automatic split. Shared helper implementations belong under
 `tools/**`; shared knowledge belongs in Context Assets. Contexts and Lenses may
 also reference helper scripts under their own roots to retrieve, filter,
 transform, or validate their associated information. Those files receive the
-same bounded executable governance as Skill scripts. Exact usage references do
-not imply ownership, policy inheritance, or permission to execute; no Context
-manifest or directory entrypoint is required.
+same bounded executable governance as Skill scripts. Direct Markdown links from
+inspected standalone Contexts/Lenses supply declared-owner candidates. Commands,
+prose paths, language imports, and transitive references do not. Agreeing owners
+resolve one effective owner while retaining all sources; conflicting owners remain
+ambiguous. Owner resolution never inherits or combines security policy or grants
+permission to execute; no Context manifest or directory entrypoint is required.
 
 Context Assets should be organized by meaning rather than migration state.
 Temporary staging paths may help during a reviewed move, but durable paths

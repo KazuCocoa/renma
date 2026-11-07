@@ -76,6 +76,181 @@ import {
 
 const execFile = promisify(execFileCallback);
 
+test("status reasons identify the same base conditions that determine CI status", () => {
+  const cases: Array<{
+    name: string;
+    diff: CiReport["diff"];
+    status: "warn" | "fail";
+    evidence: string[];
+  }> = [
+    {
+      name: "high finding despite zero net delta",
+      diff: policyDiffReport({
+        addedFindings: [finding("SEC-NEW-HIGH", "high")],
+      }),
+      status: "fail",
+      evidence: ["SEC-NEW-HIGH (high) at docs/policy.md:L1"],
+    },
+    {
+      name: "required edge",
+      diff: policyDiffReport({
+        newUnresolvedEdges: [
+          {
+            source: "skill.a",
+            target: "context.missing",
+            kind: "requires",
+            evidence: { path: "skills/a/SKILL.md", startLine: 7 },
+          },
+        ],
+      }),
+      status: "fail",
+      evidence: ["skill.a -> context.missing", "skills/a/SKILL.md:L7"],
+    },
+    {
+      name: "readiness check",
+      diff: policyDiffReport({
+        checkChanges: [
+          {
+            id: "ownership.coverage",
+            fromStatus: "pass",
+            toStatus: "fail",
+            fromSeverity: "info",
+            toSeverity: "error",
+          },
+        ],
+      }),
+      status: "warn",
+      evidence: ["ownership.coverage: pass/info -> fail/error"],
+    },
+    ...(
+      [
+        "readinessScoreDelta",
+        "ownershipCoverageDelta",
+        "graphResolutionDelta",
+      ] as const
+    ).map((key) => ({
+      name: key,
+      diff: policyDiffReport({ summary: { [key]: -1 } }),
+      status: "warn" as const,
+      evidence: [`summary.${key}: -1`],
+    })),
+    {
+      name: "finding count",
+      diff: policyDiffReport({
+        addedFindings: [finding("QUAL-NEW-LOW", "low")],
+        summary: { findingsDelta: 1 },
+      }),
+      status: "warn",
+      evidence: [
+        "summary.findingsDelta: +1",
+        "QUAL-NEW-LOW (low) at docs/policy.md:L1",
+      ],
+    },
+  ];
+  for (const item of cases) {
+    const report = buildCiReportFromDiff({
+      ...item.diff,
+      discovery: neutralSkillDiscoveryDiff(),
+    });
+    const before = formatCiReport(report, "json");
+    const markdown = formatCiReport(report, "markdown");
+    const reasons = markdown.split("## Status Reasons")[1]!.split("\n## ")[0]!;
+    assert.equal(report.status, item.status, item.name);
+    assert.equal(determineCiReportStatus(item.diff), item.status, item.name);
+    assert.ok(reasons.includes(`**${item.status.toUpperCase()}**`), item.name);
+    for (const evidence of item.evidence)
+      assert.ok(reasons.includes(evidence), `${item.name}: ${evidence}`);
+    assert.equal(formatCiReport(report, "json"), before);
+    assert.equal("statusReasons" in JSON.parse(before), false);
+  }
+});
+
+test("status reasons retain active policy matches and exclude disabled-policy evidence", () => {
+  const discovery = neutralSkillDiscoveryDiff();
+  discovery.adoption = { from: "adopted", to: "incomplete", changed: true };
+  for (const mode of ["off", "warn"] as const) {
+    const report = buildCiReportFromDiff(completeDiffReport(discovery), {
+      from: mode,
+      to: mode,
+    });
+    const reasons = formatCiReport(report, "markdown")
+      .split("## Status Reasons")[1]!
+      .split("\n## ")[0]!;
+    assert.equal(report.status, mode === "off" ? "pass" : "warn");
+    assert.equal(
+      reasons.includes("**WARN**: Skill Discovery"),
+      mode === "warn",
+    );
+    assert.equal(
+      reasons.includes("skill_discovery_ci.adoption_incomplete"),
+      mode === "warn",
+    );
+  }
+  const mixed = buildCiReportFromDiff(
+    {
+      ...policyDiffReport({ addedFindings: [finding("SEC-FAIL", "critical")] }),
+      discovery,
+    },
+    { from: "warn", to: "warn" },
+  );
+  const reasons = formatCiReport(mixed, "markdown")
+    .split("## Status Reasons")[1]!
+    .split("\n## ")[0]!;
+  assert.equal(mixed.status, "fail");
+  assert.match(reasons, /\*\*FAIL\*\*: New high or critical findings/);
+  assert.match(reasons, /\*\*WARN\*\*: Skill Discovery/);
+});
+
+test("CLI explains PASS, Discovery WARN, and FAIL exits independently of the threshold", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  await fixture.writeConfig({
+    skill_discovery: { adopted: true, ci_policy: "warn" },
+  });
+  await fixture.skill("entry", { owner: "team", publishedEntrypoint: true });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+  await fixture.skill("entry", { owner: "team" });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "Discovery incomplete"]);
+  await fixture.git(["tag", "warning"]);
+  await fixture.skill("entry", {
+    owner: "team",
+    metadata: { "requires-context": '["context.missing"]' },
+  });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "required edge missing"]);
+  for (const [toRef, status] of [
+    ["base", "pass"],
+    ["warning", "warn"],
+    ["HEAD", "fail"],
+  ] as const) {
+    let priorJson: unknown;
+    for (const threshold of ["fail", "warn"] as const) {
+      const command = await withCapturedConsole(() =>
+        runCiReportCommand(fixture.root, {
+          fromRef: "base",
+          toRef,
+          format: "json",
+          failOnStatus: threshold,
+        }),
+      );
+      const report = JSON.parse(command.stdout);
+      const blocks =
+        status === "fail" || (status === "warn" && threshold === "warn");
+      assert.equal(report.status, status);
+      assert.equal(command.code, blocks ? 1 : 0);
+      assert.equal(
+        command.stderr,
+        `Renma CI exit: report status ${status.toUpperCase()} ${blocks ? "meets" : "does not meet"} --fail-on-status ${threshold}; exit ${blocks ? 1 : 0}.\n`,
+      );
+      if (priorJson) assert.deepEqual(report, priorJson);
+      priorJson = report;
+    }
+  }
+});
+
 test("writableBy Markdown escapes opaque principals and bounds each endpoint without truncating JSON", () => {
   const report = sampleReport();
   const principals = [
@@ -2232,6 +2407,20 @@ test("security policy gate honors warn off and stricter fail-to-off resolution",
   assert.match(disabledMarkdown, /Security policy relaxation: GATE OFF/);
   assert.match(disabledMarkdown, /CI status effect: none — gate disabled/);
   assert.doesNotMatch(disabledMarkdown, /Security policy relaxation: PASS/);
+  assert.doesNotMatch(
+    disabledMarkdown.split("## Status Reasons")[1]!.split("\n## ")[0]!,
+    /Security Policy Relaxation/,
+  );
+  for (const [report, status] of [
+    [warned, "WARN"],
+    [bypassAttempt, "FAIL"],
+  ] as const) {
+    const reasons = formatCiReport(report, "markdown")
+      .split("## Status Reasons")[1]!
+      .split("\n## ")[0]!;
+    assert.ok(reasons.includes(`**${status}**: Security Policy Relaxation`));
+    assert.ok(reasons.includes(report.securityPolicy.matches[0]!.id));
+  }
   assert.equal(bypassAttempt.status, "fail");
   assert.deepEqual(bypassAttempt.securityPolicy.configured, {
     from: "fail",
@@ -2339,7 +2528,7 @@ test("enabled Discovery policy upgrades pass to warn with one review note", () =
   assert.match(markdown, /- Effective CI review policy: warn/);
   assert.match(
     markdown,
-    /- Policy outcome: WARN — review requested; exit behavior unchanged/,
+    /- Policy outcome: WARN — review requested; Discovery alone never produces FAIL\. WARN exits 1 with --fail-on-status warn, otherwise 0\./,
   );
   assert.match(
     markdown.slice(0, markdown.indexOf("<details>")),

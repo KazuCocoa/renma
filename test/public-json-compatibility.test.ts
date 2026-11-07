@@ -346,7 +346,13 @@ test("revision-based stable public JSON matches fixed compatibility baselines", 
     const normalizedStdout = normalizeJsonRoot(actual.stdout, root);
 
     assert.equal(actual.code, item.code, `${item.name} exit code`);
-    assert.equal(actual.stderr, "", `${item.name} stderr`);
+    assert.equal(
+      actual.stderr,
+      item.name === "ci-report"
+        ? "Renma CI exit: report status PASS does not meet --fail-on-status fail; exit 0.\n"
+        : "",
+      `${item.name} stderr`,
+    );
     await assertOrUpdateGolden(item.name, normalizedStdout);
     const document = record(JSON.parse(normalizedStdout));
     assert.equal(document.root, "<ROOT>", `${item.name} normalized root`);
