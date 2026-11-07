@@ -18,6 +18,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   resolution and provenance. Context/Lens owner resolution never inherits or
   combines security policies; caller policy evidence remains separate.
 
+### Fixed
+
+- Derive direct-link parent reachability from resolved link evidence without
+  computing all Markdown-to-Markdown reference closures during script inventory.
+- Report Context/Lens script owner conflicts only for inspected, cataloged
+  scripts; missing and excluded targets do not receive ownership diagnostics.
+
 ## [0.42.0] - 2026-11-04
 
 ### Added

@@ -613,8 +613,8 @@ restore, or propagate its status to dependents.
 
 Metadata-declared catalog dependencies come only from required/optional Context
 and Lens fields, `applies_to`, conflicts, and supersession references. Renma
-separately adds structurally derived static-support dependencies from
-deterministic Skill-local or Context/Lens README containment and static-reference evidence; those
+separately adds static-support dependencies from deterministic Skill-local
+containment, static references, and Context/Lens direct-link owner provenance; those
 relationships are not frontmatter declarations. `continues-with` is a separate
 Skill Discovery route declaration. `published-entrypoint` is separate
 publication intent. Neither creates a catalog dependency or claims runtime
@@ -1961,12 +1961,15 @@ Skill's `scripts/**`, and `repository-tool` for a helper under repository-root
 scripts remain visible as `noncanonical`; the inventory does not silently discard them.
 Skill-local reachability uses the same static reference graph and minimum depth
 as existing support diagnostics. Context/Lens scripts use `repository-script`
-scope. Package scripts additionally expose `parentResolution`, the candidate
-README path, ambiguous candidate paths when present, and `owningAsset` when
-resolved. `reachableFromOwningAsset` and `owningAssetReferenceDepth` describe
-exact local Markdown reference closure from that README. These are separate
-from invocation/dependency reachability. Repository tools have no invented
-parent or parent reachability state.
+scope. Their `parentResolution` describes the number of directly linking
+Context/Lens source assets: no sources is `missing`, one is `resolved`, and
+multiple sources is `ambiguous`, even if their declared owners agree.
+One source supplies `parentAssetCandidatePath` and `owningAsset`; multiple
+sources supply `parentAssetCandidates`. For one source,
+`reachableFromOwningAsset` is true and `owningAssetReferenceDepth` is 1 because
+the link is direct. No README or structural parent directory is required.
+These fields are separate from ownership agreement and invocation/dependency
+reachability. Repository tools have no invented parent or parent reachability state.
 
 The inventory recognizes the existing `node`, `bash`, `sh`, `python`, and
 `python3` helper grammar plus exact Windows launcher forms: `pwsh -File`,

@@ -408,7 +408,7 @@ export function formatExecutableGraphMarkdown(report: GraphReport): string {
 
   lines.push(
     "",
-    "Invocation does not imply ownership. Structural containment does not imply exclusive use. Scripts can be invoked by assets other than their owning Skill or Context/Lens README.",
+    "Invocation does not imply ownership. Structural containment does not imply exclusive use. Scripts may be invoked from multiple Skills, Contexts, or Lenses regardless of their owner.",
   );
   return `${lines.join("\n")}\n`;
 }

@@ -3,7 +3,6 @@ import {
   buildRepositoryScriptParentIndex,
   resolveRepositoryScriptParent,
 } from "./repository-script-parent.js";
-import { repositoryScriptReachability } from "./repository-script-reachability.js";
 import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 
 import { canonicalSha256, compareUtf16CodeUnits } from "./canonical-json.js";
@@ -110,7 +109,7 @@ export interface ExecutableSurfaceEntry {
     skillDirectory: string;
     entrypointPath?: string;
   };
-  /** Context/Lens package evidence; never populated from invocation or reference edges. */
+  /** Unique directly linking Context/Lens; source multiplicity is separate from owner agreement. */
   owningAsset?: {
     directory: string;
     sourcePath: string;
@@ -302,7 +301,6 @@ export function buildExecutableSurfaceInventory(
   );
   const reachabilityByPath = collectReachability(input);
   const scriptParents = buildRepositoryScriptParentIndex(input.documents);
-  const scriptReachability = repositoryScriptReachability(input.documents);
   const baseSurfaces = surfaceArtifacts
     .map((artifact) => {
       const scope = surfaceScope(artifact.path, input.skillParents);
@@ -325,9 +323,6 @@ export function buildExecutableSurfaceInventory(
         scriptResolution.state === "resolved"
           ? scriptResolution.parent
           : undefined;
-      const scriptDepth = scriptParent
-        ? scriptReachability.get(scriptParent.sourcePath)?.get(artifact.path)
-        : undefined;
       const policy = policiesByPath.get(artifact.path);
       const origins: ExecutableSurfaceOrigin[] = [
         ...(artifact.kind === "script" ||
@@ -394,10 +389,9 @@ export function buildExecutableSurfaceInventory(
                 id: scriptParent.id,
                 kind: scriptParent.kind,
               },
-              reachableFromOwningAsset: scriptDepth !== undefined,
-              ...(scriptDepth !== undefined
-                ? { owningAssetReferenceDepth: scriptDepth }
-                : {}),
+              // Parent resolution already proves a direct link to this surface.
+              reachableFromOwningAsset: true,
+              owningAssetReferenceDepth: 1,
             }
           : {}),
         interpreterHints,

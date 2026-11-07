@@ -20,7 +20,6 @@ import { ownership } from "../src/commands/ownership.js";
 import { readinessFromRepositorySnapshot } from "../src/commands/readiness.js";
 import { buildDiffReport } from "../src/commands/diff.js";
 import { buildCiReportFromDiff } from "../src/commands/ci-report.js";
-import { repositoryScriptReachability } from "../src/repository-script-reachability.js";
 
 const script = "contexts/devkit/f/scripts/probe.py";
 const owner = "qe-skills-hub-maintainers";
@@ -99,6 +98,26 @@ for (const scenario of [
     assert.equal(asset.ownership.effectiveOwner, scenario.effective);
     assert.equal(asset.ownership.source, scenario.source);
     assert.equal(asset.ownership.candidates?.length, scenario.owners.length);
+    const surface = snapshot.executableSurfaceInventory.surfaces.find(
+      (surface) => surface.path === script,
+    )!;
+    assert.equal(
+      surface.parentResolution,
+      scenario.owners.length === 0
+        ? "missing"
+        : scenario.owners.length === 1
+          ? "resolved"
+          : "ambiguous",
+    );
+    if (scenario.owners.length === 1) {
+      assert.equal(surface.owningAsset?.sourcePath, "contexts/source-0.md");
+      assert.equal(surface.reachableFromOwningAsset, true);
+      assert.equal(surface.owningAssetReferenceDepth, 1);
+    } else {
+      assert.equal(surface.owningAsset, undefined);
+      assert.equal(surface.reachableFromOwningAsset, undefined);
+      assert.equal(surface.owningAssetReferenceDepth, undefined);
+    }
     assert.equal(
       snapshot.catalog.assets.find((asset) =>
         asset.sourcePath.endsWith("helper.py"),
@@ -116,12 +135,6 @@ for (const scenario of [
         assert.equal(candidate.ownerEvidence?.path, candidate.sourcePath);
         assert.match(candidate.ownerEvidence!.raw, /owner:/);
       }
-      assert.equal(
-        repositoryScriptReachability(snapshot.documents)
-          .get(candidate.sourcePath)
-          ?.get(script),
-        1,
-      );
       assert.ok(
         snapshot.catalog.dependencies.some(
           (edge) =>
@@ -321,6 +334,62 @@ for (const scenario of [
       ).length >=
         scenario.owners.length + 1,
     );
+  });
+}
+
+for (const targetState of [
+  "missing",
+  "excluded",
+  "oversized",
+  "inspected",
+] as const) {
+  test(`owner conflicts are diagnosed only for inspected scripts: ${targetState}`, async (t) => {
+    const fixture = await RepositoryFixture.create({ testContext: t });
+    for (const [id, declaredOwner] of [
+      ["one", "team-one"],
+      ["two", "team-two"],
+    ]) {
+      await fixture.write(
+        `contexts/${id}.md`,
+        context(id!, declaredOwner!, `[Probe](${script})`),
+      );
+    }
+    if (targetState !== "missing") {
+      await fixture.write(
+        script,
+        targetState === "oversized"
+          ? "# padding\n".repeat(300)
+          : "print('probe')\n",
+      );
+    }
+    await fixture.writeConfig({
+      max_file_size_bytes: 1024,
+      ...(targetState === "excluded" ? { exclude: [script] } : {}),
+    });
+    const snapshot = await collectRepositorySnapshot(fixture.root);
+    const asset = snapshot.catalog.assets.find(
+      (asset) => asset.sourcePath === script,
+    );
+    const conflicts = snapshot.catalogDiagnostics.filter((diagnostic) =>
+      diagnostic.message.startsWith("Ambiguous Context/Lens script ownership"),
+    );
+    if (targetState === "inspected") {
+      assert.equal(asset?.ownership.source, "ambiguous");
+      assert.equal(conflicts.length, 1);
+      assert.equal(conflicts[0]?.path, script);
+      assert.deepEqual(
+        conflicts[0]?.details?.candidates,
+        asset?.ownership.candidates,
+      );
+    } else {
+      assert.equal(asset, undefined);
+      assert.deepEqual(conflicts, []);
+      assert.ok(
+        !snapshot.catalog.dependencies.some(
+          (edge) => edge.kind === "inherits_owner" && edge.from === script,
+        ),
+      );
+    }
   });
 }
 

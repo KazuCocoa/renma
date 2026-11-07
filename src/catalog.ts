@@ -165,20 +165,6 @@ export function buildCatalog(
 } {
   const diagnostics: Diagnostic[] = [];
   const scriptParents = buildRepositoryScriptParentIndex(documents);
-  for (const [sourcePath] of scriptParents) {
-    const ownership = resolveRepositoryScriptOwnership(
-      sourcePath,
-      scriptParents,
-    );
-    if (ownership.source !== "ambiguous") continue;
-    diagnostics.push({
-      severity: "warning",
-      path: sourcePath,
-      message:
-        "Ambiguous Context/Lens script ownership; directly linking assets declare different owners.",
-      details: { candidates: ownership.candidates },
-    });
-  }
   for (const [skillDirectory, candidates] of skillParents) {
     if (candidates.length <= 1) continue;
     diagnostics.push({
@@ -270,6 +256,20 @@ export function buildCatalog(
       if (byKind !== 0) return byKind;
       return compareUtf16CodeUnits(a.sourcePath, b.sourcePath);
     });
+
+  // Link targets may be missing or outside the inspection boundary. Only
+  // cataloged scripts have ownership evidence on which to diagnose conflicts.
+  for (const entry of entries) {
+    if (entry.kind !== "script" || entry.ownership.source !== "ambiguous")
+      continue;
+    diagnostics.push({
+      severity: "warning",
+      path: entry.sourcePath,
+      message:
+        "Ambiguous Context/Lens script ownership; directly linking assets declare different owners.",
+      details: { candidates: entry.ownership.candidates },
+    });
+  }
 
   const dependencies = [
     ...entries.flatMap((entry) => dependenciesForEntry(entry)),

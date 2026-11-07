@@ -99,9 +99,10 @@ catalog boundaries, such as repository `tools/` executables, remain available
 through the separate `executable` view.
 
 The shared catalog emits these resolved support edges once, so full graph,
-BOM dependency/dependent rows, and Trust Graph also retain them. Adding a
-Context reference does not transfer ownership or policy from that Context to
-the target, and does not expand the Skill-local security inspection boundary.
+BOM dependency/dependent rows, and Trust Graph also retain them. Reference
+edges do not transfer policy or expand the Skill-local security inspection
+boundary. Direct Context/Lens links to Context/Lens scripts also supply the
+separate owner evidence described below; other references do not transfer ownership.
 
 ## Context/Lens script parents
 
@@ -120,6 +121,10 @@ Every candidate retains its asset ID/path, link locations and owner declaration
 location. Multiple sources never collapse into one `inheritedFrom` parent,
 even when their owners agree. Classification parent resolution describes source
 asset multiplicity, separately from ownership agreement.
+
+Owner-conflict diagnostics apply only to inspected, cataloged scripts. Missing,
+excluded, or otherwise uninspected targets retain their existing reference and
+inspection-coverage handling without acquiring ownership-conflict diagnostics.
 
 Reference reachability and executable import dependencies remain independent of
 ownership. All reference edges survive ambiguity; resolved ownership emits an
