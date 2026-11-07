@@ -15,10 +15,6 @@ import type { Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
 import { parseDocument } from "./markdown.js";
-import {
-  buildRepositoryScriptParentIndex,
-  resolveRepositoryScriptParent,
-} from "./repository-script-parent.js";
 
 type InventoryArtifactKind = ArtifactKind;
 
@@ -295,19 +291,10 @@ export function collectSecurityPolicyAssetEvidence(
     documents.map((document) => [document.artifact.path, document]),
   );
   const owningSkills = skillArtifactsByDirectory(artifacts);
-  const scriptParents = buildRepositoryScriptParentIndex(documents);
   return documents
     .map((document): SecurityPolicyAssetEvidence | undefined => {
       const artifact = document.artifact;
-      const scriptParent = resolveRepositoryScriptParent(
-        artifact.path,
-        scriptParents,
-      );
-      const policyArtifact =
-        policyArtifactFor(artifact, owningSkills) ??
-        (artifact.kind === "script" && scriptParent.state === "resolved"
-          ? scriptParent.parent.document.artifact
-          : undefined);
+      const policyArtifact = policyArtifactFor(artifact, owningSkills);
       const rawSupportArtifact = isRawSupportArtifact(artifact);
       const evidenceArtifact =
         policyArtifact ??
@@ -352,10 +339,7 @@ export function collectSecurityPolicyAssetEvidence(
         ...(policyArtifact && effectivePolicy
           ? {
               inheritedFrom: {
-                id:
-                  scriptParent.state === "resolved"
-                    ? scriptParent.parent.id
-                    : policyArtifact.path,
+                id: policyArtifact.path,
                 sourcePath: policyArtifact.path,
               },
             }

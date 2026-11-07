@@ -1072,11 +1072,11 @@ Renma can also summarize the effective static policy surface across discovered a
 
 Script and asset bytes never declare local policy. Skill-local scripts and
 assets inherit policy only from one unambiguous owning Skill. Context/Lens
-package scripts inherit from one discovered package README under the
-[script-parent rules](static-asset-dependencies.md#contextlens-script-parents).
-The README's effective profile and repository configuration contributions are
-retained. An owner declaration is not required for policy inheritance, and an
-owner declaration alone does not supply security policy. Scripts remain in
+script ownership uses direct-link evidence under the
+[script ownership rules](static-asset-dependencies.md#contextlens-script-parents).
+It never inherits or combines caller policies, even when callers declare the
+same owner. Each caller's policy and invocation evidence remain independent.
+Scripts remain in
 policy inventory and provenance reporting but never contribute executable
 content to Renma security diagnostics. Ordinary output assets and binary files
 also do not contribute instruction text. Orphan scripts do not receive inherited
@@ -1109,7 +1109,7 @@ deferred. Static executable dependency edges may make that helper transitively
 reachable, but they never propagate, merge, intersect, or union invocation
 policy evidence.
 
-`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, `owning_skill`, and/or `owning_asset`. The last source identifies Context/Lens README inheritance. Both inheritance channels retain `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
+`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, `owning_skill`, and/or `owning_asset`. The last source remains accepted for older reports; direct-link Context/Lens ownership does not emit inherited policy. Skill policy inheritance retains `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
 
 Contribution is recorded during effective-policy resolution with the same
 precedence, fail-closed, replacement, accumulation, and deduplication rules. A

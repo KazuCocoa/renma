@@ -1137,6 +1137,15 @@ function formatAssetDetails(asset: AssetDelta): string[] {
     ...formatWritableByEvidence(asset, undefined, MAX_LIST_ITEMS),
     `  - Declared owner: ${formatPlainValue(asset.declaredOwner)}`,
     `  - Effective owner: ${formatPlainValue(asset.effectiveOwner)}`,
+    ...(asset.ownership
+      ? [
+          `  - Ownership resolution: ${asset.ownership.source}`,
+          ...(asset.ownership.candidates ?? []).map(
+            (candidate) =>
+              `  - Owner candidate: ${formatMarkdownInlineCode(candidate.sourcePath)} (${formatMarkdownInlineCode(candidate.declaredOwner ?? "undeclared")}), links at lines ${candidate.references.map((reference) => reference.startLine).join(", ")}`,
+          ),
+        ]
+      : []),
   ];
 }
 
@@ -1171,7 +1180,7 @@ function formatChangedAsset(change: AssetChange): string[] {
       .filter((field) => field !== "writableBy")
       .map(
         (field) =>
-          `  - ${formatComparableAssetField(field)}: ${formatCodeValue(change.from[field])} -> ${formatCodeValue(change.to[field])}`,
+          `  - ${formatComparableAssetField(field)}: ${formatCodeValue(field === "ownership" ? JSON.stringify(change.from[field]) : change.from[field])} -> ${formatCodeValue(field === "ownership" ? JSON.stringify(change.to[field]) : change.to[field])}`,
       ),
   ];
 }

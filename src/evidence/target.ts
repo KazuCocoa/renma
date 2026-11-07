@@ -267,8 +267,7 @@ function targetMetadataState(
   const hasMetadata = Object.keys(target.document.metadata).length > 0;
   if (
     (classification.scope === "skill-local" ||
-      (classification.matchedRule === "repository-script" &&
-        classification.parentResolution === "resolved")) &&
+      classification.matchedRule === "repository-script") &&
     !hasMetadata
   ) {
     return "not-required";

@@ -624,8 +624,8 @@ Ownership inheritance is structural, not metadata merging: a Skill-local
 support asset with no declared owner inherits only when Renma resolves exactly
 one parent Skill with a declared owner. Missing or ambiguous parents remain
 unowned. Shared Context assets never inherit an owner by path.
-Context/Lens package scripts can independently inherit their README parent's
-declared owner under the [script-parent rules](static-asset-dependencies.md#contextlens-script-parents).
+Context/Lens scripts inherit an agreed declared owner from directly linking
+standalone Contexts/Lenses under the [script-parent rules](static-asset-dependencies.md#contextlens-script-parents).
 
 Security profile inheritance is a different mechanism. Valid asset-local
 scalars take precedence over the selected profile chain; a child profile takes
@@ -634,8 +634,8 @@ documented replacement/fail-closed rules, while approved network/upload
 destinations accumulate from eligible profile and repository configuration
 sources. Repository disallowed commands also accumulate. Separately, a
 uniquely resolved Skill-local Script or Asset inherits its owning Skill's
-effective policy, and a Context/Lens package Script inherits its resolved
-README parent's effective policy. Ordinary Skill-local References, Profiles, and Examples can
+effective policy. Context/Lens direct-link ownership does not inherit or merge
+security policies; caller policy evidence remains separate. Ordinary Skill-local References, Profiles, and Examples can
 declare their own top-level policy but do not inherit the Skill's policy by
 placement. `allowed-floating-dependencies` is always asset-local and never
 participates in effective-policy inheritance or fingerprints.
@@ -1376,14 +1376,12 @@ blockers for strict scans, just like referenced Skill support.
 Skill-local path resolution, containment, and governance inheritance are unchanged.
 All analysis is static: Renma never runs these scripts or fetches their data.
 
-For ownership and policy inheritance, a Context/Lens package can provide a
-`README.md` alongside its `scripts/` directory or its immediate executable files.
-Exactly one discovered README must resolve as the parent. Other Markdown files,
-ancestor READMEs, and incoming references do not establish ownership. Root-level
-`contexts/scripts/**` and `lenses/scripts/**` remain shared. See the complete
-[script-parent rules](static-asset-dependencies.md#contextlens-script-parents).
-Parent resolution, inherited owner and policy, containment, and unreachable or
-deeply referenced scripts appear in the corresponding reports and diagnostics.
+For Context/Lens script ownership, directly linking standalone Contexts/Lenses
+supply declared-owner candidates. A README is unnecessary. Agreement resolves the
+owner; conflicting owners remain ambiguous, and no valid candidate means unowned.
+All candidates and reference edges are retained. Security policy is separate and
+is never inherited or merged by this rule. See the complete
+[script ownership rules](static-asset-dependencies.md#contextlens-script-parents).
 
 Static support reachability accepts explicit Skill-relative paths under their
 existing parsing semantics. Filename-shaped basenames are accepted only in

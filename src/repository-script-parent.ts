@@ -1,4 +1,9 @@
 import path from "node:path";
+import {
+  repositorySupportReferences,
+  type StaticSupportReference,
+} from "./static-support.js";
+import type { AssetOwnership } from "./types/governance.js";
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 import { parseAssetMetadata } from "./metadata.js";
@@ -12,6 +17,7 @@ export interface RepositoryScriptParent {
   kind: "context" | "context_lens";
   owner: string | null;
   document: ParsedDocument;
+  references: StaticSupportReference[];
 }
 
 export type RepositoryScriptParentIndex = ReadonlyMap<
@@ -21,34 +27,15 @@ export type RepositoryScriptParentIndex = ReadonlyMap<
 
 export type RepositoryScriptParentResolution =
   | { state: "not-applicable" }
-  | { state: "missing"; candidatePath: string }
+  | { state: "missing" }
   | {
       state: "ambiguous";
-      candidatePath: string;
       candidates: readonly RepositoryScriptParent[];
     }
   | {
       state: "resolved";
-      candidatePath: string;
       parent: RepositoryScriptParent;
     };
-
-/** A package README governs adjacent scripts and its scripts/ subtree only.
- * Root-level shared scripts, arbitrary Markdown neighbours, and references do
- * not establish a parent. Never search ancestors for a missing README.
- */
-export function repositoryScriptDirectory(
-  sourcePath: string,
-): string | undefined {
-  if (!isGovernedRepositoryScriptPath(sourcePath)) return undefined;
-  const segments = sourcePath.split("/");
-  const scriptsIndex = segments.indexOf("scripts", 1);
-  const directory =
-    scriptsIndex < 0
-      ? path.posix.dirname(sourcePath)
-      : segments.slice(0, scriptsIndex).join("/");
-  return directory.includes("/") ? directory : undefined;
-}
 
 export function buildRepositoryScriptParentIndex(
   documents: readonly ParsedDocument[],
@@ -57,28 +44,36 @@ export function buildRepositoryScriptParentIndex(
   for (const document of documents) {
     const artifact = document.artifact;
     if (
-      !/^(?:contexts|lenses)\/.+\/readme\.md$/iu.test(artifact.path) ||
+      !/^(?:contexts|lenses)\//u.test(artifact.path) ||
       !artifact.markdownParserEligible ||
       (artifact.kind !== "context" && artifact.kind !== "context_lens")
     )
       continue;
-    const directory = path.posix.dirname(artifact.path);
-    // A README inside scripts/ is documentation, not a nested owner.
-    if (directory.split("/").slice(1).includes("scripts")) continue;
     const metadata = parseAssetMetadata(document).metadata;
-    const parents = index.get(directory) ?? [];
-    parents.push({
-      directory,
-      sourcePath: artifact.path,
-      id: metadata.id ?? artifact.path,
-      kind:
-        artifact.kind === "context_lens" || metadata.type === "context_lens"
-          ? "context_lens"
-          : "context",
-      owner: metadata.owner?.trim() || null,
-      document,
-    });
-    index.set(directory, parents);
+    for (const reference of repositorySupportReferences(document, true)) {
+      if (!isGovernedRepositoryScriptPath(reference.targetPath)) continue;
+      const parents = index.get(reference.targetPath) ?? [];
+      let candidate = parents.find(
+        (parent) => parent.sourcePath === artifact.path,
+      );
+      if (!candidate) {
+        candidate = {
+          directory: path.posix.dirname(artifact.path),
+          sourcePath: artifact.path,
+          id: metadata.id ?? artifact.path,
+          kind:
+            artifact.kind === "context_lens" || metadata.type === "context_lens"
+              ? "context_lens"
+              : "context",
+          owner: metadata.owner?.trim() || null,
+          document,
+          references: [],
+        };
+        parents.push(candidate);
+      }
+      candidate.references.push(reference);
+      index.set(reference.targetPath, parents);
+    }
   }
   for (const parents of index.values())
     parents.sort((a, b) => compareUtf16CodeUnits(a.sourcePath, b.sourcePath));
@@ -89,14 +84,12 @@ export function resolveRepositoryScriptParent(
   sourcePath: string,
   index: RepositoryScriptParentIndex,
 ): RepositoryScriptParentResolution {
-  const directory = repositoryScriptDirectory(sourcePath);
-  if (!directory) return { state: "not-applicable" };
-  const candidatePath = `${directory}/README.md`;
-  const candidates = index.get(directory) ?? [];
-  if (!candidates.length) return { state: "missing", candidatePath };
-  if (candidates.length !== 1)
-    return { state: "ambiguous", candidatePath, candidates };
-  return { state: "resolved", candidatePath, parent: candidates[0]! };
+  if (!isGovernedRepositoryScriptPath(sourcePath))
+    return { state: "not-applicable" };
+  const candidates = index.get(sourcePath) ?? [];
+  if (!candidates.length) return { state: "missing" };
+  if (candidates.length !== 1) return { state: "ambiguous", candidates };
+  return { state: "resolved", parent: candidates[0]! };
 }
 
 export function withResolvedRepositoryScriptParent(
@@ -108,7 +101,9 @@ export function withResolvedRepositoryScriptParent(
   if (resolution.state === "not-applicable") return classification;
   return {
     ...classification,
-    parentAssetCandidatePath: resolution.candidatePath,
+    ...(resolution.state === "resolved"
+      ? { parentAssetCandidatePath: resolution.parent.sourcePath }
+      : {}),
     parentResolution: resolution.state,
     ...(resolution.state === "resolved"
       ? { parentAssetPath: resolution.parent.sourcePath }
@@ -118,6 +113,53 @@ export function withResolvedRepositoryScriptParent(
           parentAssetCandidates: resolution.candidates.map(
             (parent) => parent.sourcePath,
           ),
+        }
+      : {}),
+  };
+}
+
+/** Owner agreement never collapses multiple source assets to a single parent. */
+export function resolveRepositoryScriptOwnership(
+  sourcePath: string,
+  index: RepositoryScriptParentIndex,
+): AssetOwnership {
+  if (!isGovernedRepositoryScriptPath(sourcePath))
+    return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
+  const candidates = (index.get(sourcePath) ?? []).map((parent) => ({
+    id: parent.id,
+    sourcePath: parent.sourcePath,
+    declaredOwner: parent.owner,
+    references: parent.references.map((reference) => ({
+      path: reference.sourcePath,
+      startLine: reference.line,
+      endLine: reference.line,
+      snippet: reference.raw,
+    })),
+    ...(parent.document.metadataFields.owner
+      ? { ownerEvidence: parent.document.metadataFields.owner }
+      : {}),
+  }));
+  const owners = new Set(
+    candidates
+      .map((candidate) => candidate.declaredOwner)
+      .filter((owner): owner is string => owner !== null),
+  );
+  return {
+    declaredOwner: null,
+    effectiveOwner: owners.size === 1 ? [...owners][0]! : null,
+    source:
+      owners.size > 1
+        ? "ambiguous"
+        : owners.size === 1
+          ? "inherited"
+          : "unowned",
+    candidates,
+    ...(candidates.length === 1 && owners.size === 1
+      ? {
+          inheritedFrom: {
+            id: candidates[0]!.id,
+            sourcePath: candidates[0]!.sourcePath,
+          },
         }
       : {}),
   };

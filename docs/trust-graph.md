@@ -37,12 +37,15 @@ Static support uses `owns_local_resource`, `statically_references`,
 support references also use `statically_references`; these edges do not imply
 ownership or policy inheritance. See [Static Asset Dependencies](static-asset-dependencies.md). Every `owned_by` edge declares
 `ownershipSource`; when its value is `inherited`, the edge also retains an
-`inheritedFrom` object with the owning asset ID and source path. Every
+`inheritedFrom` object for a single source or `inheritedFromCandidates` for
+multiple direct-link owner sources, with every declaring asset ID and path.
+Ambiguous script owners emit no `owned_by` edge, while all references survive. Every
 `has_effective_policy` edge has a non-empty, duplicate-free `policySources`
 array. Its values are limited to `local`, `security_profile`,
 `repository_config`, `owning_skill`, and `owning_asset`, in that generated order.
-`owning_asset` identifies a uniquely resolved Context/Lens README parent.
-Effective policy inherited from either parent kind retains `inheritedFrom`.
+`owning_asset` remains accepted for compatibility with older reports. Direct-link
+Context/Lens ownership does not generate inherited security policy. Skill policy
+inheritance retains `inheritedFrom`; each Context/Lens caller keeps its own policy evidence.
 
 Representative complete top-level document:
 

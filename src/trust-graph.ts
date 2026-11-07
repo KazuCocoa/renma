@@ -176,14 +176,31 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
         type: "owned_by",
         properties: {
           ownershipSource: asset.ownership.source,
+          ...(asset.ownership.candidates
+            ? {
+                inheritedFromCandidates: asset.ownership.candidates
+                  .filter((candidate) => candidate.declaredOwner)
+                  .map((candidate) => ({
+                    id: candidate.id,
+                    sourcePath: candidate.sourcePath,
+                  })),
+              }
+            : {}),
           ...(asset.ownership.source === "inherited" &&
           asset.ownership.inheritedFrom
             ? { inheritedFrom: asset.ownership.inheritedFrom }
             : {}),
         },
-        evidence: inheritedOwnerAsset
-          ? metadataEvidence(inheritedOwnerAsset, "owner")
-          : metadataEvidence(asset, "owner"),
+        evidence: asset.ownership.candidates
+          ? asset.ownership.candidates.flatMap((candidate) => {
+              const source = assetsByPath.get(
+                normalizeDependencyReference(candidate.sourcePath),
+              );
+              return source ? metadataEvidence(source, "owner") : [];
+            })
+          : inheritedOwnerAsset
+            ? metadataEvidence(inheritedOwnerAsset, "owner")
+            : metadataEvidence(asset, "owner"),
       });
     }
     if (asset.metadata.status) {

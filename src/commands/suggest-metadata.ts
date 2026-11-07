@@ -450,7 +450,7 @@ function suggestionNextActions(
 interface SkillLocalContext {
   classification: KnownAssetClassificationEvidence;
   parent: SkillParentResolution;
-  ownershipSource: "declared" | "inherited" | "unowned";
+  ownershipSource: "declared" | "inherited" | "unowned" | "ambiguous";
   hasLocalPolicyMetadata: boolean;
 }
 

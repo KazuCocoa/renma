@@ -302,10 +302,7 @@ export function buildExecutableSurfaceInventory(
   );
   const reachabilityByPath = collectReachability(input);
   const scriptParents = buildRepositoryScriptParentIndex(input.documents);
-  const scriptReachability = repositoryScriptReachability(
-    input.documents,
-    scriptParents,
-  );
+  const scriptReachability = repositoryScriptReachability(input.documents);
   const baseSurfaces = surfaceArtifacts
     .map((artifact) => {
       const scope = surfaceScope(artifact.path, input.skillParents);
@@ -374,7 +371,12 @@ export function buildExecutableSurfaceInventory(
         ...(scriptResolution.state !== "not-applicable"
           ? {
               parentResolution: scriptResolution.state,
-              parentAssetCandidatePath: scriptResolution.candidatePath,
+              ...(scriptResolution.state === "resolved"
+                ? {
+                    parentAssetCandidatePath:
+                      scriptResolution.parent.sourcePath,
+                  }
+                : {}),
               ...(scriptResolution.state === "ambiguous"
                 ? {
                     parentAssetCandidates: scriptResolution.candidates.map(

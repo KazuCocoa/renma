@@ -1,9 +1,5 @@
 import { compareUtf16CodeUnits } from "./canonical-json.js";
 import path from "node:path";
-import {
-  buildRepositoryScriptParentIndex,
-  resolveRepositoryScriptParent,
-} from "./repository-script-parent.js";
 import { isGovernedRepositoryScriptPath } from "./executable-path-contract.js";
 
 import {
@@ -595,7 +591,7 @@ function maskRawMatches(line: string, matches: string[]): string {
 }
 
 /**
- * Derive structural Skill/README ownership separately from static references.
+ * Derive Skill containment and owner provenance separately from static references.
  * Cross-distribution references never imply ownership or policy inheritance.
  */
 export function buildStaticSupportDependencies(
@@ -618,35 +614,19 @@ export function buildStaticSupportDependencies(
     skillCounts.set(directory, (skillCounts.get(directory) ?? 0) + 1);
   }
   const result: Dependency[] = [];
-  const scriptParents = buildRepositoryScriptParentIndex(documents);
+  // Ownership provenance is separate from all reference/dependency edges.
   for (const local of entries) {
-    if (local.kind !== "script") continue;
-    const resolution = resolveRepositoryScriptParent(
-      local.sourcePath,
-      scriptParents,
-    );
-    if (resolution.state !== "resolved") continue;
-    const parent = resolution.parent;
-    result.push({
-      from: parent.id,
-      to: local.id,
-      kind: "owns_local_resource",
-      sourcePath: parent.sourcePath,
-    });
-    if (local.ownership.source === "inherited") {
+    for (const candidate of local.ownership.candidates ?? []) {
+      if (local.ownership.source !== "inherited" || !candidate.declaredOwner)
+        continue;
       result.push({
         from: local.id,
-        to: parent.id,
+        to: candidate.id,
         kind: "inherits_owner",
         sourcePath: local.sourcePath,
+        evidence: candidate.references[0]!,
       });
     }
-    result.push({
-      from: local.id,
-      to: parent.id,
-      kind: "inherits_policy",
-      sourcePath: local.sourcePath,
-    });
   }
 
   for (const skill of skillEntries) {
@@ -791,6 +771,7 @@ export function repositoryScriptReferences(
 /** Exact Markdown destinations and path tokens; no repository-wide basename guessing. */
 export function repositorySupportReferences(
   document: ParsedDocument,
+  directLinksOnly = false,
 ): StaticSupportReference[] {
   const syntax = ensureMarkdownSyntaxForDocument(document);
   const bodyStart = markdownBodyStartLineForArtifact(
@@ -807,7 +788,9 @@ export function repositorySupportReferences(
       index + 1,
       [...(syntax?.linkSyntax ?? []), ...(syntax?.definitions ?? [])],
     );
-    for (const match of line.matchAll(/([`'"])([^`'"\r\n]+)\1/g)) {
+    for (const match of (directLinksOnly ? "" : line).matchAll(
+      /([`'"])([^`'"\r\n]+)\1/g,
+    )) {
       const value = match[2]!;
       if (
         /\s/u.test(value) &&
@@ -821,8 +804,9 @@ export function repositorySupportReferences(
     // File-based Contexts and Lenses also accept the explicit path tokens used
     // by Skills. No basename guessing or directory expansion establishes use.
     if (
-      document.artifact.kind === "context" ||
-      document.artifact.kind === "context_lens"
+      !directLinksOnly &&
+      (document.artifact.kind === "context" ||
+        document.artifact.kind === "context_lens")
     ) {
       const unquoted = line.replace(/([`'"])[^`'"\r\n]+\1/g, " ");
       for (const match of unquoted.matchAll(
@@ -866,7 +850,9 @@ export function repositorySupportReferences(
       });
     }
   }
-  for (const command of collectHelperCommandEvidence([document])) {
+  for (const command of directLinksOnly
+    ? []
+    : collectHelperCommandEvidence([document])) {
     if (command.line < bodyStart || command.pathResolution.kind !== "candidate")
       continue;
     references.push({

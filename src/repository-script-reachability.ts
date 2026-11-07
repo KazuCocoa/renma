@@ -1,78 +1,36 @@
 import { repositorySupportReferences } from "./static-support.js";
-import path from "node:path";
-import {
-  buildRepositoryScriptParentIndex,
-  resolveRepositoryScriptParent,
-  type RepositoryScriptParentIndex,
-} from "./repository-script-parent.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
-/** Exact document references, bounded to one README package, with cycle-safe BFS.
- * Script imports keep their separate executable dependency reachability model.
- */
+/** Reference reachability is independent of ownership and retains every source. */
 export function repositoryScriptReachability(
   documents: readonly ParsedDocument[],
-  parents: RepositoryScriptParentIndex = buildRepositoryScriptParentIndex(
-    documents,
-  ),
 ): ReadonlyMap<string, ReadonlyMap<string, number>> {
-  const resolvedParents = [...parents.values()]
-    .filter((candidates) => candidates.length === 1)
-    .map((candidates) => candidates[0]!);
-  if (resolvedParents.length === 0) return new Map();
-  const documentsByPath = new Map(
-    documents.map((document) => [document.artifact.path, document]),
-  );
+  const paths = new Set(documents.map((document) => document.artifact.path));
   const references = new Map(
     documents
-      .filter(
-        (document) =>
-          document.artifact.markdownParserEligible &&
-          resolvedParents.some((parent) =>
-            document.artifact.path.startsWith(`${parent.directory}/`),
-          ),
-      )
+      .filter((document) => document.artifact.markdownParserEligible)
       .map((document) => [
         document.artifact.path,
         repositorySupportReferences(document),
       ]),
   );
   const result = new Map<string, Map<string, number>>();
-  for (const parent of resolvedParents) {
-    const depths = new Map<string, number>([[parent.sourcePath, 0]]);
-    const queue = [parent.sourcePath];
+  for (const source of references.keys()) {
+    const depths = new Map<string, number>([[source, 0]]);
+    const queue = [source];
     for (let i = 0; i < queue.length; i++) {
-      const sourcePath = queue[i]!;
-      for (const reference of references.get(sourcePath) ?? []) {
-        const target = documentsByPath.get(reference.targetPath);
+      const current = queue[i]!;
+      for (const reference of references.get(current) ?? []) {
         if (
-          !target ||
-          !reference.targetPath.startsWith(`${parent.directory}/`) ||
+          !paths.has(reference.targetPath) ||
           depths.has(reference.targetPath)
         )
           continue;
-        // Do not travel into another README package, including ambiguous ones.
-        let directory = path.posix.dirname(reference.targetPath);
-        while (directory !== parent.directory && !parents.has(directory)) {
-          directory = path.posix.dirname(directory);
-        }
-        if (directory !== parent.directory) continue;
-        if (target.artifact.kind === "script") {
-          const resolved = resolveRepositoryScriptParent(
-            reference.targetPath,
-            parents,
-          );
-          if (
-            resolved.state !== "resolved" ||
-            resolved.parent.sourcePath !== parent.sourcePath
-          )
-            continue;
-        }
-        depths.set(reference.targetPath, depths.get(sourcePath)! + 1);
+        depths.set(reference.targetPath, depths.get(current)! + 1);
         queue.push(reference.targetPath);
       }
     }
-    result.set(parent.sourcePath, depths);
+    result.set(source, depths);
   }
   return result;
 }

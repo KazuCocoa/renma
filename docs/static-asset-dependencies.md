@@ -10,8 +10,8 @@ renma graph . --view asset-impact --focus skills/git/scripts/create-tag.mjs --fo
 
 These views expose file-reference topology for downstream selection and export
 consumers; they do not implement export. The existing `full` graph separately
-exposes `owns_local_resource` for cataloged Skill-local distribution contents
-and scripts belonging to a uniquely resolved Context/Lens package README.
+exposes `owns_local_resource` for cataloged Skill-local distribution contents,
+plus reference and owner-provenance edges for Context/Lens scripts.
 A consumer can combine that inventory with reference closure when it needs all
 supported files belonging to a selected Skill.
 
@@ -105,37 +105,31 @@ the target, and does not expand the Skill-local security inspection boundary.
 
 ## Context/Lens script parents
 
-For `contexts/<package>/scripts/**` and `lenses/<package>/scripts/**`, the
-structural parent candidate is `<package>/README.md`. Supported executable
-files immediately alongside that README have the same parent. `<package>`
-may contain multiple directory segments. A deeper directory outside `scripts/`
-needs its own README; Renma does not search ancestors for a replacement parent.
+Scripts under Context/Lens roots do not require a README. Each inspected,
+parser-eligible standalone Context or Lens that directly links the script is an
+ownership candidate. Exact Markdown links (including reference-style links) supply
+candidates; consumer Skills, prose path tokens, commands and Python/JavaScript
+imports do not. Excluded, unreadable, oversized or otherwise uninspected sources
+supply no candidate. Transitive references do not establish ownership.
 
-Inheritance requires exactly one discovered, parser-eligible Context or Lens
-README in that directory. README filename case variants count as candidates;
-multiple candidates are ambiguous. Missing, excluded, unreadable, or otherwise
-uninspected parents do not supply governance. Other Markdown filenames and
-README files inside `scripts/` do not establish a parent. Root-level
-`contexts/scripts/**` and `lenses/scripts/**` remain shared scripts even if a
-root README exists.
+One declared owner, or agreement among multiple declared owners, resolves the
+effective owner. Conflicting declared owners produce `ownership.source: ambiguous`
+and a null effective owner. With no valid declared owners the script is unowned.
+Candidates without a declared owner remain in the evidence but do not vote.
+Every candidate retains its asset ID/path, link locations and owner declaration
+location. Multiple sources never collapse into one `inheritedFrom` parent,
+even when their owners agree. Classification parent resolution describes source
+asset multiplicity, separately from ownership agreement.
 
-Scripts inherit the parent's declared owner when present and its effective
-security policy independently. They retain their `script` kind and
-`repository-script` scope. The full graph exposes `owns_local_resource`,
-`inherits_owner` (when an owner was inherited), and `inherits_policy`; the
-executable graph exposes structural `contains` edges. An unused script still
-belongs to the package. These edges do not make it part of reference closure.
+Reference reachability and executable import dependencies remain independent of
+ownership. All reference edges survive ambiguity; resolved ownership emits an
+`inherits_owner` edge for each declaring source. Direct links do not imply
+structural containment or policy inheritance. README-package reachability
+requirements no longer apply; existing Skill-local reachability checks remain.
 
-Parent reachability follows exact references from the README through discovered
-local Markdown documents, with minimum hop counts and cycle protection. It
-does not cross into another README package, follow references from outside the
-package, or interpret script imports as Markdown references. Executable import
-reachability remains separately reported. Unreachable scripts, absent reachable
-script-reference guidance, and deep reference chains produce the existing
-`SUPPORT-UNREACHABLE-SCRIPT`, `SUPPORT-MISSING-REACHABILITY-GUIDANCE`, and
-`SUPPORT-DEEP-REFERENCE-CHAIN` diagnostics. Missing parents are exposed as
-resolution evidence; they do not by themselves require a README for shared
-scripts.
+This owner resolution never inherits or merges security policies. Caller policy
+evidence stays attached to each caller/invocation, even for callers with identical
+owners. Scripts retain their script classification and inspection boundary.
 
 ## Interpretation
 

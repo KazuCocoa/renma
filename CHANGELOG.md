@@ -8,14 +8,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Context/Lens package scripts inherit owner and effective security policy from
-  one discovered package `README.md`. Reports retain the parent resolution,
-  ownership/policy provenance, structural containment, and parent-reference
-  reachability. Missing or ambiguous parents and root-level shared scripts do
-  not acquire inferred governance.
-- Diagnose Context/Lens package scripts that are unreachable from their README,
-  missing script-reference guidance, and deep local Markdown reference chains.
-  References from other assets and executable dependencies do not transfer policy.
+- Resolve Context/Lens script ownership from direct Markdown links in inspected
+  standalone Contexts/Lenses, without requiring a README. Agreeing declared
+  owners are inherited; conflicting owners are ambiguous and have no effective
+  owner. Every candidate retains source asset, link locations and declaration
+  evidence, including when several sources declare the same owner.
+- Keep reference/import graphs and impact analysis independent of ownership.
+  Catalog, ownership, readiness, BOM, Trust Graph and CI diff preserve the
+  resolution and provenance. Context/Lens owner resolution never inherits or
+  combines security policies; caller policy evidence remains separate.
 
 ## [0.42.0] - 2026-11-04
 

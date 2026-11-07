@@ -1,7 +1,7 @@
 import { analyzeAssetBindings } from "./asset-binding-analysis.js";
 import {
   buildRepositoryScriptParentIndex,
-  resolveRepositoryScriptParent,
+  resolveRepositoryScriptOwnership,
   type RepositoryScriptParentIndex,
 } from "./repository-script-parent.js";
 import type { AssetBindingReport } from "./types/asset-bindings.js";
@@ -165,16 +165,18 @@ export function buildCatalog(
 } {
   const diagnostics: Diagnostic[] = [];
   const scriptParents = buildRepositoryScriptParentIndex(documents);
-  for (const [directory, candidates] of scriptParents) {
-    if (candidates.length <= 1) continue;
+  for (const [sourcePath] of scriptParents) {
+    const ownership = resolveRepositoryScriptOwnership(
+      sourcePath,
+      scriptParents,
+    );
+    if (ownership.source !== "ambiguous") continue;
     diagnostics.push({
       severity: "warning",
-      path: directory,
+      path: sourcePath,
       message:
-        "Ambiguous Context/Lens README parent; local scripts do not inherit ownership or policy.",
-      details: {
-        candidatePaths: candidates.map((candidate) => candidate.sourcePath),
-      },
+        "Ambiguous Context/Lens script ownership; directly linking assets declare different owners.",
+      details: { candidates: ownership.candidates },
     });
   }
   for (const [skillDirectory, candidates] of skillParents) {
@@ -314,12 +316,18 @@ function resolveAssetOwnership(
     document.artifact.path,
     skillParents,
   );
-  const resolution =
-    skillResolution.state === "not-applicable"
-      ? resolveRepositoryScriptParent(document.artifact.path, scriptParents)
-      : skillResolution;
+  if (
+    skillResolution.state === "not-applicable" &&
+    document.artifact.kind === "script"
+  ) {
+    return resolveRepositoryScriptOwnership(
+      document.artifact.path,
+      scriptParents,
+    );
+  }
+  const resolution = skillResolution;
   // Structural placement supplies only a candidate. Inheritance requires one
-  // resolved Skill/README parent and an owner declared by that parent.
+  // resolved Skill parent and an owner declared by that parent.
   if (resolution.state !== "resolved" || !resolution.parent.owner) {
     return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
   }

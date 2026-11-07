@@ -124,7 +124,46 @@
       "properties": {
         "declaredOwner": { "type": ["string", "null"] },
         "effectiveOwner": { "type": ["string", "null"] },
-        "source": { "enum": ["declared", "inherited", "unowned"] },
+        "source": { "enum": ["declared", "inherited", "unowned", "ambiguous"] },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "sourcePath", "declaredOwner", "references"],
+            "properties": {
+              "id": { "type": "string" },
+              "sourcePath": { "type": "string" },
+              "declaredOwner": { "type": ["string", "null"] },
+              "references": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "startLine", "endLine", "snippet"],
+                  "properties": {
+                    "path": { "type": "string" },
+                    "startLine": { "type": "integer" },
+                    "endLine": { "type": "integer" },
+                    "snippet": { "type": "string" }
+                  }
+                }
+              },
+              "ownerEvidence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "key", "startLine", "endLine", "raw"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "key": { "type": "string" },
+                  "startLine": { "type": "integer" },
+                  "endLine": { "type": "integer" },
+                  "raw": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
         "inheritedFrom": {
           "type": "object",
           "additionalProperties": false,

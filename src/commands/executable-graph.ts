@@ -133,8 +133,7 @@ export function executableGraphReport(
   // parent fields are previously resolved path boundaries, not ownership.
   const containmentEdges = inventory.surfaces.flatMap(
     (surface): GraphEdge[] => {
-      const entrypointPath =
-        surface.owningSkill?.entrypointPath ?? surface.owningAsset?.sourcePath;
+      const entrypointPath = surface.owningSkill?.entrypointPath;
       const parent = entrypointPath
         ? (skillsBySourcePath.get(entrypointPath) ??
           documentsBySourcePath.get(entrypointPath))
@@ -145,9 +144,7 @@ export function executableGraphReport(
           from: parent.id,
           to: surface.path,
           kind: "contains",
-          declaration: surface.owningAsset
-            ? "structural-readme-boundary"
-            : "structural-skill-boundary",
+          declaration: "structural-skill-boundary",
           sourcePath: parent.sourcePath,
           resolved: true,
           targetId: surface.path,
