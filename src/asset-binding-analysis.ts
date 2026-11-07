@@ -108,13 +108,14 @@ export function analyzeAssetBindings(
   const identities = documents.map((document, index) => {
     const locations = sourceLocations[index]!;
     const entry = assetsByPath.get(document.artifact.path);
+    const kind = entry?.kind ?? document.artifact.kind;
     const fm = ensureYamlFrontmatterForDocument(document);
-    const skill = document.artifact.kind === "skill";
+    const skill = kind === "skill";
     const fields = skill ? fm.metadataFields : fm.fields;
     const idKey = skill ? "renma.id" : "id";
     const versionKey = skill
       ? "renma.version"
-      : document.artifact.kind === "context_lens"
+      : kind === "context_lens"
         ? ASSET_BINDING_METADATA_KEYS.lensReleaseVersion
         : "version";
     const unique = (key: string) => fields.filter((field) => field.key === key);
@@ -137,7 +138,7 @@ export function analyzeAssetBindings(
         : null;
     return {
       path: document.artifact.path,
-      kind: document.artifact.kind,
+      kind,
       id,
       version,
       evidence: locations.location(0, document.artifact.content.length),
@@ -529,7 +530,7 @@ function lineStarts(content: string): number[] {
 function createBindingLocations(document: ParsedDocument) {
   const content = document.artifact.content;
   const starts = lineStarts(content);
-  let sha256 = document.artifact.contentHash;
+  let sha256 = document.artifact.contentHash?.replace(/^sha256:/, "");
   const line = (offset: number): number => {
     let low = 0;
     let high = starts.length;

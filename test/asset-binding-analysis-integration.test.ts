@@ -3,7 +3,8 @@ import { buildTrustGraph } from "../src/trust-graph.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -11,6 +12,8 @@ import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import { classifyAssetPath } from "../src/discovery.js";
 import { parseRenmaFrontmatter } from "../src/yaml-frontmatter.js";
+import { collectRepositorySnapshot } from "../src/repository-evidence.js";
+import { RepositoryFixture } from "./repository-fixture.js";
 import {
   inspectAssetBindings,
   type AssetBindingFile,
@@ -264,6 +267,53 @@ test("Lens nodes use release_version, never the format version", () => {
       .bindings![0]!.satisfaction.status,
     "target-version-invalid",
   );
+});
+
+test("filesystem binding evidence matches the public API and schema for Context-root Lenses", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  const files = [
+    skill(
+      "a",
+      "1.0.0",
+      `  renma.requires-lens: '["lens.review"]'\n  renma.asset-bindings: '[{"alias":"review","target":"lens.review","version":"2026-09"}]'\n`,
+    ),
+    file(
+      "contexts/review.lens.md",
+      '\uFEFF---\r\nid: lens.review\r\ntype: context_lens\r\nversion: "1"\r\nrelease_version: "2026-09"\r\nowner: qa\r\npurpose: Review rules\r\napplies_to: [context.rules]\r\nasset_bindings:\r\n  - alias: rules\r\n    target: context.rules\r\n    version: "2.0"\r\n---\r\nReview [rules](renma-asset:rules).\r\n',
+    ),
+    file(
+      "contexts/rules.md",
+      '---\nid: context.rules\nversion: "2.0"\nowner: qa\n---\n# Rules\n',
+    ),
+  ];
+  for (const f of files) await fixture.write(f.path, f.bytes);
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  const report = buildCatalog(snapshot.documents).assetBindings;
+  assert.deepEqual(report, inspectAssetBindings(files));
+  const validate = new Ajv2020().compile(
+    JSON.parse(
+      await readFile("docs/schemas/asset-bindings-v1.schema.json", "utf8"),
+    ),
+  );
+  assert.equal(validate(report), true, JSON.stringify(validate.errors));
+  const lens = report.documents.find((d) => d.identity.id === "lens.review")!;
+  assert.equal(lens.identity.kind, "context_lens");
+  assert.equal(lens.identity.version, "2026-09");
+  assert.equal(lens.bindings[0]!.satisfied, true);
+  assert.equal(
+    report.documents.find((d) => d.identity.id === "skill.a")!.bindings[0]!
+      .satisfied,
+    true,
+  );
+  assert.equal(
+    snapshot.catalog.assets.find((a) => a.id === "lens.review")!.releaseVersion,
+    "2026-09",
+  );
+  const boundEdge = snapshot.catalog.dependencies.find(
+    (d) => d.from === "lens.review",
+  )!;
+  const { diagnostics: _diagnostics, ...binding } = boundEdge.bindings![0]!;
+  assert.deepEqual(binding, lens.bindings[0]);
 });
 
 test("unbound edges preserve their fields and completeness summaries", () => {

@@ -512,7 +512,9 @@ transition rules for upload permission and human approval.
   `no`, `denied`, `deny`, or `0`. Prefer YAML `true`/`false` for new assets.
 - Dates must be real calendar dates in `YYYY-MM-DD` form. Review cycles support
   only `P<positive integer>D`, such as `P90D`; months, years, zero, signs,
-  fractions, and composite ISO durations are unsupported.
+  fractions, and composite ISO durations are unsupported. The duration must fit
+  within the supported `0000-01-01` through `9999-12-31` range; when
+  `last_reviewed_at` is present, the resulting review date must also fit that range.
 - `token_budget_override` must be a positive safe YAML integer, exceed the
   eligible artifact kind's stable compatibility validation baseline, and be
   needed relative to that baseline. It requires a non-empty rationale. A valid

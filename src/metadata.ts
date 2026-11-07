@@ -11,7 +11,11 @@ import type {
   MetadataValue,
   ParsedDocument,
 } from "./types/metadata.js";
-import { isIsoDate, parseDayDuration } from "./freshness.js";
+import {
+  evaluateAssetFreshness,
+  isIsoDate,
+  parseDayDuration,
+} from "./freshness.js";
 import { isRevokedLifecycleStatus } from "./lifecycle.js";
 import {
   DEFAULT_QUALITY_PROFILE,
@@ -593,14 +597,18 @@ export function parseAssetMetadata(document: ParsedDocument): {
 
   if (
     reviewCycle !== undefined &&
-    parseDayDuration(reviewCycle) === undefined
+    (parseDayDuration(reviewCycle) === undefined ||
+      (lastReviewedAt !== undefined &&
+        isIsoDate(lastReviewedAt) &&
+        evaluateAssetFreshness({ lastReviewedAt, reviewCycle }, lastReviewedAt)
+          .reviewDueAt === undefined))
   ) {
     diagnostics.push(
       invalidMetadataDiagnostic(
         document,
         source,
         "review_cycle",
-        `Invalid review_cycle "${reviewCycle}". Expected supported ISO 8601 day duration such as P90D.`,
+        `Invalid review_cycle "${reviewCycle}". Expected supported ISO 8601 day duration such as P90D within the YYYY-MM-DD date range, including the resulting review date.`,
         DIAGNOSTIC_IDS.META_INVALID_REVIEW_CYCLE,
       ),
     );

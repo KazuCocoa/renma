@@ -1,5 +1,9 @@
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_DURATION_PATTERN = /^P([1-9]\d*)D$/;
+const MAX_REVIEW_CYCLE_DAYS =
+  (Date.parse("9999-12-31T00:00:00.000Z") -
+    Date.parse("0000-01-01T00:00:00.000Z")) /
+  86_400_000;
 
 export interface FreshnessMetadata {
   lastReviewedAt?: string;
@@ -32,14 +36,19 @@ export function isIsoDate(value: string): boolean {
 export function parseDayDuration(value: string): number | undefined {
   const match = value.match(DAY_DURATION_PATTERN);
   if (!match) return undefined;
-  return Number.parseInt(match[1] ?? "", 10);
+  const days = Number.parseInt(match[1] ?? "", 10);
+  return Number.isSafeInteger(days) && days <= MAX_REVIEW_CYCLE_DAYS
+    ? days
+    : undefined;
 }
 
 /** Add whole UTC days to a strict ISO date and return an ISO date string. */
-function addDaysIsoDate(value: string, days: number): string {
+function addDaysIsoDate(value: string, days: number): string | undefined {
   const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
+  if (!Number.isFinite(date.getTime())) return undefined;
+  const result = date.toISOString().split("T")[0]!;
+  return isIsoDate(result) ? result : undefined;
 }
 
 /** Evaluate supported explicit freshness metadata against one ISO date. */

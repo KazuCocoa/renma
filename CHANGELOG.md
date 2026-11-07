@@ -20,6 +20,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Use normalized catalog kinds for asset bindings so Context-root Lenses retain
+  their release versions and valid relationships in both CLI and library output.
+- Normalize binding evidence SHA-256 values to the same 64-digit hexadecimal
+  format across filesystem and library inputs.
+- Diagnose review cycles outside the supported date range, including review-date
+  overflow, instead of aborting scans or reporting malformed due dates.
 - Derive direct-link parent reachability from resolved link evidence without
   computing all Markdown-to-Markdown reference closures during script inventory.
 - Report Context/Lens script owner conflicts only for inspected, cataloged
