@@ -296,7 +296,12 @@ test("diff and ci-report expose the same comparison-ref CLI contract", async (t)
         CLI_EXIT.success,
         `${command} ${refs.join(" ")}`,
       );
-      assert.equal(result.stderr, "");
+      assert.equal(
+        result.stderr,
+        command === "ci-report"
+          ? "Renma CI exit: report status PASS does not meet --fail-on-status fail; exit 0.\n"
+          : "",
+      );
       const report = JSON.parse(result.stdout) as {
         from: { ref: string };
         to: { ref: string };

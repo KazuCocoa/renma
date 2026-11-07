@@ -10,6 +10,7 @@ import {
 import { formatVersionedJsonDocument } from "../report.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 import type { AssetOwnership } from "../types/governance.js";
+import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 
 type OwnershipFormat = "json" | "markdown";
 export const OWNERSHIP_JSON_SCHEMA_VERSION = "renma.ownership.v1" as const;
@@ -249,6 +250,25 @@ function appendOwnershipAssets(
       `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${formatAssetOwnership(asset.ownership)} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
     );
   }
+  for (const asset of assets) {
+    if (!asset.ownership.candidates?.length) continue;
+    lines.push(
+      "",
+      `Ownership evidence for ${formatMarkdownInlineCode(asset.id)} (${formatMarkdownInlineCode(asset.sourcePath)}):`,
+      "",
+    );
+    for (const candidate of asset.ownership.candidates) {
+      lines.push(
+        `- Candidate owner: ${candidate.declaredOwner ? formatMarkdownInlineCode(candidate.declaredOwner) : "(undeclared)"}; source: ${formatMarkdownInlineCode(candidate.id)} (${formatMarkdownInlineCode(candidate.sourcePath)}).`,
+      );
+      for (const reference of candidate.references) {
+        const location = `${reference.path}:L${reference.startLine}${reference.endLine !== reference.startLine ? `-L${reference.endLine}` : ""}`;
+        lines.push(
+          `  - Direct Markdown link: ${formatMarkdownInlineCode(location)} — ${formatMarkdownInlineCode(reference.snippet)}`,
+        );
+      }
+    }
+  }
 }
 
 function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
@@ -354,7 +374,9 @@ function toOwnedAsset(asset: Asset): OwnedAsset {
 }
 
 function formatAssetOwnership(ownership: AssetOwnership): string {
-  if (ownership.source === "unowned") return "(unowned)";
+  if (ownership.source === "ambiguous")
+    return "(owner conflict; no effective owner)";
+  if (ownership.source === "unowned") return "(unowned; no declared owner)";
   const provenance =
     ownership.source === "inherited" && ownership.inheritedFrom
       ? ` from ${ownership.inheritedFrom.sourcePath}`

@@ -139,7 +139,7 @@ function formatSkillDiscoveryPolicySummary(
   }
   return [
     ...configured,
-    "- Policy outcome: WARN — review requested; exit behavior unchanged",
+    "- Policy outcome: WARN — review requested; Discovery alone never produces FAIL. WARN exits 1 with --fail-on-status warn, otherwise 0.",
   ];
 }
 

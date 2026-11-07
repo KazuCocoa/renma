@@ -157,7 +157,7 @@ test("ownership markdown output includes summary", async () => {
   assert.match(markdown, /## Unowned Assets/);
   assert.match(
     markdown,
-    /\| unowned \| skill \| skills\/unowned\/SKILL\.md \| \(unowned\) \| {2}\| todo \|/,
+    /\| unowned \| skill \| skills\/unowned\/SKILL\.md \| \(unowned; no declared owner\) \| {2}\| todo \|/,
   );
 });
 

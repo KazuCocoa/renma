@@ -1290,8 +1290,12 @@ content there after updating its references. For Markdown assets, nested `refere
 `profiles/`, `scripts/`, or `assets/` does not override that Context root. Supported
 executable files under `contexts/**` and `lenses/**` are repository scripts.
 Reference each script by its exact path or a supported command in the consuming
-Context or Lens. References do not establish ownership or policy inheritance,
-and directories/globs do not declare dependencies on their contents.
+Context or Lens. Direct Markdown links from inspected standalone Contexts/Lenses
+supply declared-owner candidates for the linked scripts. Agreeing declared owners
+resolve one effective owner while retaining every source; conflicting owners leave
+ownership ambiguous. Commands, prose path tokens, language imports, and transitive
+references supply no owner candidates. Owner resolution does not inherit or combine
+security policy. Directories/globs do not declare dependencies on their contents.
 The same directory names are Skill-local
 only inside `skills/**` or `.agents/skills/**`, where they establish a structural
 parent candidate. Local metadata overrides remain supported where valid, but

@@ -16,7 +16,10 @@ import { graphFromRepositorySnapshot } from "../src/commands/graph.js";
 import { executableGraphReport } from "../src/commands/executable-graph.js";
 import { buildTrustGraph } from "../src/trust-graph.js";
 import { buildBomReport } from "../src/commands/bom.js";
-import { ownership } from "../src/commands/ownership.js";
+import {
+  ownership,
+  formatOwnershipMarkdown,
+} from "../src/commands/ownership.js";
 import { readinessFromRepositorySnapshot } from "../src/commands/readiness.js";
 import { buildDiffReport } from "../src/commands/diff.js";
 import { buildCiReportFromDiff } from "../src/commands/ci-report.js";
@@ -246,6 +249,30 @@ for (const scenario of [
       );
     }
     const own = await ownership(fixture.root, {}, { includeOwned: true });
+    const beforeMarkdown = structuredClone(own);
+    const markdown = formatOwnershipMarkdown(own);
+    assert.deepEqual(own, beforeMarkdown);
+    if (scenario.source === "ambiguous") {
+      assert.match(markdown, /owner conflict; no effective owner/);
+    }
+    if (scenario.source === "unowned") {
+      assert.match(markdown, /unowned; no declared owner/);
+    }
+    for (const candidate of asset.ownership.candidates ?? []) {
+      assert.ok(
+        markdown.includes(
+          `Candidate owner: ${candidate.declaredOwner ? `\`${candidate.declaredOwner}\`` : "(undeclared)"}; source: \`${candidate.id}\` (\`${candidate.sourcePath}\`)`,
+        ),
+      );
+      for (const reference of candidate.references) {
+        assert.ok(
+          markdown.includes(
+            `Direct Markdown link: \`${reference.path}:L${reference.startLine}`,
+          ),
+        );
+        assert.ok(markdown.includes(reference.snippet));
+      }
+    }
     const row = [
       ...(own.ownedAssetList ?? []),
       ...(own.unownedAssetList ?? []),

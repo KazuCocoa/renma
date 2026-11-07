@@ -876,7 +876,11 @@ quality thresholds while only its inspection boundary is widened.
 constructs compact stable-ID matches from the existing diff, and does not read
 files, import commands, render Markdown, or mutate input. A separate pure
 status helper composes `fail > warn > pass`; Discovery policy can only request
-`WARN`, and `WARN` keeps exit `0`. Review-note construction appends one policy
+`WARN`. The CLI applies `--fail-on-status` separately: `WARN` exits `0` with
+the default `fail` threshold and `1` with `warn`. Base status and Markdown
+status reasons share matched conditions; policy reasons use the existing evaluated
+outcomes and match IDs. Completed CLI runs explain status, threshold, and exit
+code on stderr without adding JSON fields. Review-note construction appends one policy
 note after preserving existing reasons. Cycles never create a match.
 
 The pure `security-policy-ci-policy` module selects the stricter

@@ -54,7 +54,10 @@ duplicate declarations remain auditable while topology stays deduplicated.
 `contains` is emitted separately with
 `meaning: "structural_placement_only"`. It is not traversed as invocation and
 does not imply ownership, exclusive belonging, runtime execution, or required
-execution. Shared repository scripts do not inherit ownership from a caller.
+execution. An invocation does not supply an owner candidate. Separately, direct
+Markdown links from inspected standalone Contexts/Lenses supply script owner
+candidates; commands, prose paths, language imports, and transitive references
+do not. Owner resolution does not inherit or combine security policy.
 
 The contract is static repository evidence, not an authorization decision.
 Generating a contract for a suspended or revoked Skill does not permit

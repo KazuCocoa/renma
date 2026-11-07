@@ -1366,7 +1366,11 @@ and explicit prose path tokens record `statically_references` evidence. A link
 alone is not an invocation, and a directory or glob does not select its contents.
 No `context.yaml`, new frontmatter field, or directory entrypoint is needed.
 Supported scripts are discovered even without references. Each reference retains
-its source asset and target path; references do not transfer ownership or policy.
+its source asset and target path. Direct Markdown links from inspected standalone
+Contexts/Lenses supply script owner candidates; commands, prose paths, language
+imports, and transitive references do not. Agreeing declared owners resolve one
+effective owner, while conflicting owners remain ambiguous with all candidates
+retained. Owner resolution does not inherit or combine security policy.
 Non-Markdown files in `scripts/**`, including extensionless helpers, are script
 surfaces just as in Skill support. Elsewhere in Context/Lens roots, the existing
 supported executable suffixes identify scripts. Markdown files retain their
@@ -1589,7 +1593,9 @@ example, a `ci-report` that is generated successfully with status `FAIL` exits
 without generating a report. An unexpected invariant or implementation failure
 exits `3` with a concise stderr message. Successful reports and completed
 exit-`1` reports remain on stdout; invocation, configuration, input, and
-internal error messages use stderr. Exit codes are process metadata and do not
+internal error messages use stderr. On completed CI reports, stderr also shows
+the report status, selected `--fail-on-status` threshold, and resulting exit code.
+Exit codes are process metadata and do not
 add fields to Renma's JSON report schemas.
 
 ## Scan, Catalog, Graph, Trust Graph, Readiness, And BOM
@@ -2668,6 +2674,17 @@ never read from repository configuration. Usage, command, configuration,
 target, or ref errors exit `2`; unexpected Renma failures exit `3`. See
 [Exit codes](#exit-codes) for the authoritative process contract.
 
+Markdown includes a **Status Reasons** section derived from the same matched
+conditions used to compute status. It identifies findings with IDs and locations,
+unresolved required edges, readiness and coverage regressions, metric deltas, and
+active policy matches. Policy details retain their specific changes and match IDs;
+disabled policies may show informational matches but do not contribute a status
+reason. JSON retains its existing fields: full evidence is in `diff` and each
+policy evaluation, with no new status or exit fields. The CLI writes a separate
+completion line to stderr explaining whether report status meets the selected
+threshold and the resulting exit code. Stdout remains the complete JSON or
+Markdown report, including when the exit code is `1`.
+
 A worse readiness level, a previously passing readiness check becoming
 failing/error, a new blocking readiness check, or a newly introduced blocking
 inspection-coverage issue makes the report at least `WARN`; an independently
@@ -2959,8 +2976,10 @@ Cycles and self-loops, removed entrypoints, newly unrouted Skills, removed
 routes, declaration-count-only changes, newly reachable or resolved
 not-reached Skills, routes becoming usable, adoption becoming authoritative,
 and count-only deltas do not match. Policy matches add one review note and may
-upgrade existing `PASS` to `WARN`; they never create `FAIL`. `WARN` exits `0`,
-while any existing non-Discovery `FAIL` remains dominant and exits `1`.
+upgrade existing `PASS` to `WARN`; they never create `FAIL`. A `WARN` report
+exits `0` with the default `--fail-on-status fail`, and `1` with
+`--fail-on-status warn`. Any existing non-Discovery `FAIL` remains dominant
+and exits `1` under either threshold.
 Ownership, asset, edge, readiness-check, and security inventory details are
 observability evidence and do not independently alter `PASS`, `WARN`, or
 `FAIL`. Readiness scoring and direct `renma diff` remain policy-free, and
@@ -2990,7 +3009,13 @@ renma ownership . --format json
 
 Use this to find unowned assets, review what each owner is responsible for, and filter the report to assets owned by a specific owner.
 
-Output includes total asset count, owned asset count, ownership coverage, owner groups, and assets without declared owner. `--owner <owner>` keeps the repository-level totals for context and adds filtered matched assets for that owner. Filtered JSON reports omit `unownedAssetList` so the repository-level `unownedAssets` count is not confused with owner-filtered asset details. `--include-owned` also includes the backward-compatible flat owned asset list.
+Output includes total asset count, owned asset count, ownership coverage, owner groups, and assets without an effective owner. `--owner <owner>` keeps the repository-level totals for context and adds filtered matched assets for that owner. Filtered JSON reports omit `unownedAssetList` so the repository-level `unownedAssets` count is not confused with owner-filtered asset details. `--include-owned` also includes the backward-compatible flat owned asset list.
+
+Markdown preserves every script owner candidate, including all agreeing sources,
+conflicting declared owners, and undeclared sources. Candidate evidence includes
+source asset IDs, source paths, and direct Markdown link locations and snippets.
+An owner conflict has no effective owner and is labeled separately from an
+undeclared owner. Rendering does not select one parent or alter JSON or graphs.
 
 #### Ownership policy
 
@@ -3000,7 +3025,10 @@ Owner metadata is not globally required. Assets without an owner are accepted
 and reported as unowned unless the repository explicitly configures
 `metadata.required: ["owner"]`.
 
-Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
+Renma resolves inherited ownership only from the documented explicit Skill-parent
+or Context/Lens direct-link evidence. It does not invent an owner when that evidence
+is missing or conflicting. Choose an undeclared owner or resolve an owner conflict
+through human review or team policy.
 
 ### `guide`
 

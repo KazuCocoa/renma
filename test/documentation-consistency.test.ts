@@ -64,3 +64,42 @@ function repositoryRelativeMarkdownTarget(
   const target = decodeURIComponent(withoutTitle.split("#", 1)[0] ?? "");
   return target || undefined;
 }
+
+test("ownership and Discovery documentation retain the current evidence and exit boundaries", async () => {
+  const authoring = (await readRepoFile("docs/authoring-guide.md")).replace(
+    /\s+/g,
+    " ",
+  );
+  assert.match(
+    authoring,
+    /Direct Markdown links from inspected standalone Contexts\/Lenses supply declared-owner candidates/,
+  );
+  assert.match(
+    authoring,
+    /Commands, prose path tokens, language imports, and transitive references supply no owner candidates/,
+  );
+  assert.match(
+    authoring,
+    /Owner resolution does not inherit or combine security policy/,
+  );
+  for (const filename of [
+    "docs/authoring-guide.md",
+    "docs/user-manual.md",
+    "docs/development/design.md",
+  ]) {
+    const text = (await readRepoFile(filename)).replace(/\s+/g, " ");
+    assert.doesNotMatch(
+      text,
+      /References do not establish ownership or policy inheritance|references do not transfer ownership or policy/,
+    );
+  }
+  for (const filename of [
+    "docs/skill-discovery.md",
+    "docs/user-manual.md",
+    "docs/development/internal-architecture.md",
+  ]) {
+    const text = (await readRepoFile(filename)).replace(/\s+/g, " ");
+    assert.doesNotMatch(text, /its `WARN` exits `0`|`WARN` keeps exit `0`/);
+    assert.match(text, /--fail-on-status/);
+  }
+});

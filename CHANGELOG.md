@@ -20,6 +20,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
+- Align authoring and related ownership documentation with Context/Lens direct
+  Markdown-link candidates and their independent security-policy boundary.
+- Explain Discovery WARN status separately from the CLI exit threshold in help
+  and documentation; Discovery alone cannot produce FAIL.
+- Show every script owner candidate and direct-link location in ownership
+  Markdown, distinguishing conflicting owners from undeclared ownership.
+- Explain CI status using the same matched base conditions as the decision and
+  existing policy evaluations. Completed CLI runs report status, threshold, and
+  exit code on stderr while preserving JSON report contracts and gate behavior.
 - Use normalized catalog kinds for asset bindings so Context-root Lenses retain
   their release versions and valid relationships in both CLI and library output.
 - Normalize binding evidence SHA-256 values to the same 64-digit hexadecimal
