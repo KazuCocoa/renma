@@ -146,6 +146,40 @@ const GLOBAL_ERROR_EXIT_REFERENCE =
 
 export const COMMAND_HELP = [
   {
+    name: "metadata-keys",
+    usage: "renma metadata-keys [options]",
+    question: "Which metadata keys does this Renma version understand?",
+    purpose:
+      "List the installed Renma metadata vocabulary without reading or changing a repository.",
+    useWhen: [
+      "You need exact metadata key spellings for authoring or tooling.",
+    ],
+    doNotUseFor: [
+      "Inspecting metadata values declared in repository files; use catalog instead.",
+    ],
+    examples: [
+      "renma metadata-keys",
+      "renma metadata-keys --json",
+      "renma metadata-keys --format text",
+    ],
+    interpretation: [
+      "skill lists flat keys under SKILL.md metadata; nonSkill lists top-level keys for other assets, with applicability varying by asset kind.",
+      "agentSkillTopLevel lists portable Agent Skills frontmatter fields separately from Renma extensions.",
+      "The list includes optional keys and is not a list of required fields or arbitrary vendor extensions.",
+    ],
+    nextSteps: [
+      "Consult the User Manual metadata tables for value formats and applicability.",
+    ],
+    options: [
+      {
+        name: "format",
+        description: "Output format: text or json. Defaults to text.",
+      },
+      "json",
+      "help",
+    ],
+  },
+  {
     name: "init",
     usage: "renma init [root]",
     question: "How can this repository record explicit Renma adoption?",

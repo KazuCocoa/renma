@@ -2454,6 +2454,27 @@ change requires a new schema version.
 
 Reviewers can use Trust Graph to find assets without owners, find assets without lifecycle status, inspect assets sharing the same effective policy fingerprint, and connect diagnostics back to asset evidence. `trust-graph` exits `0` when the report is generated successfully; use `scan --fail-on` when CI should fail on findings.
 
+### `metadata-keys`
+
+Print all metadata keys understood by the installed Renma version, without
+reading repository files or configuration:
+
+```sh
+renma metadata-keys
+renma metadata-keys --format text
+renma metadata-keys --format json
+renma metadata-keys --json
+```
+
+The default is text. JSON returns three arrays: `skill` (flat keys under
+`SKILL.md`'s `metadata` mapping), `nonSkill` (top-level keys for other assets),
+and `agentSkillTopLevel` (portable Agent Skills frontmatter fields).
+Keys follow the central metadata definitions in deterministic order. The list
+includes optional catalog, security, publication, auxiliary, and asset-binding
+keys; applicability varies by asset kind. It excludes arbitrary unknown/vendor
+extensions. Consult the metadata tables above for value formats and requirements.
+This command accepts no target path or repository configuration options.
+
 ### `inspect`
 
 Inspects one file as an outline or exact line slice.
@@ -3301,6 +3322,7 @@ let it select JSON.
 
 | Command                  | Formats                       |
 | --- | --- |
+| `metadata-keys` | `text`, `json` |
 | `scan` | `text`, `json` |
 | `bom` | `json`, `markdown` |
 | `catalog` | `json`, `markdown` |
