@@ -10,6 +10,7 @@ import { ConfigError } from "../src/config.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
 const DEFAULT_FORMATS: Partial<Record<CommandName, string>> = {
+  "metadata-keys": "text",
   scan: "text",
   catalog: "json",
   graph: "json",
@@ -29,6 +30,7 @@ const DEFAULT_FORMATS: Partial<Record<CommandName, string>> = {
 };
 
 const JSON_SHORTCUTS: Record<CommandName, boolean> = {
+  "metadata-keys": true,
   init: false,
   scan: true,
   catalog: true,

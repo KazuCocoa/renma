@@ -6,6 +6,7 @@ import { COMMAND_HELP, renderCommandHelp } from "../src/cli-help.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
 
 const COMMANDS = [
+  "metadata-keys",
   "init",
   "scan",
   "bom",
@@ -26,6 +27,7 @@ const COMMANDS = [
 ] as const;
 
 const EXPECTED_FORMATS = new Map<string, string[]>([
+  ["metadata-keys", ["text", "json"]],
   ["scan", ["text", "json"]],
   ["bom", ["json", "markdown"]],
   ["catalog", ["json", "markdown"]],

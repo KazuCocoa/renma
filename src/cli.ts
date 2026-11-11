@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
+import { runMetadataKeysCommand } from "./commands/metadata-keys.js";
 import { runBomCommand } from "./commands/bom.js";
 import { runCatalogCommand } from "./commands/catalog.js";
 import { runCiReportCommand } from "./commands/ci-report.js";
@@ -74,6 +75,7 @@ const CLI_OPTIONS = {
 } satisfies Record<CliOptionName, CliOptionConfig>;
 
 const COMMAND_DEFAULT_FORMATS = {
+  "metadata-keys": "text",
   scan: "text",
   catalog: "json",
   graph: "json",
@@ -141,6 +143,24 @@ const OPTIONAL_ROOT: CommandContract = {
 };
 
 export const COMMAND_REGISTRY = {
+  "metadata-keys": commandSpec(
+    "metadata-keys",
+    { minPositionals: 0, maxPositionals: 0 },
+    COMMAND_DEFAULT_FORMATS["metadata-keys"],
+    ({ values }) => {
+      const format = values.json
+        ? "json"
+        : (stringValue(values.format) ??
+          COMMAND_DEFAULT_FORMATS["metadata-keys"]);
+      if (format !== "text" && format !== "json") {
+        return usageError(
+          "metadata-keys",
+          "--format must be either text or json.",
+        );
+      }
+      return runMetadataKeysCommand(format);
+    },
+  ),
   init: commandSpec("init", OPTIONAL_ROOT, undefined, ({ target }) =>
     runInitCommand(target),
   ),

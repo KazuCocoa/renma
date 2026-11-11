@@ -6,6 +6,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Add `renma metadata-keys` with text and JSON output for the installed metadata vocabulary, derived from the central definitions without scanning a repository.
+
 ## [0.43.0] - 2026-11-06
 
 ### Added
