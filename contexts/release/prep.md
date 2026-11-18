@@ -113,10 +113,10 @@ For full release preparation:
 
 1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, release-relevant docs, and the exact Renma consumer pins in `docs/user-manual.md` and `examples/github-actions/renma-ci-report.yml`.
    - `package.json`、`package-lock.json`、`CHANGELOG.md`、リリース関連ドキュメント、および `docs/user-manual.md` と `examples/github-actions/renma-ci-report.yml` にある Renma コンシューマー向けの正確なバージョン固定を確認します。
-2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, base-tag, and the complete maintained consumer-example contract. Each documented installation command must retain `--save-dev`, `--save-exact`, and the exact target-version Renma package argument in its maintained file form. The Actions example must retain its exact `npm ci` step and every maintained `npx --no-install renma` invocation. A missing, stale, duplicate, floating, malformed, or package-version-disagreeing pin or command is a blocker.
-   - `node tools/release-prep.mjs --check-only` を実行し、バージョン、changelog、ベースタグ、および保守対象のコンシューマー例の完全な契約を確認します。文書化された各インストールコマンドは、保守対象ファイルの形式で `--save-dev`、`--save-exact`、および正確な対象バージョンの Renma パッケージ引数を維持しなければなりません。Actions の例では、正確な `npm ci` ステップと保守対象のすべての `npx --no-install renma` 呼び出しを維持します。固定またはコマンドの欠落、古い値、重複、変動範囲、不正な形式、または package バージョンとの不一致はブロッカーです。
-3. Edit release artifacts: version fields, changelog section/links, release notes, affected docs, and both maintained exact consumer pins. Keep `--save-dev`, `--save-exact`, `npm ci`, and `npx --no-install`; do not replace the version with a floating range.
-   - バージョンフィールド、changelog のセクションとリンク、リリースノート、影響を受けるドキュメント、および保守対象の 2 つの正確なコンシューマー向け固定値を編集します。`--save-dev`、`--save-exact`、`npm ci`、`npx --no-install` を維持し、バージョンを変動範囲に置き換えません。
+2. Run `node tools/release-prep.mjs --check-only` to check the version, changelog, base tag, and maintained consumer examples. Resolve any reported blockers.
+   - `node tools/release-prep.mjs --check-only` でバージョン、changelog、ベースタグ、保守対象の利用例を確認し、報告されたブロッカーを解消します。
+3. Update version fields, the changelog section and links, release notes, affected docs, and the exact consumer pins in `docs/user-manual.md` and `examples/github-actions/renma-ci-report.yml`.
+   - バージョン、changelog の該当セクションとリンク、リリースノート、関連ドキュメント、および上記 2 ファイルのバージョン固定を更新します。
 4. Run `node tools/release-prep.mjs --release-notes --version <version>` to generate the GitHub Release body from `CHANGELOG.md`. Add `--from <tag>` or `--to <ref>` when generating notes for an older tag or a non-default comparison range.
    - `node tools/release-prep.mjs --release-notes --version <version>` を実行し、`CHANGELOG.md` から GitHub Release の本文を生成します。過去のタグまたはデフォルト以外の比較範囲からノートを生成する場合は、`--from <tag>` または `--to <ref>` を追加します。
 5. Run `node tools/release-prep.mjs` to execute tests, build, the public TypeScript API snapshot check, Renma scan/catalog/readiness/graph, diff, and CI report.
@@ -196,8 +196,8 @@ Run `node tools/release-prep.mjs`; use `--check-only` for metadata and maintaine
 
 - Release metadata, changelog, docs, and release notes are consistent for the target version.
 - リリースメタデータ、changelog、ドキュメント、およびリリースノートが対象バージョンについて整合しています。
-- Every maintained consumer installation example retains `--save-dev`, `--save-exact`, and the exact target-version Renma package argument in its documented file form. The Actions example retains its exact `npm ci` step and every maintained `npx --no-install renma` invocation.
-- 保守対象の各コンシューマー向けインストール例が、文書化されたファイル形式で `--save-dev`、`--save-exact`、および正確な対象バージョンの Renma パッケージ引数を維持しています。Actions の例では、正確な `npm ci` ステップと保守対象のすべての `npx --no-install renma` 呼び出しを維持しています。
+- `node tools/release-prep.mjs --check-only` passes for the final release files.
+- 最終的なリリース対象ファイルで `node tools/release-prep.mjs --check-only` が成功しています。
 - GitHub-ready release notes are generated from `CHANGELOG.md` and the intended comparison range, and displayed directly when that is the user's request.
 - GitHub 向けリリースノートが `CHANGELOG.md` と意図した比較範囲から生成され、ユーザーが求めた場合はそのまま表示されています。
 - Required Renma reports have been run, or any skipped report is explained.
