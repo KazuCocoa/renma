@@ -1,3 +1,4 @@
+import { SKILL_HANDOFF_CONTENT_RULES } from "../guidance/skill-authoring.js";
 import type {
   SkillAuthoringGuidance,
   SkillAuthoringHandoffGuidance,
@@ -70,7 +71,11 @@ function renderCoreInteraction(
     `- Deferred: ${interaction.progressionClasses.deferred}`,
     "",
     "Adaptive clarification guidance:",
-    ...renderBullets(interaction.questionRules),
+    ...renderBullets([
+      "Investigate applicable evidence first. Ask only for a Blocking decision that still needs human input. Resolve prerequisites first and continue independent investigation while waiting.",
+      "For example, a missing input file at runtime can be reported by the finished Skill. Clarify during authoring if the choice to report and continue or stop affects completion and the evidence leaves that choice open.",
+      "Keep remaining blockers visible. Use delegated judgment for reversible choices for the authorized scope and action. Preserve separate or immediate approvals.",
+    ]),
     "",
     "Creation gate:",
     ...renderBullets(interaction.creationGate),
@@ -91,9 +96,9 @@ function renderCompactHandoffGuidance(
 ): string[] {
   return [
     `Schema: ${handoff.schemaVersion}`,
-    handoff.purpose,
+    "After the creation gate passes, record the handoff and run `renma scaffold skill <path> --handoff <handoff.json>`.",
     handoff.boundary,
-    ...renderBullets(handoff.rules),
+    ...renderBullets(SKILL_HANDOFF_CONTENT_RULES),
   ];
 }
 

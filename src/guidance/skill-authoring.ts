@@ -20,6 +20,15 @@ export const AUTHORING_REPORTS_RULE =
 export const AUTHORING_REVALIDATION_RULE =
   "After relevant checks pass, repeat or broaden validation only for further changes, failed checks, or unresolved concerns. Reuse existing evidence only while it remains applicable to the current content, environment, and required scope. Required CI and release checks still apply.";
 
+export const SKILL_HANDOFF_CONTENT_RULES = [
+  "Keep the handoff small: creation-gate state, the core Skill contract, the smallest asset graph, ownership, declared Context and Lens relationships, local resource decisions, and significant source, security, and runtime-unknown decisions.",
+  "Do not include finished Markdown, a conversation transcript, question history, private reasoning, or a complete implementation plan.",
+  "Use provided, consulted, and designated_unconsulted source states without treating source designation as proof that source content was consulted.",
+  "A structurally valid handoff does not prove that its supporting evidence remains applicable. When current applicability cannot be established, recheck only the evidence supporting material handoff decisions that scaffolding or semantic authoring will rely on. Re-enter the creation gate when the result changes the Skill contract, source authority, security decisions, runtime-unknown handling, or asset boundaries.",
+  "Do not infer required versus optional relationships, ownership, domain truth, or broader security permission. Every planned Context requires an independent maintenance or governance justification.",
+  "Keep the positional scaffold target equal to assetGraph.skill.path after safe normalization. One scaffold invocation creates only that explicit target and declared Skill-local resource directories, never supporting assets.",
+] as const;
+
 export interface SkillAuthoringProgressionClasses {
   blocking: string;
   reversibleDefault: string;
@@ -142,12 +151,7 @@ export function buildSkillAuthoringGuidance(
         "The handoff records supplied authoring evidence. Renma validates its structure and internal consistency; it does not prove that clarification occurred, every blocker was discovered, sources are authoritative, human review occurred, or declared facts are true.",
       rules: [
         "Construct the handoff only after the supplied authoring state declares that every creation-gate requirement is established, including the smallest justified asset structure, and no Blocking decisions remain. Proposed reversible defaults and Unresolved Deferred decisions may remain in their original epistemic classes.",
-        "Keep the handoff small: creation-gate state, the core Skill contract, the smallest asset graph, ownership, declared Context and Lens relationships, local resource decisions, and significant source, security, and runtime-unknown decisions.",
-        "Do not include finished Markdown, a conversation transcript, question history, private reasoning, or a complete implementation plan.",
-        "Use provided, consulted, and designated_unconsulted source states without treating source designation as proof that source content was consulted.",
-        "A structurally valid handoff does not prove that its supporting evidence remains applicable. When current applicability cannot be established, recheck only the evidence supporting material handoff decisions that scaffolding or semantic authoring will rely on. Re-enter the creation gate when the result changes the Skill contract, source authority, security decisions, runtime-unknown handling, or asset boundaries.",
-        "Do not infer required versus optional relationships, ownership, domain truth, or broader security permission. Every planned Context requires an independent maintenance or governance justification.",
-        "Keep the positional scaffold target equal to assetGraph.skill.path after safe normalization. One scaffold invocation creates only that explicit target and declared Skill-local resource directories, never supporting assets.",
+        ...SKILL_HANDOFF_CONTENT_RULES,
       ],
       template: {
         schemaVersion: SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,

@@ -561,15 +561,9 @@ function unknownReferenceFindings(
         remediation:
           "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
         repairConstraints: [
-          { kind: "must_not_change", text: "Do not select runtime context." },
-          { kind: "must_not_change", text: "Do not assemble prompt packages." },
-          {
-            kind: "must_not_change",
-            text: "Do not infer missing dependencies with an LLM during scan.",
-          },
           {
             kind: "allowed_change",
-            text: "Only validate declared repository relationships.",
+            text: "Replace the target only when repository evidence identifies one intended asset.",
           },
         ],
         verificationSteps: [

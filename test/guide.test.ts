@@ -49,10 +49,11 @@ test("guide skill defaults to deterministic prompt output for the installed vers
     defaultResult.stdout,
     /Before creating files, evaluate the creation gate/,
   );
-  assert.match(defaultResult.stdout, /clarification is not required/i);
+  assert.match(defaultResult.stdout, /proceed without mandatory clarification/);
+  assert.match(defaultResult.stdout, /Ask only for a Blocking decision/);
   assert.match(
     defaultResult.stdout,
-    /question count, batching, and turn structure are adaptive strategies/,
+    /report and continue or stop affects completion/,
   );
   assert.match(
     defaultResult.stdout,
@@ -287,7 +288,7 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
     decisionClasses: guidance.interaction.decisionClasses,
     unknownScopes: guidance.interaction.unknownScopes,
     progressionClasses: guidance.interaction.progressionClasses,
-    questionRules: guidance.interaction.questionRules,
+
     creationGate: guidance.interaction.creationGate,
     postValidationActions: guidance.interaction.postValidationActions,
     persistenceRules: guidance.interaction.persistenceRules,
@@ -302,6 +303,12 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
   })) {
     assert.ok(prompt.includes(value), value);
   }
+  assert.doesNotMatch(prompt, /one to three closely related questions/);
+  assert.match(
+    json.interaction.questionRules.join(" "),
+    /one to three closely related questions/,
+  );
+  assert.ok(!prompt.includes(guidance.handoff.purpose));
   const sourceBacked = getIllustration(guidance, "source-backed-boundary");
   assert.ok(sourceBacked.initialStructure);
   assert.ok(sourceBacked.sourceReference);
@@ -348,36 +355,38 @@ test("guide renderers derive a compact execution prompt and complete JSON refere
 
 test("authoring aids and pending questions do not add gates or broaden authorization", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  for (const output of [
-    renderSkillGuidePrompt(guidance),
-    renderSkillGuideJson(guidance),
-  ]) {
-    assert.match(
-      output,
-      /Decision tables, question themes, and progress-summary formats are optional working aids/,
-    );
-    assert.match(output, /preserve the distinctions they explain/);
-    assert.match(
-      output,
-      /same scope and action; preserve any requirement for separate or immediate approval/,
-    );
-    assert.match(
-      output,
-      /cannot be resolved through applicable evidence or an authorized reversible choice/,
-    );
-    assert.match(
-      output,
-      /Continue independent investigation and preparation while a question is pending/,
-    );
-    assert.match(
-      output,
-      /creation gate still blocks file creation until every requirement is established/,
-    );
-    assert.match(
-      output,
-      /do not infer product behavior, source authority, ownership, security permission/,
-    );
-  }
+  const prompt = renderSkillGuidePrompt(guidance);
+  assert.match(prompt, /continue independent investigation while waiting/);
+  assert.match(prompt, /authorized scope and action/);
+  assert.match(prompt, /Preserve separate or immediate approvals/);
+  assert.match(prompt, /no reasoning sequence or mandatory progress format/);
+
+  const output = renderSkillGuideJson(guidance);
+  assert.match(
+    output,
+    /Decision tables, question themes, and progress-summary formats are optional working aids/,
+  );
+  assert.match(output, /preserve the distinctions they explain/);
+  assert.match(
+    output,
+    /same scope and action; preserve any requirement for separate or immediate approval/,
+  );
+  assert.match(
+    output,
+    /cannot be resolved through applicable evidence or an authorized reversible choice/,
+  );
+  assert.match(
+    output,
+    /Continue independent investigation and preparation while a question is pending/,
+  );
+  assert.match(
+    output,
+    /creation gate still blocks file creation until every requirement is established/,
+  );
+  assert.match(
+    output,
+    /do not infer product behavior, source authority, ownership, security permission/,
+  );
 });
 
 test("guide and every scaffold share scoped validation without weakening required checks", () => {

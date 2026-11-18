@@ -651,7 +651,7 @@ test("guide prompt and JSON expose the v1 handoff construction contract", async 
   assert.doesNotMatch(promptResult.stdout, /"currentUnderstanding"/);
   assert.match(
     promptResult.stdout,
-    /Record caller-declared authoring decisions only after every creation-gate requirement is established[\s\S]*no Blocking authoring decision remains/,
+    /After the creation gate passes, record the handoff/,
   );
   assert.match(
     promptResult.stdout,
